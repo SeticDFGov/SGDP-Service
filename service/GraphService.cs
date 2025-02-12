@@ -43,7 +43,16 @@ public class GraphService
 
             return listItems.Value
                 .Where(item => item.Fields?.AdditionalData != null)
-                .Select(item => item.Fields.AdditionalData)
+                .Select(item =>
+                {
+                    // Clona os dados existentes como IDictionary<string, object>
+                    var itemData = new Dictionary<string, object>(item.Fields.AdditionalData) as IDictionary<string, object>;
+                    
+                    // Adiciona o ID do item no dicionário
+                    itemData["ID"] = item.Id;
+
+                    return itemData;
+                })
                 .ToList();
         }
         catch (Exception ex)
@@ -52,6 +61,7 @@ public class GraphService
             return new List<IDictionary<string, object>>();
         }
     }
+
 
     // 2. Obter um único item pelo ID
     public async Task<IDictionary<string, object>?> GetSharePointListItemByIdAsync(string itemId)

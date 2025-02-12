@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace YourNamespace.Controllers
+namespace Sharepoint.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
