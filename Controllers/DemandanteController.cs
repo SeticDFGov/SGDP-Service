@@ -3,26 +3,26 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Sharepoint.Controllers
+namespace Demandante.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class SharePointController : ControllerBase
+    public class DemandanteController : ControllerBase
     {
-        private readonly GraphService _graphService;
+        private readonly DemandanteService _demanservice;
 
-        public SharePointController(GraphService graphService)
+        public DemandanteController(DemandanteService demanservice)
         {
-            _graphService = graphService;
+            _demanservice = demanservice;
         }
 
-        // GET api/sharepoint/items
+        // GET api/demandante/items
         [HttpGet("items")]
         public async Task<ActionResult<List<IDictionary<string, object>>>> GetAllItems()
         {
             try
             {
-                var items = await _graphService.GetSharePointListItemsAsync();
+                var items = await _demanservice.GetDemandanteListItemsAsync();
                 return Ok(items);  // Retorna os itens como JSON
             }
             catch (Exception ex)
@@ -31,16 +31,16 @@ namespace Sharepoint.Controllers
             }
         }
 
-        // GET api/sharepoint/items/{id}
+        // GET api/demandante/items/{id}
         [HttpGet("items/{id}")]
         public async Task<ActionResult<IDictionary<string, object>>> GetItemById(string id)
         {
             try
             {
-                var item = await _graphService.GetSharePointListItemByIdAsync(id);
+                var item = await _demanservice.GetDemandateListItemByIdAsync(id);
                 if (item == null)
                 {
-                    return NotFound($"Item com id {id} não encontrado.");
+                    return NotFound($"Demandante não encontrado.");
                 }
                 return Ok(item);
             }
@@ -50,7 +50,7 @@ namespace Sharepoint.Controllers
             }
         }
 
-        // POST api/sharepoint/items
+        // POST api/demandante/items
        [HttpPost("items")]
         public async Task<ActionResult> CreateItem([FromBody] Dictionary<string, object> fields)
         {
@@ -61,7 +61,7 @@ namespace Sharepoint.Controllers
 
             try
             {
-                var result = await _graphService.CreateSharePointListItemAsync(fields);
+                var result = await _demanservice.CreateDemandateAsync(fields);
                 if (result)
                 {
                     return CreatedAtAction(nameof(GetAllItems), new { }, fields);
@@ -74,37 +74,14 @@ namespace Sharepoint.Controllers
             }
         }
 
-        // PUT api/sharepoint/items/{id}
-        [HttpPut("items/{id}")]
-        public async Task<ActionResult> UpdateItem(string id, [FromBody] Dictionary<string, object> fields)
-        {
-            if (fields == null || fields.Count == 0)
-            {
-                return BadRequest("Os campos do item não foram fornecidos.");
-            }
 
-            try
-            {
-                var result = await _graphService.UpdateSharePointListItemAsync(id, fields);
-                if (result)
-                {
-                    return NoContent(); // 204 No Content
-                }
-                return StatusCode(500, "Erro ao atualizar item.");
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Erro ao atualizar item {id}: {ex.Message}");
-            }
-        }
-
-        // DELETE api/sharepoint/items/{id}
+        // DELETE api/demandante/items/{id}
         [HttpDelete("items/{id}")]
         public async Task<ActionResult> DeleteItem(string id)
         {
             try
             {
-                var result = await _graphService.DeleteSharePointListItemAsync(id);
+                var result = await _demanservice.DeleteDemandanteAsync(id);
                 if (result)
                 {
                     return NoContent(); // 204 No Content
@@ -117,18 +94,5 @@ namespace Sharepoint.Controllers
             }
         }
          
-        [HttpGet("temp")]
-        public async Task<ActionResult<List<IDictionary<string, object>>>> GetAlltemp()
-        {
-            try
-            {
-                var items = await _graphService.GetAvgTemp();
-                return Ok(items);  // Retorna os itens como JSON
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Erro ao obter itens: {ex.Message}");
-            }
-        }
     }
 }

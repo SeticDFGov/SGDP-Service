@@ -8,13 +8,13 @@ using System.Threading.Tasks;
 using Microsoft.Graph.Models;
 using DotNetEnv;
 
-public class GraphService
+public class DemandanteService
 {
     private readonly GraphServiceClient _graphClient;
     private readonly string _siteId;
     private readonly string _listId;
 
-    public GraphService(IConfiguration config)
+    public DemandanteService(IConfiguration config)
     {
         var tenantId = Environment.GetEnvironmentVariable("TenantId");
         var clientId = Environment.GetEnvironmentVariable("ClientId");
@@ -24,11 +24,11 @@ public class GraphService
         _graphClient = new GraphServiceClient(credential, new[] { "https://graph.microsoft.com/.default" });
 
         _siteId = Environment.GetEnvironmentVariable("SiteId");
-        _listId = Environment.GetEnvironmentVariable("ListId");
+        _listId = Environment.GetEnvironmentVariable("ListDemandanteId");
     }
 
     // 1. Obter todos os itens da lista
-    public async Task<List<IDictionary<string, object>>> GetSharePointListItemsAsync()
+    public async Task<List<IDictionary<string, object>>> GetDemandanteListItemsAsync()
     {
         try
         {
@@ -64,7 +64,7 @@ public class GraphService
 
 
     // 2. Obter um único item pelo ID
-    public async Task<IDictionary<string, object>?> GetSharePointListItemByIdAsync(string itemId)
+    public async Task<IDictionary<string, object>?> GetDemandateListItemByIdAsync(string itemId)
     {
         try
         {
@@ -87,7 +87,7 @@ public class GraphService
     }
 
     // 3. Criar um novo item na lista
-    public async Task<bool> CreateSharePointListItemAsync(Dictionary<string, object> fields)
+    public async Task<bool> CreateDemandateAsync(Dictionary<string, object> fields)
     {
         try
         {
@@ -115,34 +115,8 @@ public class GraphService
         }
     }
 
-    // 4. Atualizar um item existente pelo ID
-    public async Task<bool> UpdateSharePointListItemAsync(string itemId, Dictionary<string, object> fields)
-    {
-        try
-        {
-            var updateItem = new FieldValueSet
-            {
-                AdditionalData = fields
-            };
-
-            await _graphClient
-                .Sites[_siteId]
-                .Lists[_listId]
-                .Items[itemId]
-                .Fields
-                .PatchAsync(updateItem);
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Erro ao atualizar item {itemId}: {ex.Message}");
-            return false;
-        }
-    }
-
-    // 5. Excluir um item pelo ID
-    public async Task<bool> DeleteSharePointListItemAsync(string itemId)
+    // 4. Excluir um item pelo ID
+    public async Task<bool> DeleteDemandanteAsync(string itemId)
     {
         try
         {
@@ -161,38 +135,4 @@ public class GraphService
         }
     }
 
-    public async Task<IDictionary<string, int>> GetAvgTemp()
-    {
-        try
-        {
-            var listItems = await _graphClient
-                .Sites[_siteId]
-                .Lists[_listId]
-                .Items
-                .GetAsync(requestConfiguration =>
-                {
-                    requestConfiguration.QueryParameters.Expand = new[] { "fields" };
-                });
-
-            var response = listItems.Value.Where(item =>
-                    
-                    item.Fields?.AdditionalData != null &&
-                    item.Fields.AdditionalData.TryGetValue("STATUS", out var status) &&
-                    status?.ToString() == "Concluído"
-                
-            );
-            
-            var group = response.GroupBy(item => item.Fields.AdditionalData["CATEGORIA"]?.ToString() ?? "Sem categoria")
-            .ToDictionary(group => group.Key, group => group.Count());
-
-            return group;
-
-
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Erro ao obter itens do SharePoint: {ex.Message}");
-            return new Dictionary<string, int>();
-        }
-    }
 }
