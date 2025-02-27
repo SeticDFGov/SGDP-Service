@@ -161,38 +161,57 @@ public class GraphService
         }
     }
 
-    public async Task<IDictionary<string, int>> GetAvgTemp()
+  public async Task<IDictionary<string, double>> GetAvgTemp()
+{
+    try
     {
-        try
-        {
-            var listItems = await _graphClient
-                .Sites[_siteId]
-                .Lists[_listId]
-                .Items
-                .GetAsync(requestConfiguration =>
+        var listItems = await _graphClient
+            .Sites[_siteId]
+            .Lists[_listId]
+            .Items
+            .GetAsync(requestConfiguration =>
+            {
+                requestConfiguration.QueryParameters.Expand = new[] { "fields" };
+            });
+
+        // Filtra apenas os itens com STATUS "Concluído"
+        var response = listItems.Value.Where(item =>
+            item.Fields?.AdditionalData != null &&
+            item.Fields.AdditionalData.TryGetValue("STATUS", out var status) &&
+            status?.ToString() == "Concluído" &&
+            item.Fields.AdditionalData.TryGetValue("DT_ABERTURA", out var abertura) &&
+            item.Fields.AdditionalData.TryGetValue("DT_CONCLUSAO", out var conclusao)
+        );
+
+        // Agrupa por categoria e calcula a média de tempo
+        var group = response
+            .Select(item =>
+            {
+                var categoria = item.Fields.AdditionalData["CATEGORIA"]?.ToString() ?? "Sem categoria";
+
+                // Converte as datas
+                if (DateTime.TryParse(item.Fields.AdditionalData["DT_ABERTURA"]?.ToString(), out var dataAbertura) &&
+                    DateTime.TryParse(item.Fields.AdditionalData["DT_CONCLUSAO"]?.ToString(), out var dataConclusao))
                 {
-                    requestConfiguration.QueryParameters.Expand = new[] { "fields" };
-                });
-
-            var response = listItems.Value.Where(item =>
-                    
-                    item.Fields?.AdditionalData != null &&
-                    item.Fields.AdditionalData.TryGetValue("STATUS", out var status) &&
-                    status?.ToString() == "Concluído"
-                
+                    var diferencaDias = (dataConclusao - dataAbertura).TotalDays;
+                    return new { categoria, diferencaDias };
+                }
+                return null;
+            })
+            .Where(item => item != null)
+            .GroupBy(item => item.categoria)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Average(item => item.diferencaDias) // Calcula a média dos tempos
             );
-            
-            var group = response.GroupBy(item => item.Fields.AdditionalData["CATEGORIA"]?.ToString() ?? "Sem categoria")
-            .ToDictionary(group => group.Key, group => group.Count());
 
-            return group;
-
-
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Erro ao obter itens do SharePoint: {ex.Message}");
-            return new Dictionary<string, int>();
-        }
+        return group;
     }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Erro ao obter itens do SharePoint: {ex.Message}");
+        return new Dictionary<string, double>();
+    }
+}
+ 
 }
