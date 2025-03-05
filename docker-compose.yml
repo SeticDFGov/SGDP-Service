@@ -2,7 +2,7 @@ version: '3.4'
 
 services:
   sharepoint-api:
-    image: sharepoint-graph-api
+    image: sousacomz/api-sharepoint:latest
     build:
       context: .
       dockerfile: Dockerfile

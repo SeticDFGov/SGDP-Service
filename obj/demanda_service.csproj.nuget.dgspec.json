@@ -46,6 +46,10 @@
               "target": "Package",
               "version": "[3.1.1, )"
             },
+            "Microsoft.AspNetCore.Authentication.JwtBearer": {
+              "target": "Package",
+              "version": "[8.0.13, )"
+            },
             "Microsoft.AspNetCore.OpenApi": {
               "target": "Package",
               "version": "[8.0.11, )"
@@ -64,7 +68,7 @@
             },
             "Microsoft.Graph": {
               "target": "Package",
-              "version": "[5.69.0, )"
+              "version": "[5.71.0, )"
             },
             "Microsoft.Identity.Client": {
               "target": "Package",
@@ -73,6 +77,18 @@
             "Swashbuckle.AspNetCore": {
               "target": "Package",
               "version": "[6.6.2, )"
+            },
+            "System.DirectoryServices": {
+              "target": "Package",
+              "version": "[9.0.2, )"
+            },
+            "System.DirectoryServices.Protocols": {
+              "target": "Package",
+              "version": "[9.0.2, )"
+            },
+            "System.IdentityModel.Tokens.Jwt": {
+              "target": "Package",
+              "version": "[8.3.1, )"
             }
           },
           "imports": [
