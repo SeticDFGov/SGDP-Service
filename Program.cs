@@ -39,6 +39,7 @@ builder.Services.AddSingleton<GraphService>();
 builder.Services.AddSingleton<DemandanteService>();
 builder.Services.AddSingleton<CategoriaService>();
 builder.Services.AddSingleton<DetalhamentoService>();
+builder.Services.AddSingleton<ProjetoService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
