@@ -40,6 +40,8 @@ builder.Services.AddSingleton<DemandanteService>();
 builder.Services.AddSingleton<CategoriaService>();
 builder.Services.AddSingleton<DetalhamentoService>();
 builder.Services.AddSingleton<ProjetoService>();
+builder.Services.AddSingleton<EtapaService>();
+builder.Services.AddSingleton<AnaliseService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
