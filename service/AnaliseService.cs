@@ -28,7 +28,7 @@ public class AnaliseService
     }
 
     // Obter todas as análises
-    public async Task<List<IDictionary<string, object>>> GetAnaliseListItemsAsync(string nomeEtapa)
+    public async Task<List<IDictionary<string, object>>> GetAnaliseListItemsAsync(string nomeProjeto)
     {
         try
         {
@@ -43,8 +43,8 @@ public class AnaliseService
 
             return listItems.Value
                 .Where(item => item.Fields?.AdditionalData != null &&
-                               item.Fields.AdditionalData.ContainsKey("NM_ETAPA") &&
-                               item.Fields.AdditionalData["NM_ETAPA"]?.ToString() == nomeEtapa)
+                               item.Fields.AdditionalData.ContainsKey("NM_PROJETO") &&
+                               item.Fields.AdditionalData["NM_PROJETO"]?.ToString() == nomeProjeto)
                 .Select(item =>
                 {
                     var itemData = new Dictionary<string, object>(item.Fields.AdditionalData) as IDictionary<string, object>;
@@ -55,7 +55,7 @@ public class AnaliseService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erro ao obter análises para o projeto {nomeEtapa}: {ex.Message}");
+            Console.WriteLine($"Erro ao obter análises para o projeto {nomeProjeto}: {ex.Message}");
             return new List<IDictionary<string, object>>();
         }
     }

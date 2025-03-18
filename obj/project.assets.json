@@ -7241,11 +7241,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/home/marcio/SEEC/demanda_service/demanda_service.csproj",
+      "projectUniqueName": "/home/marcio/projects/SEEC/apiDemandas/demanda_service/demanda_service.csproj",
       "projectName": "demanda_service",
-      "projectPath": "/home/marcio/SEEC/demanda_service/demanda_service.csproj",
+      "projectPath": "/home/marcio/projects/SEEC/apiDemandas/demanda_service/demanda_service.csproj",
       "packagesPath": "/home/marcio/.nuget/packages/",
-      "outputPath": "/home/marcio/SEEC/demanda_service/obj/",
+      "outputPath": "/home/marcio/projects/SEEC/apiDemandas/demanda_service/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "/home/marcio/.nuget/NuGet/NuGet.Config"
@@ -7266,6 +7266,11 @@
         "warnAsError": [
           "NU1605"
         ]
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "direct"
       }
     },
     "frameworks": {
@@ -7336,6 +7341,20 @@
         ],
         "assetTargetFallback": true,
         "warn": true,
+        "downloadDependencies": [
+          {
+            "name": "Microsoft.AspNetCore.App.Ref",
+            "version": "[8.0.11, 8.0.11]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Host.linux-x64",
+            "version": "[8.0.11, 8.0.11]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Ref",
+            "version": "[8.0.11, 8.0.11]"
+          }
+        ],
         "frameworkReferences": {
           "Microsoft.AspNetCore.App": {
             "privateAssets": "none"
@@ -7344,7 +7363,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "/usr/lib/dotnet/sdk/8.0.112/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/8.0.404/PortableRuntimeIdentifierGraph.json"
       }
     }
   }
