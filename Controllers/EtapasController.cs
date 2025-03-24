@@ -84,7 +84,7 @@ namespace Projeto.Controllers
                 var result = await _etapaService.CreateEtapaAsync(fields);
                 if (result)
                 {
-                    return CreatedAtAction(nameof(GetAllItems), new { }, fields);
+                    return Ok(fields);  // Retorna 200 OK com os dados do campo
                 }
                 return StatusCode(500, "Erro ao criar etapa.");
             }
