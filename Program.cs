@@ -1,25 +1,23 @@
 using System.Text;
+using Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Client;
 using Microsoft.IdentityModel.Tokens;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 
-var azureAdConfig = builder.Configuration.GetSection("AzureAd");
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection") 
+    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.")));
 
-var confidentialClientApp = ConfidentialClientApplicationBuilder
-    .Create(Environment.GetEnvironmentVariable("ClientId"))
-    .WithClientSecret(Environment.GetEnvironmentVariable("ClientSecret"))
-    .WithAuthority($"https://login.microsoftonline.com/{Environment.GetEnvironmentVariable("TenantId")}")
-    .WithRedirectUri($"{Environment.GetEnvironmentVariable("UrlBack")}/api/auth/callback")
-    .Build();
 
-builder.Services.AddSingleton<IConfidentialClientApplication>(confidentialClientApp);
+
+
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

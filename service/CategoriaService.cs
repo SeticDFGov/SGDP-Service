@@ -19,7 +19,6 @@ public class CategoriaService
         var tenantId = Environment.GetEnvironmentVariable("TenantId");
         var clientId = Environment.GetEnvironmentVariable("ClientId");
         var clientSecret = Environment.GetEnvironmentVariable("ClientSecret");
-
         var credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
         _graphClient = new GraphServiceClient(credential, new[] { "https://graph.microsoft.com/.default" });
 
