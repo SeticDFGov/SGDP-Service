@@ -84,7 +84,7 @@ namespace Projeto.Controllers
                 var result = await _analiseService.CreateAnaliseAsync(fields);
                 if (result)
                 {
-                    return CreatedAtAction(nameof(GetAllItems), new { }, fields);
+                    return Ok(fields);
                 }
                 return StatusCode(500, "Erro ao criar análise.");
             }
