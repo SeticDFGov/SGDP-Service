@@ -48,8 +48,7 @@ builder.Services.AddCors(options =>
 
 // Adicionar Serviços
 builder.Services.AddControllers();
-builder.Services.AddSingleton<GraphService>();
-builder.Services.AddSingleton<DemandanteService>();
+
 builder.Services.AddScoped<CategoriaRepositorio>();
 builder.Services.AddScoped<DemandanteRepositorio>();
 builder.Services.AddScoped<DemandaRepositorio>();

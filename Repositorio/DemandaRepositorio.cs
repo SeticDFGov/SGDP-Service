@@ -102,10 +102,11 @@ public async Task<IResult> EditDemanda(int id, Demanda demandaAtualizada)
     demandaExistente.STATUS = demandaAtualizada.STATUS;
     demandaExistente.UNIDADE = demandaAtualizada.UNIDADE;
     demandaExistente.CATEGORIA = demandaAtualizada.CATEGORIA;
+    
     try
     {
 
-        _context.SaveChangesAsync(); 
+        await _context.SaveChangesAsync(); 
         
         return Results.Ok();
     }

@@ -37,16 +37,18 @@ public class DemandaController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    public IActionResult EditDemanda ([FromBody] Demanda demanda, int id)
+public async Task<IActionResult> EditDemanda([FromBody] Demanda demanda, int id)
+{
+    try
     {
-        try{
-              _repositorio.EditDemanda(id, demanda);
-              return Ok();
-        }catch(Exception e){
-            Console.Write(e);
-            return StatusCode(500);
-        }
-
-      
+        var resultado = await _repositorio.EditDemanda(id, demanda); // ✅ Correto: agora o método é aguardado
+        return Ok(resultado);
     }
+    catch (Exception e)
+    {
+        Console.WriteLine(e);
+        return StatusCode(500);
+    }
+}
+
 }
