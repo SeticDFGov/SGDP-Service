@@ -22,9 +22,9 @@ public class DemandaController : ControllerBase
     }
 
     [HttpPost]
-    public IActionResult CreateDemanda([FromBody] Demanda demanda)
+    public async Task<IActionResult> CreateDemanda([FromBody] Demanda demanda)
     {
-         _repositorio.CreateDemanda(demanda);
+        await _repositorio.CreateDemanda(demanda);
        return Ok();
 
     }
@@ -41,7 +41,7 @@ public async Task<IActionResult> EditDemanda([FromBody] Demanda demanda, int id)
 {
     try
     {
-        var resultado = await _repositorio.EditDemanda(id, demanda); // ✅ Correto: agora o método é aguardado
+        var resultado = await _repositorio.EditDemanda(id, demanda); 
         return Ok(resultado);
     }
     catch (Exception e)
