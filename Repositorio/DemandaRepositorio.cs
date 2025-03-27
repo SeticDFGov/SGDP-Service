@@ -16,16 +16,20 @@ public class DemandaRepositorio
         _context = context;
     }
 
-   public async Task<List<Dictionary<string, object>>> GetDemandaListItemsAsync()
+ public async Task<List<Dictionary<string, object>>> GetDemandaListItemsAsync()
 {
     try
     {
-        var listItems = await _context.Demandas.ToListAsync();
+        
+        var listItems = await _context.Demandas
+            .Include(d => d.CATEGORIA)   
+            .Include(d => d.NM_AREA_DEMANDANTE)  
+            .ToListAsync();
 
         if (listItems == null || !listItems.Any())
         {
             return new List<Dictionary<string, object>> {
-                new Dictionary<string, object> { { "message", "Demandas não encontrados." } }
+                new Dictionary<string, object> { { "message", "Demandas não encontradas." } }
             };
         }
 
@@ -33,18 +37,19 @@ public class DemandaRepositorio
         {
             { "ID", item.DemandaId },
             { "NM_DEMANDA", item.NM_DEMANDA },
-            {"DT_ABERTURA", item.DT_ABERTURA},
-            {"DT_CONCLUSAO", item.DT_CONCLUSAO},
-            {"DT_SOLICITACAO", item.DT_SOLICITACAO},
-            {"NM_AREA_DEMANDANTE", item.NM_AREA_DEMANDANTE},
-            {"NM_PO_DEMANDANTE", item.NM_PO_DEMANDANTE},
-            {"NM_PO_SUBTDCR", item.NM_PO_SUBTDCR},
-            {"NR_PROCESSO_SEI", item.NR_PROCESSO_SEI},
-            {"PATROCINADOR", item.PATROCINADOR},
-            {"PERIODICO", item.PERIODICO},
-            {"PERIODICIDADE", item.PERIODICIDADE},
-            {"STATUS", item.STATUS},
-            {"UNIDADE", item.UNIDADE}
+            { "DT_ABERTURA", item.DT_ABERTURA },
+            { "DT_CONCLUSAO", item.DT_CONCLUSAO },
+            { "DT_SOLICITACAO", item.DT_SOLICITACAO },
+            { "CATEGORIA", item.CATEGORIA?.Nome }, // Usa o nome da categoria (evita erro se for null)
+            { "NM_AREA_DEMANDANTE", item.NM_AREA_DEMANDANTE?.NM_DEMANDANTE }, // Usa o nome do demandante (evita erro se for null)
+            { "NM_PO_DEMANDANTE", item.NM_PO_DEMANDANTE },
+            { "NM_PO_SUBTDCR", item.NM_PO_SUBTDCR },
+            { "NR_PROCESSO_SEI", item.NR_PROCESSO_SEI },
+            { "PATROCINADOR", item.PATROCINADOR },
+            { "PERIODICO", item.PERIODICO },
+            { "PERIODICIDADE", item.PERIODICIDADE },
+            { "STATUS", item.STATUS },
+            { "UNIDADE", item.UNIDADE }
         }).ToList();
 
         return result;
@@ -52,10 +57,11 @@ public class DemandaRepositorio
     catch (Exception ex)
     {
         return new List<Dictionary<string, object>> {
-            new Dictionary<string, object> { {  "details", ex.Message } }
+            new Dictionary<string, object> { { "details", ex.Message } }
         };
     }
 }
+
 
 public void CreateDemanda (Demanda demanda)
 {
