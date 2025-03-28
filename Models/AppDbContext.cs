@@ -12,5 +12,7 @@ namespace Models
         public DbSet<Categoria> Categorias { get; set; }
         public DbSet<AreaDemandante> AreaDemandantes {get;set;}
         public DbSet<Demanda> Demandas {get;set;}
+        public DbSet<Projeto> Projetos {get;set;}
+        public DbSet<Etapa> Etapas {get;set;}
     }
 }

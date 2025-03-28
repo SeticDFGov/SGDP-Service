@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Projeto.Controllers
+namespace Controllers
 {
     [Route("api/[controller]")]
     [ApiController]

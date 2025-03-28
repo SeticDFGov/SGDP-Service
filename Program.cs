@@ -52,6 +52,8 @@ builder.Services.AddControllers();
 builder.Services.AddScoped<CategoriaRepositorio>();
 builder.Services.AddScoped<DemandanteRepositorio>();
 builder.Services.AddScoped<DemandaRepositorio>();
+builder.Services.AddScoped<ProjetoRepositorio>();
+builder.Services.AddScoped<EtapaRepositorio>();
 builder.Services.AddSingleton<DetalhamentoService>();
 builder.Services.AddSingleton<EtapaService>();
 builder.Services.AddSingleton<AnaliseService>();
