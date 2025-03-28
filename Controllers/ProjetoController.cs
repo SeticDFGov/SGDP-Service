@@ -21,6 +21,13 @@ public class ProjetoController : ControllerBase
         return items;
     }
 
+    [HttpGet("{id}")]
+    public Task<Dictionary<string, object>> GetAllDemandantes(int id)
+    {
+        var items = _repositorio.GetProjetoById(id);
+        return items;
+    }
+
     [HttpPost]
     public IActionResult CreateDemandante([FromBody] Projeto projeto)
     {
