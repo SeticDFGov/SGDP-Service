@@ -48,13 +48,15 @@ builder.Services.AddCors(options =>
 
 // Adicionar Serviços
 builder.Services.AddControllers();
-builder.Services.AddSingleton<GraphService>();
-builder.Services.AddSingleton<DemandanteService>();
+
 builder.Services.AddScoped<CategoriaRepositorio>();
+builder.Services.AddScoped<DemandanteRepositorio>();
+builder.Services.AddScoped<DemandaRepositorio>();
+builder.Services.AddScoped<ProjetoRepositorio>();
+builder.Services.AddScoped<EtapaRepositorio>();
 builder.Services.AddSingleton<DetalhamentoService>();
-builder.Services.AddSingleton<ProjetoService>();
 builder.Services.AddSingleton<EtapaService>();
-builder.Services.AddSingleton<AnaliseService>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

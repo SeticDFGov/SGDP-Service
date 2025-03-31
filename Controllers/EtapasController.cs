@@ -1,115 +1,46 @@
+using api;
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+using Models;
+using Repositorio;
 
-namespace Projeto.Controllers
+namespace Controllers;
+[ApiController]
+[Route("api/[controller]")]
+public class EtapaController : ControllerBase
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class EtapaController : ControllerBase
+    public readonly EtapaRepositorio _repositorio;
+
+    public EtapaController(EtapaRepositorio repositorio)
     {
-        private readonly EtapaService _etapaService;
-
-        public EtapaController(EtapaService etapaService)
-        {
-            _etapaService = etapaService;
-        }
-
-        [HttpPut("items/{id}")]
-        public async Task<ActionResult> UpdateItem(string id, [FromBody] Dictionary<string, object> fields)
-        {
-            if (fields == null || fields.Count == 0)
-            {
-                return BadRequest("Os campos da etapa não foram fornecidos.");
-            }
-
-            try
-            {
-                var result = await _etapaService.UpdateEtapaAsync(id, fields);
-                if (result)
-                {
-                    return NoContent();
-                }
-                return StatusCode(500, "Erro ao atualizar etapa.");
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Erro ao atualizar etapa {id}: {ex.Message}");
-            }
-        }
-
-        [HttpGet("{nome_projeto}")]
-        public async Task<ActionResult<List<IDictionary<string, object>>>> GetAllItems(string nome_projeto)
-        {
-            try
-            {
-                var items = await _etapaService.GetEtapaListItemsAsync(nome_projeto);
-                return Ok(items);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Erro ao obter etapas: {ex.Message}");
-            }
-        }
-
-        [HttpGet("items/{id}")]
-        public async Task<ActionResult<IDictionary<string, object>>> GetItemById(string id)
-        {
-            try
-            {
-                var item = await _etapaService.GetEtapaListItemByIdAsync(id);
-                if (item == null)
-                {
-                    return NotFound("Etapa não encontrada.");
-                }
-                return Ok(item);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Erro ao obter etapa {id}: {ex.Message}");
-            }
-        }
-
-        [HttpPost("items")]
-        public async Task<ActionResult> CreateItem([FromBody] Dictionary<string, object> fields)
-        {
-            if (fields == null || fields.Count == 0)
-            {
-                return BadRequest("Os campos da etapa não foram fornecidos.");
-            }
-
-            try
-            {
-                var result = await _etapaService.CreateEtapaAsync(fields);
-                if (result)
-                {
-                    return Ok(fields);  // Retorna 200 OK com os dados do campo
-                }
-                return StatusCode(500, "Erro ao criar etapa.");
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Erro ao criar etapa: {ex.Message}");
-            }
-        }
-
-        [HttpDelete("items/{id}")]
-        public async Task<ActionResult> DeleteItem(string id)
-        {
-            try
-            {
-                var result = await _etapaService.DeleteEtapaAsync(id);
-                if (result)
-                {
-                    return NoContent();
-                }
-                return StatusCode(500, "Erro ao excluir etapa.");
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Erro ao excluir etapa {id}: {ex.Message}");
-            }
-        }
+        _repositorio = repositorio;
     }
+
+    [HttpGet("{id}")]
+    public Task<List<Dictionary<string, object>>> GetAllEtapas(int id)
+    {
+        var items = _repositorio.GetEtapaListItemsAsync(id);
+        return items;
+    }
+    [HttpGet("api/byid/{id}")]
+    public Task<Etapa> GetEtapaById(int id)
+    {
+        var items = _repositorio.GetById(id);
+        return items;
+    }
+
+    [HttpPost("{id}")]
+    public IActionResult CreateEtapas([FromBody] Etapa etapa, int id)
+    {
+         _repositorio.CreateEtapa(etapa, id);
+       return Ok();
+
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateEtapas([FromBody] AfericaoEtapaDTO etapa, int id)
+    {
+        await _repositorio.EditEtapa(etapa,id);
+        return Ok();
+    }
+
 }

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Models;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace demanda_service.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250328180819_Etapa")]
+    partial class Etapa
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,57 +24,6 @@ namespace demanda_service.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("Etapa", b =>
-                {
-                    b.Property<int>("EtapaProjetoId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("EtapaProjetoId"));
-
-                    b.Property<string>("ANALISE")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTime?>("DT_INICIO_PREVISTO")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DT_INICIO_REAL")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DT_TERMINO_PREVISTO")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DT_TERMINO_REAL")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("NM_ETAPA")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<int>("NM_PROJETOprojetoId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal?>("PERCENT_EXEC_ETAPA")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("PERCENT_TOTAL_ETAPA")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("RESPONSAVEL_ETAPA")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.HasKey("EtapaProjetoId");
-
-                    b.HasIndex("NM_PROJETOprojetoId");
-
-                    b.ToTable("Etapas");
-                });
 
             modelBuilder.Entity("Models.AreaDemandante", b =>
                 {
@@ -253,71 +205,6 @@ namespace demanda_service.Migrations
                     b.ToTable("Projetos");
                 });
 
-            modelBuilder.Entity("Models.ProjetoAnalise", b =>
-                {
-                    b.Property<int>("AnaliseId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("AnaliseId"));
-
-                    b.Property<string>("ANALISE")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<bool>("ENTRAVE")
-                        .HasMaxLength(100)
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("NM_PROJETOprojetoId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("AnaliseId");
-
-                    b.HasIndex("NM_PROJETOprojetoId");
-
-                    b.ToTable("Analises");
-                });
-
-            modelBuilder.Entity("Models.Template", b =>
-                {
-                    b.Property<int>("TemplateId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("TemplateId"));
-
-                    b.Property<string>("NM_ETAPA")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("NM_TEMPLATE")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
-
-                    b.Property<decimal>("PERCENT_TOTAL")
-                        .HasMaxLength(100)
-                        .HasColumnType("numeric");
-
-                    b.HasKey("TemplateId");
-
-                    b.ToTable("Templates");
-                });
-
-            modelBuilder.Entity("Etapa", b =>
-                {
-                    b.HasOne("Models.Projeto", "NM_PROJETO")
-                        .WithMany()
-                        .HasForeignKey("NM_PROJETOprojetoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("NM_PROJETO");
-                });
-
             modelBuilder.Entity("Models.Demanda", b =>
                 {
                     b.HasOne("Models.Categoria", "CATEGORIA")
@@ -335,17 +222,6 @@ namespace demanda_service.Migrations
                     b.Navigation("CATEGORIA");
 
                     b.Navigation("NM_AREA_DEMANDANTE");
-                });
-
-            modelBuilder.Entity("Models.ProjetoAnalise", b =>
-                {
-                    b.HasOne("Models.Projeto", "NM_PROJETO")
-                        .WithMany()
-                        .HasForeignKey("NM_PROJETOprojetoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("NM_PROJETO");
                 });
 #pragma warning restore 612, 618
         }
