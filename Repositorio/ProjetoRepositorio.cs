@@ -175,7 +175,18 @@ public async Task AnaliseProjeto(ProjetoAnaliseDTO analise)
 public async Task<ProjetoAnalise> GetLastAnaliseProjeto(int projetoid)
 {
     ProjetoAnalise projeto = _context.Analises.Where(c => c.NM_PROJETO.projetoId == projetoid).ToList().LastOrDefault();
-    return projeto;
+    
+    
+
+    if(projeto == null)
+    {
+        ProjetoAnaliseDTO    analise = new ProjetoAnalise{
+            
+        }
+        response = 
+    }
+
+    return projeto ?? ;
     
 }
 

@@ -38,7 +38,7 @@ public class ProjetoController : ControllerBase
 
     }
 
-    [HttpPost("/template")]
+    [HttpPost("template")]
     public async Task<IActionResult> CreateProjetoBtTemplate([FromBody] Projeto projeto)
     {
         await _repositorio.CreateProjetoByTemplate(projeto);
