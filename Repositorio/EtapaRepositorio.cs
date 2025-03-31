@@ -1,3 +1,4 @@
+using api;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -29,20 +30,19 @@ public class EtapaRepositorio
 
         var result = listItems.Select(item => new Dictionary<string, object>
         {
-          { "ID", item.EtapaProjetoId },
-            { "NM_PROJETO", item.NM_PROJETO },
-            { "NM_ETAPA", item.NM_ETAPA },
-            { "DT_INICIO_PREVISTO", item.DT_INICIO_PREVISTO },
-            { "DT_TERMINO_PREVISTO", item.DT_TERMINO_PREVISTO },
-            { "DT_INICIO_REAL", item.DT_INICIO_REAL },
-            { "DT_TERMINO_REAL", item.DT_TERMINO_REAL },
-            { "SITUACAO", item.SITUACAO },
-            { "RESPONSAVEL_ETAPA", item.RESPONSAVEL_ETAPA },
-            { "ANALISE", item.ANALISE },
-            { "PERCENT_TOTAL_ETAPA", item.PERCENT_TOTAL_ETAPA },
-            { "PERCENT_EXEC_ETAPA", item.PERCENT_EXEC_ETAPA },
-            { "PERCENT_EXEC_REAL", item.PERCENT_EXEC_REAL },
-            { "PERCENT_PLANEJADO", item.PERCENT_PLANEJADO }
+      { "ID", item.EtapaProjetoId },
+    { "NM_PROJETO", item.NM_PROJETO },
+    { "NM_ETAPA", item.NM_ETAPA ?? "" },
+    { "DT_INICIO_PREVISTO", item.DT_INICIO_PREVISTO.Value.ToString("dd/MM/yyyy") ?? DateTime.MinValue.ToString("dd/MM/yyyy") },
+    { "DT_TERMINO_PREVISTO", item.DT_TERMINO_PREVISTO.Value.ToString("dd/MM/yyyy") ?? DateTime.MinValue.ToString("dd/MM/yyyy") },
+    { "DT_INICIO_REAL", item.DT_INICIO_REAL.Value.ToString("dd/MM/yyyy") ?? DateTime.MinValue.ToString("dd/MM/yyyy") },
+    { "DT_TERMINO_REAL", item.DT_TERMINO_REAL.Value.ToString("dd/MM/yyyy") ?? DateTime.MinValue.ToString("dd/MM/yyyy") },
+    { "SITUACAO", item.SITUACAO ?? "" },
+    { "RESPONSAVEL_ETAPA", item.RESPONSAVEL_ETAPA ?? "" },
+    { "PERCENT_TOTAL_ETAPA", item.PERCENT_TOTAL_ETAPA ?? 0 }, // Para tipos numéricos, substitua por 0 se for null
+    { "PERCENT_EXEC_ETAPA", item.PERCENT_EXEC_ETAPA ?? 0 },
+    { "PERCENT_EXEC_REAL", item.PERCENT_EXEC_REAL },
+    { "PERCENT_PLANEJADO", item.PERCENT_PLANEJADO } 
         }).ToList();
 
         return result;
@@ -66,6 +66,27 @@ public void CreateEtapa (Etapa etapa, int projeto)
     _context.SaveChangesAsync();
 }
 
+public async Task EditEtapa (AfericaoEtapaDTO etapa, int etapaid)
+{
+    Etapa etapa_edit = await _context.Etapas.FirstOrDefaultAsync(e => e.EtapaProjetoId == etapaid);
 
+    if (etapa_edit == null)
+    {
+        throw new KeyNotFoundException("Etapa não encontrada.");
+    }
+
+    etapa_edit.DT_INICIO_REAL = etapa.DT_INICIO_REAL.Value.ToUniversalTime();
+    etapa_edit.DT_TERMINO_REAL = etapa.DT_TERMINO_REAL.Value.ToUniversalTime();
+    etapa_edit.ANALISE = etapa.ANALISE;
+    etapa_edit.PERCENT_EXEC_ETAPA = etapa.PERCENT_EXEC_ETAPA;
+
+   await  _context.SaveChangesAsync();
+}
+
+public async Task<Etapa> GetById(int id)
+{
+   Etapa etapa =  _context.Etapas.FirstOrDefault(e => e.EtapaProjetoId == id);
+   return etapa;
+}
     
 }

@@ -56,7 +56,7 @@ builder.Services.AddScoped<ProjetoRepositorio>();
 builder.Services.AddScoped<EtapaRepositorio>();
 builder.Services.AddSingleton<DetalhamentoService>();
 builder.Services.AddSingleton<EtapaService>();
-builder.Services.AddSingleton<AnaliseService>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

@@ -14,5 +14,7 @@ namespace Models
         public DbSet<Demanda> Demandas {get;set;}
         public DbSet<Projeto> Projetos {get;set;}
         public DbSet<Etapa> Etapas {get;set;}
+        public DbSet<Template> Templates {get;set;}
+        public DbSet<ProjetoAnalise> Analises {get;set;}
     }
 }

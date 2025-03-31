@@ -1,3 +1,5 @@
+using System.Threading.Tasks;
+using api;
 using Microsoft.AspNetCore.Mvc;
 using Models;
 using Repositorio;
@@ -35,5 +37,28 @@ public class ProjetoController : ControllerBase
        return Ok();
 
     }
+
+    [HttpPost("/template")]
+    public async Task<IActionResult> CreateProjetoBtTemplate([FromBody] Projeto projeto)
+    {
+        await _repositorio.CreateProjetoByTemplate(projeto);
+       return Ok();
+
+    }
+    [HttpPost("analise/{id}")]
+    public async Task<IActionResult> CreateAnalise([FromBody] ProjetoAnaliseDTO projeto)
+    {
+        await _repositorio.AnaliseProjeto(projeto);
+       return Ok();
+
+    }
+    [HttpGet("analise/{id}")]
+    public async Task<ProjetoAnalise> CreateAnalise(int id)
+    {
+       ProjetoAnalise analise =  await _repositorio.GetLastAnaliseProjeto(id);
+       return analise;
+
+    }
+
 
 }
