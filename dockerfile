@@ -18,10 +18,10 @@ COPY --from=build /out .
 COPY .env .
 
 # Expor a porta que a API escutará
-EXPOSE 8080
+EXPOSE 5148
 
 # Definir a variável de ambiente para URLs
-ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_URLS=http://+:5148
 
 # Carregar variáveis do .env
 CMD export $(grep -v '^#' .env | xargs) && dotnet demanda_service.dll
