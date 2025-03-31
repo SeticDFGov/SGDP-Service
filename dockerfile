@@ -1,18 +1,24 @@
-# Use uma imagem do .NET como base
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-WORKDIR /app
-EXPOSE 5000
-EXPOSE 5001
-
+### Etapa 1: Build da aplicação
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /src
-COPY ["demanda_service.csproj", "./"]
-RUN dotnet restore "./demanda_service.csproj"
-COPY . .
-RUN dotnet publish "demanda_service.csproj" -c Release -o /app/publish
-
-FROM base AS final
 WORKDIR /app
-COPY --from=build /app/publish .
-ENV ASPNETCORE_URLS=http://+:5000
-ENTRYPOINT ["dotnet", "demanda_service.dll"]
+
+# Copiar os arquivos do projeto e restaurar dependências
+COPY . .
+RUN dotnet restore
+RUN dotnet publish -c Release -o /out
+
+### Etapa 2: Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+
+# Copiar os arquivos do build para a imagem final
+COPY --from=build /out .
+
+# Expor a porta que a API escutará
+EXPOSE 8080
+
+# Definir a variável de ambiente para URLs
+ENV ASPNETCORE_URLS=http://+:8080
+
+# Comando de inicialização
+ENTRYPOINT ["dotnet", "MinhaApi.dll"]
