@@ -14,11 +14,14 @@ WORKDIR /app
 # Copiar os arquivos do build para a imagem final
 COPY --from=build /out .
 
+# Copiar o arquivo .env para a imagem
+COPY .env .
+
 # Expor a porta que a API escutará
 EXPOSE 8080
 
 # Definir a variável de ambiente para URLs
 ENV ASPNETCORE_URLS=http://+:8080
 
-# Comando de inicialização
-ENTRYPOINT ["dotnet", "MinhaApi.dll"]
+# Carregar variáveis do .env
+CMD export $(grep -v '^#' .env | xargs) && dotnet demanda_service.dll
