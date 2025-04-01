@@ -6,19 +6,17 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Configuration;
 using Repositorio;
 using DotNetEnv;
+using service;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Carregar variáveis do .env (se existir)
 Env.Load();
 
-// Construir a configuração usando `appsettings.json` + variáveis de ambiente
 var config = new ConfigurationBuilder()
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables() // Permite sobrescrever valores com variáveis do sistema
     .Build();
 
-// Carregar string de conexão
 var connectionString = $"Host={Env.GetString("DB_HOST")};" +
                        $"Port={Env.GetInt("DB_PORT")};" +
                        $"Database={Env.GetString("DB_NAME")};" +
@@ -33,7 +31,6 @@ if (string.IsNullOrEmpty(connectionString))
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 
-// Configurar CORS
 var allowedOrigins = config["CorsPolicy:AllowedOrigins"] ?? "*";
 builder.Services.AddCors(options =>
 {
@@ -46,16 +43,21 @@ builder.Services.AddCors(options =>
         });
 });
 
-// Adicionar Serviços
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = null;
+    });
+
 
 builder.Services.AddScoped<CategoriaRepositorio>();
 builder.Services.AddScoped<DemandanteRepositorio>();
 builder.Services.AddScoped<DemandaRepositorio>();
 builder.Services.AddScoped<ProjetoRepositorio>();
 builder.Services.AddScoped<EtapaRepositorio>();
+builder.Services.AddScoped<EtapaService>();
 builder.Services.AddSingleton<DetalhamentoService>();
-builder.Services.AddSingleton<EtapaService>();
+
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

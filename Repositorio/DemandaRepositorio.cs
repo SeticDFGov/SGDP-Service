@@ -64,7 +64,6 @@ public class DemandaRepositorio
 
 public async Task CreateDemanda(Demanda demanda)
 {
-    // Converter datas para UTC antes de salvar no banco
     if (demanda.DT_SOLICITACAO.HasValue)
         demanda.DT_SOLICITACAO = demanda.DT_SOLICITACAO.Value.ToUniversalTime();
     
@@ -74,26 +73,21 @@ public async Task CreateDemanda(Demanda demanda)
     if (demanda.DT_CONCLUSAO.HasValue)
         demanda.DT_CONCLUSAO = demanda.DT_CONCLUSAO.Value.ToUniversalTime();
 
-    // Buscar a categoria corretamente
     var categoria = await _context.Categorias
         .FirstOrDefaultAsync(c => c.CategoriaId == demanda.CATEGORIA.CategoriaId);
 
-    // Buscar a área demandante corretamente
     var demandante = await _context.AreaDemandantes
         .FirstOrDefaultAsync(e => e.AreaDemandanteID == demanda.NM_AREA_DEMANDANTE.AreaDemandanteID);
 
-    // Verificar se a categoria e a área demandante existem antes de prosseguir
     if (categoria == null)
         throw new Exception("Categoria não encontrada.");
     
     if (demandante == null)
         throw new Exception("Área demandante não encontrada.");
 
-    // Atribuir valores
     demanda.CATEGORIA = categoria;
     demanda.NM_AREA_DEMANDANTE = demandante;
 
-    // Adicionar ao contexto e salvar
     _context.Demandas.Add(demanda);
     await _context.SaveChangesAsync();
 }

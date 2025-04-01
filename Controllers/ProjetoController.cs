@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using api;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Models;
 using Repositorio;
@@ -17,21 +18,26 @@ public class ProjetoController : ControllerBase
     }
 
     [HttpGet]
-    public Task<List<Dictionary<string, object>>> GetAllDemandantes()
+    public Task<List<Projeto>> GetAllProjetos()
     {
         var items = _repositorio.GetProjetoListItemsAsync();
         return items;
     }
 
     [HttpGet("{id}")]
-    public Task<Dictionary<string, object>> GetAllDemandantes(int id)
+    public async Task<IActionResult> GetProjetosById(int id)
     {
-        var items = _repositorio.GetProjetoById(id);
-        return items;
+        Projeto? items = await _repositorio.GetProjetoById(id);
+
+        if(items == null)
+        {
+            return NotFound(new {message = "Projeto não encontrado"});
+        }
+        return Ok(items);
     }
 
     [HttpPost]
-    public IActionResult CreateDemandante([FromBody] Projeto projeto)
+    public IActionResult CreateProjeto([FromBody] Projeto projeto)
     {
          _repositorio.CreateProjeto(projeto);
        return Ok();
@@ -39,7 +45,7 @@ public class ProjetoController : ControllerBase
     }
 
     [HttpPost("template")]
-    public async Task<IActionResult> CreateProjetoBtTemplate([FromBody] Projeto projeto)
+    public async Task<IActionResult> CreateProjetoByTemplate([FromBody] Projeto projeto)
     {
         await _repositorio.CreateProjetoByTemplate(projeto);
        return Ok();
