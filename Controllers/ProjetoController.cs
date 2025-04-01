@@ -53,11 +53,17 @@ public class ProjetoController : ControllerBase
 
     }
     [HttpGet("analise/{id}")]
-    public async Task<ProjetoAnalise> CreateAnalise(int id)
+    public async Task<IActionResult> Analise(int id)
     {
-       ProjetoAnalise analise =  await _repositorio.GetLastAnaliseProjeto(id);
-       return analise;
+        if (id <= 0)
+            return BadRequest(new { message = "ID inválido" }); 
 
+        ProjetoAnalise? analise = await _repositorio.GetLastAnaliseProjeto(id);
+
+        if (analise == null)
+            return NotFound(new { message = "Análise não encontrada" }); 
+
+        return Ok(analise); 
     }
 
 
