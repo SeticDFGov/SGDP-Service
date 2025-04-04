@@ -1,3 +1,4 @@
+using api;
 using demanda_service.Migrations;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -104,14 +105,11 @@ public async Task<IResult> DeleteDemanda (int id)
 
     return Results.Ok();
 }
-public async Task<IResult> EditDemanda(int id, Demanda demandaAtualizada)
+public async Task<IResult> EditDemanda(int id, DemandaDTO demandaAtualizada)
 {
-    if (demandaAtualizada == null)
-    {
-        return Results.BadRequest("Dados da demanda não fornecidos.");
-    }
-
     var demandaExistente = await _context.Demandas.FirstOrDefaultAsync(e => e.DemandaId == id);
+    var categoria = await _context.Categorias.FirstOrDefaultAsync(e => e.Nome == demandaAtualizada.CATEGORIA);
+    var demandante = await _context.AreaDemandantes.FirstOrDefaultAsync(e => e.NM_DEMANDANTE == demandaAtualizada.NM_AREA_DEMANDANTE);
     if (demandaExistente == null)
     {
         return Results.NotFound();
@@ -122,7 +120,7 @@ public async Task<IResult> EditDemanda(int id, Demanda demandaAtualizada)
     demandaExistente.DT_ABERTURA = demandaAtualizada.DT_ABERTURA;
     demandaExistente.DT_CONCLUSAO = demandaAtualizada.DT_CONCLUSAO;
     demandaExistente.DT_SOLICITACAO = demandaAtualizada.DT_SOLICITACAO;
-    demandaExistente.NM_AREA_DEMANDANTE = demandaAtualizada.NM_AREA_DEMANDANTE;
+    demandaExistente.NM_AREA_DEMANDANTE = demandante;
     demandaExistente.NM_PO_DEMANDANTE = demandaAtualizada.NM_PO_DEMANDANTE;
     demandaExistente.NM_PO_SUBTDCR = demandaAtualizada.NM_PO_SUBTDCR;
     demandaExistente.NR_PROCESSO_SEI = demandaAtualizada.NR_PROCESSO_SEI;
@@ -131,7 +129,7 @@ public async Task<IResult> EditDemanda(int id, Demanda demandaAtualizada)
     demandaExistente.PERIODICIDADE = demandaAtualizada.PERIODICIDADE;
     demandaExistente.STATUS = demandaAtualizada.STATUS;
     demandaExistente.UNIDADE = demandaAtualizada.UNIDADE;
-    demandaExistente.CATEGORIA = demandaAtualizada.CATEGORIA;
+    demandaExistente.CATEGORIA = categoria;
     
     try
     {
@@ -147,6 +145,22 @@ public async Task<IResult> EditDemanda(int id, Demanda demandaAtualizada)
     }
 }
 
+public async Task<Demanda> GetDemandaById(int id)
+{
+    Demanda demanda = await _context.Demandas.
+    Include(e => e.CATEGORIA)
+    .Include(e => e.NM_AREA_DEMANDANTE)
+    .FirstOrDefaultAsync(e => e.DemandaId == id);
+    return demanda;
+}
+
+public async Task<Dictionary<string, int>> GetQuantidadeTipo()
+{
+    return await _context.Demandas
+        .GroupBy(d => d.CATEGORIA.Nome)
+        .Select(g => new { Categoria = g.Key, Quantidade = g.Count() })
+        .ToDictionaryAsync(g => g.Categoria, g => g.Quantidade);
+}
 
     
 }

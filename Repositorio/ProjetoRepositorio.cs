@@ -78,11 +78,9 @@ public async Task CreateProjetoByTemplate(Projeto projeto)
                 _context.Etapas.Add(etapa);
             }
 
-            // Salva as etapas no banco
             await _context.SaveChangesAsync(); 
             Console.WriteLine("Etapas salvas com sucesso.");
 
-            // Confirma a transação
             await transaction.CommitAsync(); 
             Console.WriteLine("Transação confirmada com sucesso.");
         }

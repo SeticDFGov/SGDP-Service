@@ -55,6 +55,7 @@ public async Task EditEtapa (AfericaoEtapaDTO etapa, int etapaid)
 public async Task<Etapa> GetById(int id)
 {
    Etapa etapa =  _context.Etapas.FirstOrDefault(e => e.EtapaProjetoId == id);
+   
    return etapa;
 }
     

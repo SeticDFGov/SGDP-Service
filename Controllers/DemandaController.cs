@@ -1,3 +1,4 @@
+using api;
 using Microsoft.AspNetCore.Mvc;
 using Models;
 using Repositorio;
@@ -37,7 +38,7 @@ public class DemandaController : ControllerBase
     }
 
     [HttpPut("{id}")]
-public async Task<IActionResult> EditDemanda([FromBody] Demanda demanda, int id)
+public async Task<IActionResult> EditDemanda([FromBody] DemandaDTO demanda, int id)
 {
     try
     {
@@ -49,6 +50,20 @@ public async Task<IActionResult> EditDemanda([FromBody] Demanda demanda, int id)
         Console.WriteLine(e);
         return StatusCode(500);
     }
+}
+
+[HttpGet("{id}")]
+public async Task<IActionResult> GetDemandaById(int id)
+{
+    Demanda demanda = await _repositorio.GetDemandaById(id);
+    return Ok(demanda);
+}
+
+[HttpGet("rank")]
+public async Task<IActionResult> GetPercent ()
+{
+    var response = await _repositorio.GetQuantidadeTipo();
+    return Ok(response);
 }
 
 }
