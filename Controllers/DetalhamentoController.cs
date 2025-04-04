@@ -9,6 +9,7 @@ namespace Detalhamento.Controllers
     [ApiController]
     public class DetalhamentoController : ControllerBase
     {
+        
         private readonly DetalhamentoService _detalheservice;
 
         public DetalhamentoController(DetalhamentoService detalheservice)

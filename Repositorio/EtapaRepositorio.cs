@@ -15,44 +15,13 @@ public class EtapaRepositorio
         _context = context;
     }
 
-   public async Task<List<Dictionary<string, object>>> GetEtapaListItemsAsync(int id)
+   public async Task<List<Etapa>> GetEtapaListItemsAsync(int id)
 {
-    try
-    {
-        var listItems =  _context.Etapas.Where(d => d.NM_PROJETO.projetoId == id);
-
-        if (listItems == null || !listItems.Any())
-        {
-            return new List<Dictionary<string, object>> {
-                new Dictionary<string, object> { { "message", "Projetos não encontradas." } }
-            };
-        }
-
-        var result = listItems.Select(item => new Dictionary<string, object>
-        {
-      { "ID", item.EtapaProjetoId },
-    { "NM_PROJETO", item.NM_PROJETO },
-    { "NM_ETAPA", item.NM_ETAPA ?? "" },
-    { "DT_INICIO_PREVISTO", item.DT_INICIO_PREVISTO.Value.ToString("dd/MM/yyyy") ?? DateTime.MinValue.ToString("dd/MM/yyyy") },
-    { "DT_TERMINO_PREVISTO", item.DT_TERMINO_PREVISTO.Value.ToString("dd/MM/yyyy") ?? DateTime.MinValue.ToString("dd/MM/yyyy") },
-    { "DT_INICIO_REAL", item.DT_INICIO_REAL.Value.ToString("dd/MM/yyyy") ?? DateTime.MinValue.ToString("dd/MM/yyyy") },
-    { "DT_TERMINO_REAL", item.DT_TERMINO_REAL.Value.ToString("dd/MM/yyyy") ?? DateTime.MinValue.ToString("dd/MM/yyyy") },
-    { "SITUACAO", item.SITUACAO ?? "" },
-    { "RESPONSAVEL_ETAPA", item.RESPONSAVEL_ETAPA ?? "" },
-    { "PERCENT_TOTAL_ETAPA", item.PERCENT_TOTAL_ETAPA ?? 0 }, // Para tipos numéricos, substitua por 0 se for null
-    { "PERCENT_EXEC_ETAPA", item.PERCENT_EXEC_ETAPA ?? 0 },
-    { "PERCENT_EXEC_REAL", item.PERCENT_EXEC_REAL },
-    { "PERCENT_PLANEJADO", item.PERCENT_PLANEJADO } 
-        }).ToList();
-
-        return result;
-    }
-    catch (Exception ex)
-    {
-        return new List<Dictionary<string, object>> {
-            new Dictionary<string, object> { {  "details", ex.Message } }
-        };
-    }
+   
+        List<Etapa> listItems =  _context.Etapas.Where(d => d.NM_PROJETO.projetoId == id).ToList();
+        return listItems;
+    
+    
 }
 
 public void CreateEtapa (Etapa etapa, int projeto)
@@ -86,6 +55,7 @@ public async Task EditEtapa (AfericaoEtapaDTO etapa, int etapaid)
 public async Task<Etapa> GetById(int id)
 {
    Etapa etapa =  _context.Etapas.FirstOrDefault(e => e.EtapaProjetoId == id);
+   
    return etapa;
 }
     
