@@ -62,7 +62,7 @@ builder.Services.AddSingleton<DetalhamentoService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Adicionar Autenticação e Autorização (JWT)
+
 var jwtKey = Env.GetString("JWT_KEY");
 if (string.IsNullOrEmpty(jwtKey))
 {
@@ -84,18 +84,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-// Adicionar o serviço de Autorização
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// Configurar Middlewares
 app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 app.UseCors("AllowAllOrigins");
-app.UseAuthentication(); // Adicionado para autenticação funcionar corretamente
-app.UseAuthorization();  // Adicionado para autorização funcionar corretamente
+app.UseAuthentication(); 
+app.UseAuthorization();  
 app.MapControllers();
 app.Run();
