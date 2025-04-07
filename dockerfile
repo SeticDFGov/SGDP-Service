@@ -15,8 +15,13 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/out ./
 
+COPY .env .env
+
 # Expõe a porta 5148
 EXPOSE 5148
+
+# Define a URL que o ASP.NET deve escutar
+ENV ASPNETCORE_URLS=http://+:5148
 
 # Comando para iniciar a aplicação
 ENTRYPOINT ["dotnet", "demanda_service.dll"]
