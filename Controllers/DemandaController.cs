@@ -23,7 +23,7 @@ public class DemandaController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreateDemanda([FromBody] Demanda demanda)
+    public async Task<IActionResult> CreateDemanda([FromBody] DemandaDTO demanda)
     {
         await _repositorio.CreateDemanda(demanda);
        return Ok();

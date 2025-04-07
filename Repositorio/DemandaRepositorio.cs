@@ -63,7 +63,7 @@ public class DemandaRepositorio
     }
 }
 
-public async Task CreateDemanda(Demanda demanda)
+public async Task CreateDemanda(DemandaDTO demanda)
 {
     if (demanda.DT_SOLICITACAO.HasValue)
         demanda.DT_SOLICITACAO = demanda.DT_SOLICITACAO.Value.ToUniversalTime();
@@ -75,10 +75,10 @@ public async Task CreateDemanda(Demanda demanda)
         demanda.DT_CONCLUSAO = demanda.DT_CONCLUSAO.Value.ToUniversalTime();
 
     var categoria = await _context.Categorias
-        .FirstOrDefaultAsync(c => c.CategoriaId == demanda.CATEGORIA.CategoriaId);
+        .FirstOrDefaultAsync(c => c.Nome == demanda.CATEGORIA);
 
     var demandante = await _context.AreaDemandantes
-        .FirstOrDefaultAsync(e => e.AreaDemandanteID == demanda.NM_AREA_DEMANDANTE.AreaDemandanteID);
+        .FirstOrDefaultAsync(e => e.NM_DEMANDANTE == demanda.NM_AREA_DEMANDANTE);
 
     if (categoria == null)
         throw new Exception("Categoria não encontrada.");
@@ -86,10 +86,25 @@ public async Task CreateDemanda(Demanda demanda)
     if (demandante == null)
         throw new Exception("Área demandante não encontrada.");
 
-    demanda.CATEGORIA = categoria;
-    demanda.NM_AREA_DEMANDANTE = demandante;
+    Demanda demandaAdd = new Demanda{
+        NM_DEMANDA = demanda.NM_DEMANDA,
+        CATEGORIA = categoria,
+        NM_AREA_DEMANDANTE = demandante,
+        DT_ABERTURA = demanda.DT_ABERTURA,
+        DT_CONCLUSAO = demanda.DT_CONCLUSAO,
+        DT_SOLICITACAO = demanda.DT_SOLICITACAO,
+        UNIDADE = demanda.UNIDADE,
+        PERIODICIDADE = demanda.PERIODICIDADE,
+        PERIODICO = demanda.PERIODICO,
+        NM_PO_DEMANDANTE = demanda.NM_PO_DEMANDANTE,
+        NM_PO_SUBTDCR = demanda.NM_PO_SUBTDCR,
+        STATUS = demanda.STATUS,
+        NR_PROCESSO_SEI = demanda.NR_PROCESSO_SEI,
+        PATROCINADOR = demanda.PATROCINADOR
 
-    _context.Demandas.Add(demanda);
+    };
+    
+    _context.Demandas.Add(demandaAdd);
     await _context.SaveChangesAsync();
 }
 
