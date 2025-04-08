@@ -57,4 +57,10 @@ public class EtapaController : ControllerBase
         return Ok(response);
     }
 
+     [HttpGet("situacao")]
+    public async Task<ActionResult<SituacaoProjetoDTO>> GetSituacaoProjetos()
+    {
+        var resultado = await _service.GetSituacao();
+        return Ok(resultado);
+    }
 }

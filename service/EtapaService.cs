@@ -32,6 +32,55 @@ public class EtapaService
 
         return response ;
     }
+    
+ public async Task<SituacaoProjetoDTO> GetSituacao()
+{
+    var projetos = await _context.Projetos.ToListAsync();
+
+    int concluidos = 0;
+    int atrasados = 0;
+    int emAndamento = 0;
+    int naoIniciados = 0;
+
+    foreach (var projeto in projetos)
+    {
+        var etapas = await _context.Etapas
+            .Where(e => e.NM_PROJETO.projetoId == projeto.projetoId)
+            .ToListAsync();
+
+        if (etapas.Count == 0)
+        {
+            naoIniciados++;
+            continue;
+        }
+
+        if (etapas.Any(e => e.SITUACAO == "Atrasado"))
+        {
+            atrasados++;
+        }
+        else if (etapas.Any(e => e.SITUACAO == "Em Andamento"))
+        {
+            emAndamento++;
+        }
+        else if (etapas.All(e => e.SITUACAO == "Concluido"))
+        {
+            concluidos++;
+        }
+        else
+        {
+            naoIniciados++;
+        }
+    }
+
+    return new SituacaoProjetoDTO
+    {
+        Atrasado = atrasados,
+        EmAndamento = emAndamento,
+        Concluido = concluidos,
+        NaoIniciado = naoIniciados
+    };
+}
+
 
 
 }
