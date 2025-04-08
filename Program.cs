@@ -31,7 +31,7 @@ if (string.IsNullOrEmpty(connectionString))
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 
-var allowedOrigins = config["CorsPolicy:AllowedOrigins"] ?? "*";
+var allowedOrigins =  "*";
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAllOrigins",
