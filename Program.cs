@@ -34,14 +34,13 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 var allowedOrigins =  "*";
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAllOrigins",
-        policy =>
-        {
-            policy.WithOrigins(allowedOrigins)
-                  .AllowAnyMethod()
-                  .AllowAnyHeader();
-        });
+    options.AddPolicy("AllowAll",
+        builder => builder
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod());
 });
+
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -92,7 +91,7 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
-app.UseCors("AllowAllOrigins");
+app.UseCors("AllowAll");
 app.UseAuthentication(); 
 app.UseAuthorization();  
 app.MapControllers();
