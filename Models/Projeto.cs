@@ -26,7 +26,7 @@ public class Projeto
     public string NM_AREA_DEMANDANTE {get;set;}
 
     [StringLength(100)]
-    public string ANO {get;set;}
+    public string? ANO {get;set;}
 
     [StringLength(200)]
     public string TEMPLATE {get;set;}
