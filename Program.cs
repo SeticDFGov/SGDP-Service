@@ -7,15 +7,12 @@ using Microsoft.Extensions.Configuration;
 using Repositorio;
 using DotNetEnv;
 using service;
+using Microsoft.Identity.Client;
 
 var builder = WebApplication.CreateBuilder(args);
 
 Env.Load();
 
-var config = new ConfigurationBuilder()
-    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-    .AddEnvironmentVariables() // Permite sobrescrever valores com variáveis do sistema
-    .Build();
 
 var connectionString = $"Host={Env.GetString("DB_HOST")};" +
                        $"Port={Env.GetInt("DB_PORT")};" +
@@ -49,6 +46,11 @@ builder.Services.AddControllers()
     });
 
 
+var clientId = Env.GetString("ClientId");
+var clientSecret = Env.GetString("ClientSecret");
+var tenantId = Env.GetString("TenantId");
+
+
 builder.Services.AddScoped<CategoriaRepositorio>();
 builder.Services.AddScoped<DemandanteRepositorio>();
 builder.Services.AddScoped<DemandaRepositorio>();
@@ -57,17 +59,20 @@ builder.Services.AddScoped<EtapaRepositorio>();
 builder.Services.AddScoped<EtapaService>();
 builder.Services.AddScoped<ProjetoService>();
 builder.Services.AddScoped<DetalhamentoRepositorio>();
-
+builder.Services.AddSingleton<IConfidentialClientApplication>(sp =>
+{
+    return ConfidentialClientApplicationBuilder.Create(clientId)
+        .WithClientSecret(clientSecret)
+        .WithAuthority(new Uri($"https://login.microsoftonline.com/{tenantId}"))
+        .WithRedirectUri($"{Env.GetString("UrlBack")}/api/auth/callback")
+        .Build();
+});
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 
-var jwtKey = Env.GetString("JWT_KEY");
-if (string.IsNullOrEmpty(jwtKey))
-{
-    throw new InvalidOperationException("JWT Key is not configured");
-}
+var key = Encoding.UTF8.GetBytes(Env.GetString("JWT_KEY") ?? throw new InvalidOperationException("Chave JWT não configurada."));
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -80,7 +85,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = Env.GetString("JWT_ISSUER"),
             ValidAudience = Env.GetString("JWT_AUDIENCE"),
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+            IssuerSigningKey = new SymmetricSecurityKey(key)
         };
     });
 

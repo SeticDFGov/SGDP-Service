@@ -9,7 +9,7 @@ using Microsoft.Kiota.Abstractions.Authentication;
 using Microsoft.Graph.Models;
 using service.consts;
 
-namespace Auth.Controllers
+namespace Controllers
 {
     [ApiController]
     [Route("api/auth")]
@@ -81,7 +81,7 @@ namespace Auth.Controllers
 
                 // Gera um JWT personalizado
                 var tokenHandler = new JwtSecurityTokenHandler();
-                var key = Encoding.UTF8.GetBytes(Environment.GetEnvironmentVariable("Key") ?? throw new InvalidOperationException("Chave JWT não configurada."));
+                var key = Encoding.UTF8.GetBytes(Environment.GetEnvironmentVariable("JWT_KEY") ?? throw new InvalidOperationException("Chave JWT não configurada."));
                 var tokenDescriptor = new SecurityTokenDescriptor
                 {
                     Subject = new ClaimsIdentity(new[]
@@ -92,17 +92,15 @@ namespace Auth.Controllers
                     }),
                     Expires = DateTime.UtcNow.AddHours(1),
                     
-                    // Issuer = _configuration["Jwt:Issuer"],
-                    Issuer  = Environment.GetEnvironmentVariable("Issuer"),
-                    // Audience = _configuration["Jwt:Audience"],
-                    Audience  = Environment.GetEnvironmentVariable("Audience"),
+                    Issuer  = Environment.GetEnvironmentVariable("JWT_ISSUER"),
+                    Audience  = Environment.GetEnvironmentVariable("JWT_AUDIENCE"),
                     SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
                 };
 
                 var token = tokenHandler.CreateToken(tokenDescriptor);
                 var jwt = tokenHandler.WriteToken(token);
-                return Redirect($"{Environment.GetEnvironmentVariable("UrlFront")}/auth/callback?token={jwt}&name={Uri.EscapeDataString(user.DisplayName)}");
-                // Retorna o JWT para o frontend
+                return Redirect($"{Environment.GetEnvironmentVariable("UrlFront")}/demandas/auth/callback?token={jwt}&name={Uri.EscapeDataString(user.DisplayName)}");
+             
               
             }
             catch (MsalException msalEx)
