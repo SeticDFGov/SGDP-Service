@@ -63,8 +63,8 @@ builder.Services.AddSingleton<IConfidentialClientApplication>(sp =>
 {
     return ConfidentialClientApplicationBuilder.Create(clientId)
         .WithClientSecret(clientSecret)
-        .WithAuthority(new Uri($"https://login.microsoftonline.com/{tenantId}"))
         .WithRedirectUri($"{Env.GetString("UrlBack")}/api/auth/callback")
+        .WithAuthority(new Uri($"https://login.microsoftonline.com/{tenantId}"))
         .Build();
 });
 
