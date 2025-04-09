@@ -55,6 +55,7 @@ builder.Services.AddScoped<DemandaRepositorio>();
 builder.Services.AddScoped<ProjetoRepositorio>();
 builder.Services.AddScoped<EtapaRepositorio>();
 builder.Services.AddScoped<EtapaService>();
+builder.Services.AddScoped<ProjetoService>();
 builder.Services.AddSingleton<DetalhamentoService>();
 
 

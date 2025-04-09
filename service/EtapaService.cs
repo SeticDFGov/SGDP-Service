@@ -19,9 +19,9 @@ public class EtapaService
     {
         var etapas = await _context.Etapas
     .Where(e => e.NM_PROJETO.projetoId == projetoid)
-    .ToListAsync(); // Carrega os dados na memória
+    .ToListAsync(); 
 
-    decimal? somaPercentExecReal = etapas.Sum(e => e.PERCENT_EXEC_REAL);
+    decimal? somaPercentExecReal = etapas.Sum(e => e.PERCENT_EXEC_REAL ?? 0);
     decimal? somaPercentExecPlan = etapas.Sum(e => e.PERCENT_PLANEJADO);
 
         

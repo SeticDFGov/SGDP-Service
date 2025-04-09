@@ -75,7 +75,7 @@ public class Etapa
     {
         if (executadoEtapa == null || percentTota == null)
         {
-            return 0;
+           return 0;
         }
 
         var executado = percentTota * executadoEtapa / 100;
@@ -84,7 +84,7 @@ public class Etapa
 
     private decimal CalcularPercentualPlanejado(DateTime? dtInicioPrevisto, DateTime? dtTerminoPrevisto)
 {
-    // Verifica se as datas são nulas
+ 
     if (!dtInicioPrevisto.HasValue || !dtTerminoPrevisto.HasValue)
     {
         return 0;

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Models;
 using Repositorio;
+using service;
 
 namespace Controllers;
 [ApiController]
@@ -12,9 +13,11 @@ public class ProjetoController : ControllerBase
 {
     public readonly ProjetoRepositorio _repositorio;
 
-    public ProjetoController(ProjetoRepositorio repositorio)
+    public readonly ProjetoService _projetoService;
+    public ProjetoController(ProjetoRepositorio repositorio, ProjetoService projetoService)
     {
         _repositorio = repositorio;
+        _projetoService = projetoService;
     }
 
     [HttpGet]
@@ -72,5 +75,10 @@ public class ProjetoController : ControllerBase
         return Ok(analise); 
     }
 
-
+    [HttpGet("quantidade")]
+    public async Task<IActionResult> GetQuantidadeProjetos()
+    {
+        var quantidade = await _projetoService.GetQuantidadeProjetos();
+        return Ok(quantidade);
+    }
 }
