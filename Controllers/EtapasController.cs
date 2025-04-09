@@ -63,4 +63,11 @@ public class EtapaController : ControllerBase
         var resultado = await _service.GetSituacao();
         return Ok(resultado);
     }
+
+    [HttpGet("tags")]
+    public async Task<IActionResult> GetTags()
+    {
+        var tags = await _service.GetTags();
+        return Ok(tags);
+    }
 }

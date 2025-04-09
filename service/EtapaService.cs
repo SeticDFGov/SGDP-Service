@@ -81,6 +81,17 @@ public class EtapaService
     };
 }
 
+public async Task<TagsDTO> GetTags()
+{
+    var pdtic2427 = await _context.Projetos.Where(p => p.PDTIC2427 == true).ToListAsync();
+    var ptd2427 = await _context.Projetos.Where(p => p.PTD2427 == true).ToListAsync();
+    var profiscoII = await _context.Projetos.Where(p => p.PROFISCOII == true).ToListAsync();
 
+    return new TagsDTO {
+        PDTIC2427 = pdtic2427.Count,
+        PTD2427 = ptd2427.Count,
+        PROFISCOII = profiscoII.Count
+    };
+}
 
 }
