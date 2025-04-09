@@ -16,5 +16,6 @@ namespace Models
         public DbSet<Etapa> Etapas {get;set;}
         public DbSet<Template> Templates {get;set;}
         public DbSet<ProjetoAnalise> Analises {get;set;}
+        public DbSet<Detalhamento> Detalhamentos {get;set;}
     }
 }
