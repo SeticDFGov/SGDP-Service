@@ -44,13 +44,11 @@ public async Task CreateProjetoByTemplate(Projeto projeto)
           
             _context.Projetos.Add(projeto);
             await _context.SaveChangesAsync();  
-            Console.WriteLine($"Projeto adicionado com sucesso. Projeto ID: {projeto.projetoId}");
-
-          
+                     
             List<Template> templates = await _context.Templates
                 .Where(c => c.NM_TEMPLATE == projeto.TEMPLATE)
                 .ToListAsync();
-            Console.WriteLine($"Templates encontrados: {templates.Count}");
+           
 
         
             if (templates.Count == 0)
@@ -58,28 +56,24 @@ public async Task CreateProjetoByTemplate(Projeto projeto)
                 throw new Exception("Nenhum template encontrado para o projeto.");
             }
 
-            // Garantir que o projeto está rastreado pelo EF antes de criar as etapas
             _context.Attach(projeto);
             Console.WriteLine("Projeto anexado ao contexto.");
 
-            // Criar e adicionar as etapas
             foreach (Template template in templates)
             {
                 var etapa = new Etapa
                 {
                     NM_ETAPA = template.NM_ETAPA,
-                    NM_PROJETO = projeto,  // Garantindo a relação correta
+                    NM_PROJETO = projeto, 
                     PERCENT_TOTAL_ETAPA = template.PERCENT_TOTAL
                 };
 
-                // Debug: Verificar o conteúdo de cada etapa
-                Console.WriteLine($"Adicionando etapa: {etapa.NM_ETAPA} (Percentual: {etapa.PERCENT_TOTAL_ETAPA})");
+               
                 
                 _context.Etapas.Add(etapa);
             }
 
             await _context.SaveChangesAsync(); 
-            Console.WriteLine("Etapas salvas com sucesso.");
 
             await transaction.CommitAsync(); 
             Console.WriteLine("Transação confirmada com sucesso.");

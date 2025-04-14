@@ -70,4 +70,11 @@ public class EtapaController : ControllerBase
         var tags = await _service.GetTags();
         return Ok(tags);
     }
+
+    [HttpPut("iniciar")]
+    public async Task<IActionResult> IniciarEtapa([FromBody] InicioEtapaDTO inicio)
+    {
+        await _service.IniciarEtapa(inicio);
+        return Ok();
+    }
 }
