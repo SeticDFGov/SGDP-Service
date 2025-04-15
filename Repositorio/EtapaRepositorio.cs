@@ -24,15 +24,22 @@ public class EtapaRepositorio
     
 }
 
-public void CreateEtapa (Etapa etapa, int projeto)
+public async Task CreateEtapa (EtapaDTO etapa)
 {
-    Projeto projetocadastro = _context.Projetos.FirstOrDefault(e => e.projetoId == projeto);
+    Projeto projetocadastro = await _context.Projetos.FirstOrDefaultAsync(e => e.projetoId == etapa.NM_PROJETO);
 
-    etapa.NM_PROJETO = projetocadastro;
+    Etapa etapaCadastro = new Etapa();
+    etapaCadastro.NM_ETAPA = etapa.NM_ETAPA;
+    etapaCadastro.DT_INICIO_PREVISTO = etapa.DT_INICIO_PREVISTO.Value.ToUniversalTime();
+    etapaCadastro.DT_TERMINO_PREVISTO = etapa.DT_TERMINO_PREVISTO.Value.ToUniversalTime();
+    etapaCadastro.PERCENT_TOTAL_ETAPA = etapa.PERCENT_TOTAL_ETAPA;
+    etapaCadastro.RESPONSAVEL_ETAPA = etapa.RESPONSAVEL_ETAPA;
+    etapaCadastro.NM_PROJETO = projetocadastro;
+    
 
 
-    _context.Etapas.Add(etapa);
-    _context.SaveChangesAsync();
+    _context.Etapas.Add(etapaCadastro);
+    await _context.SaveChangesAsync();
 }
 
 public async Task EditEtapa (AfericaoEtapaDTO etapa, int etapaid)

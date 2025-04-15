@@ -51,12 +51,14 @@ public async Task CreateProjetoByTemplate(Projeto projeto)
            
 
         
-            if (templates.Count == 0)
-            {
-                throw new Exception("Nenhum template encontrado para o projeto.");
-            }
 
             _context.Attach(projeto);
+
+            if (templates.Count == 0)
+            {
+                await transaction.CommitAsync();
+                   
+            }
             Console.WriteLine("Projeto anexado ao contexto.");
 
             foreach (Template template in templates)

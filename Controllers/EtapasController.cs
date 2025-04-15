@@ -36,10 +36,10 @@ public class EtapaController : ControllerBase
         return items;
     }
 
-    [HttpPost("{id}")]
-    public IActionResult CreateEtapas([FromBody] Etapa etapa, int id)
+    [HttpPost()]
+    public async Task<IActionResult> CreateEtapas([FromBody] EtapaDTO etapa)
     {
-         _repositorio.CreateEtapa(etapa, id);
+       await _repositorio.CreateEtapa(etapa);
        return Ok();
 
     }
