@@ -15,24 +15,52 @@ public class EtapaService
         _etapaRepositorio = etapaRepositorio;
     }
 
-    public async Task<PercentualEtapaDTO> GetPercentEtapas (int projetoid)
+ public async Task<PercentualEtapaDTO> GetPercentEtapas(int projetoid)
+{
+    var etapas = await _context.Etapas
+        .Where(e => e.NM_PROJETO.projetoId == projetoid)
+        .ToListAsync();
+
+    decimal somaPercentExecReal = etapas.Sum(e => e.PERCENT_EXEC_REAL ?? 0);
+    decimal somaPercentExecPlan = 0;
+
+    // Filtra datas não nulas antes de aplicar Min e Max
+    var datasInicio = etapas.Where(e => e.DT_INICIO_PREVISTO.HasValue).Select(e => e.DT_INICIO_PREVISTO.Value);
+    var datasTermino = etapas.Where(e => e.DT_TERMINO_PREVISTO.HasValue).Select(e => e.DT_TERMINO_PREVISTO.Value);
+
+    if (!datasInicio.Any() || !datasTermino.Any())
     {
-        var etapas = await _context.Etapas
-    .Where(e => e.NM_PROJETO.projetoId == projetoid)
-    .ToListAsync(); 
-
-    decimal? somaPercentExecReal = etapas.Sum(e => e.PERCENT_EXEC_REAL ?? 0);
-    decimal? somaPercentExecPlan = etapas.Sum(e => e.PERCENT_PLANEJADO);
-
-        
-        PercentualEtapaDTO response = new PercentualEtapaDTO {
-            PERCENT_PLANEJADO = somaPercentExecPlan,
-            PERCENT_EXECUTADO = somaPercentExecReal,
+        // Você pode lançar uma exceção ou retornar valores padrão, depende do seu caso
+        return new PercentualEtapaDTO
+        {
+            PERCENT_PLANEJADO = 0,
+            PERCENT_EXECUTADO = somaPercentExecReal
         };
-
-        return response ;
     }
+
+    var inicioMin = datasInicio.Min();
+    var terminoMax = datasTermino.Max();
+    Console.WriteLine($"Inicio Min: {inicioMin}");
+    Console.WriteLine($"Termino Max: {terminoMax}");
+    var dataAtual = DateTime.UtcNow;
+    var diffDays = (dataAtual - inicioMin).Days;
+    var diffDaysTermino = 0;
+    if(terminoMax < dataAtual)
+        diffDaysTermino = (terminoMax - inicioMin).Days;
+    else
+        diffDaysTermino = (dataAtual - inicioMin).Days;
     
+    if (diffDays == 0) diffDays = 1; // evita divisão por zero
+
+    somaPercentExecPlan = diffDaysTermino*100 / (decimal)diffDays;
+
+    return new PercentualEtapaDTO
+    {
+        PERCENT_PLANEJADO = somaPercentExecPlan,
+        PERCENT_EXECUTADO = somaPercentExecReal
+    };
+}
+
  public async Task<SituacaoProjetoDTO> GetSituacao()
 {
     var projetos = await _context.Projetos.ToListAsync();

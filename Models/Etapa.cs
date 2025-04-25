@@ -96,7 +96,13 @@ public class Etapa
     // Verifica se a diferença de dias é positiva
     if (diffDays > 0 && dtInicioPrevisto.Value < DateTime.Now)    
     {
-        var diffToday = (DateTime.Now - dtInicioPrevisto.Value).Days;
+        var diffToday = 0;
+        if(DateTime.Now > dtTerminoPrevisto.Value)
+            diffToday = (dtTerminoPrevisto.Value - dtInicioPrevisto.Value).Days;
+        else{
+            diffToday = (DateTime.Now - dtInicioPrevisto.Value).Days;
+            
+        }
         return (decimal)(diffToday * 100.0 / diffDays);
     }
 
