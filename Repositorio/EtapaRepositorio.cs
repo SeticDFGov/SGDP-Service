@@ -30,8 +30,8 @@ public async Task CreateEtapa (EtapaDTO etapa)
 
     Etapa etapaCadastro = new Etapa();
     etapaCadastro.NM_ETAPA = etapa.NM_ETAPA;
-    etapaCadastro.DT_INICIO_PREVISTO = etapa.DT_INICIO_PREVISTO.Value.ToUniversalTime();
-    etapaCadastro.DT_TERMINO_PREVISTO = etapa.DT_TERMINO_PREVISTO.Value.ToUniversalTime();
+    etapaCadastro.DT_INICIO_PREVISTO = etapa.DT_INICIO_PREVISTO?.Date;
+    etapaCadastro.DT_TERMINO_PREVISTO = etapa.DT_TERMINO_PREVISTO?.Date;
     etapaCadastro.PERCENT_TOTAL_ETAPA = etapa.PERCENT_TOTAL_ETAPA;
     etapaCadastro.RESPONSAVEL_ETAPA = etapa.RESPONSAVEL_ETAPA;
     etapaCadastro.NM_PROJETO = projetocadastro;
@@ -51,10 +51,10 @@ public async Task EditEtapa (AfericaoEtapaDTO etapa, int etapaid)
         throw new KeyNotFoundException("Etapa não encontrada.");
     }
     if(etapa.DT_INICIO_REAL.HasValue)
-        etapa_edit.DT_INICIO_REAL = etapa.DT_INICIO_REAL.Value.ToUniversalTime();
+        etapa_edit.DT_INICIO_REAL = etapa.DT_INICIO_REAL?.Date;
         
     if(etapa.DT_TERMINO_REAL.HasValue)
-        etapa_edit.DT_TERMINO_REAL = etapa.DT_TERMINO_REAL.Value.ToUniversalTime();
+        etapa_edit.DT_TERMINO_REAL = etapa.DT_TERMINO_REAL?.Date;
     etapa_edit.ANALISE = etapa.ANALISE;
     etapa_edit.PERCENT_EXEC_ETAPA = etapa.PERCENT_EXEC_ETAPA;
 
