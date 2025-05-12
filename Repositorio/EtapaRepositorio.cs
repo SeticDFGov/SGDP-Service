@@ -51,10 +51,10 @@ public async Task EditEtapa (AfericaoEtapaDTO etapa, int etapaid)
         throw new KeyNotFoundException("Etapa não encontrada.");
     }
     if(etapa.DT_INICIO_REAL.HasValue)
-        etapa_edit.DT_INICIO_REAL = etapa.DT_INICIO_REAL;
+        etapa_edit.DT_INICIO_REAL = etapa.DT_INICIO_REAL.Value.ToUniversalTime();
         
     if(etapa.DT_TERMINO_REAL.HasValue)
-        etapa_edit.DT_TERMINO_REAL = etapa.DT_TERMINO_REAL;
+        etapa_edit.DT_TERMINO_REAL = etapa.DT_TERMINO_REAL.Value.ToUniversalTime();
     etapa_edit.ANALISE = etapa.ANALISE;
     etapa_edit.PERCENT_EXEC_ETAPA = etapa.PERCENT_EXEC_ETAPA;
 
