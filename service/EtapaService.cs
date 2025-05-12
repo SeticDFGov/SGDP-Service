@@ -126,8 +126,8 @@ public async Task IniciarEtapa(InicioEtapaDTO inicio)
 {
     Etapa etapa = await _etapaRepositorio.GetById(inicio.EtapaProjetoId);
 
-    etapa.DT_INICIO_PREVISTO = inicio.DT_INICIO_PREVISTO.Value.ToUniversalTime();
-    etapa.DT_TERMINO_PREVISTO = inicio.DT_TERMINO_PREVISTO.Value.ToUniversalTime();
+    etapa.DT_INICIO_PREVISTO = inicio.DT_INICIO_PREVISTO;
+    etapa.DT_TERMINO_PREVISTO = inicio.DT_TERMINO_PREVISTO;
 
     _context.SaveChangesAsync();
 }
