@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Graph.Drives.Item.Items.Item.Workbook.Functions.Iso_Ceiling;
 using Models;
-
+using TimeZoneConverter; // Instale via NuGet: TimeZoneConverter
 namespace Repositorio;
 
 public class EtapaRepositorio 
@@ -42,6 +42,7 @@ public async Task CreateEtapa (EtapaDTO etapa)
     await _context.SaveChangesAsync();
 }
 
+
 public async Task EditEtapa (AfericaoEtapaDTO etapa, int etapaid)
 {
     Etapa etapa_edit = await _context.Etapas.FirstOrDefaultAsync(e => e.EtapaProjetoId == etapaid);
@@ -50,17 +51,27 @@ public async Task EditEtapa (AfericaoEtapaDTO etapa, int etapaid)
     {
         throw new KeyNotFoundException("Etapa não encontrada.");
     }
+
+    TimeZoneInfo brasilia = TZConvert.GetTimeZoneInfo("E. South America Standard Time");
+
     if (etapa.DT_INICIO_REAL.HasValue)
-        etapa_edit.DT_INICIO_REAL = etapa.DT_INICIO_REAL.Value.ToUniversalTime();
+    {
+        DateTime dtInicio = DateTime.SpecifyKind(etapa.DT_INICIO_REAL.Value, DateTimeKind.Unspecified);
+        etapa_edit.DT_INICIO_REAL = TimeZoneInfo.ConvertTimeToUtc(dtInicio, brasilia);
+    }
 
     if (etapa.DT_TERMINO_REAL.HasValue)
-        etapa_edit.DT_TERMINO_REAL = etapa.DT_TERMINO_REAL.Value.ToUniversalTime();
-  
+    {
+        DateTime dtTermino = DateTime.SpecifyKind(etapa.DT_TERMINO_REAL.Value, DateTimeKind.Unspecified);
+        etapa_edit.DT_TERMINO_REAL = TimeZoneInfo.ConvertTimeToUtc(dtTermino, brasilia);
+    }
+
     etapa_edit.ANALISE = etapa.ANALISE;
     etapa_edit.PERCENT_EXEC_ETAPA = etapa.PERCENT_EXEC_ETAPA;
 
-   await  _context.SaveChangesAsync();
+    await _context.SaveChangesAsync();
 }
+
 
 public async Task<Etapa> GetById(int id)
 {
