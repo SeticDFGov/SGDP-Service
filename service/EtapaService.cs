@@ -2,6 +2,7 @@ using api;
 using Microsoft.EntityFrameworkCore;
 using Models;
 using Repositorio;
+using TimeZoneConverter; 
 
 namespace service;
 
@@ -122,14 +123,32 @@ public async Task<TagsDTO> GetTags()
     };
 }
 
+
 public async Task IniciarEtapa(InicioEtapaDTO inicio)
 {
     Etapa etapa = await _etapaRepositorio.GetById(inicio.EtapaProjetoId);
 
-    etapa.DT_INICIO_PREVISTO = inicio.DT_INICIO_PREVISTO.Value.ToUniversalTime();
-    etapa.DT_TERMINO_PREVISTO = inicio.DT_TERMINO_PREVISTO.Value.ToUniversalTime();
+    if (etapa == null)
+    {
+        throw new KeyNotFoundException("Etapa não encontrada.");
+    }
 
-    _context.SaveChangesAsync();
+    TimeZoneInfo brasilia = TZConvert.GetTimeZoneInfo("E. South America Standard Time");
+
+    if (inicio.DT_INICIO_PREVISTO.HasValue)
+    {
+        DateTime dtInicio = DateTime.SpecifyKind(inicio.DT_INICIO_PREVISTO.Value, DateTimeKind.Unspecified);
+        etapa.DT_INICIO_PREVISTO = TimeZoneInfo.ConvertTimeToUtc(dtInicio, brasilia);
+    }
+
+    if (inicio.DT_TERMINO_PREVISTO.HasValue)
+    {
+        DateTime dtTermino = DateTime.SpecifyKind(inicio.DT_TERMINO_PREVISTO.Value, DateTimeKind.Unspecified);
+        etapa.DT_TERMINO_PREVISTO = TimeZoneInfo.ConvertTimeToUtc(dtTermino, brasilia);
+    }
+
+    await _context.SaveChangesAsync();
 }
+
 
 }

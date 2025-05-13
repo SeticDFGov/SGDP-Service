@@ -24,24 +24,36 @@ public class EtapaRepositorio
     
 }
 
-public async Task CreateEtapa (EtapaDTO etapa)
+
+public async Task CreateEtapa(EtapaDTO etapa)
 {
-    Projeto projetocadastro = await _context.Projetos.FirstOrDefaultAsync(e => e.projetoId == etapa.NM_PROJETO);
+    Projeto projetocadastro = await _context.Projetos
+        .FirstOrDefaultAsync(e => e.projetoId == etapa.NM_PROJETO);
 
-    Etapa etapaCadastro = new Etapa();
-    etapaCadastro.NM_ETAPA = etapa.NM_ETAPA;
-    etapaCadastro.DT_INICIO_PREVISTO = etapa.DT_INICIO_PREVISTO.Value.ToUniversalTime();
-    etapaCadastro.DT_TERMINO_PREVISTO = etapa.DT_TERMINO_PREVISTO.Value.ToUniversalTime();
-    etapaCadastro.PERCENT_TOTAL_ETAPA = etapa.PERCENT_TOTAL_ETAPA;
-    etapaCadastro.RESPONSAVEL_ETAPA = etapa.RESPONSAVEL_ETAPA;
-    etapaCadastro.NM_PROJETO = projetocadastro;
-    
+    if (projetocadastro == null)
+    {
+        throw new KeyNotFoundException("Projeto não encontrado.");
+    }
 
+    TimeZoneInfo brasilia = TZConvert.GetTimeZoneInfo("E. South America Standard Time");
+
+    Etapa etapaCadastro = new Etapa
+    {
+        NM_ETAPA = etapa.NM_ETAPA,
+        DT_INICIO_PREVISTO = etapa.DT_INICIO_PREVISTO.HasValue
+            ? TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(etapa.DT_INICIO_PREVISTO.Value, DateTimeKind.Unspecified), brasilia)
+            : (DateTime?)null,
+        DT_TERMINO_PREVISTO = etapa.DT_TERMINO_PREVISTO.HasValue
+            ? TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(etapa.DT_TERMINO_PREVISTO.Value, DateTimeKind.Unspecified), brasilia)
+            : (DateTime?)null,
+        PERCENT_TOTAL_ETAPA = etapa.PERCENT_TOTAL_ETAPA,
+        RESPONSAVEL_ETAPA = etapa.RESPONSAVEL_ETAPA,
+        NM_PROJETO = projetocadastro
+    };
 
     _context.Etapas.Add(etapaCadastro);
     await _context.SaveChangesAsync();
 }
-
 
 public async Task EditEtapa (AfericaoEtapaDTO etapa, int etapaid)
 {
