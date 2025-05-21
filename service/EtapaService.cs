@@ -78,12 +78,11 @@ public class EtapaService
             .ToListAsync();
 
         if (etapas.Count == 0)
-        {
-            naoIniciados++;
+        { 
             continue;
         }
 
-        if (etapas.Any(e => e.SITUACAO == "Atrasado"))
+        if (etapas.Any(e => e.SITUACAO == "atrasado para inicio" || e.SITUACAO == "atrasado para conclusão"))
         {
             atrasados++;
         }
