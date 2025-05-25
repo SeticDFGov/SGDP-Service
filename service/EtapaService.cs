@@ -86,7 +86,7 @@ public class EtapaService
         {
             atrasados++;
         }
-        else if (etapas.Any(e => e.SITUACAO == "Em Andamento"))
+        else if (etapas.Any(e => e.SITUACAO == "Em andamento"))
         {
             emAndamento++;
         }
