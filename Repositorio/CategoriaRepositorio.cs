@@ -3,10 +3,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Graph.Drives.Item.Items.Item.Workbook.Functions.Iso_Ceiling;
 using Models;
+using Repositorio.Interface;
 
 namespace Repositorio;
 
-public class CategoriaRepositorio 
+public class CategoriaRepositorio: ICategoriaRepositorio 
 {
     public readonly AppDbContext _context;
     public CategoriaRepositorio(AppDbContext context)
@@ -14,51 +15,46 @@ public class CategoriaRepositorio
         _context = context;
     }
 
-   public async Task<List<Dictionary<string, object>>> GetCategoriaListItemsAsync()
-{
+   public async Task<List<Categoria>> GetCategoriaListItemsAsync()
+   {
     try
     {
         var listItems = await _context.Categorias.ToListAsync();
 
         if (listItems == null || !listItems.Any())
         {
-            return new List<Dictionary<string, object>> {
-                new Dictionary<string, object> { { "message", "Categorias não encontradas." } }
+            return new List<Categoria> {
+                new Categoria { CategoriaId = 0, Nome = "Categorias não encontradas." }
             };
         }
 
-        var result = listItems.Select(item => new Dictionary<string, object>
+        var result = listItems.Select(item => new Categoria
         {
-            { "CategoriaId", item.CategoriaId },
-            { "Nome", item.Nome },
+            CategoriaId = item.CategoriaId,
+            Nome = item.Nome
         }).ToList();
 
         return result;
     }
     catch (Exception ex)
     {
-        return new List<Dictionary<string, object>> {
-            new Dictionary<string, object> { {  "details", ex.Message } }
+        return new List<Categoria> {
         };
     }
-}
+  }
 
-public void CreateCategoria (Categoria categoria)
+public async Task CreateCategoria (Categoria categoria)
 {
     _context.Categorias.Add(categoria);
     _context.SaveChangesAsync();
 }
 
-public async Task<IResult> DeleteCategoria (int id)
+public async Task DeleteCategoria (int id)
 {   
-    var item = _context.Categorias.FirstOrDefault(e => e.CategoriaId == id);
-
-    if(item == null)  return Results.NotFound();
-
-    _context.Categorias.Remove(item);
+    var item = _context.Categorias.FirstOrDefault(e => e.CategoriaId == id) ?? throw new Exception("Categoria não encontrada.");
+        _context.Categorias.Remove(item);
     await _context.SaveChangesAsync();
 
-    return Results.Ok();
 }
 
     
