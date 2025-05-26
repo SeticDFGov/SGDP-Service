@@ -3,10 +3,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Graph.Drives.Item.Items.Item.Workbook.Functions.Iso_Ceiling;
 using Models;
+using Repositorio.Interface;
 
 namespace Repositorio;
 
-public class DemandanteRepositorio 
+public class DemandanteRepositorio : IDemandanteRepositorio
 {
     public readonly AppDbContext _context;
     public DemandanteRepositorio(AppDbContext context)
@@ -14,7 +15,7 @@ public class DemandanteRepositorio
         _context = context;
     }
 
-   public async Task<List<Dictionary<string, object>>> GetDemandanteListItemsAsync()
+   public async Task<List<AreaDemandante>> GetDemandanteListItemsAsync()
 {
     try
     {
@@ -22,44 +23,45 @@ public class DemandanteRepositorio
 
         if (listItems == null || !listItems.Any())
         {
-            return new List<Dictionary<string, object>> {
-                new Dictionary<string, object> { { "message", "Demandantes não encontradas." } }
+            return new List<AreaDemandante> {
+                new AreaDemandante { 
+                    AreaDemandanteID = 0, 
+                    NM_DEMANDANTE = "Demandantes não encontrados.", 
+                    NM_SIGLA = "N/A"
+                 }
             };
         }
 
-        var result = listItems.Select(item => new Dictionary<string, object>
+        var result = listItems.Select(item => new AreaDemandante
         {
-            { "ID", item.AreaDemandanteID },
-            { "NM_DEMANDANTE", item.NM_DEMANDANTE },
-            {"NM_SIGLA", item.NM_SIGLA}
+            AreaDemandanteID = item.AreaDemandanteID,
+            NM_DEMANDANTE = item.NM_DEMANDANTE,
+            NM_SIGLA = item.NM_SIGLA
         }).ToList();
+        
 
         return result;
     }
     catch (Exception ex)
     {
-        return new List<Dictionary<string, object>> {
-            new Dictionary<string, object> { {  "details", ex.Message } }
+        return new List<AreaDemandante> {
+            new AreaDemandante { }
         };
     }
 }
 
-public void CreateDemandante (AreaDemandante demandante)
+public async Task CreateDemandante (AreaDemandante demandante)
 {
     _context.AreaDemandantes.Add(demandante);
     _context.SaveChangesAsync();
 }
 
-public async Task<IResult> DeleteDemandante (int id)
+public async Task DeleteDemandante (int id)
 {   
-    var item = _context.AreaDemandantes.FirstOrDefault(e => e.AreaDemandanteID == id);
-
-    if(item == null)  return Results.NotFound();
-
-    _context.AreaDemandantes.Remove(item);
+    var item = _context.AreaDemandantes.FirstOrDefault(e => e.AreaDemandanteID == id) ?? throw new Exception("Demandante não encontrado.");
+        _context.AreaDemandantes.Remove(item);
     await _context.SaveChangesAsync();
 
-    return Results.Ok();
 }
 
     
