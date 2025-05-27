@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Graph.Drives.Item.Items.Item.Workbook.Functions.Iso_Ceiling;
 using Models;
 using Repositorio.Interface;
+using service;
 
 namespace Repositorio;
 
@@ -19,14 +20,7 @@ public class CategoriaRepositorio: ICategoriaRepositorio
    {
     try
     {
-        var listItems = await _context.Categorias.ToListAsync();
-
-        if (listItems == null || !listItems.Any())
-        {
-            return new List<Categoria> {
-                new Categoria { CategoriaId = 0, Nome = "Categorias não encontradas." }
-            };
-        }
+        var listItems = await _context.Categorias.ToListAsync() ?? throw new ApiException(ErrorCode.CategoriasNaoEncontradas);
 
         var result = listItems.Select(item => new Categoria
         {
@@ -36,23 +30,30 @@ public class CategoriaRepositorio: ICategoriaRepositorio
 
         return result;
     }
-    catch (Exception ex)
+    catch (Exception)
     {
-        return new List<Categoria> {
-        };
+        throw new ApiException(ErrorCode.ErroAoBuscarCategorias);
     }
   }
 
-public async Task CreateCategoria (Categoria categoria)
+public async Task CreateCategoriaAsync(Categoria categoria)
 {
-    _context.Categorias.Add(categoria);
-    _context.SaveChangesAsync();
+    try
+    {
+        _context.Categorias.Add(categoria);
+        await _context.SaveChangesAsync();
+    }
+    catch (Exception)
+    {
+        throw new ApiException(ErrorCode.ErroAoCriarCategoria);
+    }
 }
 
-public async Task DeleteCategoria (int id)
+
+public async Task DeleteCategoriaAsync (int id)
 {   
-    var item = _context.Categorias.FirstOrDefault(e => e.CategoriaId == id) ?? throw new Exception("Categoria não encontrada.");
-        _context.Categorias.Remove(item);
+    var item = _context.Categorias.FirstOrDefault(e => e.CategoriaId == id) ?? throw new ApiException(ErrorCode.CategoriaNaoEncontrada);
+    _context.Categorias.Remove(item);
     await _context.SaveChangesAsync();
 
 }

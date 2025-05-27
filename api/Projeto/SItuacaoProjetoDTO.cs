@@ -1,4 +1,4 @@
-namespace api;
+namespace api.Projeto;
 public class SituacaoProjetoDTO
 {
     public int Atrasado { get; set; }

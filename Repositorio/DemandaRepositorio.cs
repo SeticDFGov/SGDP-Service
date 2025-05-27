@@ -1,15 +1,18 @@
 using api;
+using api.Demanda;
 using demanda_service.Migrations;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Graph.Drives.Item.Items.Item.Workbook.Functions.Iso_Ceiling;
 using Models;
+using Repositorio.Interface;
+using service;
 using Sprache;
 
 namespace Repositorio;
 
-public class DemandaRepositorio 
+public class DemandaRepositorio:IDemandaRepositorio 
 {
     public readonly AppDbContext _context;
     public DemandaRepositorio(AppDbContext context)
@@ -17,7 +20,7 @@ public class DemandaRepositorio
         _context = context;
     }
 
- public async Task<List<Dictionary<string, object>>> GetDemandaListItemsAsync()
+ public async Task<List<Demanda>> GetDemandasListItemsAsync()
 {
     try
     {
@@ -25,144 +28,111 @@ public class DemandaRepositorio
         var listItems = await _context.Demandas
             .Include(d => d.CATEGORIA)   
             .Include(d => d.NM_AREA_DEMANDANTE)  
-            .ToListAsync();
+            .ToListAsync() ?? throw new ApiException(ErrorCode.DemandasNaoEncontradas);
 
-        if (listItems == null || !listItems.Any())
+        var result = listItems.Select(item => new Demanda
         {
-            return new List<Dictionary<string, object>> {
-                new Dictionary<string, object> { { "message", "Demandas não encontradas." } }
-            };
-        }
-
-        var result = listItems.Select(item => new Dictionary<string, object>
-        {
-            { "ID", item.DemandaId },
-            { "NM_DEMANDA", item.NM_DEMANDA },
-            { "DT_ABERTURA", item.DT_ABERTURA },
-            { "DT_CONCLUSAO", item.DT_CONCLUSAO },
-            { "DT_SOLICITACAO", item.DT_SOLICITACAO },
-            { "CATEGORIA", item.CATEGORIA?.Nome }, // Usa o nome da categoria (evita erro se for null)
-            { "NM_AREA_DEMANDANTE", item.NM_AREA_DEMANDANTE?.NM_DEMANDANTE }, // Usa o nome do demandante (evita erro se for null)
-            { "NM_PO_DEMANDANTE", item.NM_PO_DEMANDANTE },
-            { "NM_PO_SUBTDCR", item.NM_PO_SUBTDCR },
-            { "NR_PROCESSO_SEI", item.NR_PROCESSO_SEI },
-            { "PATROCINADOR", item.PATROCINADOR },
-            { "PERIODICO", item.PERIODICO },
-            { "PERIODICIDADE", item.PERIODICIDADE },
-            { "STATUS", item.STATUS },
-            { "UNIDADE", item.UNIDADE }
+            DemandaId =item.DemandaId ,
+            NM_DEMANDA= item.NM_DEMANDA ,
+            DT_ABERTURA = item.DT_ABERTURA.HasValue ? item.DT_ABERTURA.Value.ToLocalTime() : (DateTime?)null,
+            DT_CONCLUSAO = item.DT_CONCLUSAO.HasValue ? item.DT_CONCLUSAO.Value.ToLocalTime() : (DateTime?)null,
+            DT_SOLICITACAO = item.DT_SOLICITACAO.HasValue ? item.DT_SOLICITACAO.Value.ToLocalTime() : (DateTime?)null,
+            CATEGORIA = item.CATEGORIA,
+            NM_AREA_DEMANDANTE = item.NM_AREA_DEMANDANTE,
+            NM_PO_DEMANDANTE = item.NM_PO_DEMANDANTE,
+            NM_PO_SUBTDCR = item.NM_PO_SUBTDCR,
+            NR_PROCESSO_SEI = item.NR_PROCESSO_SEI,
+            PATROCINADOR = item.PATROCINADOR,
+            PERIODICO = item.PERIODICO,
+            PERIODICIDADE = item.PERIODICIDADE,
+            STATUS = item.STATUS,
+            UNIDADE = item.UNIDADE
         }).ToList();
 
         return result;
     }
-    catch (Exception ex)
+    catch (Exception)
     {
-        return new List<Dictionary<string, object>> {
-            new Dictionary<string, object> { { "details", ex.Message } }
-        };
+        throw new ApiException(ErrorCode.ErroAoBuscarDemandas);
     }
 }
 
-public async Task CreateDemanda(DemandaDTO demanda)
+public async Task CreateDemanda(Demanda demanda)
 {
-    if (demanda.DT_SOLICITACAO.HasValue)
-        demanda.DT_SOLICITACAO = demanda.DT_SOLICITACAO.Value.ToUniversalTime();
-    
-    if (demanda.DT_ABERTURA.HasValue)
-        demanda.DT_ABERTURA = demanda.DT_ABERTURA.Value.ToUniversalTime();
-    
-    if (demanda.DT_CONCLUSAO.HasValue)
-        demanda.DT_CONCLUSAO = demanda.DT_CONCLUSAO.Value.ToUniversalTime();
+        try
+        {
+            if (demanda.DT_SOLICITACAO.HasValue)
+                demanda.DT_SOLICITACAO = demanda.DT_SOLICITACAO.Value.ToUniversalTime();
 
-    var categoria = await _context.Categorias
-        .FirstOrDefaultAsync(c => c.Nome == demanda.CATEGORIA);
+            if (demanda.DT_ABERTURA.HasValue)
+                demanda.DT_ABERTURA = demanda.DT_ABERTURA.Value.ToUniversalTime();
 
-    var demandante = await _context.AreaDemandantes
-        .FirstOrDefaultAsync(e => e.NM_DEMANDANTE == demanda.NM_AREA_DEMANDANTE);
+            if (demanda.DT_CONCLUSAO.HasValue)
+                demanda.DT_CONCLUSAO = demanda.DT_CONCLUSAO.Value.ToUniversalTime();
 
-    if (categoria == null)
-        throw new Exception("Categoria não encontrada.");
-    
-    if (demandante == null)
-        throw new Exception("Área demandante não encontrada.");
+            var categoria = await _context.Categorias
+            .FirstOrDefaultAsync(c => c.Nome == demanda.CATEGORIA.Nome) ?? throw new ApiException(ErrorCode.CategoriaNaoEncontrada);
 
-    Demanda demandaAdd = new Demanda{
-        NM_DEMANDA = demanda.NM_DEMANDA,
-        CATEGORIA = categoria,
-        NM_AREA_DEMANDANTE = demandante,
-        DT_ABERTURA = demanda.DT_ABERTURA,
-        DT_CONCLUSAO = demanda.DT_CONCLUSAO,
-        DT_SOLICITACAO = demanda.DT_SOLICITACAO,
-        UNIDADE = demanda.UNIDADE,
-        PERIODICIDADE = demanda.PERIODICIDADE,
-        PERIODICO = demanda.PERIODICO,
-        NM_PO_DEMANDANTE = demanda.NM_PO_DEMANDANTE,
-        NM_PO_SUBTDCR = demanda.NM_PO_SUBTDCR,
-        STATUS = demanda.STATUS,
-        NR_PROCESSO_SEI = demanda.NR_PROCESSO_SEI,
-        PATROCINADOR = demanda.PATROCINADOR
+            var demandante = await _context.AreaDemandantes
+                .FirstOrDefaultAsync(e => e.NM_DEMANDANTE == demanda.NM_AREA_DEMANDANTE.NM_DEMANDANTE) ?? throw new ApiException(ErrorCode.AreasDemandantesNaoEncontradas);
 
-    };
-    
-    _context.Demandas.Add(demandaAdd);
-    await _context.SaveChangesAsync();
+
+            Demanda demandaAdd = new Demanda
+            {
+                NM_DEMANDA = demanda.NM_DEMANDA,
+                CATEGORIA = categoria,
+                NM_AREA_DEMANDANTE = demandante,
+                DT_ABERTURA = demanda.DT_ABERTURA,
+                DT_CONCLUSAO = demanda.DT_CONCLUSAO,
+                DT_SOLICITACAO = demanda.DT_SOLICITACAO,
+                UNIDADE = demanda.UNIDADE,
+                PERIODICIDADE = demanda.PERIODICIDADE,
+                PERIODICO = demanda.PERIODICO,
+                NM_PO_DEMANDANTE = demanda.NM_PO_DEMANDANTE,
+                NM_PO_SUBTDCR = demanda.NM_PO_SUBTDCR,
+                STATUS = demanda.STATUS,
+                NR_PROCESSO_SEI = demanda.NR_PROCESSO_SEI,
+                PATROCINADOR = demanda.PATROCINADOR
+
+            };
+
+            _context.Demandas.Add(demandaAdd);
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception)
+        {
+            throw new ApiException(ErrorCode.ErroAoCriarDemanda);
+        }
 }
 
 
-public async Task<IResult> DeleteDemanda (int id)
+public async Task DeleteDemanda (int id)
 {   
-    var item = _context.Demandas.FirstOrDefault(e => e.DemandaId == id);
-
-    if(item == null)  return Results.NotFound();
+    var item = _context.Demandas.FirstOrDefault(e => e.DemandaId == id) ?? throw new ApiException(ErrorCode.DemandasNaoEncontradas);
 
     _context.Demandas.Remove(item);
     await _context.SaveChangesAsync();
-
-    return Results.Ok();
 }
-public async Task<IResult> EditDemanda(int id, DemandaDTO demandaAtualizada)
+public async Task EditDemanda(Demanda demanda)
 {
-    var demandaExistente = await _context.Demandas.FirstOrDefaultAsync(e => e.DemandaId == id);
-    var categoria = await _context.Categorias.FirstOrDefaultAsync(e => e.Nome == demandaAtualizada.CATEGORIA);
-    var demandante = await _context.AreaDemandantes.FirstOrDefaultAsync(e => e.NM_DEMANDANTE == demandaAtualizada.NM_AREA_DEMANDANTE);
-    if (demandaExistente == null)
-    {
-        return Results.NotFound();
-    }
-     // Atualiza os campos com os novos valores
-    
-    demandaExistente.NM_DEMANDA = demandaAtualizada.NM_DEMANDA;
-    demandaExistente.DT_ABERTURA = demandaAtualizada.DT_ABERTURA;
-    demandaExistente.DT_CONCLUSAO = demandaAtualizada.DT_CONCLUSAO;
-    demandaExistente.DT_SOLICITACAO = demandaAtualizada.DT_SOLICITACAO;
-    demandaExistente.NM_AREA_DEMANDANTE = demandante;
-    demandaExistente.NM_PO_DEMANDANTE = demandaAtualizada.NM_PO_DEMANDANTE;
-    demandaExistente.NM_PO_SUBTDCR = demandaAtualizada.NM_PO_SUBTDCR;
-    demandaExistente.NR_PROCESSO_SEI = demandaAtualizada.NR_PROCESSO_SEI;
-    demandaExistente.PATROCINADOR = demandaAtualizada.PATROCINADOR;
-    demandaExistente.PERIODICO = demandaAtualizada.PERIODICO;
-    demandaExistente.PERIODICIDADE = demandaAtualizada.PERIODICIDADE;
-    demandaExistente.STATUS = demandaAtualizada.STATUS;
-    demandaExistente.UNIDADE = demandaAtualizada.UNIDADE;
-    demandaExistente.CATEGORIA = categoria;
+    var demandaExistente = await _context.Demandas.FirstOrDefaultAsync(e => e.DemandaId == demanda.DemandaId) ?? throw new ApiException(ErrorCode.DemandasNaoEncontradas);
+    var categoria = await _context.Categorias.FirstOrDefaultAsync(e => e.Nome == demanda.CATEGORIA.Nome) ?? throw new ApiException(ErrorCode.CategoriaNaoEncontrada);
+    var demandante = await _context.AreaDemandantes.FirstOrDefaultAsync(e => e.NM_DEMANDANTE == demanda.NM_AREA_DEMANDANTE.NM_DEMANDANTE) ?? throw new ApiException(ErrorCode.AreasDemandantesNaoEncontradas);
     
     try
     {
-
+        _context.Demandas.Update(demandaExistente);
         await _context.SaveChangesAsync(); 
-        
-        return Results.Ok();
     }
-    catch (DbUpdateException ex)
+    catch (DbUpdateException)
     {
-        // Retorne o erro detalhado
-        return Results.StatusCode(500);
+        throw new ApiException(ErrorCode.ErroAoEditarDemanda);
     }
 }
 
-public async Task<Demanda> GetDemandaById(int id)
+public async Task<Demanda?> GetDemandaById(int id)
 {
-    Demanda demanda = await _context.Demandas.
+    Demanda? demanda = await _context.Demandas.
     Include(e => e.CATEGORIA)
     .Include(e => e.NM_AREA_DEMANDANTE)
     .FirstOrDefaultAsync(e => e.DemandaId == id);

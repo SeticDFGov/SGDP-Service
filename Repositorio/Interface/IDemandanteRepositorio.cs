@@ -5,6 +5,6 @@ namespace Repositorio.Interface;
 public interface IDemandanteRepositorio
 {
     Task<List<AreaDemandante>> GetDemandanteListItemsAsync();
-    Task CreateDemandante(AreaDemandante demandante);
-    Task DeleteDemandante(int id);
+    Task CreateDemandanteAsync(AreaDemandante demandante);
+    Task DeleteDemandanteAsync(int id);
 }

@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.Graph.Drives.Item.Items.Item.GetActivitiesByInterval;
 
-namespace api;
+namespace api.Demanda;
 
 public class DemandaDTO
 {

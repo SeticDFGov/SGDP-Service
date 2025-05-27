@@ -1,4 +1,4 @@
-namespace api;
+namespace api.Demanda;
 
 public class DetalhamentoDTO
 {

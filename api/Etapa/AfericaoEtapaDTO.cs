@@ -1,4 +1,4 @@
-namespace api;
+namespace api.Etapa;
 
 public class AfericaoEtapaDTO
 {

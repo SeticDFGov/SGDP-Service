@@ -5,6 +5,6 @@ namespace Repositorio.Interface;
 public interface ICategoriaRepositorio
 {
     Task<List<Categoria>> GetCategoriaListItemsAsync();
-    Task CreateCategoria(Categoria categoria);
-    Task DeleteCategoria(int id);
+    Task CreateCategoriaAsync(Categoria categoria);
+    Task DeleteCategoriaAsync(int id);
 }

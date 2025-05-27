@@ -1,10 +1,11 @@
 using api;
 using Microsoft.EntityFrameworkCore;
 using Models;
+using service;
 
 namespace Repositorio;
 
-public class DetalhamentoRepositorio
+public class DetalhamentoRepositorio: IDetalhamentoRepositorio
 {
     private readonly AppDbContext _context;
 
@@ -15,24 +16,30 @@ public class DetalhamentoRepositorio
     
     public async Task<List<Detalhamento>> GetAllDetalhamentos(int demandaId)
     {
-        return await _context.Detalhamentos.Where(d => d.DEMANDA.DemandaId == demandaId).ToListAsync();
+        return await _context.Detalhamentos.Where(d => d.DEMANDA.DemandaId == demandaId).ToListAsync() ?? throw new ApiException(ErrorCode.DetalhamentoNaoEncontrado);
     }
 
     public async Task<Detalhamento> GetDetalhamentoById(int id)
     {
-        return await _context.Detalhamentos.FindAsync(id);
+        return await _context.Detalhamentos.FindAsync(id) ?? throw new ApiException(ErrorCode.DetalhamentoNaoEncontrado);
     }
 
-    public async Task<Detalhamento> CreateDetalhamento(DetalhamentoDTO detalhamentoDTO)
+    public async Task CreateDetalhamento(Detalhamento detalhamentoDTO)
     {
-        var detalhamento = new Detalhamento
+        try
         {
-            DEMANDA = await _context.Demandas.FindAsync(detalhamentoDTO.DEMANDA),
-            DETALHAMENTO = detalhamentoDTO.DETALHAMENTO
-        };
-        await _context.Detalhamentos.AddAsync(detalhamento);
-        await _context.SaveChangesAsync();
-        return detalhamento;
+            var detalhamento = new Detalhamento
+            {
+                DEMANDA = await _context.Demandas.FindAsync(detalhamentoDTO.DEMANDA) ?? throw new ApiException(ErrorCode.DemandasNaoEncontradas),
+                DETALHAMENTO = detalhamentoDTO.DETALHAMENTO
+            };
+            await _context.Detalhamentos.AddAsync(detalhamento);
+            await _context.SaveChangesAsync();
+        }catch (Exception)
+        {
+            throw new ApiException(ErrorCode.ErroAoCriarDetalhamento);
+        }
+        
     }
     
 }
