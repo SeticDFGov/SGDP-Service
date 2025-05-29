@@ -22,7 +22,7 @@ public class EtapaController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetAllEtapas(int id)
     {
-        List<Etapa> items = await _repositorio.GetEtapaListItemsAsync(id);
+        List<EtapaModel> items = await _repositorio.GetEtapaListItemsAsync(id);
         if(items.Count() == 0)
         {
             return NotFound(new {message = "Etapas não encontradas para este projeto"});
