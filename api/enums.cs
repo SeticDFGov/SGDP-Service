@@ -38,4 +38,14 @@ public enum ErrorCode
     ErroAoBuscarDetalhamentos,
     [Description("Erro ao criar detalhamento")]
     ErroAoCriarDetalhamento,
+    [Description("Etapas não encontradas")]
+    EtapasNaoEncontradas,
+    [Description("Projeto não encontrado")]
+    ProjetoNaoEncontrado,
+    [Description("Erro ao criar etapa")]
+    ErroAoCriarEtapa,
+    [Description("Etapa nao encontrada")]
+    EtapaNaoEncontrada,
+    [Description("Erro ao editar etapa")]
+    ErroAoEditarEtapa,
 }
