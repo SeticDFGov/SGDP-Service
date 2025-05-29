@@ -15,11 +15,35 @@ public class EtapaRepositorio
         _context = context;
     }
 
-   public async Task<List<Etapa>> GetEtapaListItemsAsync(int id)
+   public async Task<List<EtapaModel>> GetEtapaListItemsAsync(int id)
 {
-   
-        List<Etapa> listItems =  _context.Etapas.Where(d => d.NM_PROJETO.projetoId == id).ToList();
-        return listItems;
+
+   var etapas = _context.Etapas
+        .Where(e => e.NM_PROJETO.projetoId == id)
+        .Join(
+            _context.Templates,
+            etapa => etapa.NM_ETAPA,
+            
+            template => template.NM_ETAPA,
+            (etapa, template) => new EtapaModel
+            {
+                EtapaProjetoId = etapa.EtapaProjetoId,
+                NM_ETAPA = etapa.NM_ETAPA,
+                RESPONSAVEL_ETAPA = etapa.RESPONSAVEL_ETAPA,
+                ANALISE = etapa.ANALISE,
+                PERCENT_TOTAL_ETAPA = etapa.PERCENT_TOTAL_ETAPA,
+                PERCENT_EXEC_ETAPA = etapa.PERCENT_EXEC_ETAPA,
+                DT_INICIO_PREVISTO = etapa.DT_INICIO_PREVISTO,
+                DT_TERMINO_PREVISTO = etapa.DT_TERMINO_PREVISTO,
+                DT_INICIO_REAL = etapa.DT_INICIO_REAL,
+                DT_TERMINO_REAL = etapa.DT_TERMINO_REAL,
+                Order = template.ORDER
+                // os campos calculados serão populados automaticamente pelas propriedades
+            }
+        )
+        .ToList();
+
+    return etapas;
     
     
 }
