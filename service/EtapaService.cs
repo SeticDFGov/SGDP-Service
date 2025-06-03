@@ -1,16 +1,19 @@
 using api;
+using api.Etapa;
+using api.Projeto;
 using Microsoft.EntityFrameworkCore;
 using Models;
 using Repositorio;
+using Repositorio.Interface;
 using TimeZoneConverter; 
 
 namespace service;
 
 public class EtapaService
 {
-    public readonly EtapaRepositorio _etapaRepositorio;
+    public readonly IEtapaRepositorio _etapaRepositorio;
     public readonly AppDbContext _context;
-    public EtapaService( EtapaRepositorio etapaRepositorio, AppDbContext context)
+    public EtapaService( IEtapaRepositorio etapaRepositorio, AppDbContext context)
     {
         _context = context;
         _etapaRepositorio = etapaRepositorio;
@@ -25,13 +28,11 @@ public class EtapaService
     decimal somaPercentExecReal = etapas.Sum(e => e.PERCENT_EXEC_REAL ?? 0);
     decimal somaPercentExecPlan = 0;
 
-    // Filtra datas não nulas antes de aplicar Min e Max
     var datasInicio = etapas.Where(e => e.DT_INICIO_PREVISTO.HasValue).Select(e => e.DT_INICIO_PREVISTO.Value);
     var datasTermino = etapas.Where(e => e.DT_TERMINO_PREVISTO.HasValue).Select(e => e.DT_TERMINO_PREVISTO.Value);
 
     if (!datasInicio.Any() || !datasTermino.Any())
     {
-        // Você pode lançar uma exceção ou retornar valores padrão, depende do seu caso
         return new PercentualEtapaDTO
         {
             PERCENT_PLANEJADO = 0,
@@ -41,8 +42,6 @@ public class EtapaService
 
     var inicioMin = datasInicio.Min();
     var terminoMax = datasTermino.Max();
-    Console.WriteLine($"Inicio Min: {inicioMin}");
-    Console.WriteLine($"Termino Max: {terminoMax}");
     var dataAtual = DateTime.UtcNow;
     var diffDays = (dataAtual - inicioMin).Days;
     var diffDaysTermino = 0;
@@ -51,7 +50,7 @@ public class EtapaService
     else
         diffDaysTermino = (dataAtual - inicioMin).Days;
     
-    if (diffDays == 0) diffDays = 1; // evita divisão por zero
+    if (diffDays == 0) diffDays = 1; 
 
     somaPercentExecPlan = diffDaysTermino*100 / (decimal)diffDays;
 

@@ -38,9 +38,7 @@ public async Task CreateProjetoByTemplate(Projeto projeto)
     using (var transaction = await _context.Database.BeginTransactionAsync())
     {
         try
-        {
-            Console.WriteLine("Iniciando transação...");
-            
+        {            
           
             _context.Projetos.Add(projeto);
             await _context.SaveChangesAsync();  

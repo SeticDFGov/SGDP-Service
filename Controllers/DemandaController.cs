@@ -1,25 +1,27 @@
 using api;
+using api.Demanda;
 using Microsoft.AspNetCore.Mvc;
 using Models;
 using Repositorio;
+using Repositorio.Interface;
 
 namespace Controllers;
 [ApiController]
 [Route("api/[controller]")]
 public class DemandaController : ControllerBase
 {
-    public readonly DemandaRepositorio _repositorio;
+    public readonly IDemandaRepositorio _repositorio;
 
-    public DemandaController(DemandaRepositorio repositorio)
+    public DemandaController(IDemandaRepositorio repositorio)
     {
         _repositorio = repositorio;
     }
 
     [HttpGet]
-    public Task<List<Dictionary<string, object>>> GetAllDemandandas()
+    public IActionResult GetAllDemandandas()
     {
-        var items = _repositorio.GetDemandaListItemsAsync();
-        return items;
+        var items = _repositorio.GetDemandasListItemsAsync();
+        return Ok(items);
     }
 
     [HttpPost]
@@ -37,19 +39,11 @@ public class DemandaController : ControllerBase
         return Ok();
     }
 
-    [HttpPut("{id}")]
-public async Task<IActionResult> EditDemanda([FromBody] DemandaDTO demanda, int id)
+    [HttpPut()]
+public IActionResult EditDemanda([FromBody] DemandaDTO demanda)
 {
-    try
-    {
-        var resultado = await _repositorio.EditDemanda(id, demanda); 
-        return Ok(resultado);
-    }
-    catch (Exception e)
-    {
-        Console.WriteLine(e);
-        return StatusCode(500);
-    }
+        _repositorio.EditDemanda(demanda); 
+        return Ok(demanda);
 }
 
 [HttpGet("{id}")]

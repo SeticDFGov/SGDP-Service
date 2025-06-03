@@ -1,30 +1,31 @@
 using Microsoft.AspNetCore.Mvc;
 using Models;
 using Repositorio;
+using Repositorio.Interface;
 
 namespace Controllers;
 [ApiController]
 [Route("api/[controller]")]
 public class CategoriaController : ControllerBase
 {
-    public readonly CategoriaRepositorio _repositorio;
+    public readonly ICategoriaRepositorio _repositorio;
 
-    public CategoriaController(CategoriaRepositorio repositorio)
+    public CategoriaController(ICategoriaRepositorio repositorio)
     {
         _repositorio = repositorio;
     }
 
     [HttpGet]
-    public Task<List<Dictionary<string, object>>> GetAllCategorias()
+    public IActionResult GetAllCategorias()
     {
         var items = _repositorio.GetCategoriaListItemsAsync();
-        return items;
+        return Ok(items);
     }
 
     [HttpPost]
     public IActionResult CreateCategoria([FromBody] Categoria categoria)
     {
-         _repositorio.CreateCategoria(categoria);
+         _repositorio.CreateCategoriaAsync(categoria);
        return Ok();
 
     }
@@ -32,7 +33,7 @@ public class CategoriaController : ControllerBase
     [HttpDelete("{id}")]
     public IActionResult DeleteCategoria(int id)
     {
-        _repositorio.DeleteCategoria(id);
+        _repositorio.DeleteCategoriaAsync(id);
         return Ok();
     }
 
