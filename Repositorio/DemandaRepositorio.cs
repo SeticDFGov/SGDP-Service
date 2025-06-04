@@ -57,7 +57,7 @@ public class DemandaRepositorio:IDemandaRepositorio
     }
 }
 
-public async Task CreateDemanda(Demanda demanda)
+public async Task CreateDemanda(DemandaDTO demanda)
 {
         try
         {
@@ -71,10 +71,10 @@ public async Task CreateDemanda(Demanda demanda)
                 demanda.DT_CONCLUSAO = demanda.DT_CONCLUSAO.Value.ToUniversalTime();
 
             var categoria = await _context.Categorias
-            .FirstOrDefaultAsync(c => c.Nome == demanda.CATEGORIA.Nome) ?? throw new ApiException(ErrorCode.CategoriaNaoEncontrada);
+            .FirstOrDefaultAsync(c => c.Nome == demanda.NM_DEMANDA) ?? throw new ApiException(ErrorCode.CategoriaNaoEncontrada);
 
             var demandante = await _context.AreaDemandantes
-                .FirstOrDefaultAsync(e => e.NM_DEMANDANTE == demanda.NM_AREA_DEMANDANTE.NM_DEMANDANTE) ?? throw new ApiException(ErrorCode.AreasDemandantesNaoEncontradas);
+                .FirstOrDefaultAsync(e => e.NM_DEMANDANTE == demanda.NM_AREA_DEMANDANTE) ?? throw new ApiException(ErrorCode.AreasDemandantesNaoEncontradas);
 
 
             Demanda demandaAdd = new Demanda
@@ -113,11 +113,11 @@ public async Task DeleteDemanda (int id)
     _context.Demandas.Remove(item);
     await _context.SaveChangesAsync();
 }
-public async Task EditDemanda(Demanda demanda)
+public async Task EditDemanda(DemandaDTO demanda)
 {
     var demandaExistente = await _context.Demandas.FirstOrDefaultAsync(e => e.DemandaId == demanda.DemandaId) ?? throw new ApiException(ErrorCode.DemandasNaoEncontradas);
-    var categoria = await _context.Categorias.FirstOrDefaultAsync(e => e.Nome == demanda.CATEGORIA.Nome) ?? throw new ApiException(ErrorCode.CategoriaNaoEncontrada);
-    var demandante = await _context.AreaDemandantes.FirstOrDefaultAsync(e => e.NM_DEMANDANTE == demanda.NM_AREA_DEMANDANTE.NM_DEMANDANTE) ?? throw new ApiException(ErrorCode.AreasDemandantesNaoEncontradas);
+    var categoria = await _context.Categorias.FirstOrDefaultAsync(e => e.Nome == demanda.NM_DEMANDA) ?? throw new ApiException(ErrorCode.CategoriaNaoEncontrada);
+    var demandante = await _context.AreaDemandantes.FirstOrDefaultAsync(e => e.NM_DEMANDANTE == demanda.NM_AREA_DEMANDANTE) ?? throw new ApiException(ErrorCode.AreasDemandantesNaoEncontradas);
     
     try
     {

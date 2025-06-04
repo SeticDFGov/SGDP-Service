@@ -1,4 +1,5 @@
 using api;
+using api.Demanda;
 using Microsoft.EntityFrameworkCore;
 using Models;
 using service;
@@ -24,7 +25,7 @@ public class DetalhamentoRepositorio: IDetalhamentoRepositorio
         return await _context.Detalhamentos.FindAsync(id) ?? throw new ApiException(ErrorCode.DetalhamentoNaoEncontrado);
     }
 
-    public async Task CreateDetalhamento(Detalhamento detalhamentoDTO)
+    public async Task CreateDetalhamento(DetalhamentoDTO detalhamentoDTO)
     {
         try
         {

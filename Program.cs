@@ -8,6 +8,7 @@ using Repositorio;
 using DotNetEnv;
 using service;
 using Microsoft.Identity.Client;
+using Repositorio.Interface;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,7 +56,7 @@ builder.Services.AddScoped<CategoriaRepositorio>();
 builder.Services.AddScoped<DemandanteRepositorio>();
 builder.Services.AddScoped<DemandaRepositorio>();
 builder.Services.AddScoped<ProjetoRepositorio>();
-builder.Services.AddScoped<EtapaRepositorio>();
+builder.Services.AddScoped<IEtapaRepositorio, EtapaRepositorio>();
 builder.Services.AddScoped<EtapaService>();
 builder.Services.AddScoped<ProjetoService>();
 builder.Services.AddScoped<DetalhamentoRepositorio>();

@@ -1,4 +1,5 @@
 using api;
+using api.Demanda;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Models;
@@ -29,7 +30,7 @@ public class DetalhamentoController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateDetalhamento(DetalhamentoDTO detalhamentoDTO)
     {
-        var novoDetalhamento = await _detalhamentoRepositorio.CreateDetalhamento(detalhamentoDTO);
-        return Ok(novoDetalhamento);
+        await _detalhamentoRepositorio.CreateDetalhamento(detalhamentoDTO);
+        return Ok();
     }
 }

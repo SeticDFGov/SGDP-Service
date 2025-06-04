@@ -1,4 +1,6 @@
 using api;
+using api.Etapa;
+using api.Projeto;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Models;

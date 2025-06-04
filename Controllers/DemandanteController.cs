@@ -15,16 +15,16 @@ public class DemandanteController : ControllerBase
     }
 
     [HttpGet]
-    public Task<List<Dictionary<string, object>>> GetAllDemandantes()
+    public IActionResult GetAllDemandantes()
     {
         var items = _repositorio.GetDemandanteListItemsAsync();
-        return items;
+        return Ok(items);
     }
 
     [HttpPost]
     public IActionResult CreateDemandante([FromBody] AreaDemandante demandante)
     {
-         _repositorio.CreateDemandante(demandante);
+         _repositorio.CreateDemandanteAsync(demandante);
        return Ok();
 
     }
@@ -32,7 +32,7 @@ public class DemandanteController : ControllerBase
     [HttpDelete("{id}")]
     public IActionResult DeleteDemandante(int id)
     {
-        _repositorio.DeleteDemandante(id);
+        _repositorio.DeleteDemandanteAsync(id);
         return Ok();
     }
 
