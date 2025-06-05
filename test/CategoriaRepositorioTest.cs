@@ -41,16 +41,15 @@ public class CategoriaRepositorioTests: TestBed<Base>, IDisposable
     [Fact]
     public async Task CreateCategoriaAsync_AddsCategoria()
     {
-        // Arrange
         var novaCategoria = new Categoria { CategoriaId = 2, Nome = "Nova" };
 
-        // Act
         await _categoriaRepositorio.CreateCategoriaAsync(novaCategoria);
 
-        // Assert
         var categoriaSalva = await _context.Categorias.FindAsync(2);
         Assert.NotNull(categoriaSalva);
         Assert.Equal("Nova", categoriaSalva.Nome);
+        _context.Categorias.Remove(categoriaSalva);
+        await _context.SaveChangesAsync();
     }
 
     [Fact]

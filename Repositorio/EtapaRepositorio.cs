@@ -1,4 +1,3 @@
-using api;
 using api.Etapa;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;

@@ -1,4 +1,3 @@
-using api;
 using api.Projeto;
 using Models;
 using Repositorio;
