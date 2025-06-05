@@ -21,11 +21,19 @@ public class DemandandeRepositorioTest : TestBed<Base>, IDisposable
     [Fact]
     public async Task GetDemandanteListItemsAsync_ReturnsDemandantes()
     {
-        _context.AreaDemandantes.Add(new AreaDemandante { AreaDemandanteID = 1, NM_SIGLA = "TestSIGLA", NM_DEMANDANTE = "Teste" });
+        var areaDemandante = new AreaDemandante
+        {
+            AreaDemandanteID = 1,
+            NM_SIGLA = "TestSIGLA",
+            NM_DEMANDANTE = "Teste"
+        };
+        _context.AreaDemandantes.Add(areaDemandante);
         await _context.SaveChangesAsync();
 
         var result = await _demandandanteRepositorio.GetDemandanteListItemsAsync();
         Assert.NotEmpty(result);
+        _context.AreaDemandantes.Remove(areaDemandante);
+        await _context.SaveChangesAsync();
     }
     [Fact]
     public async Task CreateDemandanteAsync_AddsDemandante()

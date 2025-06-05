@@ -27,14 +27,20 @@ public class CategoriaRepositorioTests: TestBed<Base>, IDisposable
     public async Task GetCategoriaListItemsAsync_ReturnsCategorias()
     {
 
-        _context.Categorias.Add(new Categoria { CategoriaId = 1, Nome = "Teste" });
+        var categoria = new Categoria
+        {
+            CategoriaId = 1,
+            Nome = "Teste"
+        };
+        _context.Categorias.Add(categoria);
         await _context.SaveChangesAsync();
 
-        
         var result = await _categoriaRepositorio.GetCategoriaListItemsAsync();
 
-     
+
         Assert.Equal("Teste", result.First().Nome);
+        _context.Categorias.Remove(categoria);
+        await _context.SaveChangesAsync();
     }
 
 

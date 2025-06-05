@@ -60,17 +60,25 @@ public async Task CreateDemanda(DemandaDTO demanda)
 {
         try
         {
-            if (demanda.DT_SOLICITACAO.HasValue)
-                demanda.DT_SOLICITACAO = demanda.DT_SOLICITACAO.Value.ToUniversalTime();
+            try
+            {
+                if (demanda.DT_SOLICITACAO.HasValue)
+                    demanda.DT_SOLICITACAO = demanda.DT_SOLICITACAO.Value.ToUniversalTime();
 
-            if (demanda.DT_ABERTURA.HasValue)
-                demanda.DT_ABERTURA = demanda.DT_ABERTURA.Value.ToUniversalTime();
+                if (demanda.DT_ABERTURA.HasValue)
+                    demanda.DT_ABERTURA = demanda.DT_ABERTURA.Value.ToUniversalTime();
 
-            if (demanda.DT_CONCLUSAO.HasValue)
-                demanda.DT_CONCLUSAO = demanda.DT_CONCLUSAO.Value.ToUniversalTime();
+                if (demanda.DT_CONCLUSAO.HasValue)
+                    demanda.DT_CONCLUSAO = demanda.DT_CONCLUSAO.Value.ToUniversalTime();
+            }
+            catch (Exception)
+            {
+                throw new ApiException(ErrorCode.DataInvalida);
+            }
+           
 
             var categoria = await _context.Categorias
-            .FirstOrDefaultAsync(c => c.Nome == demanda.NM_DEMANDA) ?? throw new ApiException(ErrorCode.CategoriaNaoEncontrada);
+            .FirstOrDefaultAsync(c => c.Nome == demanda.CATEGORIA) ?? throw new ApiException(ErrorCode.CategoriaNaoEncontrada);
 
             var demandante = await _context.AreaDemandantes
                 .FirstOrDefaultAsync(e => e.NM_DEMANDANTE == demanda.NM_AREA_DEMANDANTE) ?? throw new ApiException(ErrorCode.AreasDemandantesNaoEncontradas);
