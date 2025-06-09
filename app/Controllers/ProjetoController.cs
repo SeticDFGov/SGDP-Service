@@ -11,10 +11,10 @@ namespace Controllers;
 [Route("api/[controller]")]
 public class ProjetoController : ControllerBase
 {
-    public readonly ProjetoRepositorio _repositorio;
+    public readonly IProjetoRepositorio _repositorio;
 
     public readonly ProjetoService _projetoService;
-    public ProjetoController(ProjetoRepositorio repositorio, ProjetoService projetoService)
+    public ProjetoController(IProjetoRepositorio repositorio, ProjetoService projetoService)
     {
         _repositorio = repositorio;
         _projetoService = projetoService;

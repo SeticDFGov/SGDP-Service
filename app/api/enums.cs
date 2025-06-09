@@ -49,5 +49,6 @@ public enum ErrorCode
     [Description("Erro ao editar etapa")]
     ErroAoEditarEtapa,
     [Description("Data Inválida")]
-    DataInvalida,  
+    DataInvalida,
+    
 }

@@ -5,10 +5,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Graph.Drives.Item.Items.Item.Workbook.Functions.Iso_Ceiling;
 using Models;
+using service;
 
 namespace Repositorio;
 
-public class ProjetoRepositorio 
+public class ProjetoRepositorio : IProjetoRepositorio 
 {
     public readonly AppDbContext _context;
     public ProjetoRepositorio(AppDbContext context)
@@ -18,11 +19,11 @@ public class ProjetoRepositorio
 
    public async Task<List<Projeto>> GetProjetoListItemsAsync()
 {
-        List<Projeto?> listItems = await _context.Projetos.ToListAsync();
+        List<Projeto> listItems = await _context.Projetos.ToListAsync() ?? throw new ApiException(ErrorCode.ProjetoNaoEncontrado);
         return listItems;
 }
 
-public void CreateProjeto (Projeto projeto)
+public async Task CreateProjeto (Projeto projeto)
 {
     _context.Projetos.Add(projeto);
     _context.SaveChangesAsync();

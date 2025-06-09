@@ -6,9 +6,9 @@ namespace service;
 
 public class ProjetoService
 {
-    public readonly ProjetoRepositorio _projetoRepositorio;
+    public readonly IProjetoRepositorio _projetoRepositorio;
     public readonly AppDbContext _context;
-    public ProjetoService(ProjetoRepositorio projetoRepositorio, AppDbContext context)
+    public ProjetoService(IProjetoRepositorio projetoRepositorio, AppDbContext context)
     {
         _projetoRepositorio = projetoRepositorio;
         _context = context;
