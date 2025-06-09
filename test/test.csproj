@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\demanda_service.csproj" />
+    <ProjectReference Include="..\app\demanda_service.csproj" />
   </ItemGroup>
 
 </Project>

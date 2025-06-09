@@ -57,12 +57,13 @@ public class DemandaRepositorioTest : TestBed<Base>, IDisposable
         var areaDemandante = new AreaDemandante { AreaDemandanteID = 100, NM_SIGLA = "Area Teste", NM_DEMANDANTE = "Demandante Teste" };
         _context.Categorias.Add(categoria);
         _context.AreaDemandantes.Add(areaDemandante);
+        _context.SaveChanges();
         var novaDemanda = new DemandaDTO
         {
             NM_DEMANDA = "Nova Demanda",
-            DT_ABERTURA = DateTime.UtcNow,
-            DT_SOLICITACAO = DateTime.UtcNow,
-            DT_CONCLUSAO = DateTime.UtcNow,
+            DT_ABERTURA = DateTime.Now,
+            DT_SOLICITACAO = DateTime.Now,
+            DT_CONCLUSAO = DateTime.Now,
             CATEGORIA = "Categoria Teste", 
             NM_AREA_DEMANDANTE = "Demandante Teste", 
             NM_PO_DEMANDANTE = "PO Teste",
