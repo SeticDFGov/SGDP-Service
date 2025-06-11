@@ -1,5 +1,6 @@
 using Models;
 using Microsoft.EntityFrameworkCore;
+using app.Models;
 
 namespace Models
 {
@@ -17,5 +18,6 @@ namespace Models
         public DbSet<Template> Templates {get;set;}
         public DbSet<ProjetoAnalise> Analises {get;set;}
         public DbSet<Detalhamento> Detalhamentos {get;set;}
+        public DbSet<User> Users {get;set;}
     }
 }

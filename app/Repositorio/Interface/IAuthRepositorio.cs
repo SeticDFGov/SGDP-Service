@@ -1,0 +1,13 @@
+
+using app.Models;
+
+namespace Repositorio
+{
+    public interface IAuthRepositorio
+    {
+        Task<User?> GetUsuarioByAdUsernameAsync(string adUsername);
+        Task<User> CriarOuAtualizarUsuarioAsync(string nome, string email);
+        string GerarJwt(User usuario);
+        Task<LdapResponseDto?> ConsultarUsuarioNoAdAsync(string username);
+    }
+}

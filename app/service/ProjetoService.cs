@@ -1,6 +1,7 @@
 using api.Projeto;
 using Models;
 using Repositorio;
+using Repositorio.Interface;
 
 namespace service;
 

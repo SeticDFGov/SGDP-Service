@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Models;
 using Repositorio;
+using Repositorio.Interface;
 using service;
 
 namespace Controllers;

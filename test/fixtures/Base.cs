@@ -22,7 +22,6 @@ public class Base : TestBedFixture
 
         services.AddScoped<ICategoriaRepositorio, CategoriaRepositorio>();
         services.AddScoped<IDemandaRepositorio, DemandaRepositorio>();
-        services.AddScoped<IProjetoRepositorio, ProjetoRepositorio>();
         services.AddScoped<DetalhamentoRepositorio>();
         services.AddScoped<IDemandanteRepositorio, DemandanteRepositorio>();
 

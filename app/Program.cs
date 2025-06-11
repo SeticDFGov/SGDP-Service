@@ -9,6 +9,7 @@ using DotNetEnv;
 using service;
 using Microsoft.Identity.Client;
 using Repositorio.Interface;
+using api.Auth;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,9 +58,11 @@ builder.Services.AddScoped<IDemandanteRepositorio,DemandanteRepositorio>();
 builder.Services.AddScoped<DemandaRepositorio>();
 builder.Services.AddScoped<IProjetoRepositorio, ProjetoRepositorio>();
 builder.Services.AddScoped<IEtapaRepositorio, EtapaRepositorio>();
+builder.Services.AddScoped<IAuthRepositorio, AuthRepositorio>();
 builder.Services.AddScoped<EtapaService>();
 builder.Services.AddScoped<ProjetoService>();
 builder.Services.AddScoped<DetalhamentoRepositorio>();
+builder.Services.AddScoped<ConfigAuth>();
 builder.Services.AddSingleton<IConfidentialClientApplication>(sp =>
 {
     return ConfidentialClientApplicationBuilder.Create(clientId)
