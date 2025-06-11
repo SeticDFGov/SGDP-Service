@@ -19,5 +19,6 @@ namespace Models
         public DbSet<ProjetoAnalise> Analises {get;set;}
         public DbSet<Detalhamento> Detalhamentos {get;set;}
         public DbSet<User> Users {get;set;}
+        public DbSet<Unidade> Unidades {get;set;}
     }
 }

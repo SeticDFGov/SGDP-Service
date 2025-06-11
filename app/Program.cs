@@ -61,6 +61,7 @@ builder.Services.AddScoped<IEtapaRepositorio, EtapaRepositorio>();
 builder.Services.AddScoped<IAuthRepositorio, AuthRepositorio>();
 builder.Services.AddScoped<EtapaService>();
 builder.Services.AddScoped<ProjetoService>();
+builder.Services.AddScoped<HttpClient>();
 builder.Services.AddScoped<DetalhamentoRepositorio>();
 builder.Services.AddScoped<ConfigAuth>();
 builder.Services.AddSingleton<IConfidentialClientApplication>(sp =>

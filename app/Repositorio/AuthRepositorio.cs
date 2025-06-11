@@ -17,7 +17,7 @@ public class AuthRepositorio :IAuthRepositorio
     public AuthRepositorio(AppDbContext context, HttpClient http, ConfigAuth auth)
     {
         _context = context;
-         _http = http;
+        _http = http;
         _auth = auth;
     }
 
@@ -46,13 +46,17 @@ public class AuthRepositorio :IAuthRepositorio
 
         return usuario;
     }
-    public async Task<LdapResponseDto?> ConsultarUsuarioNoAdAsync(string username)
+    public User GetUser(string email)
+    {
+        var result =  _context.Users.FirstOrDefault(e => e.Email == email);
+        return result;
+    }
+    public async Task<LdapResponseDto?> ConsultarUsuarioNoAdAsync(string username, string senha)
     {   
-        var config = new ConfigAuth();
-        var url = config.url; 
+        
 
-        var requestBody = new LdapRequestDto { Email = username };
-        var response = await _http.PostAsJsonAsync(url, requestBody);
+        var requestBody = new LdapRequestDto { Email = username , Senha =senha };
+        var response = await _http.PostAsJsonAsync(_auth.url, requestBody);
 
         if (!response.IsSuccessStatusCode)
             return null;
@@ -65,9 +69,9 @@ public class AuthRepositorio :IAuthRepositorio
     {
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.Name, usuario.Nome),
-            new Claim(ClaimTypes.Email, usuario.Email),
-            new Claim("unidade", usuario.Unidade.ToString())
+            new Claim(ClaimTypes.Name, usuario.Nome??""),
+            new Claim(ClaimTypes.Email, usuario.Email ?? ""),
+            new Claim("Unidade", usuario.Unidade?.ToString() ?? "")
         };
 
       
@@ -82,5 +86,15 @@ public class AuthRepositorio :IAuthRepositorio
             signingCredentials: creds);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
-    }                                                                                                                                                                                                                                                   
+    }     
+
+    
+    public async Task CriarUnidade(UnidadeDTO unidade)
+    {
+        var unidade_add = new Unidade{
+            Nome = unidade.nome
+        };
+        _context.Unidades.Add(unidade_add);
+        await _context.SaveChangesAsync();
+    }                                                                                                                                                                                                                                               
 }

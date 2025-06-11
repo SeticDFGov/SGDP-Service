@@ -11,6 +11,6 @@ public class User
     [Required]
     public string Email { get; set; }
     
-    public Unidade Unidade {get;set;}
+    public Unidade? Unidade {get;set;}
 
 }
