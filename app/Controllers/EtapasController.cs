@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Models;
 using Repositorio;
+using Repositorio.Interface;
 using service;
 
 namespace Controllers;
@@ -13,10 +14,10 @@ namespace Controllers;
 [Route("api/[controller]")]
 public class EtapaController : ControllerBase
 {
-    public readonly EtapaRepositorio _repositorio;
+    public readonly IEtapaRepositorio _repositorio;
     public readonly EtapaService _service;
 
-    public EtapaController(EtapaRepositorio repositorio, EtapaService service)
+    public EtapaController(IEtapaRepositorio repositorio, EtapaService service)
     {
         _repositorio = repositorio;
         _service = service;

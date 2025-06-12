@@ -19,32 +19,37 @@ public class EtapaRepositorio : IEtapaRepositorio
 
    public async Task<List<EtapaModel>> GetEtapaListItemsAsync(int projetoId)
 {
-
-   var etapas = _context.Etapas
+var etapas = await _context.Etapas
         .Where(e => e.NM_PROJETO.projetoId == projetoId)
-        .Join(
+        .GroupJoin(
             _context.Templates,
             etapa => etapa.NM_ETAPA,
-            
             template => template.NM_ETAPA,
-            (etapa, template) => new EtapaModel
+            (etapa, templates) => new { etapa, templates }
+        )
+        .SelectMany(
+            joinResult => joinResult.templates.DefaultIfEmpty(),
+            (joinResult, template) => new EtapaModel
             {
-                EtapaProjetoId = etapa.EtapaProjetoId,
-                NM_ETAPA = etapa.NM_ETAPA,
-                RESPONSAVEL_ETAPA = etapa.RESPONSAVEL_ETAPA,
-                ANALISE = etapa.ANALISE,
-                PERCENT_TOTAL_ETAPA = etapa.PERCENT_TOTAL_ETAPA,
-                PERCENT_EXEC_ETAPA = etapa.PERCENT_EXEC_ETAPA,
-                DT_INICIO_PREVISTO = etapa.DT_INICIO_PREVISTO,
-                DT_TERMINO_PREVISTO = etapa.DT_TERMINO_PREVISTO,
-                DT_INICIO_REAL = etapa.DT_INICIO_REAL,
-                DT_TERMINO_REAL = etapa.DT_TERMINO_REAL,
-                Order = template.ORDER
+                EtapaProjetoId = joinResult.etapa.EtapaProjetoId,
+                NM_ETAPA = joinResult.etapa.NM_ETAPA,
+                RESPONSAVEL_ETAPA = joinResult.etapa.RESPONSAVEL_ETAPA,
+                ANALISE = joinResult.etapa.ANALISE,
+                PERCENT_TOTAL_ETAPA = joinResult.etapa.PERCENT_TOTAL_ETAPA,
+                PERCENT_EXEC_ETAPA = joinResult.etapa.PERCENT_EXEC_ETAPA,
+                DT_INICIO_PREVISTO = joinResult.etapa.DT_INICIO_PREVISTO,
+                DT_TERMINO_PREVISTO = joinResult.etapa.DT_TERMINO_PREVISTO,
+                DT_INICIO_REAL = joinResult.etapa.DT_INICIO_REAL,
+                DT_TERMINO_REAL = joinResult.etapa.DT_TERMINO_REAL,
+                Order = template != null ? template.ORDER : 0 // ou -1 se quiser sinalizar que não tem template
             }
         )
-        .ToList();
-    
-    return etapas ?? throw new ApiException(ErrorCode.EtapasNaoEncontradas);
+        .ToListAsync();
+
+    if (etapas == null || etapas.Count == 0)
+        throw new ApiException(ErrorCode.EtapasNaoEncontradas);
+
+    return etapas;
     
     
 }
