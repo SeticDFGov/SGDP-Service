@@ -1,4 +1,5 @@
 using api.Demanda;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Models;
@@ -7,6 +8,7 @@ using Repositorio;
 namespace Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class DetalhamentoController : ControllerBase
 {

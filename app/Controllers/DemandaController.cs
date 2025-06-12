@@ -1,4 +1,5 @@
 using api.Demanda;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Models;
 using Repositorio;
@@ -6,6 +7,7 @@ using Repositorio.Interface;
 
 namespace Controllers;
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class DemandaController : ControllerBase
 {
@@ -17,9 +19,9 @@ public class DemandaController : ControllerBase
     }
 
     [HttpGet]
-    public IActionResult GetAllDemandandas()
+    public async Task<IActionResult> GetAllDemandandas()
     {
-        var items = _repositorio.GetDemandasListItemsAsync();
+        var items = await _repositorio.GetDemandasListItemsAsync();
         return Ok(items);
     }
 
@@ -32,16 +34,16 @@ public class DemandaController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    public IActionResult DeleteDemanda(int id)
+    public async Task<IActionResult> DeleteDemanda(int id)
     {
-        _repositorio.DeleteDemanda(id);
+        await _repositorio.DeleteDemanda(id);
         return Ok();
     }
 
     [HttpPut()]
-public IActionResult EditDemanda([FromBody] DemandaDTO demanda)
+public async Task<IActionResult> EditDemanda([FromBody] DemandaDTO demanda)
 {
-        _repositorio.EditDemanda(demanda); 
+        await _repositorio.EditDemanda(demanda); 
         return Ok(demanda);
 }
 

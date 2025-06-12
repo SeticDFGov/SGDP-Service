@@ -1,5 +1,6 @@
 using api.Etapa;
 using api.Projeto;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Models;
@@ -8,6 +9,7 @@ using service;
 
 namespace Controllers;
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class EtapaController : ControllerBase
 {

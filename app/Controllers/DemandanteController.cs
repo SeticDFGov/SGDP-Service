@@ -1,9 +1,12 @@
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Models;
 using Repositorio;
 
 namespace Controllers;
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class DemandanteController : ControllerBase
 {
@@ -15,24 +18,24 @@ public class DemandanteController : ControllerBase
     }
 
     [HttpGet]
-    public IActionResult GetAllDemandantes()
+    public async Task<IActionResult> GetAllDemandantes()
     {
-        var items = _repositorio.GetDemandanteListItemsAsync();
+        var items = await _repositorio.GetDemandanteListItemsAsync();
         return Ok(items);
     }
 
     [HttpPost]
-    public IActionResult CreateDemandante([FromBody] AreaDemandante demandante)
+    public async Task<IActionResult> CreateDemandante([FromBody] AreaDemandante demandante)
     {
-         _repositorio.CreateDemandanteAsync(demandante);
+       await  _repositorio.CreateDemandanteAsync(demandante);
        return Ok();
 
     }
 
     [HttpDelete("{id}")]
-    public IActionResult DeleteDemandante(int id)
+    public async Task<IActionResult> DeleteDemandante(int id)
     {
-        _repositorio.DeleteDemandanteAsync(id);
+        await _repositorio.DeleteDemandanteAsync(id);
         return Ok();
     }
 

@@ -10,6 +10,7 @@ using service;
 using Microsoft.Identity.Client;
 using Repositorio.Interface;
 using api.Auth;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,7 +54,7 @@ var clientSecret = Env.GetString("ClientSecret");
 var tenantId = Env.GetString("TenantId");
 
 
-builder.Services.AddScoped<CategoriaRepositorio>();
+builder.Services.AddScoped<ICategoriaRepositorio,CategoriaRepositorio>();
 builder.Services.AddScoped<IDemandanteRepositorio,DemandanteRepositorio>();
 builder.Services.AddScoped<DemandaRepositorio>();
 builder.Services.AddScoped<IProjetoRepositorio, ProjetoRepositorio>();
@@ -74,7 +75,40 @@ builder.Services.AddSingleton<IConfidentialClientApplication>(sp =>
 });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Minha API", Version = "v1" });
+
+    
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "Insira o token JWT no formato: Bearer {seu token}",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
+
+    
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                },
+                Scheme = "oauth2",
+                Name = "Bearer",
+                In = ParameterLocation.Header,
+            },
+            new List<string>()
+        }
+    });
+});
+
 
 
 var key = Encoding.UTF8.GetBytes(Env.GetString("JWT_KEY") ?? throw new InvalidOperationException("Chave JWT não configurada."));

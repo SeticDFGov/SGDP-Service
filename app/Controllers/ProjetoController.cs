@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using api.Projeto;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Models;
@@ -9,6 +10,7 @@ using service;
 
 namespace Controllers;
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class ProjetoController : ControllerBase
 {
@@ -41,9 +43,9 @@ public class ProjetoController : ControllerBase
     }
 
     [HttpPost]
-    public IActionResult CreateProjeto([FromBody] Projeto projeto)
+    public async Task<IActionResult> CreateProjeto([FromBody] Projeto projeto)
     {
-         _repositorio.CreateProjeto(projeto);
+       await  _repositorio.CreateProjeto(projeto);
        return Ok();
 
     }

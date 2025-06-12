@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Models;
 using Repositorio;
@@ -5,6 +6,7 @@ using Repositorio.Interface;
 
 namespace Controllers;
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class CategoriaController : ControllerBase
 {
@@ -16,24 +18,24 @@ public class CategoriaController : ControllerBase
     }
 
     [HttpGet]
-    public IActionResult GetAllCategorias()
+    public async Task<IActionResult> GetAllCategorias()
     {
-        var items = _repositorio.GetCategoriaListItemsAsync();
+        var items = await _repositorio.GetCategoriaListItemsAsync();
         return Ok(items);
     }
 
     [HttpPost]
-    public IActionResult CreateCategoria([FromBody] Categoria categoria)
+    public async Task<IActionResult> CreateCategoria([FromBody] Categoria categoria)
     {
-         _repositorio.CreateCategoriaAsync(categoria);
+       await  _repositorio.CreateCategoriaAsync(categoria);
        return Ok();
 
     }
 
     [HttpDelete("{id}")]
-    public IActionResult DeleteCategoria(int id)
+    public async Task<IActionResult> DeleteCategoria(int id)
     {
-        _repositorio.DeleteCategoriaAsync(id);
+        await _repositorio.DeleteCategoriaAsync(id);
         return Ok();
     }
 
