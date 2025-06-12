@@ -9,7 +9,7 @@ using Models;
 
 namespace Repositorio;
 
-public class AuthRepositorio :IAuthRepositorio
+public class AuthRepositorio : IAuthRepositorio
 {
     private readonly AppDbContext _context;
     private readonly HttpClient _http;
@@ -48,14 +48,14 @@ public class AuthRepositorio :IAuthRepositorio
     }
     public User GetUser(string email)
     {
-        var result =  _context.Users.FirstOrDefault(e => e.Email == email);
+        var result = _context.Users.FirstOrDefault(e => e.Email == email);
         return result;
     }
     public async Task<LdapResponseDto?> ConsultarUsuarioNoAdAsync(string username, string senha)
-    {   
-        
+    {
 
-        var requestBody = new LdapRequestDto { Email = username , Senha =senha };
+
+        var requestBody = new LdapRequestDto { Email = username, Senha = senha };
         var response = await _http.PostAsJsonAsync(_auth.url, requestBody);
 
         if (!response.IsSuccessStatusCode)
@@ -74,7 +74,7 @@ public class AuthRepositorio :IAuthRepositorio
             new Claim("Unidade", usuario.Unidade?.ToString() ?? "")
         };
 
-      
+
         var chave = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_auth.Key));
         var creds = new SigningCredentials(chave, SecurityAlgorithms.HmacSha256);
 
@@ -86,15 +86,31 @@ public class AuthRepositorio :IAuthRepositorio
             signingCredentials: creds);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
-    }     
+    }
 
-    
+
     public async Task CriarUnidade(UnidadeDTO unidade)
     {
-        var unidade_add = new Unidade{
+        var unidade_add = new Unidade
+        {
             Nome = unidade.nome
         };
         _context.Unidades.Add(unidade_add);
         await _context.SaveChangesAsync();
-    }                                                                                                                                                                                                                                               
+    }
+
+    public async Task InformarUnidadeUsuario(string email, string unidadeId)
+    {
+        var usuario = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+        var unidade = await _context.Unidades.FirstOrDefaultAsync(u => u.id == Guid.Parse(unidadeId));
+        usuario.Unidade = unidade;
+        _context.Users.Update(usuario);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<List<Unidade>> GetUnidadesAsync()
+    {
+        return await _context.Unidades.ToListAsync();
+    }
+
 }

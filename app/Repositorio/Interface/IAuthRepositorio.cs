@@ -12,5 +12,7 @@ namespace Repositorio
         Task<LdapResponseDto?> ConsultarUsuarioNoAdAsync(string username, string senha);
         Task CriarUnidade(UnidadeDTO unidade);
         User GetUser(string email);
+        Task InformarUnidadeUsuario(string email, string unidadeId);
+        Task<List<Unidade>> GetUnidadesAsync();
     }
 }
