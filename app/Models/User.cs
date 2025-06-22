@@ -11,6 +11,8 @@ public class User
     [Required]
     public string Email { get; set; }
     
+    public string Perfil { get; set; } = "basico";
+    
     public Unidade? Unidade {get;set;}
 
 }

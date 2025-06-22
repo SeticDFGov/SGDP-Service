@@ -48,7 +48,7 @@ public class AuthRepositorio : IAuthRepositorio
     }
     public User GetUser(string email)
     {
-        var result = _context.Users.FirstOrDefault(e => e.Email == email);
+        var result = _context.Users.Include(e => e.Unidade).FirstOrDefault(e => e.Email == email);
         return result;
     }
     public async Task<LdapResponseDto?> ConsultarUsuarioNoAdAsync(string username, string senha)
@@ -71,7 +71,8 @@ public class AuthRepositorio : IAuthRepositorio
         {
             new Claim(ClaimTypes.Name, usuario.Nome??""),
             new Claim(ClaimTypes.Email, usuario.Email ?? ""),
-            new Claim("Unidade", usuario.Unidade?.ToString() ?? "")
+            new Claim("Unidade", usuario.Unidade?.ToString() ?? ""),
+            new Claim("Perfil", usuario.Perfil ?? "basico")
         };
 
 
@@ -113,4 +114,34 @@ public class AuthRepositorio : IAuthRepositorio
         return await _context.Unidades.ToListAsync();
     }
 
+    public async Task<bool> AlterarPerfilUsuarioAsync(string emailUsuario, string novoPerfil, string emailAdmin)
+    {
+        var admin = await _context.Users.FirstOrDefaultAsync(u => u.Email == emailAdmin);
+        if (admin?.Perfil != "admin")
+            return false;
+
+        var usuario = await _context.Users.FirstOrDefaultAsync(u => u.Email == emailUsuario);
+        if (usuario == null)
+            return false;
+
+        usuario.Perfil = novoPerfil;
+        _context.Users.Update(usuario);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> VerificarSeAdminAsync(string email)
+    {
+        var usuario = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+        return usuario?.Perfil == "admin";
+    }
+
+    public async Task<List<User>?> ListarUsuariosAsync(string emailAdmin)
+    {
+        var admin = await _context.Users.FirstOrDefaultAsync(u => u.Email == emailAdmin);
+        if (admin?.Perfil != "admin")
+            return null;
+
+        return await _context.Users.Include(u => u.Unidade).ToListAsync();
+    }
 }

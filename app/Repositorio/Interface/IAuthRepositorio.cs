@@ -1,4 +1,3 @@
-
 using api.Auth;
 using app.Models;
 
@@ -14,5 +13,8 @@ namespace Repositorio
         User GetUser(string email);
         Task InformarUnidadeUsuario(string email, string unidadeId);
         Task<List<Unidade>> GetUnidadesAsync();
+        Task<bool> AlterarPerfilUsuarioAsync(string emailUsuario, string novoPerfil, string emailAdmin);
+        Task<bool> VerificarSeAdminAsync(string email);
+        Task<List<User>?> ListarUsuariosAsync(string emailAdmin);
     }
 }

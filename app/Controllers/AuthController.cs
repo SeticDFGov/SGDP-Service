@@ -53,4 +53,58 @@ public class AuthController : ControllerBase
         return Ok(unidades);
     }
 
+    [HttpGet("user/{email}")]
+    public async Task<IActionResult> GetUserByEmail(string email)
+    {
+        var user = _authRepositorio.GetUser(email);
+        if (user == null)
+        {
+            return NotFound("Usuário não encontrado.");
+        }
+        return Ok(user);
+    }
+
+    [HttpPut("alterar-perfil")]
+    public async Task<IActionResult> AlterarPerfilUsuario([FromBody] PerfilDTO request, [FromHeader] string adminEmail)
+    {
+        if (string.IsNullOrEmpty(adminEmail))
+        {
+            return BadRequest("Email do administrador é obrigatório.");
+        }
+
+        var sucesso = await _authRepositorio.AlterarPerfilUsuarioAsync(request.Email, request.Perfil, adminEmail);
+        
+        if (!sucesso)
+        {
+            return BadRequest("Não foi possível alterar o perfil. Verifique se você é admin e se o usuário existe.");
+        }
+
+        return Ok("Perfil alterado com sucesso.");
+    }
+
+    [HttpGet("verificar-admin/{email}")]
+    public async Task<IActionResult> VerificarSeAdmin(string email)
+    {
+        var isAdmin = await _authRepositorio.VerificarSeAdminAsync(email);
+        return Ok(new { isAdmin });
+    }
+
+    [HttpGet("usuarios")]
+    public async Task<IActionResult> ListarUsuarios([FromHeader] string adminEmail)
+    {
+        if (string.IsNullOrEmpty(adminEmail))
+        {
+            return BadRequest("Email do administrador é obrigatório.");
+        }
+
+        var usuarios = await _authRepositorio.ListarUsuariosAsync(adminEmail);
+        
+        if (usuarios == null)
+        {
+           return Unauthorized("Apenas administradores podem listar usuários.");
+ 
+        }
+
+        return Ok(usuarios);
+    }
 }
