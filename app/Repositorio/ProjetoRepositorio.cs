@@ -1,4 +1,3 @@
-
 using api.Projeto;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -18,9 +17,9 @@ public class ProjetoRepositorio : IProjetoRepositorio
         _context = context;
     }
 
-   public async Task<List<Projeto>> GetProjetoListItemsAsync()
+   public async Task<List<Projeto>> GetProjetoListItemsAsync(string unidade)
 {
-        List<Projeto> listItems = await _context.Projetos.ToListAsync() ?? throw new ApiException(ErrorCode.ProjetoNaoEncontrado);
+        List<Projeto> listItems = await _context.Projetos.Where(p => p.UNIDADE == unidade).ToListAsync() ?? throw new ApiException(ErrorCode.ProjetoNaoEncontrado);
         return listItems;
 }
 

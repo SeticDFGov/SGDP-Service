@@ -16,5 +16,6 @@ namespace Repositorio
         Task<bool> AlterarPerfilUsuarioAsync(string emailUsuario, string novoPerfil, string emailAdmin);
         Task<bool> VerificarSeAdminAsync(string email);
         Task<List<User>?> ListarUsuariosAsync(string emailAdmin);
+        Task<bool> ModificarUnidadeUsuario(string email, string unidadeId, string adminEmail);
     }
 }

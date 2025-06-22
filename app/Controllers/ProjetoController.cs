@@ -24,9 +24,9 @@ public class ProjetoController : ControllerBase
     }
 
     [HttpGet]
-    public Task<List<Projeto>> GetAllProjetos()
+    public Task<List<Projeto>> GetAllProjetos([FromQuery] string unidade)
     {
-        var items = _repositorio.GetProjetoListItemsAsync();
+        var items = _repositorio.GetProjetoListItemsAsync(unidade);
         return items;
     }
 

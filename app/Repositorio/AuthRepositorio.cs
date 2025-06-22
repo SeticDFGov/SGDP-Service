@@ -144,4 +144,24 @@ public class AuthRepositorio : IAuthRepositorio
 
         return await _context.Users.Include(u => u.Unidade).ToListAsync();
     }
+
+    public async Task<bool> ModificarUnidadeUsuario(string email, string unidadeId, string adminEmail)
+    {
+        var admin = await _context.Users.FirstOrDefaultAsync(u => u.Email == adminEmail);
+        if (admin?.Perfil != "admin")
+            return false;
+
+        var usuario = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+        if (usuario == null)
+            return false;
+
+        var unidade = await _context.Unidades.FirstOrDefaultAsync(u => u.id == Guid.Parse(unidadeId));
+        if (unidade == null)
+            return false;
+
+        usuario.Unidade = unidade;
+        _context.Users.Update(usuario);
+        await _context.SaveChangesAsync();
+        return true;
+    }
 }

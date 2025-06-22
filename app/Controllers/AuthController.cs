@@ -107,4 +107,22 @@ public class AuthController : ControllerBase
 
         return Ok(usuarios);
     }
+
+    [HttpPut("modificar-unidade")]
+    public async Task<IActionResult> ModificarUnidadeUsuario([FromBody] InformUnidadeUsuario request, [FromHeader] string adminEmail)
+    {
+        if (string.IsNullOrEmpty(adminEmail))
+        {
+            return BadRequest("Email do administrador é obrigatório.");
+        }
+        
+        var sucesso = await _authRepositorio.ModificarUnidadeUsuario(request.email, request.unidadeId, adminEmail);
+        
+        if (!sucesso)
+        {
+            return BadRequest("Não foi possível alterar a unidade do usuário. Verifique se você é admin e se o usuário e a unidade existem.");
+        }
+
+        return Ok("Unidade do usuário alterada com sucesso.");
+    }
 }
