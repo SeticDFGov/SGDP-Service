@@ -15,12 +15,14 @@ namespace Controllers;
 public class ProjetoController : ControllerBase
 {
     public readonly IProjetoRepositorio _repositorio;
-
     public readonly ProjetoService _projetoService;
-    public ProjetoController(IProjetoRepositorio repositorio, ProjetoService projetoService)
+    public readonly AppDbContext _context;
+
+    public ProjetoController(IProjetoRepositorio repositorio, ProjetoService projetoService, AppDbContext context)
     {
         _repositorio = repositorio;
         _projetoService = projetoService;
+        _context = context;
     }
 
     [HttpGet]
@@ -43,19 +45,57 @@ public class ProjetoController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreateProjeto([FromBody] Projeto projeto)
+    public async Task<IActionResult> CreateProjeto([FromBody] ProjetoDTO dto)
     {
-       await  _repositorio.CreateProjeto(projeto);
-       return Ok();
-
+        var unidade = await _context.Unidades.FindAsync(dto.UnidadeId);
+        var esteira = await _context.Esteiras.FindAsync(dto.EsteiraId);
+        if (unidade == null || esteira == null)
+            return BadRequest("Unidade ou Esteira não encontrada");
+        var projeto = new Projeto
+        {
+            NM_PROJETO = dto.NM_PROJETO,
+            GERENTE_PROJETO = dto.GERENTE_PROJETO,
+            SITUACAO = dto.SITUACAO,
+            NR_PROCESSO_SEI = dto.NR_PROCESSO_SEI,
+            NM_AREA_DEMANDANTE = dto.NM_AREA_DEMANDANTE,
+            ANO = dto.ANO,
+            TEMPLATE = dto.TEMPLATE,
+            PROFISCOII = dto.PROFISCOII,
+            PDTIC2427 = dto.PDTIC2427,
+            PTD2427 = dto.PTD2427,
+            valorEstimado = dto.valorEstimado,
+            Unidade = unidade,
+            Esteira = esteira
+        };
+        await _repositorio.CreateProjeto(projeto);
+        return Ok();
     }
 
     [HttpPost("template")]
-    public async Task<IActionResult> CreateProjetoByTemplate([FromBody] Projeto projeto)
+    public async Task<IActionResult> CreateProjetoByTemplate([FromBody] ProjetoDTO dto)
     {
+        var unidade = await _context.Unidades.FindAsync(dto.UnidadeId);
+        var esteira = await _context.Esteiras.FindAsync(dto.EsteiraId);
+        if (unidade == null || esteira == null)
+            return BadRequest("Unidade ou Esteira não encontrada");
+        var projeto = new Projeto
+        {
+            NM_PROJETO = dto.NM_PROJETO,
+            GERENTE_PROJETO = dto.GERENTE_PROJETO,
+            SITUACAO = dto.SITUACAO,
+            NR_PROCESSO_SEI = dto.NR_PROCESSO_SEI,
+            NM_AREA_DEMANDANTE = dto.NM_AREA_DEMANDANTE,
+            ANO = dto.ANO,
+            TEMPLATE = dto.TEMPLATE,
+            PROFISCOII = dto.PROFISCOII,
+            PDTIC2427 = dto.PDTIC2427,
+            PTD2427 = dto.PTD2427,
+            valorEstimado = dto.valorEstimado,
+            Unidade = unidade,
+            Esteira = esteira
+        };
         await _repositorio.CreateProjetoByTemplate(projeto);
-       return Ok();
-
+        return Ok();
     }
     [HttpPost("analise/{id}")]
     public async Task<IActionResult> CreateAnalise([FromBody] ProjetoAnaliseDTO projeto)

@@ -19,7 +19,7 @@ public class ProjetoRepositorio : IProjetoRepositorio
 
    public async Task<List<Projeto>> GetProjetoListItemsAsync(string unidade)
 {
-        List<Projeto> listItems = await _context.Projetos.Where(p => p.UNIDADE == unidade).ToListAsync() ?? throw new ApiException(ErrorCode.ProjetoNaoEncontrado);
+        List<Projeto> listItems = await _context.Projetos.Where(p => p.Unidade.Nome == unidade).ToListAsync() ?? throw new ApiException(ErrorCode.ProjetoNaoEncontrado);
         return listItems;
 }
 
@@ -51,13 +51,14 @@ public async Task CreateProjetoByTemplate(Projeto projeto)
 
         
 
+            
+            Console.WriteLine(templates.Count);
+                if (templates.Count == 0)
+                {
+                    await transaction.CommitAsync();
+                    return;
+                }
             _context.Attach(projeto);
-
-            if (templates.Count == 0)
-            {
-                await transaction.CommitAsync();
-                   
-            }
             Console.WriteLine("Projeto anexado ao contexto.");
 
             foreach (Template template in templates)
