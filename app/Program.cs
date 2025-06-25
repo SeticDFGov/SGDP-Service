@@ -73,6 +73,8 @@ builder.Services.AddSingleton<IConfidentialClientApplication>(sp =>
         .WithAuthority(new Uri($"https://login.microsoftonline.com/{tenantId}"))
         .Build();
 });
+builder.Services.AddScoped<IEsteiraRepositorio, EsteiraRepositorio>();
+builder.Services.AddScoped<IEsteiraService, EsteiraService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
