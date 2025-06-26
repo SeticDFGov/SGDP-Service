@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace demanda_service.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250624152507_AreaDemandanteRelacionamentoProjeto")]
-    partial class AreaDemandanteRelacionamentoProjeto
+    [Migration("20250626142149_demandante_add_projeto")]
+    partial class demandante_add_projeto
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -244,7 +244,7 @@ namespace demanda_service.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<int?>("AreaDemandanteID")
+                    b.Property<int?>("AREA_DEMANDANTEAreaDemandanteID")
                         .HasColumnType("integer");
 
                     b.Property<Guid?>("EsteiraId")
@@ -288,7 +288,7 @@ namespace demanda_service.Migrations
 
                     b.HasKey("projetoId");
 
-                    b.HasIndex("AreaDemandanteID");
+                    b.HasIndex("AREA_DEMANDANTEAreaDemandanteID");
 
                     b.HasIndex("EsteiraId");
 
@@ -440,9 +440,9 @@ namespace demanda_service.Migrations
 
             modelBuilder.Entity("Models.Projeto", b =>
                 {
-                    b.HasOne("Models.AreaDemandante", "AreaDemandante")
+                    b.HasOne("Models.AreaDemandante", "AREA_DEMANDANTE")
                         .WithMany()
-                        .HasForeignKey("AreaDemandanteID");
+                        .HasForeignKey("AREA_DEMANDANTEAreaDemandanteID");
 
                     b.HasOne("Models.Esteira", "Esteira")
                         .WithMany()
@@ -452,7 +452,7 @@ namespace demanda_service.Migrations
                         .WithMany()
                         .HasForeignKey("Unidadeid");
 
-                    b.Navigation("AreaDemandante");
+                    b.Navigation("AREA_DEMANDANTE");
 
                     b.Navigation("Esteira");
 

@@ -70,7 +70,7 @@ namespace demanda_service.Migrations
 
                     b.HasIndex("NM_PROJETOprojetoId");
 
-                    b.ToTable("Etapas");
+                    b.ToTable("Etapas", (string)null);
                 });
 
             modelBuilder.Entity("Models.AreaDemandante", b =>
@@ -93,7 +93,7 @@ namespace demanda_service.Migrations
 
                     b.HasKey("AreaDemandanteID");
 
-                    b.ToTable("AreaDemandantes");
+                    b.ToTable("AreaDemandantes", (string)null);
                 });
 
             modelBuilder.Entity("Models.Categoria", b =>
@@ -111,7 +111,7 @@ namespace demanda_service.Migrations
 
                     b.HasKey("CategoriaId");
 
-                    b.ToTable("Categorias");
+                    b.ToTable("Categorias", (string)null);
                 });
 
             modelBuilder.Entity("Models.Demanda", b =>
@@ -188,7 +188,7 @@ namespace demanda_service.Migrations
 
                     b.HasIndex("NM_AREA_DEMANDANTEAreaDemandanteID");
 
-                    b.ToTable("Demandas");
+                    b.ToTable("Demandas", (string)null);
                 });
 
             modelBuilder.Entity("Models.Detalhamento", b =>
@@ -210,7 +210,7 @@ namespace demanda_service.Migrations
 
                     b.HasIndex("DemandaId");
 
-                    b.ToTable("Detalhamentos");
+                    b.ToTable("Detalhamentos", (string)null);
                 });
 
             modelBuilder.Entity("Models.Esteira", b =>
@@ -226,7 +226,7 @@ namespace demanda_service.Migrations
 
                     b.HasKey("EsteiraId");
 
-                    b.ToTable("Esteiras");
+                    b.ToTable("Esteiras", (string)null);
                 });
 
             modelBuilder.Entity("Models.Projeto", b =>
@@ -241,14 +241,13 @@ namespace demanda_service.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<int?>("AREA_DEMANDANTEAreaDemandanteID")
+                        .HasColumnType("integer");
+
                     b.Property<Guid?>("EsteiraId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("GERENTE_PROJETO")
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
-
-                    b.Property<string>("NM_AREA_DEMANDANTE")
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
@@ -286,11 +285,13 @@ namespace demanda_service.Migrations
 
                     b.HasKey("projetoId");
 
+                    b.HasIndex("AREA_DEMANDANTEAreaDemandanteID");
+
                     b.HasIndex("EsteiraId");
 
                     b.HasIndex("Unidadeid");
 
-                    b.ToTable("Projetos");
+                    b.ToTable("Projetos", (string)null);
                 });
 
             modelBuilder.Entity("Models.ProjetoAnalise", b =>
@@ -317,7 +318,7 @@ namespace demanda_service.Migrations
 
                     b.HasIndex("NM_PROJETOprojetoId");
 
-                    b.ToTable("Analises");
+                    b.ToTable("Analises", (string)null);
                 });
 
             modelBuilder.Entity("Models.Template", b =>
@@ -347,7 +348,7 @@ namespace demanda_service.Migrations
 
                     b.HasKey("TemplateId");
 
-                    b.ToTable("Templates");
+                    b.ToTable("Templates", (string)null);
                 });
 
             modelBuilder.Entity("app.Models.Unidade", b =>
@@ -362,7 +363,7 @@ namespace demanda_service.Migrations
 
                     b.HasKey("id");
 
-                    b.ToTable("Unidades");
+                    b.ToTable("Unidades", (string)null);
                 });
 
             modelBuilder.Entity("app.Models.User", b =>
@@ -390,7 +391,7 @@ namespace demanda_service.Migrations
 
                     b.HasIndex("Unidadeid");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("Etapa", b =>
@@ -436,6 +437,10 @@ namespace demanda_service.Migrations
 
             modelBuilder.Entity("Models.Projeto", b =>
                 {
+                    b.HasOne("Models.AreaDemandante", "AREA_DEMANDANTE")
+                        .WithMany()
+                        .HasForeignKey("AREA_DEMANDANTEAreaDemandanteID");
+
                     b.HasOne("Models.Esteira", "Esteira")
                         .WithMany()
                         .HasForeignKey("EsteiraId");
@@ -443,6 +448,8 @@ namespace demanda_service.Migrations
                     b.HasOne("app.Models.Unidade", "Unidade")
                         .WithMany()
                         .HasForeignKey("Unidadeid");
+
+                    b.Navigation("AREA_DEMANDANTE");
 
                     b.Navigation("Esteira");
 

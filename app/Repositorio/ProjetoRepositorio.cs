@@ -19,7 +19,11 @@ public class ProjetoRepositorio : IProjetoRepositorio
 
    public async Task<List<Projeto>> GetProjetoListItemsAsync(string unidade)
 {
-        List<Projeto> listItems = await _context.Projetos.Where(p => p.Unidade.Nome == unidade).ToListAsync() ?? throw new ApiException(ErrorCode.ProjetoNaoEncontrado);
+        List<Projeto> listItems = await _context.Projetos.Where(p => p.Unidade.Nome == unidade)
+            .Include(e => e.AREA_DEMANDANTE)
+            .Include(e => e.Unidade)
+            .Include(e=> e.Esteira)
+            .ToListAsync() ?? throw new ApiException(ErrorCode.ProjetoNaoEncontrado);
         return listItems;
 }
 

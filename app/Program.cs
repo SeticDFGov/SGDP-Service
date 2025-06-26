@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Configuration;
 using Repositorio;
 using DotNetEnv;
+using service.Interface;
 using service;
 using Microsoft.Identity.Client;
 using Repositorio.Interface;
@@ -65,6 +66,8 @@ builder.Services.AddScoped<ProjetoService>();
 builder.Services.AddScoped<HttpClient>();
 builder.Services.AddScoped<DetalhamentoRepositorio>();
 builder.Services.AddScoped<ConfigAuth>();
+builder.Services.AddScoped<IEsteiraRepositorio, EsteiraRepositorio>();
+builder.Services.AddScoped<IEsteiraService, EsteiraService>();
 builder.Services.AddSingleton<IConfidentialClientApplication>(sp =>
 {
     return ConfidentialClientApplicationBuilder.Create(clientId)
@@ -73,8 +76,7 @@ builder.Services.AddSingleton<IConfidentialClientApplication>(sp =>
         .WithAuthority(new Uri($"https://login.microsoftonline.com/{tenantId}"))
         .Build();
 });
-builder.Services.AddScoped<IEsteiraRepositorio, EsteiraRepositorio>();
-builder.Services.AddScoped<IEsteiraService, EsteiraService>();
+
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>

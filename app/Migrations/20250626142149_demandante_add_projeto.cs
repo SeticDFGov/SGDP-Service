@@ -5,7 +5,7 @@
 namespace demanda_service.Migrations
 {
     /// <inheritdoc />
-    public partial class AreaDemandanteRelacionamentoProjeto : Migration
+    public partial class demandante_add_projeto : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -15,20 +15,20 @@ namespace demanda_service.Migrations
                 table: "Projetos");
 
             migrationBuilder.AddColumn<int>(
-                name: "AreaDemandanteID",
+                name: "AREA_DEMANDANTEAreaDemandanteID",
                 table: "Projetos",
                 type: "integer",
                 nullable: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_Projetos_AreaDemandanteID",
+                name: "IX_Projetos_AREA_DEMANDANTEAreaDemandanteID",
                 table: "Projetos",
-                column: "AreaDemandanteID");
+                column: "AREA_DEMANDANTEAreaDemandanteID");
 
             migrationBuilder.AddForeignKey(
-                name: "FK_Projetos_AreaDemandantes_AreaDemandanteID",
+                name: "FK_Projetos_AreaDemandantes_AREA_DEMANDANTEAreaDemandanteID",
                 table: "Projetos",
-                column: "AreaDemandanteID",
+                column: "AREA_DEMANDANTEAreaDemandanteID",
                 principalTable: "AreaDemandantes",
                 principalColumn: "AreaDemandanteID");
         }
@@ -37,15 +37,15 @@ namespace demanda_service.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropForeignKey(
-                name: "FK_Projetos_AreaDemandantes_AreaDemandanteID",
+                name: "FK_Projetos_AreaDemandantes_AREA_DEMANDANTEAreaDemandanteID",
                 table: "Projetos");
 
             migrationBuilder.DropIndex(
-                name: "IX_Projetos_AreaDemandanteID",
+                name: "IX_Projetos_AREA_DEMANDANTEAreaDemandanteID",
                 table: "Projetos");
 
             migrationBuilder.DropColumn(
-                name: "AreaDemandanteID",
+                name: "AREA_DEMANDANTEAreaDemandanteID",
                 table: "Projetos");
 
             migrationBuilder.AddColumn<string>(

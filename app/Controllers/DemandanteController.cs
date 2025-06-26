@@ -2,7 +2,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Models;
-using Repositorio;
+using Repositorio.Interface;
 
 namespace Controllers;
 [ApiController]
@@ -10,9 +10,9 @@ namespace Controllers;
 [Route("api/[controller]")]
 public class DemandanteController : ControllerBase
 {
-    public readonly DemandanteRepositorio _repositorio;
+    public readonly IDemandanteRepositorio _repositorio;
 
-    public DemandanteController(DemandanteRepositorio repositorio)
+    public DemandanteController(IDemandanteRepositorio repositorio)
     {
         _repositorio = repositorio;
     }

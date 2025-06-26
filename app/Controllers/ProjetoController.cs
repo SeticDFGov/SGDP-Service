@@ -49,6 +49,7 @@ public class ProjetoController : ControllerBase
     {
         var unidade = await _context.Unidades.FindAsync(dto.UnidadeId);
         var esteira = await _context.Esteiras.FindAsync(dto.EsteiraId);
+        var demandante = await _context.AreaDemandantes.FindAsync(dto.NM_AREA_DEMANDANTE);
         if (unidade == null || esteira == null)
             return BadRequest("Unidade ou Esteira não encontrada");
         var projeto = new Projeto
@@ -57,7 +58,6 @@ public class ProjetoController : ControllerBase
             GERENTE_PROJETO = dto.GERENTE_PROJETO,
             SITUACAO = dto.SITUACAO,
             NR_PROCESSO_SEI = dto.NR_PROCESSO_SEI,
-            NM_AREA_DEMANDANTE = dto.NM_AREA_DEMANDANTE,
             ANO = dto.ANO,
             TEMPLATE = dto.TEMPLATE,
             PROFISCOII = dto.PROFISCOII,
@@ -65,7 +65,9 @@ public class ProjetoController : ControllerBase
             PTD2427 = dto.PTD2427,
             valorEstimado = dto.valorEstimado,
             Unidade = unidade,
-            Esteira = esteira
+            Esteira = esteira,
+            AREA_DEMANDANTE = demandante
+            
         };
         await _repositorio.CreateProjeto(projeto);
         return Ok();
@@ -76,7 +78,8 @@ public class ProjetoController : ControllerBase
     {
         var unidade = await _context.Unidades.FindAsync(dto.UnidadeId);
         var esteira = await _context.Esteiras.FindAsync(dto.EsteiraId);
-        if (unidade == null || esteira == null)
+        var demandante = await _context.AreaDemandantes.FindAsync(dto.NM_AREA_DEMANDANTE);
+        if (unidade == null || esteira == null || demandante == null)
             return BadRequest("Unidade ou Esteira não encontrada");
         var projeto = new Projeto
         {
@@ -84,7 +87,6 @@ public class ProjetoController : ControllerBase
             GERENTE_PROJETO = dto.GERENTE_PROJETO,
             SITUACAO = dto.SITUACAO,
             NR_PROCESSO_SEI = dto.NR_PROCESSO_SEI,
-            NM_AREA_DEMANDANTE = dto.NM_AREA_DEMANDANTE,
             ANO = dto.ANO,
             TEMPLATE = dto.TEMPLATE,
             PROFISCOII = dto.PROFISCOII,
@@ -92,7 +94,8 @@ public class ProjetoController : ControllerBase
             PTD2427 = dto.PTD2427,
             valorEstimado = dto.valorEstimado,
             Unidade = unidade,
-            Esteira = esteira
+            Esteira = esteira,
+            AREA_DEMANDANTE = demandante
         };
         await _repositorio.CreateProjetoByTemplate(projeto);
         return Ok();

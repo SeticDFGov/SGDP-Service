@@ -22,8 +22,7 @@ public class Projeto
     [StringLength(300)]
     public string? NR_PROCESSO_SEI {get;set;}
 
-    [StringLength(300)]
-    public string? NM_AREA_DEMANDANTE {get;set;}
+    public AreaDemandante? AREA_DEMANDANTE {get;set;}
 
     [StringLength(100)]
     public string? ANO {get;set;}
