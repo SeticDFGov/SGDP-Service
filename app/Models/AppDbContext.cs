@@ -21,5 +21,7 @@ namespace Models
         public DbSet<User> Users { get; set; }
         public DbSet<Unidade> Unidades { get; set; }
         public DbSet<Esteira> Esteiras { get; set; }
+        public DbSet<Despacho> Despachos { get; set; }
+
     }
 }

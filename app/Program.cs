@@ -68,6 +68,8 @@ builder.Services.AddScoped<DetalhamentoRepositorio>();
 builder.Services.AddScoped<ConfigAuth>();
 builder.Services.AddScoped<IEsteiraRepositorio, EsteiraRepositorio>();
 builder.Services.AddScoped<IEsteiraService, EsteiraService>();
+builder.Services.AddScoped<IDespachoRepositorio, DespachoRepositorio>();
+builder.Services.AddScoped<IDespachoService, DespachoService>();
 builder.Services.AddSingleton<IConfidentialClientApplication>(sp =>
 {
     return ConfidentialClientApplicationBuilder.Create(clientId)
