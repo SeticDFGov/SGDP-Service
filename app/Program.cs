@@ -57,7 +57,7 @@ var tenantId = Env.GetString("TenantId");
 
 builder.Services.AddScoped<ICategoriaRepositorio,CategoriaRepositorio>();
 builder.Services.AddScoped<IDemandanteRepositorio,DemandanteRepositorio>();
-builder.Services.AddScoped<DemandaRepositorio>();
+builder.Services.AddScoped<IDemandaRepositorio, DemandaRepositorio>();
 builder.Services.AddScoped<IProjetoRepositorio, ProjetoRepositorio>();
 builder.Services.AddScoped<IEtapaRepositorio, EtapaRepositorio>();
 builder.Services.AddScoped<IAuthRepositorio, AuthRepositorio>();
