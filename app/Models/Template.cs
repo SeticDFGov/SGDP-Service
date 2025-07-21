@@ -2,6 +2,15 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Models;
 
+public enum Complexidade
+{
+    BAIXA,
+    MEDIA,
+    ALTA,
+    NAO_SE_APLICA
+
+}
+
 public class Template
 {
     [Key]
@@ -18,6 +27,8 @@ public class Template
     [Required]
     [StringLength(100)]
     public decimal PERCENT_TOTAL { get; set; }
+
+    public Complexidade COMPLEXIDADE { get; set; }
 
     public int ORDER { get; set; }
 }

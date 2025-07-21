@@ -50,5 +50,6 @@ public enum ErrorCode
     ErroAoEditarEtapa,
     [Description("Data Inválida")]
     DataInvalida,
-    
+    [Description("Template não encontrado")]
+    TemplateNaoEncontrado, 
 }

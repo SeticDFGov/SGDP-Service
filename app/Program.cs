@@ -12,6 +12,7 @@ using Microsoft.Identity.Client;
 using Repositorio.Interface;
 using api.Auth;
 using Microsoft.OpenApi.Models;
+using Interface.Repositorio;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -58,6 +59,7 @@ var tenantId = Env.GetString("TenantId");
 builder.Services.AddScoped<ICategoriaRepositorio,CategoriaRepositorio>();
 builder.Services.AddScoped<IDemandanteRepositorio,DemandanteRepositorio>();
 builder.Services.AddScoped<IDemandaRepositorio, DemandaRepositorio>();
+builder.Services.AddScoped<ITemplateRepositorio, TemplateRepositorio>(); 
 builder.Services.AddScoped<IProjetoRepositorio, ProjetoRepositorio>();
 builder.Services.AddScoped<IEtapaRepositorio, EtapaRepositorio>();
 builder.Services.AddScoped<IAuthRepositorio, AuthRepositorio>();
