@@ -8,4 +8,5 @@ public interface IEtapaService
     Task CreateEtapa(EtapaDTO etapa);
     Task EditEtapa(AfericaoEtapaDTO etapa, int etapaId);
     Task<Etapa> GetById(int id);
+    Task IniciarEtapa(int id, DateTime dtInicioPrevisto);
 }

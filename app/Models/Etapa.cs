@@ -86,32 +86,31 @@ public class Etapa
         return executado;
     }
 
-    private decimal CalcularPercentualPlanejado(DateTime? dtInicioPrevisto, DateTime? dtTerminoPrevisto)
+   private decimal CalcularPercentualPlanejado(DateTime? dtInicioPrevisto, DateTime? dtTerminoPrevisto)
 {
- 
     if (!dtInicioPrevisto.HasValue || !dtTerminoPrevisto.HasValue)
-    {
         return 0;
-    }
 
-    // Calcula a diferença de dias
     var diffDays = (dtTerminoPrevisto.Value - dtInicioPrevisto.Value).Days;
 
-    // Verifica se a diferença de dias é positiva
-    if (diffDays > 0 && dtInicioPrevisto.Value < DateTime.Now)    
+    // Use UtcNow para manter coerência com os dados do banco
+    var hoje = DateTime.UtcNow;
+
+    if (diffDays > 0 && dtInicioPrevisto.Value <= hoje)
     {
-        var diffToday = 0;
-        if(DateTime.Now > dtTerminoPrevisto.Value)
+        int diffToday;
+
+        if (hoje > dtTerminoPrevisto.Value)
             diffToday = (dtTerminoPrevisto.Value - dtInicioPrevisto.Value).Days;
-        else{
-            diffToday = (DateTime.Now - dtInicioPrevisto.Value).Days;
-            
-        }
+        else
+            diffToday = (hoje - dtInicioPrevisto.Value).Days;
+
         return (decimal)(diffToday * 100.0 / diffDays);
     }
 
     return 0;
 }
+
 
 
     // Método para definir a situação automaticamente com base nas datas

@@ -76,9 +76,9 @@ public class EtapaController : ControllerBase
     }
 
     [HttpPut("iniciar/{id}")]
-    public async Task<IActionResult> IniciarEtapa(int id)
+    public async Task<IActionResult> IniciarEtapa(int id, [FromBody] DateTime dtInicioPrevisto)
     {
-        await _service.IniciarEtapa(id);
+        await _service.IniciarEtapa(id, dtInicioPrevisto);
         return Ok();
     }
 }

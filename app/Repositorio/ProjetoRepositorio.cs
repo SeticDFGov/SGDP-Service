@@ -35,7 +35,10 @@ public async Task CreateProjeto (Projeto projeto)
 
    public async Task<Projeto> GetProjetoById(int id)
 {
-        Projeto? item = await _context.Projetos.FirstOrDefaultAsync(e => e.projetoId == id);
+        Projeto? item = await _context.Projetos
+        .Include(e => e.AREA_DEMANDANTE)
+        .Include(e => e.Unidade)
+        .FirstOrDefaultAsync(e => e.projetoId == id);
         return item;
 }
 public async Task CreateProjetoByTemplate(Projeto projeto)

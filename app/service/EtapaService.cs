@@ -25,7 +25,7 @@ public class EtapaService
         .ToListAsync();
 
     decimal somaPercentExecReal = etapas.Sum(e => e.PERCENT_EXEC_REAL ?? 0);
-    decimal somaPercentExecPlan = 0;
+    decimal somaPercentExecPlan = etapas.Sum(e => e.PERCENT_PLANEJADO );
 
     var datasInicio = etapas.Where(e => e.DT_INICIO_PREVISTO.HasValue).Select(e => e.DT_INICIO_PREVISTO.Value);
     var datasTermino = etapas.Where(e => e.DT_TERMINO_PREVISTO.HasValue).Select(e => e.DT_TERMINO_PREVISTO.Value);
@@ -51,7 +51,7 @@ public class EtapaService
     
     if (diffDays == 0) diffDays = 1; 
 
-    somaPercentExecPlan = diffDaysTermino*100 / (decimal)diffDays;
+    
 
     return new PercentualEtapaDTO
     {
@@ -121,23 +121,33 @@ public async Task<TagsDTO> GetTags()
 }
 
 
-public async Task IniciarEtapa(int id)
+public async Task IniciarEtapa(int id, DateTime dtInicioPrevisto)
 {
     Etapa etapa = await _etapaRepositorio.GetById(id);
 
     if (etapa == null)
         throw new KeyNotFoundException("Etapa não encontrada.");
 
-    TimeZoneInfo brasilia = TZConvert.GetTimeZoneInfo("E. South America Standard Time");
+    // Garante que o valor será armazenado como UTC
+    DateTime dtUtc;
 
-    DateTime agoraBrasilia = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, brasilia);
-    DateTime agoraUtc = TimeZoneInfo.ConvertTimeToUtc(agoraBrasilia, brasilia);
+    if (dtInicioPrevisto.Kind == DateTimeKind.Utc)
+    {
+        dtUtc = dtInicioPrevisto;
+    }
+    else
+    {
+        // Supondo que o valor recebido está no horário de Brasília
+        TimeZoneInfo brasilia = TZConvert.GetTimeZoneInfo("E. South America Standard Time");
+        dtUtc = TimeZoneInfo.ConvertTimeToUtc(dtInicioPrevisto, brasilia);
+    }
 
-    etapa.DT_INICIO_PREVISTO = agoraUtc;
-    etapa.DT_TERMINO_PREVISTO = agoraUtc.AddDays(etapa.DIAS_PREVISTOS);
+    etapa.DT_INICIO_PREVISTO = dtUtc;
+    etapa.DT_TERMINO_PREVISTO = dtUtc.AddDays(etapa.DIAS_PREVISTOS);
 
     await _context.SaveChangesAsync();
 }
+
 
 
 }
