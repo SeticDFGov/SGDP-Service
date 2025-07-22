@@ -26,7 +26,7 @@ public class EtapaController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetAllEtapas(int id)
     {
-        List<EtapaModel> items = await _repositorio.GetEtapaListItemsAsync(id);
+        List<Etapa> items = await _repositorio.GetEtapaListItemsAsync(id);
         if(items.Count() == 0)
         {
             return NotFound(new {message = "Etapas não encontradas para este projeto"});
@@ -75,10 +75,10 @@ public class EtapaController : ControllerBase
         return Ok(tags);
     }
 
-    [HttpPut("iniciar")]
-    public async Task<IActionResult> IniciarEtapa([FromBody] InicioEtapaDTO inicio)
+    [HttpPut("iniciar/{id}")]
+    public async Task<IActionResult> IniciarEtapa(int id)
     {
-        await _service.IniciarEtapa(inicio);
+        await _service.IniciarEtapa(id);
         return Ok();
     }
 }

@@ -6,6 +6,7 @@ public class TemplateDTO
 
     public decimal PERCENT_TOTAL { get; set; }
 
-    public string COMPLEXIDADE { get; set; }
+    public int DIAS_PREVISTOS { get; set; }
+
     public int ORDER { get; set; }
 }

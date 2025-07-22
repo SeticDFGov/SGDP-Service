@@ -28,7 +28,7 @@ public class Template
     [StringLength(100)]
     public decimal PERCENT_TOTAL { get; set; }
 
-    public Complexidade COMPLEXIDADE { get; set; }
+    public int DIAS_PREVISTOS { get; set; }
 
     public int ORDER { get; set; }
 }

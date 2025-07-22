@@ -71,7 +71,9 @@ public async Task CreateProjetoByTemplate(Projeto projeto)
                 {
                     NM_ETAPA = template.NM_ETAPA,
                     NM_PROJETO = projeto, 
-                    PERCENT_TOTAL_ETAPA = template.PERCENT_TOTAL
+                    PERCENT_TOTAL_ETAPA = template.PERCENT_TOTAL,
+                    DIAS_PREVISTOS = template.DIAS_PREVISTOS,
+                    Order = template.ORDER
                 };
 
                

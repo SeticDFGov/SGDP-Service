@@ -27,7 +27,11 @@ public class Etapa
     [AllowNull]
     public DateTime? DT_TERMINO_REAL { get; set; }
 
-  
+    [AllowNull]
+    public int DIAS_PREVISTOS { get; set; }
+    [AllowNull]
+    public int Order {get; set;}
+
     [NotMapped]
     public string SITUACAO { 
         get {

@@ -121,28 +121,20 @@ public async Task<TagsDTO> GetTags()
 }
 
 
-public async Task IniciarEtapa(InicioEtapaDTO inicio)
+public async Task IniciarEtapa(int id)
 {
-    Etapa etapa = await _etapaRepositorio.GetById(inicio.EtapaProjetoId);
+    Etapa etapa = await _etapaRepositorio.GetById(id);
 
     if (etapa == null)
-    {
         throw new KeyNotFoundException("Etapa não encontrada.");
-    }
 
     TimeZoneInfo brasilia = TZConvert.GetTimeZoneInfo("E. South America Standard Time");
 
-    if (inicio.DT_INICIO_PREVISTO.HasValue)
-    {
-        DateTime dtInicio = DateTime.SpecifyKind(inicio.DT_INICIO_PREVISTO.Value, DateTimeKind.Unspecified);
-        etapa.DT_INICIO_PREVISTO = TimeZoneInfo.ConvertTimeToUtc(dtInicio, brasilia);
-    }
+    DateTime agoraBrasilia = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, brasilia);
+    DateTime agoraUtc = TimeZoneInfo.ConvertTimeToUtc(agoraBrasilia, brasilia);
 
-    if (inicio.DT_TERMINO_PREVISTO.HasValue)
-    {
-        DateTime dtTermino = DateTime.SpecifyKind(inicio.DT_TERMINO_PREVISTO.Value, DateTimeKind.Unspecified);
-        etapa.DT_TERMINO_PREVISTO = TimeZoneInfo.ConvertTimeToUtc(dtTermino, brasilia);
-    }
+    etapa.DT_INICIO_PREVISTO = agoraUtc;
+    etapa.DT_TERMINO_PREVISTO = agoraUtc.AddDays(etapa.DIAS_PREVISTOS);
 
     await _context.SaveChangesAsync();
 }

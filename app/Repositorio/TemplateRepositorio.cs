@@ -14,10 +14,23 @@ public class TemplateRepositorio : ITemplateRepositorio
         _context = context;
     }
 
-    public async Task<List<Template>> GetTemplateListItemsAsync()
+    public async Task<Dictionary<string, List<Template>>> GetTemplateListItemsAsync()
     {
-        List<Template> listItems = await _context.Templates.ToListAsync();
-        return listItems;
+        var templates = await _context.Templates
+            .ToListAsync();
+
+        var groupedTemplates = templates
+            .GroupBy(t => t.NM_TEMPLATE)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        return groupedTemplates;
+    }
+
+
+    public async Task<List<string>> GetNameTemplate()
+    {
+        var templates = await _context.Templates.Select(e => e.NM_TEMPLATE).Distinct().ToListAsync();
+        return templates;
     }
 
     public async Task<Template> GetTemplateById(int id)
@@ -47,6 +60,6 @@ public class TemplateRepositorio : ITemplateRepositorio
         _context.Templates.Remove(item);
         await _context.SaveChangesAsync();
     }
-    
+   
 
 }

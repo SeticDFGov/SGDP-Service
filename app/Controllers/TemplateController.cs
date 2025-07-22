@@ -44,23 +44,37 @@ public class TemplateController : ControllerBase
         {
             NM_TEMPLATE = template.NM_TEMPLATE,
             NM_ETAPA = template.NM_ETAPA,
-            COMPLEXIDADE = MapearPrioridade(template.COMPLEXIDADE),
+            DIAS_PREVISTOS = template.DIAS_PREVISTOS,
             PERCENT_TOTAL = template.PERCENT_TOTAL,
             ORDER = template.ORDER
         };
         await _templateRepositorio.CreateTemplate(newTemplate);
         return Ok();
     }
-    private Complexidade MapearPrioridade(string prioridade)
+
+    [HttpPut("templates/{id}")]
+    public async Task<IActionResult> UpdateTemplate(int id, [FromBody] TemplateDTO template)
     {
-        return prioridade.ToLower().Trim() switch
+        var existingTemplate = await _templateRepositorio.GetTemplateById(id);
+        if (existingTemplate == null)
         {
-            "baixa" => Complexidade.BAIXA,
-            "média" or "media" => Complexidade.MEDIA,
-            "alta" => Complexidade.ALTA,
-            "não se aplica" or "nao se aplica" => Complexidade.NAO_SE_APLICA,
-            _ => throw new ArgumentException("Prioridade inválida.")
-        };
+            return NotFound(new { Message = "Template not found" });
+        }
+        existingTemplate.NM_TEMPLATE = template.NM_TEMPLATE;
+        existingTemplate.NM_ETAPA = template.NM_ETAPA;
+        existingTemplate.DIAS_PREVISTOS = template.DIAS_PREVISTOS;
+        existingTemplate.PERCENT_TOTAL = template.PERCENT_TOTAL;
+        existingTemplate.ORDER = template.ORDER;
+        await _templateRepositorio.UpdateTemplate(existingTemplate);
+        return Ok();
     }
+
+    [HttpGet("templates/name")]
+    public async Task<IActionResult> GetNameTemplate()
+    {
+        var nameTemplate = await _templateRepositorio.GetNameTemplate();
+        return Ok(nameTemplate);
+    }
+  
 
 }

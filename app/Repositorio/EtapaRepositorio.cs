@@ -17,38 +17,15 @@ public class EtapaRepositorio : IEtapaRepositorio
         _context = context;
     }
 
-   public async Task<List<EtapaModel>> GetEtapaListItemsAsync(int projetoId)
+   public async Task<List<Etapa>> GetEtapaListItemsAsync(int projetoId)
 {
 var etapas = await _context.Etapas
-        .Where(e => e.NM_PROJETO.projetoId == projetoId)
-        .GroupJoin(
-            _context.Templates,
-            etapa => etapa.NM_ETAPA,
-            template => template.NM_ETAPA,
-            (etapa, templates) => new { etapa, templates }
-        )
-        .SelectMany(
-            joinResult => joinResult.templates.DefaultIfEmpty(),
-            (joinResult, template) => new EtapaModel
-            {
-                EtapaProjetoId = joinResult.etapa.EtapaProjetoId,
-                NM_ETAPA = joinResult.etapa.NM_ETAPA,
-                RESPONSAVEL_ETAPA = joinResult.etapa.RESPONSAVEL_ETAPA,
-                ANALISE = joinResult.etapa.ANALISE,
-                PERCENT_TOTAL_ETAPA = joinResult.etapa.PERCENT_TOTAL_ETAPA,
-                PERCENT_EXEC_ETAPA = joinResult.etapa.PERCENT_EXEC_ETAPA,
-                DT_INICIO_PREVISTO = joinResult.etapa.DT_INICIO_PREVISTO,
-                DT_TERMINO_PREVISTO = joinResult.etapa.DT_TERMINO_PREVISTO,
-                DT_INICIO_REAL = joinResult.etapa.DT_INICIO_REAL,
-                DT_TERMINO_REAL = joinResult.etapa.DT_TERMINO_REAL,
-                Order = template != null ? template.ORDER : 0 // ou -1 se quiser sinalizar que não tem template
-            }
-        )
+        .Where(e => e.NM_PROJETO.projetoId == projetoId) 
         .ToListAsync();
 
     if (etapas == null || etapas.Count == 0)
         throw new ApiException(ErrorCode.EtapasNaoEncontradas);
-
+   
     return etapas;
     
     
