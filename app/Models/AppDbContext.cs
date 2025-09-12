@@ -16,13 +16,14 @@ namespace Models
         public DbSet<Projeto> Projetos { get; set; }
         public DbSet<Etapa> Etapas { get; set; }
         public DbSet<Template> Templates { get; set; }
-        public DbSet<ProjetoAnalise> Analises { get; set; }
+        public DbSet<Report> Analises { get; set; }
         public DbSet<Detalhamento> Detalhamentos { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Unidade> Unidades { get; set; }
         public DbSet<Esteira> Esteiras { get; set; }
         public DbSet<Despacho> Despachos { get; set; }
-    
+        
+        public DbSet<Atividade> Atividades { get; set; }
     }
 
 }

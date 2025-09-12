@@ -55,10 +55,6 @@ public async Task CreateProjetoByTemplate(Projeto projeto)
                 .Where(c => c.NM_TEMPLATE == projeto.TEMPLATE)
                 .ToListAsync();
            
-
-        
-
-            
             Console.WriteLine(templates.Count);
                 if (templates.Count == 0)
                 {
@@ -98,26 +94,38 @@ public async Task CreateProjetoByTemplate(Projeto projeto)
     }
 }
 
-public async Task AnaliseProjeto(ProjetoAnaliseDTO analise)
+public async Task AnaliseProjeto(ReportDTO analise)
 {
     Projeto projeto = _context.Projetos.FirstOrDefault(c => c.projetoId == analise.NM_PROJETO);
     
-    ProjetoAnalise nova_analise = new ProjetoAnalise
+    Report novo_report = new Report
 {
     NM_PROJETO = projeto,
-    ANALISE = analise.ANALISE,
-    ENTRAVE = analise.ENTRAVE,
+    descricao = analise.descricao,
+    fase = analise.fase,
+    Data_criacao = DateTime.UtcNow,
+    Data_fim = analise.data_fim,
 };
+    foreach (var atividade in analise.atividades)
+    {
+        var nova_atividade = new Atividade
+        {
+            descricao = atividade.descricao,
+            categoria = atividade.categoria,
+            data_termino = atividade.data_fim,
+            situacao = atividade.situacao,
+        };
+        novo_report.Atividades.Add(nova_atividade);
+    }
 
-    _context.Analises.Add(nova_analise);
-    _context.SaveChangesAsync();
+    _context.Analises.Add(novo_report);
+    await _context.SaveChangesAsync();
     
 }
-
-public async Task<ProjetoAnalise> GetLastAnaliseProjeto(int projetoid)
+public async Task<List<Report>> GetListReport(int projetoId)
 {
-    ProjetoAnalise projeto = _context.Analises.Where(c => c.NM_PROJETO.projetoId == projetoid).ToList().LastOrDefault();
-    return projeto ; 
+    List<Report> report = await _context.Analises.Include(p=>p.Atividades).Where(p=>p.NM_PROJETO.projetoId==projetoId).ToListAsync();
+    return report; 
 }
 
     

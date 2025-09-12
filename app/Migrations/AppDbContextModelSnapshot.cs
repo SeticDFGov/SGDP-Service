@@ -102,6 +102,42 @@ namespace demanda_service.Migrations
                     b.ToTable("AreaDemandantes");
                 });
 
+            modelBuilder.Entity("Models.Atividade", b =>
+                {
+                    b.Property<int>("AtividadeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("AtividadeId"));
+
+                    b.Property<int?>("ReportId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("categoria")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("data_termino")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("descricao")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("situacao")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("AtividadeId");
+
+                    b.HasIndex("ReportId");
+
+                    b.ToTable("Atividades");
+                });
+
             modelBuilder.Entity("Models.Categoria", b =>
                 {
                     b.Property<int>("CategoriaId")
@@ -327,27 +363,34 @@ namespace demanda_service.Migrations
                     b.ToTable("Projetos");
                 });
 
-            modelBuilder.Entity("Models.ProjetoAnalise", b =>
+            modelBuilder.Entity("Models.Report", b =>
                 {
-                    b.Property<int>("AnaliseId")
+                    b.Property<int>("ReportId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("AnaliseId"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("ReportId"));
 
-                    b.Property<string>("ANALISE")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                    b.Property<DateTime>("Data_criacao")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool>("ENTRAVE")
-                        .HasMaxLength(100)
-                        .HasColumnType("boolean");
+                    b.Property<DateTime>("Data_fim")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("NM_PROJETOprojetoId")
                         .HasColumnType("integer");
 
-                    b.HasKey("AnaliseId");
+                    b.Property<string>("descricao")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("fase")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("ReportId");
 
                     b.HasIndex("NM_PROJETOprojetoId");
 
@@ -441,6 +484,13 @@ namespace demanda_service.Migrations
                     b.Navigation("NM_PROJETO");
                 });
 
+            modelBuilder.Entity("Models.Atividade", b =>
+                {
+                    b.HasOne("Models.Report", null)
+                        .WithMany("Atividades")
+                        .HasForeignKey("ReportId");
+                });
+
             modelBuilder.Entity("Models.Demanda", b =>
                 {
                     b.HasOne("Models.Categoria", "CATEGORIA")
@@ -503,7 +553,7 @@ namespace demanda_service.Migrations
                     b.Navigation("Unidade");
                 });
 
-            modelBuilder.Entity("Models.ProjetoAnalise", b =>
+            modelBuilder.Entity("Models.Report", b =>
                 {
                     b.HasOne("Models.Projeto", "NM_PROJETO")
                         .WithMany()
@@ -521,6 +571,11 @@ namespace demanda_service.Migrations
                         .HasForeignKey("Unidadeid");
 
                     b.Navigation("Unidade");
+                });
+
+            modelBuilder.Entity("Models.Report", b =>
+                {
+                    b.Navigation("Atividades");
                 });
 #pragma warning restore 612, 618
         }

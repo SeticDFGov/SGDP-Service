@@ -101,7 +101,7 @@ public class ProjetoController : ControllerBase
         return Ok();
     }
     [HttpPost("analise/{id}")]
-    public async Task<IActionResult> CreateAnalise([FromBody] ProjetoAnaliseDTO projeto)
+    public async Task<IActionResult> CreateAnalise([FromBody] ReportDTO projeto)
     {
         await _repositorio.AnaliseProjeto(projeto);
        return Ok();
@@ -113,7 +113,7 @@ public class ProjetoController : ControllerBase
         if (id <= 0)
             return BadRequest(new { message = "ID inválido" }); 
 
-        ProjetoAnalise? analise = await _repositorio.GetLastAnaliseProjeto(id);
+        List<Report?> analise = await _repositorio.GetListReport(id);
 
         if (analise == null)
             return NotFound(new { message = "Análise não encontrada" }); 
