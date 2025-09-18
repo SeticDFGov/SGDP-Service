@@ -1,0 +1,59 @@
+﻿using api.Atividade;
+using demanda_service.Repositorio.Interface;
+using Microsoft.EntityFrameworkCore;
+using Models;
+
+namespace Repositorio;
+
+public class AtividadeRepositorio:IAtividadeRepositorio
+{
+    public readonly AppDbContext _context;
+
+    public AtividadeRepositorio(AppDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task IniciarReport(InicioAtividadeDTO inicioatividadeDTO)
+    {
+        Projeto projeto =  _context.Projetos.FirstOrDefault(c => c.projetoId == inicioatividadeDTO.NM_PROJETO);
+        Report novo_report = new Report
+        {
+            descricao = inicioatividadeDTO.descricao,
+            Data_criacao = DateTime.Now,
+            Data_fim = inicioatividadeDTO.data_fim,
+            NM_PROJETO = projeto,
+        };
+        
+        _context.Reports.Add(novo_report);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task InserirAtividade(AtividadeDTO atividadeDTO, int reportId)
+    {
+        Report report = await _context.Reports.FirstOrDefaultAsync(c => c.ReportId == reportId);
+        report.Atividades.Add(new Atividade{situacao = situacao.proximo,categoria = atividadeDTO.categoria, descricao = atividadeDTO.descricao, data_termino = atividadeDTO.data_fim});
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task AlterarAtividade(AtividadeDTO atividadeDTO, int atividadeId)
+    {
+        Atividade atividade = await _context.Atividades.FirstOrDefaultAsync(c => c.AtividadeId == atividadeId);
+        atividade.situacao = atividadeDTO.situacao;
+        atividade.categoria = atividadeDTO.categoria;
+        atividade.descricao = atividadeDTO.descricao;
+        atividade.data_termino = atividadeDTO.data_fim;
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task RemoverAtividade(int atividadeId)
+    {
+        Atividade remove = await _context.Atividades.FirstOrDefaultAsync(c => c.AtividadeId == atividadeId);
+        _context.Atividades.Remove(remove);
+    }
+
+    public async Task<List<Atividade>> VisualizarAtividades(int reportId)
+    {
+        return await _context.Atividades.Where(c => c.Report.ReportId == reportId).ToListAsync();
+    }
+}

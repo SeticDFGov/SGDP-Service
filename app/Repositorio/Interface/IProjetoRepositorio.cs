@@ -9,6 +9,5 @@ public interface IProjetoRepositorio
     Task<Projeto> GetProjetoById(int id);
     Task CreateProjeto(Projeto projeto);
     Task CreateProjetoByTemplate(Projeto projeto);
-    Task<List<Report>> GetListReport(int projetoId);
-    Task AnaliseProjeto(ReportDTO analise);
+   
 }

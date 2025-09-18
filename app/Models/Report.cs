@@ -7,8 +7,6 @@ public class Report
     [Key]
     public int ReportId {get;set;}
 
-    [Required]
-    [StringLength(300)]
     public Projeto NM_PROJETO {get;set;}
     
     [Required]
@@ -19,8 +17,7 @@ public class Report
     [StringLength(100)]
     public string fase {get;set;}
     
-    [Required]
-    public List<Atividade> Atividades {get;set;} = new List<Atividade>();
+    public ICollection<Atividade> Atividades {get;set;}
     
     [Required]
     public DateTime Data_criacao {get;set;}
@@ -34,9 +31,10 @@ public class Atividade
     [Key] 
     public int AtividadeId { get; set; }
     
+    public Report Report { get; set; }
+
     [Required]
-    [StringLength(100)]
-    public string situacao {get;set;}
+    public situacao situacao {get;set;}
     
     [Required]
     [StringLength(100)]
@@ -49,6 +47,11 @@ public class Atividade
     [Required]
     public DateTime data_termino {get;set;}
     
-    
+}
 
+public enum situacao
+{
+    concluido,
+    andamento,
+    proximo,
 }

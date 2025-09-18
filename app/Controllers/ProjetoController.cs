@@ -100,26 +100,6 @@ public class ProjetoController : ControllerBase
         await _repositorio.CreateProjetoByTemplate(projeto);
         return Ok();
     }
-    [HttpPost("analise/{id}")]
-    public async Task<IActionResult> CreateAnalise([FromBody] ReportDTO projeto)
-    {
-        await _repositorio.AnaliseProjeto(projeto);
-       return Ok();
-
-    }
-    [HttpGet("analise/{id}")]
-    public async Task<IActionResult> Analise(int id)
-    {
-        if (id <= 0)
-            return BadRequest(new { message = "ID inválido" }); 
-
-        List<Report?> analise = await _repositorio.GetListReport(id);
-
-        if (analise == null)
-            return NotFound(new { message = "Análise não encontrada" }); 
-
-        return Ok(analise); 
-    }
 
     [HttpGet("quantidade")]
     public async Task<IActionResult> GetQuantidadeProjetos()
