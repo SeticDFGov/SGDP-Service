@@ -62,6 +62,8 @@ public class AtividadeRepositorio:IAtividadeRepositorio
         await _context.SaveChangesAsync();
     }
 
+   
+ 
     public async Task<List<Atividade>> VisualizarAtividades(int reportId)
     {
         return await _context.Atividades.Where(c => c.Report.ReportId == reportId).ToListAsync();

@@ -2,20 +2,31 @@
 using demanda_service.Repositorio.Interface;
 using Microsoft.AspNetCore.Mvc;
 using Models;
-
+using Microsoft.EntityFrameworkCore;
 [ApiController]
 [Route("api/reports")] 
 public class ReportsController : ControllerBase
 {
     private readonly IAtividadeRepositorio _atividadeRepositorio;
-
+    private readonly AppDbContext _context;
    
-    public ReportsController(IAtividadeRepositorio atividadeRepositorio)
+    public ReportsController(IAtividadeRepositorio atividadeRepositorio, AppDbContext appDbContext)
     {
         _atividadeRepositorio = atividadeRepositorio;
+        _context = appDbContext;
     }
 
-   
+    [HttpGet("{projetoId}")]
+    public async Task<ActionResult> VisualizarReport(int projetoId)
+    {
+        var report = await _context.Reports
+            .FirstOrDefaultAsync(c => c.NM_PROJETO.projetoId == projetoId);
+
+        if (report == null)
+            return NotFound();
+
+        return Ok(report);
+    } 
     [HttpPost]
    
     public async Task<IActionResult> IniciarReport([FromBody] InicioAtividadeDTO inicioDto)
@@ -50,11 +61,13 @@ public class ReportsController : ControllerBase
 public class AtividadesController : ControllerBase
 {
     private readonly IAtividadeRepositorio _atividadeRepositorio;
-
-    public AtividadesController(IAtividadeRepositorio atividadeRepositorio)
+    private readonly AppDbContext _context;
+    public AtividadesController(IAtividadeRepositorio atividadeRepositorio,  AppDbContext appDbContext)
     {
         _atividadeRepositorio = atividadeRepositorio;
+        _context = appDbContext;
     }
+   
 
     [HttpPut("{atividadeId}")]
     public async Task<IActionResult> AlterarAtividade(int atividadeId, [FromBody] AtividadeDTO atividadeDto)
