@@ -1,0 +1,54 @@
+version: '3.4'
+
+services:
+  demanda-service:
+    depends_on:
+      - postgres
+    build:
+      context: .
+    ports:
+      - "7083:7083"
+    container_name: demanda-service
+    volumes:
+      - ./app:/app/app
+    environment:
+      - MODE=container 
+      - ASPNETCORE_URLS=http://+:7083 
+    env_file:
+      - .env
+    networks:
+      - demanda-network 
+  postgres:
+    container_name: postgres_container
+    image: postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      PGDATA: /data/postgres
+    volumes:
+       - postgres:/data/postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - demanda-network
+    restart: unless-stopped
+    
+  pgadmin:
+    container_name: demanda-pg-admin
+    image: dpage/pgadmin4
+    ports:
+      - "5555:80"
+    volumes:
+      - pg-admin-volume:/var/lib/pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: setic@eco.com
+      PGADMIN_DEFAULT_PASSWORD: eco1234
+    networks:
+      - demanda-network
+networks:
+  demanda-network:
+    driver: bridge
+
+volumes:
+    postgres:
+    pg-admin-volume:
