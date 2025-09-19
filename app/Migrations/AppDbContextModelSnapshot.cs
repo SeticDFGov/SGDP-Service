@@ -110,7 +110,7 @@ namespace demanda_service.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("AtividadeId"));
 
-                    b.Property<int?>("ReportId")
+                    b.Property<int>("ReportId")
                         .HasColumnType("integer");
 
                     b.Property<string>("categoria")
@@ -126,10 +126,8 @@ namespace demanda_service.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
-                    b.Property<string>("situacao")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                    b.Property<int>("situacao")
+                        .HasColumnType("integer");
 
                     b.HasKey("AtividadeId");
 
@@ -394,7 +392,7 @@ namespace demanda_service.Migrations
 
                     b.HasIndex("NM_PROJETOprojetoId");
 
-                    b.ToTable("Analises");
+                    b.ToTable("Reports");
                 });
 
             modelBuilder.Entity("Models.Template", b =>
@@ -486,9 +484,13 @@ namespace demanda_service.Migrations
 
             modelBuilder.Entity("Models.Atividade", b =>
                 {
-                    b.HasOne("Models.Report", null)
+                    b.HasOne("Models.Report", "Report")
                         .WithMany("Atividades")
-                        .HasForeignKey("ReportId");
+                        .HasForeignKey("ReportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Report");
                 });
 
             modelBuilder.Entity("Models.Demanda", b =>

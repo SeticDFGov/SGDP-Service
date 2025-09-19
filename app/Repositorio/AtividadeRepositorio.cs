@@ -20,9 +20,10 @@ public class AtividadeRepositorio:IAtividadeRepositorio
         Report novo_report = new Report
         {
             descricao = inicioatividadeDTO.descricao,
-            Data_criacao = DateTime.Now,
+            Data_criacao = DateTime.UtcNow,
             Data_fim = inicioatividadeDTO.data_fim,
             NM_PROJETO = projeto,
+            fase = inicioatividadeDTO.fase,
         };
         
         _context.Reports.Add(novo_report);
@@ -32,7 +33,15 @@ public class AtividadeRepositorio:IAtividadeRepositorio
     public async Task InserirAtividade(AtividadeDTO atividadeDTO, int reportId)
     {
         Report report = await _context.Reports.FirstOrDefaultAsync(c => c.ReportId == reportId);
-        report.Atividades.Add(new Atividade{situacao = situacao.proximo,categoria = atividadeDTO.categoria, descricao = atividadeDTO.descricao, data_termino = atividadeDTO.data_fim});
+        Atividade nova = new Atividade
+        {
+            situacao = situacao.proximo,
+            categoria = atividadeDTO.categoria,
+            descricao = atividadeDTO.descricao,
+            data_termino = atividadeDTO.data_fim,
+            Report = report,
+        };
+        _context.Atividades.Add(nova);
         await _context.SaveChangesAsync();
     }
 
@@ -50,6 +59,7 @@ public class AtividadeRepositorio:IAtividadeRepositorio
     {
         Atividade remove = await _context.Atividades.FirstOrDefaultAsync(c => c.AtividadeId == atividadeId);
         _context.Atividades.Remove(remove);
+        await _context.SaveChangesAsync();
     }
 
     public async Task<List<Atividade>> VisualizarAtividades(int reportId)

@@ -16,7 +16,7 @@ public class Report
     [Required]
     [StringLength(100)]
     public string fase {get;set;}
-    
+    [Required]
     public ICollection<Atividade> Atividades {get;set;}
     
     [Required]
@@ -30,7 +30,7 @@ public class Atividade
 {
     [Key] 
     public int AtividadeId { get; set; }
-    
+    [Required] 
     public Report Report { get; set; }
 
     [Required]

@@ -11,6 +11,7 @@ using service;
 using Microsoft.Identity.Client;
 using Repositorio.Interface;
 using api.Auth;
+using demanda_service.Repositorio.Interface;
 using Microsoft.OpenApi.Models;
 using Interface.Repositorio;
 
@@ -63,6 +64,7 @@ builder.Services.AddScoped<IEsteiraRepositorio, EsteiraRepositorio>();
 builder.Services.AddScoped<IEsteiraService, EsteiraService>();
 builder.Services.AddScoped<IDespachoRepositorio, DespachoRepositorio>();
 builder.Services.AddScoped<IDespachoService, DespachoService>();
+builder.Services.AddScoped<IAtividadeRepositorio, AtividadeRepositorio>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
