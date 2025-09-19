@@ -19,11 +19,8 @@ var builder = WebApplication.CreateBuilder(args);
 Env.Load();
 
 
-var connectionString = $"Host={Env.GetString("DB_HOST")};" +
-                       $"Port={Env.GetInt("DB_PORT")};" +
-                       $"Database={Env.GetString("DB_NAME")};" +
-                       $"Username={Env.GetString("DB_USER")};" +
-                       $"Password={Env.GetString("DB_PASS")}";
+var mode = Environment.GetEnvironmentVariable("MODE");
+var connectionString = mode == "container" ? "PostgreSqlDocker" : "PostgreSql";
 
 if (string.IsNullOrEmpty(connectionString))
 {
@@ -31,8 +28,7 @@ if (string.IsNullOrEmpty(connectionString))
 }
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString));
-
+    options.UseNpgsql(builder.Configuration.GetConnectionString(connectionString)));
 var allowedOrigins =  "*";
 builder.Services.AddCors(options =>
 {
@@ -51,10 +47,6 @@ builder.Services.AddControllers()
     });
 
 
-var clientId = Env.GetString("ClientId");
-var clientSecret = Env.GetString("ClientSecret");
-var tenantId = Env.GetString("TenantId");
-
 
 builder.Services.AddScoped<ICategoriaRepositorio,CategoriaRepositorio>();
 builder.Services.AddScoped<IDemandanteRepositorio,DemandanteRepositorio>();
@@ -67,20 +59,10 @@ builder.Services.AddScoped<EtapaService>();
 builder.Services.AddScoped<ProjetoService>();
 builder.Services.AddScoped<HttpClient>();
 builder.Services.AddScoped<DetalhamentoRepositorio>();
-builder.Services.AddScoped<ConfigAuth>();
 builder.Services.AddScoped<IEsteiraRepositorio, EsteiraRepositorio>();
 builder.Services.AddScoped<IEsteiraService, EsteiraService>();
 builder.Services.AddScoped<IDespachoRepositorio, DespachoRepositorio>();
 builder.Services.AddScoped<IDespachoService, DespachoService>();
-builder.Services.AddSingleton<IConfidentialClientApplication>(sp =>
-{
-    return ConfidentialClientApplicationBuilder.Create(clientId)
-        .WithClientSecret(clientSecret)
-        .WithRedirectUri($"{Env.GetString("UrlBack")}/api/auth/callback")
-        .WithAuthority(new Uri($"https://login.microsoftonline.com/{tenantId}"))
-        .Build();
-});
-
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -116,23 +98,22 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
-
-
-
-var key = Encoding.UTF8.GetBytes(Env.GetString("JWT_KEY") ?? throw new InvalidOperationException("Chave JWT não configurada."));
+var authSettingsSection = builder.Configuration.GetSection(AuthSettings.SectionName);
+builder.Services.Configure<AuthSettings>(authSettingsSection);
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer = true,
-            ValidateAudience = true,
+            ValidIssuer = authSettingsSection["Issuer"],
+            ValidAudience = authSettingsSection["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authSettingsSection["Key"]!)),
+            ValidateIssuer = bool.Parse(authSettingsSection["ValidateIssuer"] ?? "false"),
+            ValidateAudience = bool.Parse(authSettingsSection["ValidateAudience"] ?? "false"),
             ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = Env.GetString("JWT_ISSUER"),
-            ValidAudience = Env.GetString("JWT_AUDIENCE"),
-            IssuerSigningKey = new SymmetricSecurityKey(key)
+            ValidateIssuerSigningKey = bool.Parse(authSettingsSection["ValidateIssuerSigningKey"] ?? "false")
         };
     });
 

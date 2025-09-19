@@ -35,15 +35,7 @@
     <PackageReference Include="TimeZoneConverter" Version="7.0.0" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Remove="docker-compose.prod.yml" />
-    <None Remove=".docker-compose.yml.swp" />
-  </ItemGroup>
 
-  <ItemGroup>
-    <Content Include="..\.dockerignore">
-      <Link>.dockerignore</Link>
-    </Content>
-  </ItemGroup>
+
 
 </Project>

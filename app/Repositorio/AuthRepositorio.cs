@@ -6,19 +6,19 @@ using app.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Models;
-
+using Microsoft.Extensions.Options;
 namespace Repositorio;
 
 public class AuthRepositorio : IAuthRepositorio
 {
     private readonly AppDbContext _context;
     private readonly HttpClient _http;
-    private readonly ConfigAuth _auth;
-    public AuthRepositorio(AppDbContext context, HttpClient http, ConfigAuth auth)
+    private readonly AuthSettings _auth;
+    public AuthRepositorio(AppDbContext context, HttpClient http, IOptions<AuthSettings> auth)
     {
         _context = context;
         _http = http;
-        _auth = auth;
+        _auth = auth.Value;
     }
 
     public async Task<User?> GetUsuarioByAdUsernameAsync(string email)
@@ -80,10 +80,10 @@ public class AuthRepositorio : IAuthRepositorio
         var creds = new SigningCredentials(chave, SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
-            issuer: _auth.issuer,
-            audience: _auth.audience,
+            issuer: _auth.Issuer,
+            audience: _auth.Audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(4),
+            expires: DateTime.Now.AddMinutes(_auth.ExpireMinutes),
             signingCredentials: creds);
 
         return new JwtSecurityTokenHandler().WriteToken(token);

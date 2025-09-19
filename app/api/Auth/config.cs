@@ -1,17 +1,16 @@
-namespace api.Auth;
-
-public class ConfigAuth
+public class AuthSettings
 {
-    public readonly string url;
-    public readonly string issuer;
-    public readonly string audience;
-    public readonly string Key;
+   
+    public const string SectionName = "Auth";
 
-    public ConfigAuth()
-    {
-        issuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? throw new InvalidOperationException("Issuer não definida");
-        audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? throw new InvalidOperationException("audience não definida");
-        url = Environment.GetEnvironmentVariable("LDAP_URL") ?? throw new InvalidOperationException("LDAP_URL não definida no ambiente.");
-        Key = Environment.GetEnvironmentVariable("JWT_KEY") ?? throw new InvalidOperationException("Chave não definina no ambiente");
-    } 
+    public bool Enabled { get; set; }
+    public string Key { get; set; } = string.Empty;
+    public string Issuer { get; set; } = string.Empty;
+    public string Audience { get; set; } = string.Empty;
+    public bool ValidateIssuer { get; set; }
+    public bool ValidateAudience { get; set; }
+    public bool ValidateIssuerSigningKey { get; set; }
+    public int ExpireMinutes { get; set; }
+    public int RefreshTokenExpireMinutes { get; set; }
+    public string url { get; set; } = "https://subgd-api.df.gov.br/autenticar";
 }
