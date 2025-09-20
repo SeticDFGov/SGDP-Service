@@ -33,12 +33,15 @@ public class AtividadeRepositorio:IAtividadeRepositorio
     public async Task InserirAtividade(AtividadeDTO atividadeDTO, int reportId)
     {
         Report report = await _context.Reports.FirstOrDefaultAsync(c => c.ReportId == reportId);
+        var brasilia = TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time");
         Atividade nova = new Atividade
         {
+            titulo = atividadeDTO.titulo,
             situacao = situacao.proximo,
             categoria = atividadeDTO.categoria,
             descricao = atividadeDTO.descricao,
-            data_termino = atividadeDTO.data_fim,
+            data_termino = atividadeDTO.data_fim = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(atividadeDTO.data_fim, DateTimeKind.Unspecified), brasilia),
+
             Report = report,
         };
         _context.Atividades.Add(nova);
@@ -47,11 +50,14 @@ public class AtividadeRepositorio:IAtividadeRepositorio
 
     public async Task AlterarAtividade(AtividadeDTO atividadeDTO, int atividadeId)
     {
-        Atividade atividade = await _context.Atividades.FirstOrDefaultAsync(c => c.AtividadeId == atividadeId);
-        atividade.situacao = atividadeDTO.situacao;
+      
+      Atividade atividade = await _context.Atividades.FirstOrDefaultAsync(c => c.AtividadeId == atividadeId);
+      var brasilia = TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time");
+      atividade.situacao = atividadeDTO.situacao;
         atividade.categoria = atividadeDTO.categoria;
         atividade.descricao = atividadeDTO.descricao;
-        atividade.data_termino = atividadeDTO.data_fim;
+        atividade.data_termino = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(atividadeDTO.data_fim, DateTimeKind.Unspecified), brasilia);
+
         await _context.SaveChangesAsync();
     }
 

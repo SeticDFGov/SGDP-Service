@@ -34,6 +34,8 @@ public class Atividade
     public Report Report { get; set; }
 
     [Required]
+    public string titulo {get;set;}
+    [Required]
     public situacao situacao {get;set;}
     
     [Required]
