@@ -1,0 +1,20 @@
+name: Build .NET
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]  
+jobs:
+  build:
+    runs-on: self-hosted   
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Instalar dependências NuGet
+        run: dotnet restore ./app/demanda_service.csproj
+
+      - name: Build do projeto
+        run: dotnet build ./app/demanda_service.csproj --configuration Release
