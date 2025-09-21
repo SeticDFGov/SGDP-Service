@@ -1,0 +1,15 @@
+﻿FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+COPY ./app/*.csproj ./app/
+RUN dotnet restore ./app/demanda_service.csproj
+
+COPY ./app ./app
+WORKDIR /src/app
+RUN dotnet publish -c Release -o /out
+
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+WORKDIR /app
+COPY --from=build /out .
+ENTRYPOINT ["dotnet", "demanda_service.dll"]
