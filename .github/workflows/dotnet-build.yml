@@ -23,7 +23,7 @@ jobs:
 
     - name: Build da imagem
       run: |
-        docker build -t -f Dockerfile.prod ${{ secrets.DOCKERHUB_USERNAME }}/sgpd_service:latest .
+        docker build -f Dockerfile.prod -t ${{ secrets.DOCKERHUB_USERNAME }}/sgpd_service:latest .
 
     - name: Push da imagem
       run: |
