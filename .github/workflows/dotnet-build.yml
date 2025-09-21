@@ -1,4 +1,4 @@
-name: Build .NET
+name: Deploy
 
 on:
   push:
@@ -10,11 +10,8 @@ jobs:
     runs-on: self-hosted   
 
     steps:
-      - name: Checkout do código
-        uses: actions/checkout@v4
-
-      - name: Instalar dependências NuGet
-        run: dotnet restore ./app/demanda_service.csproj
-
-      - name: Build do projeto
-        run: dotnet build ./app/demanda_service.csproj --configuration Release
+      - name: Deploy com docker-compose
+      run: | 
+        cd ..
+        docker-compose down
+        docker-compose up --build -d
