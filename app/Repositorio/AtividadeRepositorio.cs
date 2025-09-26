@@ -1,7 +1,12 @@
 ﻿using api.Atividade;
+using api.Projeto;
 using demanda_service.Repositorio.Interface;
 using Microsoft.EntityFrameworkCore;
 using Models;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
+using AtividadeDTO = api.Atividade.AtividadeDTO;
 
 namespace Repositorio;
 
@@ -73,5 +78,80 @@ public class AtividadeRepositorio:IAtividadeRepositorio
     public async Task<List<Atividade>> VisualizarAtividades(int reportId)
     {
         return await _context.Atividades.Where(c => c.Report.ReportId == reportId).ToListAsync();
+    }
+    
+    public byte[] GerarRelatorioPedidos(Guid exportId)
+    {
+        List<Atividade> atividades = _context.Atividades
+            .Include(a => a.Export)
+            .Where(a => a.Export.Id == exportId)
+            .ToList(); 
+        var doc = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Margin(30);
+                page.Header().Text("Status Report").FontSize(20).Bold().AlignCenter();
+                page.Content().Table(table =>
+                {
+                    table.ColumnsDefinition(columns =>
+                    {
+                        columns.ConstantColumn(50);
+                        columns.RelativeColumn();
+                        columns.RelativeColumn();
+                        columns.RelativeColumn();
+                    });
+
+                    table.Header(header =>
+                    {
+                        header.Cell().Text("titulo").Bold();
+                        header.Cell().Text("situacao").Bold();
+                        header.Cell().Text("categoria").Bold();
+                        header.Cell().Text("decrição").Bold();
+                    });
+
+                    foreach (var atividade in atividades)
+                    {
+                        table.Cell().Text(atividade.titulo);
+                        table.Cell().Text(atividade.situacao);
+                        table.Cell().Text(atividade.categoria);
+                        table.Cell().Text(atividade.descricao);
+                    }
+                });
+                page.Footer().AlignCenter().Text(x =>
+                {
+                    x.Span("Página ");
+                    x.CurrentPageNumber();
+                    x.Span(" de ");
+                    x.TotalPages();
+                });
+            });
+        });
+
+        return doc.GeneratePdf();
+    }
+
+    public async Task GerarStatusReport( int reportId)
+    {
+        Report report = await _context.Reports
+            .Include(r => r.NM_PROJETO)
+            .FirstOrDefaultAsync(e => e.ReportId == reportId);
+
+        Projeto projeto = report.NM_PROJETO; 
+        List<Atividade> atividades = await _context.Atividades
+            .Where(c => c.Report.ReportId == reportId)
+            .ToListAsync();
+
+        Export novo_export = new Export
+        {
+            NM_PROJETO = projeto,
+            descricao = report.descricao,
+            Data_fim = report.Data_fim,
+            Data_criacao = DateTime.UtcNow,
+            Atividades = atividades,
+            fase = report.fase,
+        };
+        _context.Exports.Add(novo_export);
+        await  _context.SaveChangesAsync();
     }
 }

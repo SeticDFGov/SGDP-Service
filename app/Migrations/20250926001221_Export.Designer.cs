@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Models;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace demanda_service.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250926001221_Export")]
+    partial class Export
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -110,7 +113,7 @@ namespace demanda_service.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("AtividadeId"));
 
-                    b.Property<Guid>("ExportId")
+                    b.Property<Guid?>("ExportId")
                         .HasColumnType("uuid");
 
                     b.Property<int>("ReportId")
@@ -525,19 +528,15 @@ namespace demanda_service.Migrations
 
             modelBuilder.Entity("Models.Atividade", b =>
                 {
-                    b.HasOne("Models.Export", "Export")
+                    b.HasOne("Models.Export", null)
                         .WithMany("Atividades")
-                        .HasForeignKey("ExportId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("ExportId");
 
                     b.HasOne("Models.Report", "Report")
                         .WithMany("Atividades")
                         .HasForeignKey("ReportId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Export");
 
                     b.Navigation("Report");
                 });

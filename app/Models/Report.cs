@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Models;
 
@@ -32,7 +33,9 @@ public class Atividade
     public int AtividadeId { get; set; }
     [Required] 
     public Report Report { get; set; }
-
+    
+    public Guid ExportId { get; set; }   
+    public Export Export { get; set; }   
     [Required]
     public string titulo {get;set;}
     [Required]

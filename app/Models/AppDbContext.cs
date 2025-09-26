@@ -22,7 +22,7 @@ namespace Models
         public DbSet<Unidade> Unidades { get; set; }
         public DbSet<Esteira> Esteiras { get; set; }
         public DbSet<Despacho> Despachos { get; set; }
-        
+        public DbSet<Export> Exports { get; set; }         
         public DbSet<Atividade> Atividades { get; set; }
     }
 

@@ -14,9 +14,9 @@ using api.Auth;
 using demanda_service.Repositorio.Interface;
 using Microsoft.OpenApi.Models;
 using Interface.Repositorio;
-
+using QuestPDF.Infrastructure;
 var builder = WebApplication.CreateBuilder(args);
-
+QuestPDF.Settings.License = LicenseType.Community;
 Env.Load();
 
 
@@ -65,7 +65,6 @@ builder.Services.AddScoped<IEsteiraService, EsteiraService>();
 builder.Services.AddScoped<IDespachoRepositorio, DespachoRepositorio>();
 builder.Services.AddScoped<IDespachoService, DespachoService>();
 builder.Services.AddScoped<IAtividadeRepositorio, AtividadeRepositorio>();
-
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

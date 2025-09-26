@@ -1,8 +1,11 @@
-﻿using api.Atividade; 
+﻿using api.Atividade;
+using api.Projeto;
 using demanda_service.Repositorio.Interface;
 using Microsoft.AspNetCore.Mvc;
 using Models;
 using Microsoft.EntityFrameworkCore;
+using AtividadeDTO = api.Atividade.AtividadeDTO;
+
 [ApiController]
 [Route("api/reports")] 
 public class ReportsController : ControllerBase
@@ -84,5 +87,27 @@ public class AtividadesController : ControllerBase
     {
         await _atividadeRepositorio.RemoverAtividade(atividadeId);
         return NoContent(); 
+    }
+    
+    [HttpGet("export/{exportId}")]
+    public IActionResult GerarExport(Guid exportId)
+    {
+        var pdf = _atividadeRepositorio.GerarRelatorioPedidos(exportId);
+        return File(pdf, "application/pdf", "report.pdf");
+    }
+
+    [HttpPost("export/create/{reportId})")]
+
+    public async Task<IActionResult> GerarReport(int reportId)
+    {
+        await _atividadeRepositorio.GerarStatusReport(reportId);
+        return Ok();
+    }
+
+    [HttpGet("export/list/{projectId}")]
+    public IActionResult ListarExports(int projectId)
+    {
+        List<Export> exports = _context.Exports.Where(e => e.NM_PROJETO.projetoId == projectId).ToList();
+        return Ok(exports);
     }
 }
