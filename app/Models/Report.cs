@@ -34,8 +34,6 @@ public class Atividade
     [Required] 
     public Report Report { get; set; }
     
-    public Guid ExportId { get; set; }   
-    public Export Export { get; set; }   
     [Required]
     public string titulo {get;set;}
     [Required]

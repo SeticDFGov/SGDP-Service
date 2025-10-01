@@ -80,9 +80,9 @@ public class AtividadeRepositorio:IAtividadeRepositorio
         return await _context.Atividades.Where(c => c.Report.ReportId == reportId).ToListAsync();
     }
     
-    public byte[] GerarRelatorioPedidos(Guid exportId)
+    public byte[] GerarReportPDF(Guid exportId)
     {
-        List<Atividade> atividades = _context.Atividades
+        List<AtividadeExport> atividades = _context.AtividadeExport
             .Include(a => a.Export)
             .Where(a => a.Export.Id == exportId)
             .ToList(); 
@@ -131,24 +131,37 @@ public class AtividadeRepositorio:IAtividadeRepositorio
         return doc.GeneratePdf();
     }
 
-    public async Task GerarStatusReport( int reportId)
+    public async Task GerarStatusReportExport( int projetoId)
     {
         Report report = await _context.Reports
             .Include(r => r.NM_PROJETO)
-            .FirstOrDefaultAsync(e => e.ReportId == reportId);
+            .FirstOrDefaultAsync(e => e.NM_PROJETO.projetoId == projetoId);
 
         Projeto projeto = report.NM_PROJETO; 
         List<Atividade> atividades = await _context.Atividades
-            .Where(c => c.Report.ReportId == reportId)
+            .Where(c => c.Report.NM_PROJETO.projetoId == projetoId)
             .ToListAsync();
-
+        List<AtividadeExport> atividadesExport = new List<AtividadeExport>();
+        foreach (var atividade in atividades )
+        {
+            atividadesExport.Add(
+            new AtividadeExport
+            {
+                titulo    = atividade.titulo,
+                descricao = atividade.descricao,
+                categoria = atividade.categoria,
+                data_termino = atividade.data_termino,
+                situacao = atividade.situacao
+            }
+            );
+        }
         Export novo_export = new Export
         {
             NM_PROJETO = projeto,
             descricao = report.descricao,
             Data_fim = report.Data_fim,
             Data_criacao = DateTime.UtcNow,
-            Atividades = atividades,
+            AtividadeExport = atividadesExport,
             fase = report.fase,
         };
         _context.Exports.Add(novo_export);

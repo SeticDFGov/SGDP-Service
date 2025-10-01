@@ -92,15 +92,15 @@ public class AtividadesController : ControllerBase
     [HttpGet("export/{exportId}")]
     public IActionResult GerarExport(Guid exportId)
     {
-        var pdf = _atividadeRepositorio.GerarRelatorioPedidos(exportId);
+        var pdf = _atividadeRepositorio.GerarReportPDF(exportId);
         return File(pdf, "application/pdf", "report.pdf");
     }
 
-    [HttpPost("export/create/{reportId})")]
+    [HttpPost("export/create/{projetoId})")]
 
-    public async Task<IActionResult> GerarReport(int reportId)
+    public async Task<IActionResult> GerarReport(int projetoId)
     {
-        await _atividadeRepositorio.GerarStatusReport(reportId);
+        await _atividadeRepositorio.GerarStatusReportExport(projetoId);
         return Ok();
     }
 

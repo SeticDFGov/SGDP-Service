@@ -24,6 +24,8 @@ namespace Models
         public DbSet<Despacho> Despachos { get; set; }
         public DbSet<Export> Exports { get; set; }         
         public DbSet<Atividade> Atividades { get; set; }
+         public DbSet<AtividadeExport> AtividadeExport { get; set; }
+        
     }
 
 }
