@@ -96,7 +96,7 @@ public class AtividadesController : ControllerBase
         return File(pdf, "application/pdf", "report.pdf");
     }
 
-    [HttpPost("export/create/{projetoId})")]
+    [HttpPost("export/create/{projetoId}")]
 
     public async Task<IActionResult> GerarReport(int projetoId)
     {
