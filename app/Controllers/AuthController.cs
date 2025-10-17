@@ -29,7 +29,7 @@ public class AuthController : ControllerBase
         );
         var user = _authRepositorio.GetUser(adResponse.Email);
         var token = _authRepositorio.GerarJwt(user);
-        return Ok(new { token });
+        return Ok(new { token, user });
     }
 
     [HttpPost("unidade")]
