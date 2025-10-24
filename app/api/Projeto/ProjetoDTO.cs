@@ -4,7 +4,6 @@ public class ProjetoDTO
 {
     public string NM_PROJETO {get;set;}
     public string? GERENTE_PROJETO {get;set;}
-    public string? SITUACAO {get;set;}
     public string? NR_PROCESSO_SEI {get;set;}
     public int? NM_AREA_DEMANDANTE {get;set;}
     public string? ANO {get;set;}

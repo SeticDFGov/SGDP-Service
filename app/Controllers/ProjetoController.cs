@@ -56,7 +56,7 @@ public class ProjetoController : ControllerBase
         {
             NM_PROJETO = dto.NM_PROJETO,
             GERENTE_PROJETO = dto.GERENTE_PROJETO,
-            SITUACAO = dto.SITUACAO,
+            SITUACAO = "",
             NR_PROCESSO_SEI = dto.NR_PROCESSO_SEI,
             ANO = dto.ANO,
             TEMPLATE = dto.TEMPLATE,
@@ -85,7 +85,7 @@ public class ProjetoController : ControllerBase
         {
             NM_PROJETO = dto.NM_PROJETO,
             GERENTE_PROJETO = dto.GERENTE_PROJETO,
-            SITUACAO = dto.SITUACAO,
+            SITUACAO = "",
             NR_PROCESSO_SEI = dto.NR_PROCESSO_SEI,
             ANO = dto.ANO,
             TEMPLATE = dto.TEMPLATE,
