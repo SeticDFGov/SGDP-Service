@@ -93,7 +93,7 @@ public class Etapa
 
     var diffDays = (dtTerminoPrevisto.Value - dtInicioPrevisto.Value).Days;
 
-    // Use UtcNow para manter coerência com os dados do banco
+    
     var hoje = DateTime.UtcNow;
 
     if (diffDays > 0 && dtInicioPrevisto.Value <= hoje)
@@ -113,7 +113,7 @@ public class Etapa
 
 
 
-    // Método para definir a situação automaticamente com base nas datas
+    
     private string DefinirSituacao(DateTime? dtInicioPrevisto, DateTime? dtTerminoPrevisto, DateTime? dtInicioReal, DateTime? dtTerminoReal)
     {
         DateTime hoje = DateTime.Now;

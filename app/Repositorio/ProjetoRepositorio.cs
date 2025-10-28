@@ -87,7 +87,7 @@ public async Task CreateProjetoByTemplate(Projeto projeto)
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync(); // Reverte em caso de erro
+            await transaction.RollbackAsync(); 
             Console.WriteLine($"Erro: {ex.Message}");
             throw new Exception("Erro ao salvar o projeto e as etapas: " + ex.Message, ex);
         }
