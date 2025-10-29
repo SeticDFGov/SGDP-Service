@@ -14,19 +14,17 @@ namespace Controllers;
 [Route("api/[controller]")]
 public class EtapaController : ControllerBase
 {
-    public readonly IEtapaRepositorio _repositorio;
     public readonly EtapaService _service;
 
     public EtapaController(IEtapaRepositorio repositorio, EtapaService service)
     {
-        _repositorio = repositorio;
         _service = service;
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetAllEtapas(int id)
     {
-        List<Etapa> items = await _repositorio.GetEtapaListItemsAsync(id);
+        List<Etapa> items = await _service.GetEtapaListItemsAsync(id);
         if(items.Count() == 0)
         {
             return NotFound(new {message = "Etapas não encontradas para este projeto"});
@@ -36,14 +34,14 @@ public class EtapaController : ControllerBase
     [HttpGet("api/byid/{id}")]
     public Task<Etapa> GetEtapaById(int id)
     {
-        var items = _repositorio.GetById(id);
+        var items = _service.GetById(id);
         return items;
     }
 
     [HttpPost()]
     public async Task<IActionResult> CreateEtapas([FromBody] EtapaDTO etapa)
     {
-       await _repositorio.CreateEtapa(etapa);
+       await _service.CreateEtapa(etapa);
        return Ok();
 
     }
@@ -51,7 +49,7 @@ public class EtapaController : ControllerBase
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateEtapas([FromBody] AfericaoEtapaDTO etapa, int id)
     {
-        await _repositorio.EditEtapa(etapa,id);
+        await _service.EditEtapa(etapa,id);
         return Ok();
     }
     [HttpGet("percent/{projetoid}")]
