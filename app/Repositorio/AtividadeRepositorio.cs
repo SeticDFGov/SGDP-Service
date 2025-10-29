@@ -34,7 +34,7 @@ public class AtividadeRepositorio:IAtividadeRepositorio
         _context.Reports.Add(novo_report);
         await _context.SaveChangesAsync();
     }
-
+    
     public async Task InserirAtividade(AtividadeDTO atividadeDTO, int reportId)
     {
         Report report = await _context.Reports.FirstOrDefaultAsync(c => c.ReportId == reportId);
