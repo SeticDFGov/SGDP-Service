@@ -3,9 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using Models;
 using Repositorio;
 using Repositorio.Interface;
+using service;
 using service.Interface;
 
-namespace service;
+namespace demanda_service.service;
 
 public class ProjetoService : IProjetoService
 {
@@ -21,8 +22,8 @@ public class ProjetoService : IProjetoService
 
     public async Task<List<Projeto>> GetProjetoListItemsAsync(string unidade)
     {
-        return await _projetoRepositorio.GetProjetoListItemsAsync(unidade) ??
-               throw new ApiException(ErrorCode.ProjetoNaoEncontrado);
+        var result = await _projetoRepositorio.GetProjetoListItemsAsync(unidade);
+        return result.Count==0 ? throw new ApiException(ErrorCode.ProjetoNaoEncontrado): result;;
     }
 
     public async Task<Projeto> GetProjetoById(int id)
@@ -44,7 +45,6 @@ public class ProjetoService : IProjetoService
                     .Where(c => c.NM_TEMPLATE == projeto.TEMPLATE)
                     .ToListAsync();
 
-                Console.WriteLine(templates.Count);
                 if (templates.Count == 0)
                 {
                     await transaction.CommitAsync();

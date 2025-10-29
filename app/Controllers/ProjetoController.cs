@@ -16,10 +16,10 @@ namespace Controllers;
 public class ProjetoController : ControllerBase
 {
     public readonly IProjetoService _service;
-    public readonly ProjetoService _projetoService;
+    public readonly IProjetoService _projetoService;
     public readonly AppDbContext _context;
 
-    public ProjetoController(IProjetoService service, ProjetoService projetoService, AppDbContext context)
+    public ProjetoController(IProjetoService service, IProjetoService projetoService, AppDbContext context)
     {
         _service = service;
         _projetoService = projetoService;
@@ -36,12 +36,7 @@ public class ProjetoController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetProjetosById(int id)
     {
-        Projeto? items = await _service.GetProjetoById(id);
-
-        if(items == null)
-        {
-            return NotFound(new {message = "Projeto não encontrado"});
-        }
+        Projeto items = await _service.GetProjetoById(id);
         return Ok(items);
     }
     
