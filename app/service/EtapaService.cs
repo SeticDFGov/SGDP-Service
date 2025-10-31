@@ -11,12 +11,12 @@ namespace service;
 
 public class EtapaService: IEtapaService
 {
-    public readonly IEtapaRepositorio _etapaRepositorio;
+    
     public readonly AppDbContext _context;
-    public EtapaService( IEtapaRepositorio etapaRepositorio, AppDbContext context)
+    public EtapaService(  AppDbContext context)
     {
         _context = context;
-        _etapaRepositorio = etapaRepositorio;
+        
     }
 
  public async Task<PercentualEtapaDTO> GetPercentEtapas(int projetoid)
@@ -208,7 +208,7 @@ public async Task<TagsDTO> GetTags()
 
 public async Task IniciarEtapa(int id, DateTime dtInicioPrevisto)
 {
-    Etapa etapa = await _etapaRepositorio.GetById(id);
+    Etapa etapa = await GetById(id);
 
     if (etapa == null)
         throw new KeyNotFoundException("Etapa não encontrada.");
