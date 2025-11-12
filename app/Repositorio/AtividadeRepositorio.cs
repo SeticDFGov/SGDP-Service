@@ -7,6 +7,11 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using AtividadeDTO = api.Atividade.AtividadeDTO;
+using QuestPDF.Fluent; 
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Repositorio;
 
@@ -79,57 +84,137 @@ public class AtividadeRepositorio:IAtividadeRepositorio
     {
         return await _context.Atividades.Where(c => c.Report.ReportId == reportId).ToListAsync();
     }
-    
-    public byte[] GerarReportPDF(Guid exportId)
+ public byte[] GerarReportPDF(Guid exportId)
+{
+    List<AtividadeExport> atividades = _context.AtividadeExport
+        .Include(a => a.Export)
+        .Where(a => a.Export.Id == exportId)
+        .ToList(); 
+
+    if (!atividades.Any())
     {
-        List<AtividadeExport> atividades = _context.AtividadeExport
-            .Include(a => a.Export)
-            .Where(a => a.Export.Id == exportId)
-            .ToList(); 
-        var doc = Document.Create(container =>
+        return new byte[0]; 
+    }
+
+    var export = _context.Exports.Include(a=>a.NM_PROJETO).FirstOrDefault(a=>a.Id == exportId);
+    var projeto = export.NM_PROJETO;
+    
+     
+
+    // <<< NOTA IMPORTANTE >>>
+    // Substitua 'dadosDoProjeto.NomeProjeto', 'dadosDoProjeto.Fase', etc.,
+    // pelas propriedades REAIS do seu modelo 'Export'.
+
+    var doc = Document.Create(container =>
+    {
+        container.Page(page =>
         {
-            container.Page(page =>
+            page.Margin(30);
+
+            page.Header().Stack(stack =>
             {
-                page.Margin(30);
-                page.Header().Text("Status Report").FontSize(20).Bold().AlignCenter();
-                page.Content().Table(table =>
+                // Substitua pela sua propriedade
+                stack.Item().Text($"Status Report de Projeto No {projeto.projetoId}") 
+                    .FontSize(20).Bold().AlignCenter();
+                
+                stack.Item().Text($"De: XX a XX").AlignCenter();
+                stack.Item().PaddingTop(10); 
+            });
+            
+            page.Content().Column(column =>
+            {
+                // --- INÍCIO DA TABELA DE DADOS DO PROJETO ---
+                // <<< CORRIGIDO: Border(1) e BorderColor(Colors.Grey.Medium) aplicados >>>
+                column.Item().Border(1).BorderColor(Colors.Grey.Medium).Table(projectTable =>
+                {
+                    projectTable.ColumnsDefinition(columns =>
+                    {
+                        columns.ConstantColumn(150); 
+                        columns.RelativeColumn();    
+                        columns.ConstantColumn(110); 
+                        columns.RelativeColumn();    
+                    });
+
+                    // --- Linha 1: Nome do Projeto ---
+                    // <<< CORRIGIDO: Estilos aplicados diretamente e 'Lighten4' e 'Lighten1' corrigidos >>>
+                    projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Background(Colors.Grey.Lighten4).Padding(5).AlignLeft()
+                        .Text("Nome do Projeto:");
+                    projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(5).AlignLeft()
+                        .Text(projeto.NM_PROJETO ?? ""); 
+
+                    // --- Linha 2: Processo de Contratação / Pagamento ---
+                    projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Background(Colors.Grey.Lighten4).Padding(5).AlignLeft()
+                        .Text("Processo de Contratação:");
+                    projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(5).AlignLeft()
+                        .Text(projeto.NR_PROCESSO_SEI ?? "N/A"); 
+                    projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(5).AlignLeft() // Era ValueCellStyle
+                        .Text("Processo de Pagamento"); 
+                    projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(5).AlignLeft()
+                        .Text(projeto.NR_PROCESSO_SEI ?? "N/A"); 
+
+                    // --- Linha 3: Data Início/Fim ---
+                    projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Background(Colors.Grey.Lighten4).Padding(5).AlignLeft()
+                        .Text("Data de início - fim do projeto:");
+                    projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(5).AlignLeft()
+                        .Text( "N/A"); 
+                    projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(5).AlignLeft()
+                        .Text("(documento SEI)");
+
+                                 // --- Linha 6: Fase ---
+                    projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Background(Colors.Grey.Lighten4).Padding(5).AlignLeft()
+                        .Text("Fase:");
+                    projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(5).AlignLeft()
+                        .Text(export.fase ?? "Execução");
+                });
+                // --- FIM DA NOVA TABELA ---
+
+                column.Item().PaddingTop(20); 
+
+                // --- INÍCIO DA TABELA DE ATIVIDADES (SEU CÓDIGO ORIGINAL) ---
+                column.Item().Table(table =>
                 {
                     table.ColumnsDefinition(columns =>
                     {
-                        columns.ConstantColumn(50);
-                        columns.RelativeColumn();
-                        columns.RelativeColumn();
-                        columns.RelativeColumn();
+                        columns.RelativeColumn(2); 
+                        columns.RelativeColumn(1); 
+                        columns.RelativeColumn(1); 
+                        columns.RelativeColumn(3); 
                     });
 
                     table.Header(header =>
                     {
-                        header.Cell().Text("titulo").Bold();
-                        header.Cell().Text("situacao").Bold();
-                        header.Cell().Text("categoria").Bold();
-                        header.Cell().Text("decrição").Bold();
+                        // <<< CORRIGIDO: Estilos aplicados diretamente e 'Lighten2' corrigido >>>
+                        header.Cell().BorderBottom(1).Padding(5).Background(Colors.Grey.Lighten2).Text("Título");
+                        header.Cell().BorderBottom(1).Padding(5).Background(Colors.Grey.Lighten2).Text("Situação");
+                        header.Cell().BorderBottom(1).Padding(5).Background(Colors.Grey.Lighten2).Text("Categoria");
+                        header.Cell().BorderBottom(1).Padding(5).Background(Colors.Grey.Lighten2).Text("Descrição");
                     });
 
                     foreach (var atividade in atividades)
                     {
-                        table.Cell().Text(atividade.titulo);
-                        table.Cell().Text(atividade.situacao);
-                        table.Cell().Text(atividade.categoria);
-                        table.Cell().Text(atividade.descricao);
+                        // <<< CORRIGIDO: Estilos aplicados diretamente e 'Lighten2' corrigido >>>
+                        table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).Text(atividade.titulo);
+                        table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).Text(atividade.situacao);
+                        table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).Text(atividade.categoria);
+                        table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).Text(atividade.descricao);
                     }
                 });
-                page.Footer().AlignCenter().Text(x =>
-                {
-                    x.Span("Página ");
-                    x.CurrentPageNumber();
-                    x.Span(" de ");
-                    x.TotalPages();
-                });
+                // --- FIM DA TABELA DE ATIVIDADES ---
+            });
+
+            // Footer original
+            page.Footer().AlignCenter().Text(x =>
+            {
+                x.Span("Página ");
+                x.CurrentPageNumber();
+                x.Span(" de ");
+                x.TotalPages();
             });
         });
+    });
 
-        return doc.GeneratePdf();
-    }
+    return doc.GeneratePdf();
+} 
 
     public async Task GerarStatusReportExport( int projetoId)
     {

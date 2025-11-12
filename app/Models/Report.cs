@@ -54,7 +54,8 @@ public class Atividade
 
 public enum situacao
 {
-    concluido,
-    andamento,
-    proximo,
+    concluido=3,
+    andamento=1,
+    proximo=2,
+    a_fazer=4,
 }
