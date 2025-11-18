@@ -7,7 +7,5 @@ public interface IProjetoRepositorio
 {
     Task<List<Projeto>> GetProjetoListItemsAsync(string unidade);
     Task<Projeto> GetProjetoById(int id);
-    Task CreateProjeto(Projeto projeto);
-    Task CreateProjetoByTemplate(Projeto projeto);
    
 }

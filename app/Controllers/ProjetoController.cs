@@ -7,20 +7,21 @@ using Models;
 using Repositorio;
 using Repositorio.Interface;
 using service;
-
+using service.Interface;
+using TimeZoneConverter;
 namespace Controllers;
 [ApiController]
 [Authorize]
 [Route("api/[controller]")]
 public class ProjetoController : ControllerBase
 {
-    public readonly IProjetoRepositorio _repositorio;
-    public readonly ProjetoService _projetoService;
+    public readonly IProjetoService _service;
+    public readonly IProjetoService _projetoService;
     public readonly AppDbContext _context;
 
-    public ProjetoController(IProjetoRepositorio repositorio, ProjetoService projetoService, AppDbContext context)
+    public ProjetoController(IProjetoService service, IProjetoService projetoService, AppDbContext context)
     {
-        _repositorio = repositorio;
+        _service = service;
         _projetoService = projetoService;
         _context = context;
     }
@@ -28,52 +29,19 @@ public class ProjetoController : ControllerBase
     [HttpGet]
     public Task<List<Projeto>> GetAllProjetos([FromQuery] string unidade)
     {
-        var items = _repositorio.GetProjetoListItemsAsync(unidade);
+        var items = _service.GetProjetoListItemsAsync(unidade);
         return items;
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetProjetosById(int id)
     {
-        Projeto? items = await _repositorio.GetProjetoById(id);
-
-        if(items == null)
-        {
-            return NotFound(new {message = "Projeto não encontrado"});
-        }
+        Projeto items = await _service.GetProjetoById(id);
         return Ok(items);
     }
+    
 
-    [HttpPost]
-    public async Task<IActionResult> CreateProjeto([FromBody] ProjetoDTO dto)
-    {
-        var unidade = await _context.Unidades.FindAsync(dto.UnidadeId);
-        var esteira = await _context.Esteiras.FindAsync(dto.EsteiraId);
-        var demandante = await _context.AreaDemandantes.FindAsync(dto.NM_AREA_DEMANDANTE);
-        if (unidade == null || esteira == null)
-            return BadRequest("Unidade ou Esteira não encontrada");
-        var projeto = new Projeto
-        {
-            NM_PROJETO = dto.NM_PROJETO,
-            GERENTE_PROJETO = dto.GERENTE_PROJETO,
-            SITUACAO = dto.SITUACAO,
-            NR_PROCESSO_SEI = dto.NR_PROCESSO_SEI,
-            ANO = dto.ANO,
-            TEMPLATE = dto.TEMPLATE,
-            PROFISCOII = dto.PROFISCOII,
-            PDTIC2427 = dto.PDTIC2427,
-            PTD2427 = dto.PTD2427,
-            valorEstimado = dto.valorEstimado,
-            Unidade = unidade,
-            Esteira = esteira,
-            AREA_DEMANDANTE = demandante
-            
-        };
-        await _repositorio.CreateProjeto(projeto);
-        return Ok();
-    }
-
-    [HttpPost("template")]
+    [HttpPost("")]
     public async Task<IActionResult> CreateProjetoByTemplate([FromBody] ProjetoDTO dto)
     {
         var unidade = await _context.Unidades.FindAsync(dto.UnidadeId);
@@ -81,11 +49,16 @@ public class ProjetoController : ControllerBase
         var demandante = await _context.AreaDemandantes.FindAsync(dto.NM_AREA_DEMANDANTE);
         if (unidade == null || esteira == null || demandante == null)
             return BadRequest("Unidade ou Esteira não encontrada");
+        TimeZoneInfo brasilia = TZConvert.GetTimeZoneInfo("E. South America Standard Time");
+        dto.DT_INICIO =
+            TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(dto.DT_INICIO, DateTimeKind.Unspecified), brasilia);
+        dto.DT_TERMINO =
+            TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(dto.DT_TERMINO, DateTimeKind.Unspecified), brasilia);
         var projeto = new Projeto
         {
             NM_PROJETO = dto.NM_PROJETO,
             GERENTE_PROJETO = dto.GERENTE_PROJETO,
-            SITUACAO = dto.SITUACAO,
+            SITUACAO = "",
             NR_PROCESSO_SEI = dto.NR_PROCESSO_SEI,
             ANO = dto.ANO,
             TEMPLATE = dto.TEMPLATE,
@@ -95,9 +68,11 @@ public class ProjetoController : ControllerBase
             valorEstimado = dto.valorEstimado,
             Unidade = unidade,
             Esteira = esteira,
-            AREA_DEMANDANTE = demandante
+            AREA_DEMANDANTE = demandante,
+            DT_INICIO = dto.DT_INICIO,
+            DT_TERMINO = dto.DT_TERMINO,
         };
-        await _repositorio.CreateProjetoByTemplate(projeto);
+        await _service.CreateProjetoByTemplate(projeto);
         return Ok();
     }
 

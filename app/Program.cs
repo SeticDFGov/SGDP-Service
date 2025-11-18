@@ -12,6 +12,7 @@ using Microsoft.Identity.Client;
 using Repositorio.Interface;
 using api.Auth;
 using demanda_service.Repositorio.Interface;
+using demanda_service.service;
 using Microsoft.OpenApi.Models;
 using Interface.Repositorio;
 using QuestPDF.Infrastructure;
@@ -57,7 +58,7 @@ builder.Services.AddScoped<IProjetoRepositorio, ProjetoRepositorio>();
 builder.Services.AddScoped<IEtapaRepositorio, EtapaRepositorio>();
 builder.Services.AddScoped<IAuthRepositorio, AuthRepositorio>();
 builder.Services.AddScoped<EtapaService>();
-builder.Services.AddScoped<ProjetoService>();
+builder.Services.AddScoped<IProjetoService, ProjetoService>();
 builder.Services.AddScoped<HttpClient>();
 builder.Services.AddScoped<DetalhamentoRepositorio>();
 builder.Services.AddScoped<IEsteiraRepositorio, EsteiraRepositorio>();
@@ -68,7 +69,7 @@ builder.Services.AddScoped<IAtividadeRepositorio, AtividadeRepositorio>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Minha API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "API-SUBGD", Version = "v1" });
 
     
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme

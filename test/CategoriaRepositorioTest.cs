@@ -74,7 +74,6 @@ public class CategoriaRepositorioTests: TestBed<Base>, IDisposable
     public async Task DeleteCategoriaAsync_ThrowsApiException_WhenNotFound()
     {
 
-        // Act & Assert
         var ex = await Assert.ThrowsAsync<ApiException>(() => _categoriaRepositorio.DeleteCategoriaAsync(999));
         Assert.Equal(ErrorCode.CategoriaNaoEncontrada.ToString(), ex.Error.CodeStr);
     }
