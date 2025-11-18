@@ -36,7 +36,8 @@ public class Projeto
 
     public bool? PTD2427 {get;set;}
     public decimal? valorEstimado { get; set; }
-
+    public DateTime DT_INICIO {get;set;}
+    public DateTime DT_TERMINO {get;set;}
     public Unidade? Unidade { get; set; }
     public Esteira? Esteira { get; set; }
 }

@@ -114,10 +114,11 @@ public class AtividadeRepositorio:IAtividadeRepositorio
             page.Header().Stack(stack =>
             {
                 // Substitua pela sua propriedade
-                stack.Item().Text($"Status Report de Projeto No {projeto.projetoId}") 
+                stack.Item().Text($"Report de Projeto: {projeto.NM_PROJETO}") 
                     .FontSize(20).Bold().AlignCenter();
-                
-                stack.Item().Text($"De: XX a XX").AlignCenter();
+                stack.Item()
+                    .Text($"De: {projeto.DT_INICIO:dd/MM/yyyy} a {projeto.DT_TERMINO:dd/MM/yyyy}")
+                    .AlignCenter(); 
                 stack.Item().PaddingTop(10); 
             });
             
@@ -159,7 +160,8 @@ public class AtividadeRepositorio:IAtividadeRepositorio
                         .Text( "N/A"); 
                     projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(5).AlignLeft()
                         .Text("(documento SEI)");
-
+                    projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(5).AlignLeft()
+                        .Text("N/A");
                                  // --- Linha 6: Fase ---
                     projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Background(Colors.Grey.Lighten4).Padding(5).AlignLeft()
                         .Text("Fase:");

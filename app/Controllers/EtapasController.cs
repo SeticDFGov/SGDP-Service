@@ -7,6 +7,7 @@ using Models;
 using Repositorio;
 using Repositorio.Interface;
 using service;
+using TimeZoneConverter;
 
 namespace Controllers;
 [ApiController]
@@ -76,6 +77,10 @@ public class EtapaController : ControllerBase
     [HttpPut("iniciar/{id}")]
     public async Task<IActionResult> IniciarEtapa(int id, [FromBody] DateTime dtInicioPrevisto)
     {
+        TimeZoneInfo brasilia = TZConvert.GetTimeZoneInfo("E. South America Standard Time");
+        dtInicioPrevisto =
+            TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(dtInicioPrevisto, DateTimeKind.Unspecified), brasilia);
+            
         await _service.IniciarEtapa(id, dtInicioPrevisto);
         return Ok();
     }
