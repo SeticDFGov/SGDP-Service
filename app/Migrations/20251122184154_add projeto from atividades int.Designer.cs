@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Models;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace demanda_service.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251122184154_add projeto from atividades int")]
+    partial class addprojetofromatividadesint
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -387,12 +390,6 @@ namespace demanda_service.Migrations
 
                     b.Property<int?>("AREA_DEMANDANTEAreaDemandanteID")
                         .HasColumnType("integer");
-
-                    b.Property<DateTime>("DT_INICIO")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("DT_TERMINO")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("EsteiraId")
                         .HasColumnType("uuid");

@@ -12,6 +12,6 @@ public interface IAtividadeRepositorio
     public Task AlterarAtividade(AtividadeDTO atividadeDTO, int atividadeId);
     public Task RemoverAtividade(int atividadeId);
     public Task<List<Atividade>> VisualizarAtividades(int reportId);
-    public byte[] GerarReportPDF(Guid reportId);
+    public byte[] GerarReportPDF(int reportId);
     public Task GerarStatusReportExport(int projetoId);
 }

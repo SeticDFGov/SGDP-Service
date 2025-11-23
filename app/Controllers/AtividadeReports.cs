@@ -22,13 +22,9 @@ public class ReportsController : ControllerBase
     [HttpGet("{projetoId}")]
     public async Task<ActionResult> VisualizarReport(int projetoId)
     {
-        var report = await _context.Reports
-            .FirstOrDefaultAsync(c => c.NM_PROJETO.projetoId == projetoId);
-
-        if (report == null)
-            return NotFound();
-
-        return Ok(report);
+        var reports = await _context.Reports
+            .Where(c => c.NM_PROJETO.projetoId == projetoId).ToListAsync();
+        return Ok(reports);
     } 
     [HttpPost]
    
@@ -42,11 +38,11 @@ public class ReportsController : ControllerBase
         return Ok(inicioDto);
     }
 
-   
-    [HttpPost("{reportId}/atividades")]
-    public async Task<IActionResult> InserirAtividade(int reportId, [FromBody] AtividadeDTO atividadeDto)
+    
+    [HttpPost("{projetoId}/atividades")]
+    public async Task<IActionResult> InserirAtividade(int projetoId, [FromBody] AtividadeDTO atividadeDto)
     {
-        await _atividadeRepositorio.InserirAtividade(atividadeDto, reportId);
+        await _atividadeRepositorio.InserirAtividade(atividadeDto, projetoId);
         return Ok(atividadeDto);
     }
 
@@ -89,25 +85,11 @@ public class AtividadesController : ControllerBase
         return NoContent(); 
     }
     
-    [HttpGet("export/{exportId}")]
-    public IActionResult GerarExport(Guid exportId)
+    [HttpGet("export/{reportId}")]
+    public IActionResult GerarExport(int reportId)
     {
-        var pdf = _atividadeRepositorio.GerarReportPDF(exportId);
+        var pdf = _atividadeRepositorio.GerarReportPDF(reportId);
         return File(pdf, "application/pdf", "report.pdf");
     }
-
-    [HttpPost("export/create/{projetoId}")]
-
-    public async Task<IActionResult> GerarReport(int projetoId)
-    {
-        await _atividadeRepositorio.GerarStatusReportExport(projetoId);
-        return Ok();
-    }
-
-    [HttpGet("export/list/{projectId}")]
-    public IActionResult ListarExports(int projectId)
-    {
-        List<Export> exports = _context.Exports.Where(e => e.NM_PROJETO.projetoId == projectId).ToList();
-        return Ok(exports);
-    }
+    
 }
