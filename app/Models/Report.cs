@@ -31,8 +31,9 @@ public class Atividade
 {
     [Key] 
     public int AtividadeId { get; set; }
-    [Required] 
-    public Report Report { get; set; }
+  
+    [Required]
+    public int NM_PROJETO {get;set;}
     
     [Required]
     public string titulo {get;set;}

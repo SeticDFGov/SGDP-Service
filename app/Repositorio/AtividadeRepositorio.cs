@@ -27,12 +27,16 @@ public class AtividadeRepositorio:IAtividadeRepositorio
     public async Task IniciarReport(InicioAtividadeDTO inicioatividadeDTO)
     {
         Projeto projeto =  _context.Projetos.FirstOrDefault(c => c.projetoId == inicioatividadeDTO.NM_PROJETO);
+        List<Atividade> atividades  = _context.Atividades.Where(a => a.NM_PROJETO == inicioatividadeDTO.NM_PROJETO)
+            .ToList();
+        
         Report novo_report = new Report
         {
             descricao = inicioatividadeDTO.descricao,
             Data_criacao = DateTime.UtcNow,
             Data_fim = inicioatividadeDTO.data_fim,
             NM_PROJETO = projeto,
+            Atividades = atividades,
             fase = inicioatividadeDTO.fase,
         };
         
@@ -40,9 +44,9 @@ public class AtividadeRepositorio:IAtividadeRepositorio
         await _context.SaveChangesAsync();
     }
     
-    public async Task InserirAtividade(AtividadeDTO atividadeDTO, int reportId)
+    public async Task InserirAtividade(AtividadeDTO atividadeDTO, int projetoId)
     {
-        Report report = await _context.Reports.FirstOrDefaultAsync(c => c.ReportId == reportId);
+        Projeto projeto = await _context.Projetos.FirstOrDefaultAsync(c => c.projetoId == projetoId);
         var brasilia = TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time");
         Atividade nova = new Atividade
         {
@@ -52,7 +56,7 @@ public class AtividadeRepositorio:IAtividadeRepositorio
             descricao = atividadeDTO.descricao,
             data_termino = atividadeDTO.data_fim = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(atividadeDTO.data_fim, DateTimeKind.Unspecified), brasilia),
 
-            Report = report,
+            NM_PROJETO = projeto.projetoId,
         };
         _context.Atividades.Add(nova);
         await _context.SaveChangesAsync();
@@ -80,31 +84,16 @@ public class AtividadeRepositorio:IAtividadeRepositorio
 
    
  
-    public async Task<List<Atividade>> VisualizarAtividades(int reportId)
+    public async Task<List<Atividade>> VisualizarAtividades(int projetoId)
     {
-        return await _context.Atividades.Where(c => c.Report.ReportId == reportId).ToListAsync();
+        return await _context.Atividades.Where(c => c.NM_PROJETO == projetoId).ToListAsync();
     }
- public byte[] GerarReportPDF(Guid exportId)
-{
-    List<AtividadeExport> atividades = _context.AtividadeExport
-        .Include(a => a.Export)
-        .Where(a => a.Export.Id == exportId)
-        .ToList(); 
-
-    if (!atividades.Any())
-    {
-        return new byte[0]; 
-    }
-
-    var export = _context.Exports.Include(a=>a.NM_PROJETO).FirstOrDefault(a=>a.Id == exportId);
-    var projeto = export.NM_PROJETO;
     
-     
-
-    // <<< NOTA IMPORTANTE >>>
-    // Substitua 'dadosDoProjeto.NomeProjeto', 'dadosDoProjeto.Fase', etc.,
-    // pelas propriedades REAIS do seu modelo 'Export'.
-
+ public byte[] GerarReportPDF(int reportId)
+ { 
+     Report report = _context.Reports.Include(r=>r.Atividades).Include(r => r.NM_PROJETO).FirstOrDefault(r => r.ReportId == reportId);
+    var projeto = report.NM_PROJETO;
+    
     var doc = Document.Create(container =>
     {
         container.Page(page =>
@@ -123,8 +112,7 @@ public class AtividadeRepositorio:IAtividadeRepositorio
             
             page.Content().Column(column =>
             {
-                // --- INÍCIO DA TABELA DE DADOS DO PROJETO ---
-                // <<< CORRIGIDO: Border(1) e BorderColor(Colors.Grey.Medium) aplicados >>>
+              
                 column.Item().Border(1).BorderColor(Colors.Grey.Medium).Table(projectTable =>
                 {
                     projectTable.ColumnsDefinition(columns =>
@@ -135,14 +123,13 @@ public class AtividadeRepositorio:IAtividadeRepositorio
                         columns.RelativeColumn();    
                     });
 
-                    // --- Linha 1: Nome do Projeto ---
-                    // <<< CORRIGIDO: Estilos aplicados diretamente e 'Lighten4' e 'Lighten1' corrigidos >>>
+                   
                     projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Background(Colors.Grey.Lighten4).Padding(5).AlignLeft()
                         .Text("Nome do Projeto:");
                     projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(5).AlignLeft()
                         .Text(projeto.NM_PROJETO ?? ""); 
 
-                    // --- Linha 2: Processo de Contratação / Pagamento ---
+               
                     projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Background(Colors.Grey.Lighten4).Padding(5).AlignLeft()
                         .Text("Processo de Contratação:");
                     projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(5).AlignLeft()
@@ -152,7 +139,7 @@ public class AtividadeRepositorio:IAtividadeRepositorio
                     projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(5).AlignLeft()
                         .Text(projeto.NR_PROCESSO_SEI ?? "N/A"); 
 
-                    // --- Linha 3: Data Início/Fim ---
+                 
                     projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Background(Colors.Grey.Lighten4).Padding(5).AlignLeft()
                         .Text("Data de início - fim do projeto:");
                     projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(5).AlignLeft()
@@ -160,17 +147,16 @@ public class AtividadeRepositorio:IAtividadeRepositorio
                     projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(5).AlignLeft()
                         .Text("(documento SEI)");
 
-                                 // --- Linha 6: Fase ---
+                     
                     projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Background(Colors.Grey.Lighten4).Padding(5).AlignLeft()
                         .Text("Fase:");
                     projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(5).AlignLeft()
-                        .Text(export.fase ?? "Execução");
+                        .Text(report.fase ?? "Execução");
                 });
-                // --- FIM DA NOVA TABELA ---
-
+            
                 column.Item().PaddingTop(20); 
 
-                // --- INÍCIO DA TABELA DE ATIVIDADES (SEU CÓDIGO ORIGINAL) ---
+           
                 column.Item().Table(table =>
                 {
                     table.ColumnsDefinition(columns =>
@@ -190,19 +176,16 @@ public class AtividadeRepositorio:IAtividadeRepositorio
                         header.Cell().BorderBottom(1).Padding(5).Background(Colors.Grey.Lighten2).Text("Descrição");
                     });
 
-                    foreach (var atividade in atividades)
+                    foreach (var atividade in report.Atividades)
                     {
-                        // <<< CORRIGIDO: Estilos aplicados diretamente e 'Lighten2' corrigido >>>
                         table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).Text(atividade.titulo);
                         table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).Text(atividade.situacao);
                         table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).Text(atividade.categoria);
                         table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(5).Text(atividade.descricao);
                     }
                 });
-                // --- FIM DA TABELA DE ATIVIDADES ---
             });
 
-            // Footer original
             page.Footer().AlignCenter().Text(x =>
             {
                 x.Span("Página ");
@@ -218,7 +201,7 @@ public class AtividadeRepositorio:IAtividadeRepositorio
 
     public async Task GerarStatusReportExport( int projetoId)
     {
-        Report report = await _context.Reports
+        /*Report report = await _context.Reports
             .Include(r => r.NM_PROJETO)
             .FirstOrDefaultAsync(e => e.NM_PROJETO.projetoId == projetoId);
 
@@ -250,6 +233,6 @@ public class AtividadeRepositorio:IAtividadeRepositorio
             fase = report.fase,
         };
         _context.Exports.Add(novo_export);
-        await  _context.SaveChangesAsync();
+        await  _context.SaveChangesAsync();*/
     }
 }
