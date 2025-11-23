@@ -147,7 +147,7 @@ public class AtividadeRepositorio:IAtividadeRepositorio
                     projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(5).AlignLeft()
                         .Text("(documento SEI)");
 
-                     
+                                 // --- Linha 6: Fase ---
                     projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Background(Colors.Grey.Lighten4).Padding(5).AlignLeft()
                         .Text("Fase:");
                     projectTable.Cell().Border(1).BorderColor(Colors.Grey.Lighten1).Padding(5).AlignLeft()

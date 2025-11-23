@@ -8,7 +8,7 @@ using Repositorio;
 using Repositorio.Interface;
 using service;
 using service.Interface;
-
+using TimeZoneConverter;
 namespace Controllers;
 [ApiController]
 [Authorize]
@@ -49,6 +49,11 @@ public class ProjetoController : ControllerBase
         var demandante = await _context.AreaDemandantes.FindAsync(dto.NM_AREA_DEMANDANTE);
         if (unidade == null || esteira == null || demandante == null)
             return BadRequest("Unidade ou Esteira não encontrada");
+        TimeZoneInfo brasilia = TZConvert.GetTimeZoneInfo("E. South America Standard Time");
+        dto.DT_INICIO =
+            TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(dto.DT_INICIO, DateTimeKind.Unspecified), brasilia);
+        dto.DT_TERMINO =
+            TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(dto.DT_TERMINO, DateTimeKind.Unspecified), brasilia);
         var projeto = new Projeto
         {
             NM_PROJETO = dto.NM_PROJETO,
@@ -63,7 +68,9 @@ public class ProjetoController : ControllerBase
             valorEstimado = dto.valorEstimado,
             Unidade = unidade,
             Esteira = esteira,
-            AREA_DEMANDANTE = demandante
+            AREA_DEMANDANTE = demandante,
+            DT_INICIO = dto.DT_INICIO,
+            DT_TERMINO = dto.DT_TERMINO,
         };
         await _service.CreateProjetoByTemplate(projeto);
         return Ok();
