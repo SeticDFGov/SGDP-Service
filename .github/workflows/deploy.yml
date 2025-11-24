@@ -31,14 +31,15 @@ jobs:
 
     - name: Configurar Acesso Kubernetes
       env : 
-        KUBE_CONFIG_CONTENT: ${{ secrets.KUBE_CONFIG_RAW }} 
+        KUBECONFIG_CONTENT: ${{ secrets.KUBE_CONFIG_RAW }} 
       run: |
-        mkdir -p $HOME/.kube 
-   
-        echo "$KUBE_CONFIG_CONTENT" > $HOME/.kube/config
-    
-        export KUBECONFIG=$HOME/.kube/config      
-    - name: Deploy Kubernetes
-      run: | 
-        cd ..
-        kubectl rollout restart deployment/meu-backend-deployment
+        KUBE_PATH="$HOME/.kube/ci-config"
+        mkdir -p $(dirname $KUBE_PATH)
+        
+        echo "$KUBECONFIG_CONTENT" > $KUBE_PATH
+        
+        echo "Kubeconfig injetado em $KUBE_PATH. Executando restart..."
+        
+        kubectl --kubeconfig=$KUBE_PATH rollout restart deployment/meu-backend-deployment
+        
+        rm $KUBE_PATH
