@@ -30,12 +30,14 @@ jobs:
         docker push ${{ secrets.DOCKERHUB_USERNAME }}/sgpd_service:latest 
 
     - name: Configurar Acesso Kubernetes
+      env : 
+        KUBE_CONFIG_CONTENT: ${{ secrets.KUBE_CONFIG_RAW }} 
       run: |
         mkdir -p $HOME/.kube 
+   
+        echo "$KUBE_CONFIG_CONTENT" > $HOME/.kube/config
     
-        echo "$KUBE_CONFIG_RAW" > $HOME/.kube/config
-    
-        export KUBECONFIG=$HOME/.kube/config
+        export KUBECONFIG=$HOME/.kube/config      
     - name: Deploy Kubernetes
       run: | 
         cd ..
