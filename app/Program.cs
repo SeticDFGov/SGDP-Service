@@ -31,14 +31,37 @@ if (string.IsNullOrEmpty(connectionString))
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString(connectionString)));
-var allowedOrigins =  "*";
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll",
-        builder => builder
-            .AllowAnyOrigin()
-            .AllowAnyHeader()
-            .AllowAnyMethod());
+    if (builder.Environment.IsDevelopment())
+    {
+        // Desenvolvimento: mais permissivo para facilitar testes locais
+        options.AddPolicy("CorsPolicy",
+            corsBuilder => corsBuilder
+                .WithOrigins(
+                    "http://localhost:4200",
+                    "http://localhost:5148",
+                    "https://localhost:5148",
+                    "http://localhost:3000"
+                )
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials());
+    }
+    else
+    {
+        // Produção: apenas origens confiáveis
+        options.AddPolicy("CorsPolicy",
+            corsBuilder => corsBuilder
+                .WithOrigins(
+                    "https://subgd.df.gov.br",
+                    "https://subgd-hom.df.gov.br",
+                    "https://subgd-api.df.gov.br"
+                )
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials());
+    }
 });
 
 
@@ -49,15 +72,30 @@ builder.Services.AddControllers()
     });
 
 
+builder.Services.AddHttpClient("NomeDoSeuServicoExterno", client =>
+{
+    client.BaseAddress = new Uri("https://subgd-api.df.gov.br/autenticar"); // URL que está dando erro
+})
+.ConfigurePrimaryHttpMessageHandler(() =>
+{
+    var handler = new HttpClientHandler();
+    if (builder.Environment.IsDevelopment())
+    {
+        handler.ServerCertificateCustomValidationCallback =
+            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+    }
 
-builder.Services.AddScoped<ICategoriaRepositorio,CategoriaRepositorio>();
-builder.Services.AddScoped<IDemandanteRepositorio,DemandanteRepositorio>();
+    return handler;
+});
+
+builder.Services.AddScoped<ICategoriaRepositorio, CategoriaRepositorio>();
+builder.Services.AddScoped<IDemandanteRepositorio, DemandanteRepositorio>();
 builder.Services.AddScoped<IDemandaRepositorio, DemandaRepositorio>();
-builder.Services.AddScoped<ITemplateRepositorio, TemplateRepositorio>(); 
+builder.Services.AddScoped<ITemplateRepositorio, TemplateRepositorio>();
 builder.Services.AddScoped<IProjetoRepositorio, ProjetoRepositorio>();
 builder.Services.AddScoped<IEtapaRepositorio, EtapaRepositorio>();
 builder.Services.AddScoped<IAuthRepositorio, AuthRepositorio>();
-builder.Services.AddScoped<EtapaService>();
+builder.Services.AddScoped<IEtapaService, EtapaService>();
 builder.Services.AddScoped<IProjetoService, ProjetoService>();
 builder.Services.AddScoped<HttpClient>();
 builder.Services.AddScoped<DetalhamentoRepositorio>();
@@ -71,7 +109,6 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "API-SUBGD", Version = "v1" });
 
-    
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = "Insira o token JWT no formato: Bearer {seu token}",
@@ -81,7 +118,6 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "Bearer"
     });
 
-    
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -106,7 +142,6 @@ builder.Services.Configure<AuthSettings>(authSettingsSection);
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidIssuer = authSettingsSection["Issuer"],
@@ -127,8 +162,8 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
-app.UseCors("AllowAll");
-app.UseAuthentication(); 
-app.UseAuthorization();  
+app.UseCors("CorsPolicy");
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 app.Run();

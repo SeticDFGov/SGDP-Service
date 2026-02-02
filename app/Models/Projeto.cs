@@ -34,4 +34,7 @@ public class Projeto
     public Unidade? Unidade { get; set; }
     public Esteira? Esteira { get; set; }
 
+    // Relacionamento com Etapas (para eager loading)
+    public ICollection<Etapa>? Etapas { get; set; }
+
 }

@@ -4,7 +4,10 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
 using Models;
 
-
+/// <summary>
+/// Representa uma Etapa (Entregável) de um Projeto.
+/// Agora as datas e situação são calculadas a partir das Atividades.
+/// </summary>
 public class Etapa
 {
     [Key]
@@ -12,127 +15,151 @@ public class Etapa
 
     public Projeto NM_PROJETO { get; set; }
 
+    [Required]
     [StringLength(200)]
-    public string NM_ETAPA { get; set; }
+    public string NM_ETAPA { get; set; } = string.Empty;
 
     [AllowNull]
-    public DateTime? DT_INICIO_PREVISTO { get; set; }
+    public int Order { get; set; }
 
-    [AllowNull]
-    public DateTime? DT_TERMINO_PREVISTO { get; set; }
+    /// <summary>
+    /// Relacionamento com Atividades (eager loading)
+    /// </summary>
+    public ICollection<Atividade>? Atividades { get; set; }
 
-    [AllowNull]
-    public DateTime? DT_INICIO_REAL { get; set; }
-
-    [AllowNull]
-    public DateTime? DT_TERMINO_REAL { get; set; }
-
-    [AllowNull]
-    public int DIAS_PREVISTOS { get; set; }
-    [AllowNull]
-    public int Order {get; set;}
-
-    [NotMapped]
-    public string SITUACAO { 
-        get {
-            return DefinirSituacao(DT_INICIO_PREVISTO, DT_TERMINO_PREVISTO,DT_INICIO_REAL, DT_TERMINO_REAL);
-        }
-    }
-
-   
     [StringLength(200)]
-    [Required] 
-    public string RESPONSAVEL_ETAPA { get; set; } = "";
+    public string? RESPONSAVEL_ETAPA { get; set; }
 
-  
     [StringLength(500)]
-    [Required] 
-    public string ANALISE { get; set; } = ""; 
+    public string? ANALISE { get; set; }
 
-    [AllowNull]
-    [Range(0, 100)]
-    public decimal? PERCENT_TOTAL_ETAPA { get; set; }
-
-    [AllowNull]
-    [Range(0, 100)]
-    public decimal? PERCENT_EXEC_ETAPA { get; set; }
-
+    /// <summary>
+    /// Situação calculada agregando as situações das atividades
+    /// </summary>
     [NotMapped]
-    public decimal? PERCENT_EXEC_REAL
+    public string SITUACAO
     {
         get
         {
-            return CalcularPercentualReal(PERCENT_EXEC_ETAPA, PERCENT_TOTAL_ETAPA);
+            return CalcularSituacaoDasAtividades();
         }
     }
 
+    /// <summary>
+    /// Data de início prevista (mínima entre as atividades)
+    /// </summary>
+    [NotMapped]
+    public DateTime? DT_INICIO_PREVISTO
+    {
+        get => Atividades?.OrderBy(a => a.DT_INICIO_PREVISTO).FirstOrDefault()?.DT_INICIO_PREVISTO;
+    }
+
+    /// <summary>
+    /// Data de término prevista (máxima entre as atividades)
+    /// </summary>
+    [NotMapped]
+    public DateTime? DT_TERMINO_PREVISTO
+    {
+        get => Atividades?.OrderByDescending(a => a.DT_TERMINO_PREVISTO).FirstOrDefault()?.DT_TERMINO_PREVISTO;
+    }
+
+    /// <summary>
+    /// Data de início real (mínima entre as atividades que iniciaram)
+    /// </summary>
+    [NotMapped]
+    public DateTime? DT_INICIO_REAL
+    {
+        get => Atividades?.Where(a => a.DT_INICIO_REAL.HasValue)
+                          .OrderBy(a => a.DT_INICIO_REAL)
+                          .FirstOrDefault()?.DT_INICIO_REAL;
+    }
+
+    /// <summary>
+    /// Data de término real (se TODAS as atividades foram concluídas)
+    /// </summary>
+    [NotMapped]
+    public DateTime? DT_TERMINO_REAL
+    {
+        get
+        {
+            if (Atividades == null || !Atividades.Any())
+                return null;
+
+            // Só retorna data se TODAS as atividades foram concluídas
+            if (Atividades.All(a => a.DT_TERMINO_REAL.HasValue))
+                return Atividades.OrderByDescending(a => a.DT_TERMINO_REAL).FirstOrDefault()?.DT_TERMINO_REAL;
+
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Dias previstos (do início ao término previsto)
+    /// </summary>
+    [NotMapped]
+    public int DIAS_PREVISTOS
+    {
+        get
+        {
+            if (!DT_INICIO_PREVISTO.HasValue || !DT_TERMINO_PREVISTO.HasValue)
+                return 0;
+
+            return (DT_TERMINO_PREVISTO.Value - DT_INICIO_PREVISTO.Value).Days;
+        }
+    }
+
+    /// <summary>
+    /// Percentual de conclusão (atividades concluídas / total)
+    /// </summary>
+    [NotMapped]
+    public decimal PERCENT_EXEC_ETAPA
+    {
+        get
+        {
+            if (Atividades == null || !Atividades.Any())
+                return 0;
+
+            int concluidas = Atividades.Count(a => a.SITUACAO == "Concluído");
+            return (decimal)concluidas / Atividades.Count * 100;
+        }
+    }
+
+    /// <summary>
+    /// Percentual planejado (média dos percentuais das atividades)
+    /// </summary>
     [NotMapped]
     public decimal PERCENT_PLANEJADO
     {
         get
         {
-            return CalcularPercentualPlanejado(DT_INICIO_PREVISTO, DT_TERMINO_PREVISTO);
+            if (Atividades == null || !Atividades.Any())
+                return 0;
+
+            return Atividades.Average(a => a.PERCENT_PLANEJADO);
         }
     }
 
-    private decimal? CalcularPercentualReal(decimal? executadoEtapa, decimal? percentTota)
+    /// <summary>
+    /// Calcula a situação da etapa baseada nas situações das atividades
+    /// </summary>
+    private string CalcularSituacaoDasAtividades()
     {
-        if (executadoEtapa == null || percentTota == null)
-        {
-           return 0;
-        }
+        if (Atividades == null || !Atividades.Any())
+            return "Sem Atividades";
 
-        var executado = percentTota * executadoEtapa / 100;
-        return executado;
-    }
+        // Prioridade 1: Se alguma atividade está atrasada
+        if (Atividades.Any(a => a.SITUACAO.Contains("Atrasado")))
+            return "Atrasado";
 
-   private decimal CalcularPercentualPlanejado(DateTime? dtInicioPrevisto, DateTime? dtTerminoPrevisto)
-{
-    if (!dtInicioPrevisto.HasValue || !dtTerminoPrevisto.HasValue)
-        return 0;
+        // Prioridade 2: Se alguma está em andamento
+        if (Atividades.Any(a => a.SITUACAO == "Em Andamento"))
+            return "Em Andamento";
 
-    var diffDays = (dtTerminoPrevisto.Value - dtInicioPrevisto.Value).Days;
-
-    
-    var hoje = DateTime.UtcNow;
-
-    if (diffDays > 0 && dtInicioPrevisto.Value <= hoje)
-    {
-        int diffToday;
-
-        if (hoje > dtTerminoPrevisto.Value)
-            diffToday = (dtTerminoPrevisto.Value - dtInicioPrevisto.Value).Days;
-        else
-            diffToday = (hoje - dtInicioPrevisto.Value).Days;
-
-        return (decimal)(diffToday * 100.0 / diffDays);
-    }
-
-    return 0;
-}
-
-
-
-    
-    private string DefinirSituacao(DateTime? dtInicioPrevisto, DateTime? dtTerminoPrevisto, DateTime? dtInicioReal, DateTime? dtTerminoReal)
-    {
-        DateTime hoje = DateTime.Now;
-
-        bool inicioReal = dtInicioReal.HasValue;
-        bool terminoReal = dtTerminoReal.HasValue;
-        DateTime? inicioPrevisto = dtInicioPrevisto;
-        DateTime? terminoPrevisto = dtTerminoPrevisto;
-
-        if (!inicioReal && hoje < inicioPrevisto)
-            return "não iniciada";
-        else if (hoje > inicioPrevisto && !inicioReal)
-            return "atrasado para inicio";
-        else if (inicioReal && !terminoReal && hoje < terminoPrevisto)
-            return "Em andamento";
-        else if (inicioReal && !terminoReal && hoje > terminoPrevisto)
-            return "atrasado para conclusão";
-        else if (inicioReal && terminoReal)
+        // Prioridade 3: Se todas concluídas
+        if (Atividades.All(a => a.SITUACAO == "Concluído"))
             return "Concluído";
-        return "";
+
+        // Padrão: Não iniciada
+        return "Não Iniciada";
     }
 }

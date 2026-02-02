@@ -1,5 +1,7 @@
 using System.Threading.Tasks;
+using api.Common;
 using api.Projeto;
+using demanda_service.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -8,7 +10,7 @@ using Repositorio;
 using Repositorio.Interface;
 using service;
 using service.Interface;
-using TimeZoneConverter;
+
 namespace Controllers;
 [ApiController]
 [Authorize]
@@ -26,11 +28,26 @@ public class ProjetoController : ControllerBase
         _context = context;
     }
 
+    /// <summary>
+    /// Lista todos os projetos de uma unidade (sem paginação - mantido para compatibilidade)
+    /// </summary>
     [HttpGet]
     public Task<List<Projeto>> GetAllProjetos([FromQuery] string unidade)
     {
         var items = _service.GetProjetoListItemsAsync(unidade);
         return items;
+    }
+
+    /// <summary>
+    /// Lista projetos de uma unidade com paginação
+    /// </summary>
+    [HttpGet("paged")]
+    public async Task<ActionResult<PagedResponse<Projeto>>> GetProjetosPaged(
+        [FromQuery] string unidade,
+        [FromQuery] PagedRequest request)
+    {
+        var pagedResult = await _service.GetProjetosPaginatedAsync(unidade, request);
+        return Ok(pagedResult);
     }
 
     [HttpGet("{id}")]
@@ -49,11 +66,10 @@ public class ProjetoController : ControllerBase
         var demandante = await _context.AreaDemandantes.FindAsync(dto.NM_AREA_DEMANDANTE);
         if (unidade == null || esteira == null || demandante == null)
             return BadRequest("Unidade ou Esteira não encontrada");
-        TimeZoneInfo brasilia = TZConvert.GetTimeZoneInfo("E. South America Standard Time");
-        dto.DT_INICIO =
-            TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(dto.DT_INICIO, DateTimeKind.Unspecified), brasilia);
-        dto.DT_TERMINO =
-            TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(dto.DT_TERMINO, DateTimeKind.Unspecified), brasilia);
+
+        // Usando DateTimeHelper para conversão de timezone
+        dto.DT_INICIO = DateTimeHelper.ToUtc(dto.DT_INICIO);
+        dto.DT_TERMINO = DateTimeHelper.ToUtc(dto.DT_TERMINO);
         var projeto = new Projeto
         {
             NM_PROJETO = dto.NM_PROJETO,

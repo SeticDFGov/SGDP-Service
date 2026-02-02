@@ -19,10 +19,13 @@ public class ProjetoRepositorio : IProjetoRepositorio
 
    public async Task<List<Projeto>> GetProjetoListItemsAsync(string unidade)
    {
-       List<Projeto> listItems = await _context.Projetos.Where(p => p.Unidade.Nome == unidade)
-           .Include(e => e.AREA_DEMANDANTE)
-           .Include(e => e.Unidade)
-           .Include(e => e.Esteira)
+       List<Projeto> listItems = await _context.Projetos
+           .Where(p => p.Unidade.Nome == unidade)
+           .Include(p => p.AREA_DEMANDANTE)
+           .Include(p => p.Unidade)
+           .Include(p => p.Esteira)
+           .Include(p => p.Etapas) // Eager loading das etapas para evitar N+1
+           .AsSplitQuery() // Otimiza queries com múltiplos Includes
            .ToListAsync();
         return listItems;
 } 
