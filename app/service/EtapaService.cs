@@ -26,11 +26,12 @@ public class EtapaService : IEtapaService
     public async Task<PercentualEtapaDTO> GetPercentEtapas(int projetoid)
     {
         var etapas = await _context.Etapas
+            .Include(e => e.Atividades)
             .Where(e => e.NM_PROJETO.projetoId == projetoid)
             .ToListAsync();
 
-        decimal somaPercentExecReal = etapas.Sum(e => e.PERCENT_EXEC_REAL ?? 0);
-        decimal somaPercentExecPlan = etapas.Sum(e => e.PERCENT_PLANEJADO);
+        decimal somaPercentExec = etapas.Sum(e => e.PERCENT_EXEC_ETAPA);
+        decimal somaPercentPlan = etapas.Sum(e => e.PERCENT_PLANEJADO);
 
         var datasInicio = etapas.Where(e => e.DT_INICIO_PREVISTO.HasValue).Select(e => e.DT_INICIO_PREVISTO.Value);
         var datasTermino = etapas.Where(e => e.DT_TERMINO_PREVISTO.HasValue).Select(e => e.DT_TERMINO_PREVISTO.Value);
@@ -40,7 +41,7 @@ public class EtapaService : IEtapaService
             return new PercentualEtapaDTO
             {
                 PERCENT_PLANEJADO = 0,
-                PERCENT_EXECUTADO = somaPercentExecReal
+                PERCENT_EXECUTADO = somaPercentExec
             };
         }
 
@@ -60,12 +61,13 @@ public class EtapaService : IEtapaService
 
         return new PercentualEtapaDTO
         {
-            PERCENT_PLANEJADO = somaPercentExecPlan,
-            PERCENT_EXECUTADO = somaPercentExecReal
+            PERCENT_PLANEJADO = somaPercentPlan,
+            PERCENT_EXECUTADO = somaPercentExec
         };
     }
     /// <summary>
-    /// Edita uma etapa existente (aferição)
+    /// Edita uma etapa existente (apenas campos editáveis)
+    /// NOTA: Datas e percentuais agora são calculados das Atividades e não podem ser editados diretamente
     /// </summary>
     public async Task EditEtapa(AfericaoEtapaDTO etapa, int etapaid)
     {
@@ -74,19 +76,8 @@ public class EtapaService : IEtapaService
 
         try
         {
-            // Conversões de timezone usando DateTimeHelper
-            if (etapa.DT_INICIO_REAL.HasValue)
-            {
-                etapaEdit.DT_INICIO_REAL = DateTimeHelper.ToUtc(etapa.DT_INICIO_REAL.Value);
-            }
-
-            if (etapa.DT_TERMINO_REAL.HasValue)
-            {
-                etapaEdit.DT_TERMINO_REAL = DateTimeHelper.ToUtc(etapa.DT_TERMINO_REAL.Value);
-            }
-
+            // Apenas campos editáveis (não calculados)
             etapaEdit.ANALISE = etapa.ANALISE;
-            etapaEdit.PERCENT_EXEC_ETAPA = etapa.PERCENT_EXEC_ETAPA;
 
             await _etapaRepositorio.SaveChangesAsync();
         }
@@ -97,7 +88,7 @@ public class EtapaService : IEtapaService
     }
 
     /// <summary>
-    /// Cria uma nova etapa
+    /// Cria uma nova etapa (sem datas - agora em Atividades)
     /// </summary>
     public async Task CreateEtapa(EtapaDTO etapa)
     {
@@ -106,13 +97,9 @@ public class EtapaService : IEtapaService
 
         try
         {
-            // Conversões de timezone usando DateTimeHelper
             var etapaCadastro = new Etapa
             {
                 NM_ETAPA = etapa.NM_ETAPA,
-                DT_INICIO_PREVISTO = DateTimeHelper.ToUtc(etapa.DT_INICIO_PREVISTO),
-                DT_TERMINO_PREVISTO = DateTimeHelper.ToUtc(etapa.DT_TERMINO_PREVISTO),
-                PERCENT_TOTAL_ETAPA = etapa.PERCENT_TOTAL_ETAPA,
                 RESPONSAVEL_ETAPA = etapa.RESPONSAVEL_ETAPA,
                 NM_PROJETO = projetoCadastro
             };
@@ -126,11 +113,15 @@ public class EtapaService : IEtapaService
         }
     }
     /// <summary>
-    /// Obtém todas as etapas de um projeto
+    /// Obtém todas as etapas de um projeto (com atividades para cálculos)
     /// </summary>
     public async Task<List<Etapa>> GetEtapaListItemsAsync(int projetoId)
     {
-        var etapas = await _etapaRepositorio.GetEtapasByProjetoIdAsync(projetoId);
+        var etapas = await _context.Etapas
+            .Include(e => e.Atividades)
+            .Where(e => e.NM_PROJETO.projetoId == projetoId)
+            .OrderBy(e => e.Order)
+            .ToListAsync();
 
         if (etapas == null || etapas.Count == 0)
             return new List<Etapa>();
@@ -139,11 +130,13 @@ public class EtapaService : IEtapaService
     }
 
     /// <summary>
-    /// Obtém uma etapa por ID
+    /// Obtém uma etapa por ID (com atividades para cálculos)
     /// </summary>
     public async Task<Etapa> GetById(int id)
     {
-        var etapa = await _etapaRepositorio.GetByIdAsync(id)
+        var etapa = await _context.Etapas
+            .Include(e => e.Atividades)
+            .FirstOrDefaultAsync(e => e.EtapaProjetoId == id)
             ?? throw new ApiException(ErrorCode.EtapaNaoEncontrada);
 
         return etapa;
@@ -161,6 +154,7 @@ public class EtapaService : IEtapaService
         foreach (var projeto in projetos)
         {
             var etapas = await _context.Etapas
+                .Include(e => e.Atividades)
                 .Where(e => e.NM_PROJETO.projetoId == projeto.projetoId)
                 .ToListAsync();
 
@@ -169,15 +163,15 @@ public class EtapaService : IEtapaService
                 continue;
             }
 
-            if (etapas.Any(e => e.SITUACAO == "atrasado para inicio" || e.SITUACAO == "atrasado para conclusão"))
+            if (etapas.Any(e => e.SITUACAO == "Atrasado"))
             {
                 atrasados++;
             }
-            else if (etapas.Any(e => e.SITUACAO == "Em andamento"))
+            else if (etapas.Any(e => e.SITUACAO == "Em Andamento"))
             {
                 emAndamento++;
             }
-            else if (etapas.All(e => e.SITUACAO == "Concluido"))
+            else if (etapas.All(e => e.SITUACAO == "Concluído"))
             {
                 concluidos++;
             }
@@ -211,20 +205,16 @@ public class EtapaService : IEtapaService
     }
 
 
+    /// <summary>
+    /// OBSOLETO: Iniciar etapa agora é feito criando/iniciando Atividades
+    /// Este método permanece para compatibilidade mas não faz nada
+    /// </summary>
+    [Obsolete("Use AtividadeService para iniciar atividades da etapa")]
     public async Task IniciarEtapa(int id, DateTime dtInicioPrevisto)
     {
-        Etapa etapa = await GetById(id);
-
-        if (etapa == null)
-            throw new KeyNotFoundException("Etapa não encontrada.");
-
-        // Usando DateTimeHelper centralizado
-        DateTime dtUtc = DateTimeHelper.ToUtc(dtInicioPrevisto);
-
-        etapa.DT_INICIO_PREVISTO = dtUtc;
-        etapa.DT_TERMINO_PREVISTO = dtUtc.AddDays(etapa.DIAS_PREVISTOS);
-
-        await _context.SaveChangesAsync();
+        // Método obsoleto - datas agora são controladas por Atividades
+        // Mantido para não quebrar código existente que chama este método
+        await Task.CompletedTask;
     }
 
 

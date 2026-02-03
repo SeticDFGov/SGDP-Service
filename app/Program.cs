@@ -104,6 +104,7 @@ builder.Services.AddScoped<IEsteiraService, EsteiraService>();
 builder.Services.AddScoped<IDespachoRepositorio, DespachoRepositorio>();
 builder.Services.AddScoped<IDespachoService, DespachoService>();
 builder.Services.AddScoped<IAtividadeRepositorio, AtividadeRepositorio>();
+builder.Services.AddScoped<IAtividadeService, AtividadeService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

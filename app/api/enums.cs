@@ -51,5 +51,11 @@ public enum ErrorCode
     [Description("Data Inválida")]
     DataInvalida,
     [Description("Template não encontrado")]
-    TemplateNaoEncontrado, 
+    TemplateNaoEncontrado,
+    [Description("Atividade não encontrada")]
+    AtividadeNaoEncontrada,
+    [Description("Atividade já iniciada")]
+    AtividadeJaIniciada,
+    [Description("Atividade já concluída")]
+    AtividadeJaConcluida,
 }

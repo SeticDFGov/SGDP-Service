@@ -28,21 +28,20 @@ public class ProjetoService : IProjetoService
         var etapas = await _etapaService.GetEtapaListItemsAsync(id);
         if (etapas == null || !etapas.Any())
         {
-            return "Nao Iniciado";
+            return "Não Iniciado";
         }
 
-        bool temAtraso = etapas.Any(e => e.SITUACAO == "atrasado para inicio" ||
-                                         e.SITUACAO == "atrasado");
+        bool temAtraso = etapas.Any(e => e.SITUACAO == "Atrasado");
         if (temAtraso) return "Atrasado";
 
-        bool emAndamento = etapas.Any(e => e.SITUACAO == "Em andamento");
+        bool emAndamento = etapas.Any(e => e.SITUACAO == "Em Andamento");
 
-        if (emAndamento) return "Andamento";
-        bool tudoConcluido = etapas.All(e => e.SITUACAO == "Concluido");
+        if (emAndamento) return "Em Andamento";
+        bool tudoConcluido = etapas.All(e => e.SITUACAO == "Concluído");
 
-        if (tudoConcluido) return "Concluido";
+        if (tudoConcluido) return "Concluído";
 
-        return "Nao Iniciado";
+        return "Não Iniciado";
     }
 
     public async Task<List<Projeto>> GetProjetoListItemsAsync(string unidade)
@@ -86,23 +85,21 @@ public class ProjetoService : IProjetoService
         }
 
         // Prioridade 1: Atrasado (se qualquer etapa estiver atrasada)
-        if (etapas.Any(e => e.SITUACAO == "atrasado para inicio" ||
-                           e.SITUACAO == "atrasado para conclusão" ||
-                           e.SITUACAO == "atrasado"))
+        if (etapas.Any(e => e.SITUACAO == "Atrasado"))
         {
             return "Atrasado";
         }
 
         // Prioridade 2: Em Andamento
-        if (etapas.Any(e => e.SITUACAO == "Em andamento"))
+        if (etapas.Any(e => e.SITUACAO == "Em Andamento"))
         {
             return "Em Andamento";
         }
 
         // Prioridade 3: Concluído (todas etapas concluídas)
-        if (etapas.All(e => e.SITUACAO == "Concluido"))
+        if (etapas.All(e => e.SITUACAO == "Concluído"))
         {
-            return "Concluido";
+            return "Concluído";
         }
 
         // Padrão: Não Iniciado
@@ -119,13 +116,14 @@ public class ProjetoService : IProjetoService
     /// </summary>
     public async Task<PagedResponse<Projeto>> GetProjetosPaginatedAsync(string unidade, PagedRequest request)
     {
-        // Query base
+        // Query base (com Atividades para cálculo de situação)
         var query = _context.Projetos
             .Where(p => p.Unidade.Nome == unidade)
             .Include(p => p.AREA_DEMANDANTE)
             .Include(p => p.Unidade)
             .Include(p => p.Esteira)
             .Include(p => p.Etapas)
+                .ThenInclude(e => e.Atividades)
             .AsSplitQuery();
 
         // Conta total (antes da paginação)
@@ -172,16 +170,19 @@ public class ProjetoService : IProjetoService
 
                 foreach (Template template in templates)
                 {
+                    // Cria apenas a estrutura de etapas
+                    // As datas e percentuais agora são definidos pelas Atividades
                     var etapa = new Etapa
                     {
                         NM_ETAPA = template.NM_ETAPA,
                         NM_PROJETO = projeto,
-                        PERCENT_TOTAL_ETAPA = template.PERCENT_TOTAL,
-                        DIAS_PREVISTOS = template.DIAS_PREVISTOS,
                         Order = template.ORDER
                     };
 
                     _context.Etapas.Add(etapa);
+
+                    // TODO: Criar Atividades padrão para cada etapa baseado no template
+                    // (será implementado quando AtividadeService estiver pronto)
                 }
 
                 await _context.SaveChangesAsync();

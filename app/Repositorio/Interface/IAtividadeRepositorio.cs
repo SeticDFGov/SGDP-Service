@@ -19,6 +19,9 @@ public interface IAtividadeRepositorio
 
     // Métodos legados (compatibilidade com Reports)
     Task IniciarReport(InicioAtividadeDTO inicioatividadeDTO);
+    Task InserirAtividade(AtividadeDTO atividadeDTO, int projetoId);
+    Task AlterarAtividade(AtividadeDTO atividadeDTO, int atividadeId);
     Task RemoverAtividade(int atividadeId);
     Task<List<Atividade>> VisualizarAtividades(int projetoId);
+    byte[] GerarReportPDF(int reportId);
 }
