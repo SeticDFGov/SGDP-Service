@@ -40,6 +40,13 @@ public static class DateTimeHelper
             return brasiliaDateTime;
         }
 
+        // Se for Local ou Unspecified, precisamos especificar que é timezone de Brasília
+        if (brasiliaDateTime.Kind == DateTimeKind.Local || brasiliaDateTime.Kind == DateTimeKind.Unspecified)
+        {
+            // Marca como Unspecified para poder converter do timezone de Brasília
+            brasiliaDateTime = DateTime.SpecifyKind(brasiliaDateTime, DateTimeKind.Unspecified);
+        }
+
         return TimeZoneInfo.ConvertTimeToUtc(brasiliaDateTime, BrasiliaTimeZone);
     }
 

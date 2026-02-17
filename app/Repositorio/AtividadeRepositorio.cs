@@ -33,6 +33,14 @@ public class AtividadeRepositorio : IAtividadeRepositorio
     }
 
     /// <summary>
+    /// Alias para GetAtividadesByEtapaIdAsync (compatibilidade)
+    /// </summary>
+    public async Task<List<Atividade>> GetByEtapaIdAsync(int etapaId)
+    {
+        return await GetAtividadesByEtapaIdAsync(etapaId);
+    }
+
+    /// <summary>
     /// Busca atividades por ID do projeto (através das etapas)
     /// </summary>
     public async Task<List<Atividade>> GetAtividadesByProjetoIdAsync(int projetoId)

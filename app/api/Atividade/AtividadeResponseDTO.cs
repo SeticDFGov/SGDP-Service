@@ -95,4 +95,18 @@ public class AtividadeResponseDTO
     /// Ordem de exibição dentro da etapa
     /// </summary>
     public int Order { get; set; }
+
+    /// <summary>
+    /// Peso da atividade em relação ao total de dias do entregável (0-100%)
+    /// Calculado como: (DIAS_PREVISTOS desta atividade / Total de DIAS_PREVISTOS do entregável) * 100
+    /// </summary>
+    public decimal PESO_ATIVIDADE { get; set; }
+
+    /// <summary>
+    /// Percentual de execução da atividade (0-100%)
+    /// 0% = Não iniciada
+    /// 100% = Concluída
+    /// Entre 0-100% = baseado em DT_INICIO_REAL e tempo decorrido
+    /// </summary>
+    public decimal PERCENT_EXECUTADO { get; set; }
 }

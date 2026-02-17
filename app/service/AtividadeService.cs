@@ -142,9 +142,10 @@ public class AtividadeService : IAtividadeService
         if (atividade.DT_INICIO_REAL.HasValue)
             throw new ApiException(ErrorCode.AtividadeJaIniciada, "Atividade já foi iniciada");
 
-        // Usa data atual se não informada
-        var dataInicio = dtInicio ?? DateTime.Now;
-        atividade.DT_INICIO_REAL = DateTimeHelper.ToUtc(dataInicio);
+        // Usa data atual UTC se não informada, ou converte a data informada
+        atividade.DT_INICIO_REAL = dtInicio.HasValue
+            ? DateTimeHelper.ToUtc(dtInicio.Value)
+            : DateTime.UtcNow;
 
         await _atividadeRepositorio.SaveChangesAsync();
 
@@ -171,9 +172,10 @@ public class AtividadeService : IAtividadeService
             atividade.DT_INICIO_REAL = atividade.DT_INICIO_PREVISTO;
         }
 
-        // Usa data atual se não informada
-        var dataTermino = dtTermino ?? DateTime.Now;
-        atividade.DT_TERMINO_REAL = DateTimeHelper.ToUtc(dataTermino);
+        // Usa data atual UTC se não informada, ou converte a data informada
+        atividade.DT_TERMINO_REAL = dtTermino.HasValue
+            ? DateTimeHelper.ToUtc(dtTermino.Value)
+            : DateTime.UtcNow;
 
         await _atividadeRepositorio.SaveChangesAsync();
 
@@ -183,8 +185,20 @@ public class AtividadeService : IAtividadeService
     /// <summary>
     /// Mapeia Atividade para AtividadeResponseDTO
     /// </summary>
-    private AtividadeResponseDTO MapToResponseDTO(Atividade atividade)
+    private async Task<AtividadeResponseDTO> MapToResponseDTOAsync(Atividade atividade)
     {
+        // Buscar todas as atividades da mesma etapa para calcular peso
+        var atividadesDaEtapa = await _atividadeRepositorio.GetByEtapaIdAsync(atividade.EtapaProjetoId);
+        var totalDiasEtapa = atividadesDaEtapa.Sum(a => a.DIAS_PREVISTOS);
+
+        // Calcular PESO_ATIVIDADE (% que essa atividade representa no entregável)
+        decimal pesoAtividade = totalDiasEtapa > 0
+            ? (decimal)atividade.DIAS_PREVISTOS / totalDiasEtapa * 100
+            : 0;
+
+        // Calcular PERCENT_EXECUTADO (0-100% de conclusão da atividade)
+        decimal percentExecutado = CalcularPercentExecutado(atividade);
+
         return new AtividadeResponseDTO
         {
             AtividadeId = atividade.AtividadeId,
@@ -204,7 +218,44 @@ public class AtividadeService : IAtividadeService
             PERCENT_PLANEJADO = atividade.PERCENT_PLANEJADO,
             DIAS_PREVISTOS = atividade.DIAS_PREVISTOS,
             DIAS_EXECUTADOS = atividade.DIAS_EXECUTADOS,
-            Order = atividade.Order
+            Order = atividade.Order,
+            PESO_ATIVIDADE = Math.Round(pesoAtividade, 2),
+            PERCENT_EXECUTADO = Math.Round(percentExecutado, 2)
         };
+    }
+
+    /// <summary>
+    /// Calcula o percentual de execução de uma atividade (0-100%)
+    /// </summary>
+    private decimal CalcularPercentExecutado(Atividade atividade)
+    {
+        // Se concluída: 100%
+        if (atividade.DT_TERMINO_REAL.HasValue)
+            return 100m;
+
+        // Se não iniciada: 0%
+        if (!atividade.DT_INICIO_REAL.HasValue)
+            return 0m;
+
+        // Se iniciada mas não concluída: calcular baseado no tempo decorrido
+        var hoje = DateTime.UtcNow;
+        var diasDecorridos = (hoje - atividade.DT_INICIO_REAL.Value).Days;
+        var diasPrevistos = atividade.DIAS_PREVISTOS;
+
+        if (diasPrevistos <= 0)
+            return 50m; // Se não há prazo definido, considera 50% quando em andamento
+
+        var percent = (decimal)diasDecorridos / diasPrevistos * 100;
+
+        // Limita entre 1% e 99% (nunca 0% nem 100% quando em andamento)
+        return Math.Max(1m, Math.Min(99m, percent));
+    }
+
+    /// <summary>
+    /// Versão síncrona do MapToResponseDTO (para compatibilidade)
+    /// </summary>
+    private AtividadeResponseDTO MapToResponseDTO(Atividade atividade)
+    {
+        return MapToResponseDTOAsync(atividade).GetAwaiter().GetResult();
     }
 }

@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace demanda_service.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260203004459_RefatoracaoAtividadesEtapas")]
-    partial class RefatoracaoAtividadesEtapas
+    [Migration("20260203143619_EtapasWithAtividades")]
+    partial class EtapasWithAtividades
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

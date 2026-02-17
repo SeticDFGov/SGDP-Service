@@ -10,6 +10,7 @@ public interface IAtividadeRepositorio
 {
     // Novos métodos (após refatoração)
     Task<List<Atividade>> GetAtividadesByEtapaIdAsync(int etapaId);
+    Task<List<Atividade>> GetByEtapaIdAsync(int etapaId); // Alias para GetAtividadesByEtapaIdAsync
     Task<List<Atividade>> GetAtividadesByProjetoIdAsync(int projetoId);
     Task<Atividade?> GetByIdAsync(int id);
     Task<Etapa?> GetEtapaByIdAsync(int etapaId);
