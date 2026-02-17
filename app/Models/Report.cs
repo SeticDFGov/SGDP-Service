@@ -3,13 +3,16 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Models;
 
-public class Report 
+/// <summary>
+/// Report (relatório semanal) de um projeto
+/// </summary>
+public class Report
 {
     [Key]
     public int ReportId {get;set;}
 
     public Projeto NM_PROJETO {get;set;}
-    
+
     [Required]
     [StringLength(100)]
     public string descricao {get;set;} = "";
@@ -17,46 +20,19 @@ public class Report
     [Required]
     [StringLength(100)]
     public string fase {get;set;}
+
+    /// <summary>
+    /// Atividades associadas ao report
+    /// Nota: Atividade agora está vinculada à Etapa, não ao Projeto
+    /// </summary>
     [Required]
     public ICollection<Atividade> Atividades {get;set;}
-    
+
     [Required]
     public DateTime Data_criacao {get;set;}
-    
+
     [Required]
     public DateTime Data_fim {get;set;}
 }
 
-public class Atividade
-{
-    [Key] 
-    public int AtividadeId { get; set; }
-  
-    [Required]
-    public int NM_PROJETO {get;set;}
-    
-    [Required]
-    public string titulo {get;set;}
-    [Required]
-    public situacao situacao {get;set;}
-    
-    [Required]
-    [StringLength(100)]
-    public string categoria {get;set;}
-    
-    [Required]
-    [StringLength(300)]
-    public string descricao {get;set;} = "";
-    
-    [Required]
-    public DateTime data_termino {get;set;}
-    
-}
-
-public enum situacao
-{
-    concluido=3,
-    andamento=1,
-    proximo=2,
-    a_fazer=4,
-}
+// REMOVIDA classe Atividade daqui - agora está em Models/Atividade.cs

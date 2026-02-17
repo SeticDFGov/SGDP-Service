@@ -1,17 +1,28 @@
 ﻿using api.Atividade;
-using api.Projeto;
 using Models;
-using AtividadeDTO = api.Atividade.AtividadeDTO;
 
 namespace demanda_service.Repositorio.Interface;
 
+/// <summary>
+/// Interface do repositório de Atividade (apenas acesso a dados)
+/// </summary>
 public interface IAtividadeRepositorio
 {
-    public Task IniciarReport(InicioAtividadeDTO inicioatividadeDTO);
-    public Task InserirAtividade(AtividadeDTO atividadeDTO, int reportId);
-    public Task AlterarAtividade(AtividadeDTO atividadeDTO, int atividadeId);
-    public Task RemoverAtividade(int atividadeId);
-    public Task<List<Atividade>> VisualizarAtividades(int reportId);
-    public byte[] GerarReportPDF(int reportId);
-    public Task GerarStatusReportExport(int projetoId);
+    // Novos métodos (após refatoração)
+    Task<List<Atividade>> GetAtividadesByEtapaIdAsync(int etapaId);
+    Task<List<Atividade>> GetByEtapaIdAsync(int etapaId); // Alias para GetAtividadesByEtapaIdAsync
+    Task<List<Atividade>> GetAtividadesByProjetoIdAsync(int projetoId);
+    Task<Atividade?> GetByIdAsync(int id);
+    Task<Etapa?> GetEtapaByIdAsync(int etapaId);
+    void Add(Atividade atividade);
+    void Remove(Atividade atividade);
+    Task SaveChangesAsync();
+
+    // Métodos legados (compatibilidade com Reports)
+    Task IniciarReport(InicioAtividadeDTO inicioatividadeDTO);
+    Task InserirAtividade(AtividadeDTO atividadeDTO, int projetoId);
+    Task AlterarAtividade(AtividadeDTO atividadeDTO, int atividadeId);
+    Task RemoverAtividade(int atividadeId);
+    Task<List<Atividade>> VisualizarAtividades(int projetoId);
+    byte[] GerarReportPDF(int reportId);
 }

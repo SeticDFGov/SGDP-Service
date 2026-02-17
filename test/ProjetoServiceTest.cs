@@ -13,15 +13,17 @@ namespace test;
 public class ProjetoServiceTest
 {
     private readonly Mock<IProjetoRepositorio> _repo;
+    private readonly Mock<IEtapaService> _etapaService;
     private readonly AppDbContext _context;
     private readonly ProjetoService _service;
 
     public ProjetoServiceTest()
     {
         _repo = new Mock<IProjetoRepositorio>();
+        _etapaService = new Mock<IEtapaService>();
         var options = new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString()).Options;
         _context = new AppDbContext(options);
-        
+
         _context.Projetos.Add(new Projeto
         {
             projetoId = 1,
@@ -35,10 +37,10 @@ public class ProjetoServiceTest
             GERENTE_PROJETO = "GERENTETESTE",
             ANO = "2020",
             Unidade = new Unidade{id = Guid.NewGuid(), Nome = "TESTE"}
-            
+
         });
         _context.SaveChanges();
-        _service = new ProjetoService(_repo.Object, _context); 
+        _service = new ProjetoService(_repo.Object, _etapaService.Object, _context);
     }
     
     [Fact]

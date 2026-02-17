@@ -22,10 +22,21 @@ namespace Models
         public DbSet<Unidade> Unidades { get; set; }
         public DbSet<Esteira> Esteiras { get; set; }
         public DbSet<Despacho> Despachos { get; set; }
-        public DbSet<Export> Exports { get; set; }         
+        public DbSet<Export> Exports { get; set; }
         public DbSet<Atividade> Atividades { get; set; }
          public DbSet<AtividadeExport> AtividadeExport { get; set; }
-        
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            // Configura relacionamento Atividade -> Etapa
+            modelBuilder.Entity<Atividade>()
+                .HasOne(a => a.Etapa)
+                .WithMany(e => e.Atividades)
+                .HasForeignKey(a => a.EtapaProjetoId)
+                .OnDelete(DeleteBehavior.Cascade);
+        }
     }
 
 }

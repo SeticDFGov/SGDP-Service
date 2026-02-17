@@ -3,6 +3,8 @@ using api.Projeto;
 using app.Models;
 using Microsoft.EntityFrameworkCore;
 using Models;
+using Repositorio;
+using Repositorio.Interface;
 using service;
 using Xunit;
 
@@ -11,12 +13,15 @@ namespace test;
 public class EtapaServiceTest
 {
     private readonly AppDbContext _context;
+    private readonly IEtapaRepositorio _repositorio;
     private readonly EtapaService _service;
 
     public EtapaServiceTest()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString()).Options;
         _context = new AppDbContext(options);
+        _repositorio = new EtapaRepositorio(_context);
+
         _context.Projetos.Add(new Projeto
         {
             projetoId = 1,
@@ -30,10 +35,10 @@ public class EtapaServiceTest
             GERENTE_PROJETO = "GERENTETESTE",
             ANO = "2020",
             Unidade = new Unidade{id = Guid.NewGuid(), Nome = "TESTE"}
-            
+
         });
         _context.SaveChanges();
-        _service = new EtapaService(_context);
+        _service = new EtapaService(_repositorio, _context);
     }
     
     [Fact]

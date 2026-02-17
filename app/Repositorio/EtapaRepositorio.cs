@@ -1,109 +1,63 @@
-using api.Etapa;
-using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Graph.Drives.Item.Items.Item.Workbook.Functions.Iso_Ceiling;
 using Models;
 using Repositorio.Interface;
-using service;
-using TimeZoneConverter; // Instale via NuGet: TimeZoneConverter
+
 namespace Repositorio;
 
+/// <summary>
+/// Repositório para acesso a dados de Etapa (apenas queries simples)
+/// Lógica de negócio deve estar em EtapaService
+/// </summary>
 public class EtapaRepositorio : IEtapaRepositorio
 {
-    public readonly AppDbContext _context;
+    private readonly AppDbContext _context;
+
     public EtapaRepositorio(AppDbContext context)
     {
         _context = context;
     }
 
-   public async Task<List<Etapa>> GetEtapaListItemsAsync(int projetoId)
-{
-var etapas = await _context.Etapas
-        .Where(e => e.NM_PROJETO.projetoId == projetoId) 
-        .ToListAsync();
-
-    if (etapas == null || etapas.Count == 0)
-        throw new ApiException(ErrorCode.EtapasNaoEncontradas);
-   
-    return etapas;
-    
-    
-}
-
-
-public async Task CreateEtapa(EtapaDTO etapa)
-{
-    Projeto projetocadastro = await _context.Projetos
-        .FirstOrDefaultAsync(e => e.projetoId == etapa.NM_PROJETO) ?? throw new ApiException(ErrorCode.ProjetoNaoEncontrado);
-
-
-        try
-        {
-            TimeZoneInfo brasilia = TZConvert.GetTimeZoneInfo("E. South America Standard Time");
-
-            Etapa etapaCadastro = new Etapa
-            {
-                NM_ETAPA = etapa.NM_ETAPA,
-                DT_INICIO_PREVISTO = etapa.DT_INICIO_PREVISTO.HasValue
-                    ? TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(etapa.DT_INICIO_PREVISTO.Value, DateTimeKind.Unspecified), brasilia)
-                    : (DateTime?)null,
-                DT_TERMINO_PREVISTO = etapa.DT_TERMINO_PREVISTO.HasValue
-                    ? TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(etapa.DT_TERMINO_PREVISTO.Value, DateTimeKind.Unspecified), brasilia)
-                    : (DateTime?)null,
-                PERCENT_TOTAL_ETAPA = etapa.PERCENT_TOTAL_ETAPA,
-                RESPONSAVEL_ETAPA = etapa.RESPONSAVEL_ETAPA,
-                NM_PROJETO = projetocadastro
-            };
-
-            _context.Etapas.Add(etapaCadastro);
-            await _context.SaveChangesAsync();
-        }
-        catch (Exception)
-        {
-            throw new ApiException(ErrorCode.ErroAoCriarEtapa);
-        }
-    }
-     
-
-
-public async Task EditEtapa(AfericaoEtapaDTO etapa, int etapaid)
+    /// <summary>
+    /// Busca etapas por ID do projeto (data access only)
+    /// </summary>
+    public async Task<List<Etapa>> GetEtapasByProjetoIdAsync(int projetoId)
     {
-        Etapa etapa_edit = await _context.Etapas.FirstOrDefaultAsync(e => e.EtapaProjetoId == etapaid) ?? throw new ApiException(ErrorCode.EtapaNaoEncontrada);
+        return await _context.Etapas
+            .Where(e => e.NM_PROJETO.projetoId == projetoId)
+            .ToListAsync();
+    }
 
-        TimeZoneInfo brasilia = TZConvert.GetTimeZoneInfo("E. South America Standard Time");
-        try
-        {
-            if (etapa.DT_INICIO_REAL.HasValue)
-            {
-                DateTime dtInicio = DateTime.SpecifyKind(etapa.DT_INICIO_REAL.Value, DateTimeKind.Unspecified);
-                etapa_edit.DT_INICIO_REAL = TimeZoneInfo.ConvertTimeToUtc(dtInicio, brasilia);
-            }
+    /// <summary>
+    /// Busca etapa por ID (data access only)
+    /// </summary>
+    public async Task<Etapa?> GetByIdAsync(int id)
+    {
+        return await _context.Etapas
+            .FirstOrDefaultAsync(e => e.EtapaProjetoId == id);
+    }
 
-            if (etapa.DT_TERMINO_REAL.HasValue)
-            {
-                DateTime dtTermino = DateTime.SpecifyKind(etapa.DT_TERMINO_REAL.Value, DateTimeKind.Unspecified);
-                etapa_edit.DT_TERMINO_REAL = TimeZoneInfo.ConvertTimeToUtc(dtTermino, brasilia);
-            }
+    /// <summary>
+    /// Busca projeto por ID (data access only)
+    /// </summary>
+    public async Task<Projeto?> GetProjetoByIdAsync(int projetoId)
+    {
+        return await _context.Projetos
+            .FirstOrDefaultAsync(p => p.projetoId == projetoId);
+    }
 
-            etapa_edit.ANALISE = etapa.ANALISE;
-            etapa_edit.PERCENT_EXEC_ETAPA = etapa.PERCENT_EXEC_ETAPA;
+    /// <summary>
+    /// Adiciona uma etapa ao contexto
+    /// </summary>
+    public void Add(Etapa etapa)
+    {
+        _context.Etapas.Add(etapa);
+    }
 
-            await _context.SaveChangesAsync();
-
-        }catch(Exception)
-        {
-            throw new ApiException(ErrorCode.ErroAoEditarEtapa);
-        }
-}
-
-public async Task<Etapa> GetById(int id)
-{
-   Etapa etapa =  _context.Etapas.FirstOrDefault(e => e.EtapaProjetoId == id) ?? throw new ApiException(ErrorCode.EtapaNaoEncontrada);
-   
-   return etapa;
-}
-
-
-
+    /// <summary>
+    /// Salva as mudanças no banco de dados
+    /// </summary>
+    public async Task SaveChangesAsync()
+    {
+        await _context.SaveChangesAsync();
+    }
 }
