@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using api.Etapa;
 using api.Projeto;
 using demanda_service.Helpers;
@@ -13,10 +14,17 @@ namespace Controllers;
 public class EtapaController : ControllerBase
 {
     private readonly IEtapaService _service;
+    private readonly IPermissionService _permissionService;
 
-    public EtapaController(IEtapaService service)
+    public EtapaController(IEtapaService service, IPermissionService permissionService)
     {
         _service = service;
+        _permissionService = permissionService;
+    }
+
+    private string? GetUserEmail()
+    {
+        return User.FindFirst(ClaimTypes.Email)?.Value;
     }
 
     [HttpGet("{id}")]
@@ -35,14 +43,29 @@ public class EtapaController : ControllerBase
     [HttpPost()]
     public async Task<IActionResult> CreateEtapas([FromBody] EtapaDTO etapa)
     {
+        var email = GetUserEmail();
+        if (string.IsNullOrEmpty(email))
+            return Unauthorized();
+
+        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        if (!_permissionService.CanCreate(perfil, "etapa"))
+            return Forbid();
+
         await _service.CreateEtapa(etapa);
         return Ok();
-
     }
 
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateEtapas([FromBody] AfericaoEtapaDTO etapa, int id)
     {
+        var email = GetUserEmail();
+        if (string.IsNullOrEmpty(email))
+            return Unauthorized();
+
+        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        if (!_permissionService.CanEdit(perfil, "etapa"))
+            return Forbid();
+
         await _service.EditEtapa(etapa, id);
         return Ok();
     }

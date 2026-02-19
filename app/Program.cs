@@ -55,6 +55,7 @@ builder.Services.AddCors(options =>
             corsBuilder => corsBuilder
                 .WithOrigins(
                     "https://subgd.df.gov.br",
+                    "https://subgd.setic.df.gov.br",
                     "https://subgd-hom.df.gov.br",
                     "https://subgd-api.df.gov.br"
                 )
@@ -106,6 +107,7 @@ builder.Services.AddScoped<IDespachoRepositorio, DespachoRepositorio>();
 builder.Services.AddScoped<IDespachoService, DespachoService>();
 builder.Services.AddScoped<IAtividadeRepositorio, AtividadeRepositorio>();
 builder.Services.AddScoped<IAtividadeService, AtividadeService>();
+builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

@@ -1,6 +1,9 @@
+using System.Security.Claims;
 using api.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Repositorio;
+using service.Interface;
 
 namespace Controllers;
 
@@ -9,10 +12,17 @@ namespace Controllers;
 public class AuthController : ControllerBase
 {
     public readonly IAuthRepositorio _authRepositorio;
+    private readonly IPermissionService _permissionService;
 
-    public AuthController(IAuthRepositorio authRepositorio)
+    public AuthController(IAuthRepositorio authRepositorio, IPermissionService permissionService)
     {
         _authRepositorio = authRepositorio;
+        _permissionService = permissionService;
+    }
+
+    private string? GetUserEmail()
+    {
+        return User.FindFirst(ClaimTypes.Email)?.Value;
     }
 
     [HttpPost]
@@ -115,14 +125,44 @@ public class AuthController : ControllerBase
         {
             return BadRequest("Email do administrador é obrigatório.");
         }
-        
+
         var sucesso = await _authRepositorio.ModificarUnidadeUsuario(request.email, request.unidadeId, adminEmail);
-        
+
         if (!sucesso)
         {
             return BadRequest("Não foi possível alterar a unidade do usuário. Verifique se você é admin e se o usuário e a unidade existem.");
         }
 
         return Ok("Unidade do usuário alterada com sucesso.");
+    }
+
+    /// <summary>
+    /// Retorna as permissões do usuário atual baseado no seu perfil
+    /// </summary>
+    [HttpGet("permissoes")]
+    [Authorize]
+    public async Task<IActionResult> GetPermissoes()
+    {
+        var email = GetUserEmail();
+        if (string.IsNullOrEmpty(email))
+            return Unauthorized();
+
+        var perfil = await _permissionService.GetUserPerfilAsync(email);
+
+        var permissoes = new
+        {
+            Perfil = perfil,
+            CanCreateProjeto = _permissionService.CanCreate(perfil, "projeto"),
+            CanEditProjeto = _permissionService.CanEdit(perfil, "projeto"),
+            CanDeleteProjeto = _permissionService.CanDelete(perfil, "projeto"),
+            CanCreateEtapa = _permissionService.CanCreate(perfil, "etapa"),
+            CanEditEtapa = _permissionService.CanEdit(perfil, "etapa"),
+            CanDeleteEtapa = _permissionService.CanDelete(perfil, "etapa"),
+            CanCreateAtividade = _permissionService.CanCreate(perfil, "atividade"),
+            CanEditAtividade = _permissionService.CanEdit(perfil, "atividade"),
+            CanDeleteAtividade = _permissionService.CanDelete(perfil, "atividade")
+        };
+
+        return Ok(permissoes);
     }
 }

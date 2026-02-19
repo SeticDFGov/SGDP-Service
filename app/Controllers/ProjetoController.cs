@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Threading.Tasks;
 using api.Common;
 using api.Projeto;
@@ -5,6 +6,7 @@ using demanda_service.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Models;
 using Repositorio;
 using Repositorio.Interface;
@@ -20,34 +22,102 @@ public class ProjetoController : ControllerBase
     public readonly IProjetoService _service;
     public readonly IProjetoService _projetoService;
     public readonly AppDbContext _context;
+    private readonly IPermissionService _permissionService;
 
-    public ProjetoController(IProjetoService service, IProjetoService projetoService, AppDbContext context)
+    public ProjetoController(
+        IProjetoService service,
+        IProjetoService projetoService,
+        AppDbContext context,
+        IPermissionService permissionService)
     {
         _service = service;
         _projetoService = projetoService;
         _context = context;
+        _permissionService = permissionService;
+    }
+
+    private string? GetUserEmail()
+    {
+        return User.FindFirst(ClaimTypes.Email)?.Value;
     }
 
     /// <summary>
-    /// Lista todos os projetos de uma unidade (sem paginação - mantido para compatibilidade)
+    /// Lista todos os projetos filtrados por perfil do usuário (sem paginação - mantido para compatibilidade)
     /// </summary>
     [HttpGet]
-    public Task<List<Projeto>> GetAllProjetos([FromQuery] string unidade)
+    public async Task<ActionResult<List<Projeto>>> GetAllProjetos([FromQuery] string unidade)
     {
-        var items = _service.GetProjetoListItemsAsync(unidade);
-        return items;
+        var email = GetUserEmail();
+        if (string.IsNullOrEmpty(email))
+            return Unauthorized();
+
+        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        var userUnidade = await _permissionService.GetUserUnidadeAsync(email);
+        var unidadeNome = userUnidade?.Nome ?? unidade;
+
+        var query = _permissionService.GetFilteredProjetosQuery(perfil, unidadeNome);
+        var projetos = await query.ToListAsync();
+
+        // Calcula situação para cada projeto
+        foreach (var projeto in projetos)
+        {
+            var etapas = projeto.Etapas ?? new List<Etapa>();
+            projeto.SITUACAO = CalcularSituacaoProjeto(etapas);
+        }
+
+        return Ok(projetos);
     }
 
     /// <summary>
-    /// Lista projetos de uma unidade com paginação
+    /// Lista projetos filtrados por perfil com paginação
     /// </summary>
     [HttpGet("paged")]
     public async Task<ActionResult<PagedResponse<Projeto>>> GetProjetosPaged(
         [FromQuery] string unidade,
         [FromQuery] PagedRequest request)
     {
-        var pagedResult = await _service.GetProjetosPaginatedAsync(unidade, request);
-        return Ok(pagedResult);
+        var email = GetUserEmail();
+        if (string.IsNullOrEmpty(email))
+            return Unauthorized();
+
+        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        var userUnidade = await _permissionService.GetUserUnidadeAsync(email);
+        var unidadeNome = userUnidade?.Nome ?? unidade;
+
+        var query = _permissionService.GetFilteredProjetosQuery(perfil, unidadeNome);
+
+        var totalItems = await query.CountAsync();
+
+        var projetos = await query
+            .Skip(request.Skip)
+            .Take(request.PageSize)
+            .ToListAsync();
+
+        // Calcula situação para cada projeto
+        foreach (var projeto in projetos)
+        {
+            var etapas = projeto.Etapas ?? new List<Etapa>();
+            projeto.SITUACAO = CalcularSituacaoProjeto(etapas);
+        }
+
+        return Ok(PagedResponse<Projeto>.Create(projetos, totalItems, request));
+    }
+
+    private string CalcularSituacaoProjeto(ICollection<Etapa> etapas)
+    {
+        if (!etapas.Any())
+            return "Não Iniciado";
+
+        if (etapas.Any(e => e.SITUACAO == "Atrasado"))
+            return "Atrasado";
+
+        if (etapas.Any(e => e.SITUACAO == "Em Andamento"))
+            return "Em Andamento";
+
+        if (etapas.All(e => e.SITUACAO == "Concluído"))
+            return "Concluído";
+
+        return "Não Iniciado";
     }
 
     [HttpGet("{id}")]
@@ -61,6 +131,14 @@ public class ProjetoController : ControllerBase
     [HttpPost("")]
     public async Task<IActionResult> CreateProjetoByTemplate([FromBody] ProjetoDTO dto)
     {
+        var email = GetUserEmail();
+        if (string.IsNullOrEmpty(email))
+            return Unauthorized();
+
+        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        if (!_permissionService.CanCreate(perfil, "projeto"))
+            return Forbid();
+
         var unidade = await _context.Unidades.FindAsync(dto.UnidadeId);
         var esteira = await _context.Esteiras.FindAsync(dto.EsteiraId);
         var demandante = await _context.AreaDemandantes.FindAsync(dto.NM_AREA_DEMANDANTE);

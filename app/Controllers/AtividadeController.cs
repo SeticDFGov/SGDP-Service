@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using api.Atividade;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,10 +15,17 @@ namespace demanda_service.Controllers;
 public class AtividadeController : ControllerBase
 {
     private readonly IAtividadeService _atividadeService;
+    private readonly IPermissionService _permissionService;
 
-    public AtividadeController(IAtividadeService atividadeService)
+    public AtividadeController(IAtividadeService atividadeService, IPermissionService permissionService)
     {
         _atividadeService = atividadeService;
+        _permissionService = permissionService;
+    }
+
+    private string? GetUserEmail()
+    {
+        return User.FindFirst(ClaimTypes.Email)?.Value;
     }
 
     /// <summary>
@@ -29,8 +37,17 @@ public class AtividadeController : ControllerBase
     [ProducesResponseType(typeof(AtividadeResponseDTO), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CreateAtividade([FromBody] AtividadeCreateDTO dto)
     {
+        var email = GetUserEmail();
+        if (string.IsNullOrEmpty(email))
+            return Unauthorized();
+
+        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        if (!_permissionService.CanCreate(perfil, "atividade"))
+            return Forbid();
+
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
@@ -48,8 +65,17 @@ public class AtividadeController : ControllerBase
     [ProducesResponseType(typeof(AtividadeResponseDTO), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> UpdateAtividade(int id, [FromBody] AtividadeUpdateDTO dto)
     {
+        var email = GetUserEmail();
+        if (string.IsNullOrEmpty(email))
+            return Unauthorized();
+
+        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        if (!_permissionService.CanEdit(perfil, "atividade"))
+            return Forbid();
+
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
@@ -105,8 +131,17 @@ public class AtividadeController : ControllerBase
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> DeleteAtividade(int id)
     {
+        var email = GetUserEmail();
+        if (string.IsNullOrEmpty(email))
+            return Unauthorized();
+
+        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        if (!_permissionService.CanDelete(perfil, "atividade"))
+            return Forbid();
+
         await _atividadeService.DeleteAtividadeAsync(id);
         return NoContent();
     }
@@ -121,8 +156,17 @@ public class AtividadeController : ControllerBase
     [ProducesResponseType(typeof(AtividadeResponseDTO), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> IniciarAtividade(int id, [FromBody] IniciarAtividadeRequest? request = null)
     {
+        var email = GetUserEmail();
+        if (string.IsNullOrEmpty(email))
+            return Unauthorized();
+
+        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        if (!_permissionService.CanEdit(perfil, "atividade"))
+            return Forbid();
+
         var result = await _atividadeService.IniciarAtividadeAsync(id, request?.DataInicio);
         return Ok(result);
     }
@@ -137,8 +181,17 @@ public class AtividadeController : ControllerBase
     [ProducesResponseType(typeof(AtividadeResponseDTO), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> ConcluirAtividade(int id, [FromBody] ConcluirAtividadeRequest? request = null)
     {
+        var email = GetUserEmail();
+        if (string.IsNullOrEmpty(email))
+            return Unauthorized();
+
+        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        if (!_permissionService.CanEdit(perfil, "atividade"))
+            return Forbid();
+
         var result = await _atividadeService.ConcluirAtividadeAsync(id, request?.DataConclusao);
         return Ok(result);
     }
