@@ -10,9 +10,6 @@ public class PermissionService : IPermissionService
 {
     private readonly AppDbContext _context;
 
-    // Nome da esteira para CentralIT
-    private const string EsteiraCentralIT = "Desenvolvimento de Soluções";
-
     public PermissionService(AppDbContext context)
     {
         _context = context;
@@ -41,9 +38,9 @@ public class PermissionService : IPermissionService
         {
             Perfis.Admin => true,
             Perfis.Gestor => true,
-            Perfis.CentralIT => resource is "etapa" or "atividade",
+            Perfis.CentralIT => resource is "entregavel",
             Perfis.Parceiro => false,
-            _ => false // basico ou outros
+            _ => false
         };
     }
 
@@ -53,7 +50,7 @@ public class PermissionService : IPermissionService
         {
             Perfis.Admin => true,
             Perfis.Gestor => true,
-            Perfis.CentralIT => resource is "etapa" or "atividade" or "descricao",
+            Perfis.CentralIT => resource is "entregavel" or "percentual",
             Perfis.Parceiro => false,
             _ => false
         };
@@ -65,39 +62,29 @@ public class PermissionService : IPermissionService
         {
             Perfis.Admin => true,
             Perfis.Gestor => true,
-            Perfis.CentralIT => false, // CentralIT NUNCA pode excluir
+            Perfis.CentralIT => false,
             Perfis.Parceiro => false,
             _ => false
         };
     }
 
-    public IQueryable<Projeto> GetFilteredProjetosQuery(string perfil, string? unidadeNome)
+    public IQueryable<Demanda> GetFilteredDemandasQuery(string perfil, string? unidadeNome)
     {
-        var query = _context.Projetos
-            .Include(p => p.AREA_DEMANDANTE)
-            .Include(p => p.Unidade)
-            .Include(p => p.Esteira)
-            .Include(p => p.Etapas!)
-                .ThenInclude(e => e.Atividades)
+        var query = _context.Demandas
+            .Include(d => d.AREA_DEMANDANTE)
+            .Include(d => d.Esteira)
+            .Include(d => d.Entregaveis!)
+                .ThenInclude(e => e.Responsavel)
             .AsSplitQuery()
             .AsQueryable();
 
         return perfil switch
         {
-            // Admin vê tudo
             Perfis.Admin => query,
-
-            // Gestor vê apenas projetos da sua unidade
-            Perfis.Gestor => query.Where(p => p.Unidade != null && p.Unidade.Nome == unidadeNome),
-
-            // CentralIT vê apenas projetos da esteira "Desenvolvimento de Soluções"
-            Perfis.CentralIT => query.Where(p => p.Esteira != null && p.Esteira.Nome == EsteiraCentralIT),
-
-            // Parceiro vê apenas projetos onde AreaDemandante.NM_DEMANDANTE == User.Unidade.Nome
-            Perfis.Parceiro => query.Where(p => p.AREA_DEMANDANTE != null && p.AREA_DEMANDANTE.NM_DEMANDANTE == unidadeNome),
-
-            // Basico e outros - vê apenas projetos da sua unidade (comportamento padrão)
-            _ => query.Where(p => p.Unidade != null && p.Unidade.Nome == unidadeNome)
+            Perfis.Gestor => query,
+            Perfis.CentralIT => query,
+            Perfis.Parceiro => query.Where(d => d.AREA_DEMANDANTE != null && d.AREA_DEMANDANTE.NM_DEMANDANTE == unidadeNome),
+            _ => query.Where(d => d.AREA_DEMANDANTE != null && d.AREA_DEMANDANTE.NM_DEMANDANTE == unidadeNome)
         };
     }
 }

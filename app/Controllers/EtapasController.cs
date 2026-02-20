@@ -1,7 +1,5 @@
 using System.Security.Claims;
-using api.Etapa;
-using api.Projeto;
-using demanda_service.Helpers;
+using api.Entregavel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using service.Interface;
@@ -10,91 +8,115 @@ namespace Controllers;
 
 [ApiController]
 [Authorize]
-[Route("api/[controller]")]
-public class EtapaController : ControllerBase
+[Route("api/entregavel")]
+public class EntregaveisController : ControllerBase
 {
     private readonly IEtapaService _service;
     private readonly IPermissionService _permissionService;
 
-    public EtapaController(IEtapaService service, IPermissionService permissionService)
+    public EntregaveisController(IEtapaService service, IPermissionService permissionService)
     {
         _service = service;
         _permissionService = permissionService;
     }
 
-    private string? GetUserEmail()
-    {
-        return User.FindFirst(ClaimTypes.Email)?.Value;
-    }
+    private string? GetUserEmail() => User.FindFirst(ClaimTypes.Email)?.Value;
 
-    [HttpGet("{id}")]
-    public async Task<IActionResult> GetAllEtapas(int id)
+    /// <summary>
+    /// Lista entregáveis de uma demanda
+    /// </summary>
+    [HttpGet("{demandaId}")]
+    public async Task<IActionResult> GetEntregaveis(int demandaId)
     {
-        List<Etapa> items = await _service.GetEtapaListItemsAsync(id);
+        var items = await _service.GetEntregaveisByDemandaAsync(demandaId);
         return Ok(items);
     }
-    [HttpGet("api/byid/{id}")]
-    public Task<Etapa> GetEtapaById(int id)
+
+    /// <summary>
+    /// Lista entregáveis da AreaExecutora do usuário CentralIT
+    /// </summary>
+    [HttpGet("centralit")]
+    public async Task<IActionResult> GetEntregaveisCentralIT([FromQuery] string areaExecutoraNome)
     {
-        var items = _service.GetById(id);
-        return items;
+        var items = await _service.GetEntregaveisByCentralITAsync(areaExecutoraNome);
+        return Ok(items);
     }
 
-    [HttpPost()]
-    public async Task<IActionResult> CreateEtapas([FromBody] EtapaDTO etapa)
+    /// <summary>
+    /// Retorna um entregável por ID
+    /// </summary>
+    [HttpGet("byid/{id}")]
+    public async Task<IActionResult> GetById(int id)
+    {
+        var item = await _service.GetByIdAsync(id);
+        return Ok(item);
+    }
+
+    /// <summary>
+    /// Cria um novo entregável
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> CreateEntregavel([FromBody] EntregavelCreateDTO dto)
     {
         var email = GetUserEmail();
-        if (string.IsNullOrEmpty(email))
-            return Unauthorized();
+        if (string.IsNullOrEmpty(email)) return Unauthorized();
 
         var perfil = await _permissionService.GetUserPerfilAsync(email);
-        if (!_permissionService.CanCreate(perfil, "etapa"))
+        if (!_permissionService.CanCreate(perfil, "entregavel"))
             return Forbid();
 
-        await _service.CreateEtapa(etapa);
+        await _service.CreateEntregavelAsync(dto);
         return Ok();
     }
 
+    /// <summary>
+    /// Atualiza um entregável
+    /// </summary>
     [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateEtapas([FromBody] AfericaoEtapaDTO etapa, int id)
+    public async Task<IActionResult> UpdateEntregavel(int id, [FromBody] EntregavelUpdateDTO dto)
     {
         var email = GetUserEmail();
-        if (string.IsNullOrEmpty(email))
-            return Unauthorized();
+        if (string.IsNullOrEmpty(email)) return Unauthorized();
 
         var perfil = await _permissionService.GetUserPerfilAsync(email);
-        if (!_permissionService.CanEdit(perfil, "etapa"))
+        if (!_permissionService.CanEdit(perfil, "entregavel"))
             return Forbid();
 
-        await _service.EditEtapa(etapa, id);
+        await _service.UpdateEntregavelAsync(id, dto);
         return Ok();
     }
-    [HttpGet("percent/{projetoid}")]
-    public async Task<IActionResult> GetPercentEtapas(int projetoid)
+
+    /// <summary>
+    /// Atualiza percentual executado e descrição (CentralIT)
+    /// </summary>
+    [HttpPut("{id}/percentual")]
+    public async Task<IActionResult> UpdatePercentual(int id, [FromBody] EntregavelUpdatePercentDTO dto)
     {
-        PercentualEtapaDTO response = await _service.GetPercentEtapas(projetoid);
-        return Ok(response);
+        var email = GetUserEmail();
+        if (string.IsNullOrEmpty(email)) return Unauthorized();
+
+        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        if (!_permissionService.CanEdit(perfil, "percentual"))
+            return Forbid();
+
+        await _service.UpdatePercentualAsync(id, dto);
+        return Ok();
     }
 
-    [HttpGet("situacao")]
-    public async Task<ActionResult<SituacaoProjetoDTO>> GetSituacaoProjetos()
+    /// <summary>
+    /// Remove um entregável
+    /// </summary>
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteEntregavel(int id)
     {
-        var resultado = await _service.GetSituacao();
-        return Ok(resultado);
-    }
+        var email = GetUserEmail();
+        if (string.IsNullOrEmpty(email)) return Unauthorized();
 
-    [HttpGet("tags")]
-    public async Task<IActionResult> GetTags()
-    {
-        var tags = await _service.GetTags();
-        return Ok(tags);
-    }
+        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        if (!_permissionService.CanDelete(perfil, "entregavel"))
+            return Forbid();
 
-    [HttpPut("iniciar/{id}")]
-    public async Task<IActionResult> IniciarEtapa(int id, [FromBody] DateTime dtInicioPrevisto)
-    {
-        // Conversão de timezone movida para o Service layer
-        await _service.IniciarEtapa(id, dtInicioPrevisto);
+        await _service.DeleteEntregavelAsync(id);
         return Ok();
     }
 }

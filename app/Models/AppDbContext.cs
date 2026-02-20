@@ -10,32 +10,33 @@ namespace Models
             : base(options)
         {
         }
-        public DbSet<Categoria> Categorias { get; set; }
+
         public DbSet<AreaDemandante> AreaDemandantes { get; set; }
         public DbSet<Demanda> Demandas { get; set; }
-        public DbSet<Projeto> Projetos { get; set; }
         public DbSet<Etapa> Etapas { get; set; }
-        public DbSet<Template> Templates { get; set; }
-        public DbSet<Report> Reports { get; set; }
-        public DbSet<Detalhamento> Detalhamentos { get; set; }
+        public DbSet<AreaExecutora> AreasExecutoras { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Unidade> Unidades { get; set; }
         public DbSet<Esteira> Esteiras { get; set; }
-        public DbSet<Despacho> Despachos { get; set; }
-        public DbSet<Export> Exports { get; set; }
-        public DbSet<Atividade> Atividades { get; set; }
-         public DbSet<AtividadeExport> AtividadeExport { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            // Configura relacionamento Atividade -> Etapa
-            modelBuilder.Entity<Atividade>()
-                .HasOne(a => a.Etapa)
-                .WithMany(e => e.Atividades)
-                .HasForeignKey(a => a.EtapaProjetoId)
+            // Configura relacionamento Etapa -> Demanda
+            modelBuilder.Entity<Etapa>()
+                .HasOne(e => e.NM_PROJETO)
+                .WithMany(d => d.Entregaveis)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // Configura relacionamento Etapa -> AreaExecutora
+            modelBuilder.Entity<Etapa>()
+                .HasOne(e => e.Responsavel)
+                .WithMany()
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Demandas table mapping (renamed from Projetos)
+            modelBuilder.Entity<Demanda>().ToTable("Demandas");
         }
     }
 

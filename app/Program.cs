@@ -3,23 +3,19 @@ using Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.Extensions.Configuration;
 using Repositorio;
 using DotNetEnv;
 using service.Interface;
 using service;
-using Microsoft.Identity.Client;
 using Repositorio.Interface;
 using api.Auth;
-using demanda_service.Repositorio.Interface;
 using demanda_service.service;
 using Microsoft.OpenApi.Models;
-using Interface.Repositorio;
 using QuestPDF.Infrastructure;
+
 var builder = WebApplication.CreateBuilder(args);
 QuestPDF.Settings.License = LicenseType.Community;
 Env.Load();
-
 
 var mode = Environment.GetEnvironmentVariable("MODE");
 var connectionString = mode == "container" ? "PostgreSqlDocker" : "PostgreSql";
@@ -31,11 +27,11 @@ if (string.IsNullOrEmpty(connectionString))
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString(connectionString)));
+
 builder.Services.AddCors(options =>
 {
     if (builder.Environment.IsDevelopment())
     {
-        // Desenvolvimento: mais permissivo para facilitar testes locais
         options.AddPolicy("CorsPolicy",
             corsBuilder => corsBuilder
                 .WithOrigins(
@@ -50,7 +46,6 @@ builder.Services.AddCors(options =>
     }
     else
     {
-        // Produção: apenas origens confiáveis
         options.AddPolicy("CorsPolicy",
             corsBuilder => corsBuilder
                 .WithOrigins(
@@ -65,7 +60,6 @@ builder.Services.AddCors(options =>
     }
 });
 
-
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -73,10 +67,9 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
     });
 
-
 builder.Services.AddHttpClient("NomeDoSeuServicoExterno", client =>
 {
-    client.BaseAddress = new Uri("https://subgd-api.df.gov.br/autenticar"); // URL que está dando erro
+    client.BaseAddress = new Uri("https://subgd-api.df.gov.br/autenticar");
 })
 .ConfigurePrimaryHttpMessageHandler(() =>
 {
@@ -86,28 +79,24 @@ builder.Services.AddHttpClient("NomeDoSeuServicoExterno", client =>
         handler.ServerCertificateCustomValidationCallback =
             HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
     }
-
     return handler;
 });
 
-builder.Services.AddScoped<ICategoriaRepositorio, CategoriaRepositorio>();
+// Repositórios
 builder.Services.AddScoped<IDemandanteRepositorio, DemandanteRepositorio>();
 builder.Services.AddScoped<IDemandaRepositorio, DemandaRepositorio>();
-builder.Services.AddScoped<ITemplateRepositorio, TemplateRepositorio>();
-builder.Services.AddScoped<IProjetoRepositorio, ProjetoRepositorio>();
 builder.Services.AddScoped<IEtapaRepositorio, EtapaRepositorio>();
+builder.Services.AddScoped<IAreaExecutoraRepositorio, AreaExecutoraRepositorio>();
 builder.Services.AddScoped<IAuthRepositorio, AuthRepositorio>();
-builder.Services.AddScoped<IEtapaService, EtapaService>();
-builder.Services.AddScoped<IProjetoService, ProjetoService>();
-builder.Services.AddScoped<HttpClient>();
-builder.Services.AddScoped<DetalhamentoRepositorio>();
 builder.Services.AddScoped<IEsteiraRepositorio, EsteiraRepositorio>();
+
+// Serviços
+builder.Services.AddScoped<IDemandaService, DemandaService>();
+builder.Services.AddScoped<IEtapaService, EtapaService>();
 builder.Services.AddScoped<IEsteiraService, EsteiraService>();
-builder.Services.AddScoped<IDespachoRepositorio, DespachoRepositorio>();
-builder.Services.AddScoped<IDespachoService, DespachoService>();
-builder.Services.AddScoped<IAtividadeRepositorio, AtividadeRepositorio>();
-builder.Services.AddScoped<IAtividadeService, AtividadeService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
+builder.Services.AddScoped<HttpClient>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -140,6 +129,7 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
+
 var authSettingsSection = builder.Configuration.GetSection(AuthSettings.SectionName);
 builder.Services.Configure<AuthSettings>(authSettingsSection);
 

@@ -4,10 +4,6 @@ using Repositorio.Interface;
 
 namespace Repositorio;
 
-/// <summary>
-/// Repositório para acesso a dados de Etapa (apenas queries simples)
-/// Lógica de negócio deve estar em EtapaService
-/// </summary>
 public class EtapaRepositorio : IEtapaRepositorio
 {
     private readonly AppDbContext _context;
@@ -17,45 +13,53 @@ public class EtapaRepositorio : IEtapaRepositorio
         _context = context;
     }
 
-    /// <summary>
-    /// Busca etapas por ID do projeto (data access only)
-    /// </summary>
-    public async Task<List<Etapa>> GetEtapasByProjetoIdAsync(int projetoId)
+    public async Task<List<Etapa>> GetEntregaveisByDemandaIdAsync(int demandaId)
     {
         return await _context.Etapas
-            .Where(e => e.NM_PROJETO.projetoId == projetoId)
+            .Include(e => e.Responsavel)
+            .Where(e => e.NM_PROJETO.demandaId == demandaId)
             .ToListAsync();
     }
 
-    /// <summary>
-    /// Busca etapa por ID (data access only)
-    /// </summary>
+    public async Task<List<Etapa>> GetEntregaveisByAreaExecutoraAsync(string areaExecutoraNome)
+    {
+        return await _context.Etapas
+            .Include(e => e.Responsavel)
+            .Include(e => e.NM_PROJETO)
+            .Where(e => e.Responsavel != null && e.Responsavel.Nome == areaExecutoraNome)
+            .ToListAsync();
+    }
+
     public async Task<Etapa?> GetByIdAsync(int id)
     {
         return await _context.Etapas
+            .Include(e => e.Responsavel)
+            .Include(e => e.NM_PROJETO)
             .FirstOrDefaultAsync(e => e.EtapaProjetoId == id);
     }
 
-    /// <summary>
-    /// Busca projeto por ID (data access only)
-    /// </summary>
-    public async Task<Projeto?> GetProjetoByIdAsync(int projetoId)
+    public async Task<Demanda?> GetDemandaByIdAsync(int demandaId)
     {
-        return await _context.Projetos
-            .FirstOrDefaultAsync(p => p.projetoId == projetoId);
+        return await _context.Demandas
+            .FirstOrDefaultAsync(d => d.demandaId == demandaId);
     }
 
-    /// <summary>
-    /// Adiciona uma etapa ao contexto
-    /// </summary>
+    public async Task<AreaExecutora?> GetAreaExecutoraByIdAsync(int areaExecutoraId)
+    {
+        return await _context.AreasExecutoras
+            .FirstOrDefaultAsync(a => a.AreaExecutoraId == areaExecutoraId);
+    }
+
     public void Add(Etapa etapa)
     {
         _context.Etapas.Add(etapa);
     }
 
-    /// <summary>
-    /// Salva as mudanças no banco de dados
-    /// </summary>
+    public void Remove(Etapa etapa)
+    {
+        _context.Etapas.Remove(etapa);
+    }
+
     public async Task SaveChangesAsync()
     {
         await _context.SaveChangesAsync();

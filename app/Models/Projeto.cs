@@ -1,40 +1,23 @@
 using System.ComponentModel.DataAnnotations;
-using System;
+using System.ComponentModel.DataAnnotations.Schema;
 using app.Models;
 
 namespace Models;
 
-public class Projeto
+public class Demanda
 {
-    [Key] public int projetoId { get; set; }
+    [Key] public int demandaId { get; set; }
 
-    [StringLength(200)] public string NM_PROJETO { get; set; }
-
-    [StringLength(300)] public string? GERENTE_PROJETO { get; set; }
-
-    [StringLength(300)] public string? SITUACAO { get; set; }
-
+    [Required]
+    [StringLength(200)] public string NM_PROJETO { get; set; } = string.Empty;
 
     [StringLength(300)] public string? NR_PROCESSO_SEI { get; set; }
 
     public AreaDemandante? AREA_DEMANDANTE { get; set; }
 
-    [StringLength(100)] public string? ANO { get; set; }
-
-    [StringLength(200)] public string? TEMPLATE { get; set; }
-
-    public bool? PROFISCOII { get; set; }
-
-    public bool? PDTIC2427 { get; set; }
-
-    public bool? PTD2427 { get; set; }
-    public decimal? valorEstimado { get; set; }
-    public DateTime DT_INICIO {get;set;}
-    public DateTime DT_TERMINO {get;set;}
-    public Unidade? Unidade { get; set; }
     public Esteira? Esteira { get; set; }
 
-    // Relacionamento com Etapas (para eager loading)
-    public ICollection<Etapa>? Etapas { get; set; }
+    public ICollection<Etapa>? Entregaveis { get; set; }
 
+    [NotMapped] public string? SITUACAO { get; set; }
 }

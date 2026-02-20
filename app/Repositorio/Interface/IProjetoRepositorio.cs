@@ -1,11 +1,10 @@
-using api.Projeto;
 using Models;
 
 namespace Repositorio.Interface;
 
-public interface IProjetoRepositorio
+public interface IDemandaRepositorio
 {
-    Task<List<Projeto>> GetProjetoListItemsAsync(string unidade);
-    Task<Projeto> GetProjetoById(int id);
-   
+    Task<List<Demanda>> GetDemandasAsync();
+    Task<Demanda?> GetDemandaByIdAsync(int id);
+    Task AddAsync(Demanda demanda);
 }
