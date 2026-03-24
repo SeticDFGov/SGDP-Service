@@ -1,15 +1,15 @@
-using api.Etapa;
-using api.Projeto;
+using api.Entregavel;
+using Models;
+
 namespace service.Interface;
 
 public interface IEtapaService
 {
-    Task<PercentualEtapaDTO> GetPercentEtapas(int projetoId);
-    Task CreateEtapa(EtapaDTO etapa);
-    Task EditEtapa(AfericaoEtapaDTO etapa, int etapaId);
-    Task<Etapa> GetById(int id);
-    Task IniciarEtapa(int id, DateTime dtInicioPrevisto);
-    Task<List<Etapa>> GetEtapaListItemsAsync(int projetoId);
-    Task<SituacaoProjetoDTO> GetSituacao();
-    Task<TagsDTO> GetTags();
+    Task<List<Etapa>> GetEntregaveisByDemandaAsync(int demandaId);
+    Task<List<Etapa>> GetEntregaveisByCentralITAsync(string areaExecutoraNome);
+    Task<Etapa> GetByIdAsync(int id);
+    Task CreateEntregavelAsync(EntregavelCreateDTO dto);
+    Task UpdateEntregavelAsync(int id, EntregavelUpdateDTO dto);
+    Task UpdatePercentualAsync(int id, EntregavelUpdatePercentDTO dto);
+    Task DeleteEntregavelAsync(int id);
 }

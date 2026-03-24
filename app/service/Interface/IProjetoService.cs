@@ -1,16 +1,13 @@
-﻿using api.Common;
-using api.Projeto;
+using api.Common;
+using api.Demanda;
 using Models;
 
 namespace service.Interface;
 
-public interface IProjetoService
+public interface IDemandaService
 {
-    Task<List<Projeto>> GetProjetoListItemsAsync(string unidade);
-    Task<PagedResponse<Projeto>> GetProjetosPaginatedAsync(string unidade, PagedRequest request);
-    Task<Projeto> GetProjetoById(int id);
-
-    Task CreateProjetoByTemplate(Projeto projeto);
-    Task<QuantidadeProjetoDTO> GetQuantidadeProjetos();
-
+    Task<List<Demanda>> GetDemandasAsync();
+    Task<Demanda> GetDemandaByIdAsync(int id);
+    Task CreateDemandaAsync(DemandaCreateDTO dto);
+    IQueryable<Demanda> GetFilteredDemandasQuery(string perfil, string? unidadeNome);
 }

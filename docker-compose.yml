@@ -12,10 +12,14 @@ services:
     volumes:
       - ./app:/app/app
     environment:
-      - MODE=container 
-      - ASPNETCORE_URLS=http://+:5148 
+      - MODE=container
+      - ASPNETCORE_URLS=http://+:5148
     env_file:
       - .env
+    dns:
+      - 10.72.31.103
+      - 10.72.31.104
+      - 8.8.8.8
     networks:
       - demanda-network 
   postgres:

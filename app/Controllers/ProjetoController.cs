@@ -1,101 +1,93 @@
-using System.Threading.Tasks;
+using System.Security.Claims;
 using api.Common;
-using api.Projeto;
-using demanda_service.Helpers;
+using api.Demanda;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Models;
-using Repositorio;
-using Repositorio.Interface;
-using service;
 using service.Interface;
 
 namespace Controllers;
+
 [ApiController]
 [Authorize]
-[Route("api/[controller]")]
-public class ProjetoController : ControllerBase
+[Route("api/demanda")]
+public class DemandaController : ControllerBase
 {
-    public readonly IProjetoService _service;
-    public readonly IProjetoService _projetoService;
-    public readonly AppDbContext _context;
+    private readonly IDemandaService _service;
+    private readonly IPermissionService _permissionService;
 
-    public ProjetoController(IProjetoService service, IProjetoService projetoService, AppDbContext context)
+    public DemandaController(IDemandaService service, IPermissionService permissionService)
     {
         _service = service;
-        _projetoService = projetoService;
-        _context = context;
+        _permissionService = permissionService;
     }
 
+    private string? GetUserEmail() => User.FindFirst(ClaimTypes.Email)?.Value;
+
     /// <summary>
-    /// Lista todos os projetos de uma unidade (sem paginação - mantido para compatibilidade)
+    /// Lista demandas paginadas filtradas por perfil
     /// </summary>
     [HttpGet]
-    public Task<List<Projeto>> GetAllProjetos([FromQuery] string unidade)
+    public async Task<ActionResult<PagedResponse<Demanda>>> GetDemandas([FromQuery] PagedRequest request)
     {
-        var items = _service.GetProjetoListItemsAsync(unidade);
-        return items;
+        var email = GetUserEmail();
+        if (string.IsNullOrEmpty(email)) return Unauthorized();
+
+        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        var userUnidade = await _permissionService.GetUserUnidadeAsync(email);
+
+        var query = _permissionService.GetFilteredDemandasQuery(perfil, userUnidade?.Nome);
+
+        var totalItems = await query.CountAsync();
+        var demandas = await query
+            .Skip(request.Skip)
+            .Take(request.PageSize)
+            .ToListAsync();
+
+        // Calcular situação para cada demanda
+        foreach (var demanda in demandas)
+        {
+            var entregaveis = demanda.Entregaveis ?? new List<Etapa>();
+            demanda.SITUACAO = CalcularSituacaoDemanda(entregaveis);
+        }
+
+        return Ok(PagedResponse<Demanda>.Create(demandas, totalItems, request));
     }
 
     /// <summary>
-    /// Lista projetos de uma unidade com paginação
+    /// Retorna uma demanda por ID
     /// </summary>
-    [HttpGet("paged")]
-    public async Task<ActionResult<PagedResponse<Projeto>>> GetProjetosPaged(
-        [FromQuery] string unidade,
-        [FromQuery] PagedRequest request)
-    {
-        var pagedResult = await _service.GetProjetosPaginatedAsync(unidade, request);
-        return Ok(pagedResult);
-    }
-
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetProjetosById(int id)
+    public async Task<IActionResult> GetDemandaById(int id)
     {
-        Projeto items = await _service.GetProjetoById(id);
-        return Ok(items);
+        var demanda = await _service.GetDemandaByIdAsync(id);
+        return Ok(demanda);
     }
-    
 
-    [HttpPost("")]
-    public async Task<IActionResult> CreateProjetoByTemplate([FromBody] ProjetoDTO dto)
+    /// <summary>
+    /// Cria uma nova demanda
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> CreateDemanda([FromBody] DemandaCreateDTO dto)
     {
-        var unidade = await _context.Unidades.FindAsync(dto.UnidadeId);
-        var esteira = await _context.Esteiras.FindAsync(dto.EsteiraId);
-        var demandante = await _context.AreaDemandantes.FindAsync(dto.NM_AREA_DEMANDANTE);
-        if (unidade == null || esteira == null || demandante == null)
-            return BadRequest("Unidade ou Esteira não encontrada");
+        var email = GetUserEmail();
+        if (string.IsNullOrEmpty(email)) return Unauthorized();
 
-        // Usando DateTimeHelper para conversão de timezone
-        dto.DT_INICIO = DateTimeHelper.ToUtc(dto.DT_INICIO);
-        dto.DT_TERMINO = DateTimeHelper.ToUtc(dto.DT_TERMINO);
-        var projeto = new Projeto
-        {
-            NM_PROJETO = dto.NM_PROJETO,
-            GERENTE_PROJETO = dto.GERENTE_PROJETO,
-            SITUACAO = "",
-            NR_PROCESSO_SEI = dto.NR_PROCESSO_SEI,
-            ANO = dto.ANO,
-            TEMPLATE = dto.TEMPLATE,
-            PROFISCOII = dto.PROFISCOII,
-            PDTIC2427 = dto.PDTIC2427,
-            PTD2427 = dto.PTD2427,
-            valorEstimado = dto.valorEstimado,
-            Unidade = unidade,
-            Esteira = esteira,
-            AREA_DEMANDANTE = demandante,
-            DT_INICIO = dto.DT_INICIO,
-            DT_TERMINO = dto.DT_TERMINO,
-        };
-        await _service.CreateProjetoByTemplate(projeto);
+        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        if (!_permissionService.CanCreate(perfil, "demanda"))
+            return Forbid();
+
+        await _service.CreateDemandaAsync(dto);
         return Ok();
     }
 
-    [HttpGet("quantidade")]
-    public async Task<IActionResult> GetQuantidadeProjetos()
+    private string CalcularSituacaoDemanda(ICollection<Etapa> entregaveis)
     {
-        var quantidade = await _projetoService.GetQuantidadeProjetos();
-        return Ok(quantidade);
+        if (!entregaveis.Any()) return "Não Iniciado";
+        if (entregaveis.Any(e => e.SITUACAO == "Atrasado")) return "Atrasado";
+        if (entregaveis.Any(e => e.SITUACAO == "Em Andamento")) return "Em Andamento";
+        if (entregaveis.All(e => e.SITUACAO == "Concluído")) return "Concluído";
+        return "Não Iniciado";
     }
 }
