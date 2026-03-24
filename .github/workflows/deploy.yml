@@ -37,7 +37,7 @@ jobs:
         git config --global user.email "ci@example.com"
         git config --global user.name "CI Bot"
         
-        git clone https://${{ secrets.GH_TOKEN }}@github.com/SeticDFGov/k8s-manifests.git
+        git clone https://github.com/SeticDFGov/k8s-manifests.git
         cd k8s-manifests
 
         yq eval ".spec.template.spec.containers[0].image = \"${{ secrets.DOCKERHUB_USERNAME }}/sgpd_service:${{ env.IMAGE_TAG }}\"" \
