@@ -1,0 +1,51 @@
+name: Apply Database Migrations
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'app/Migrations/**'
+
+jobs:
+  apply-migrations:
+    runs-on: self-hosted
+
+    steps:
+    - name: Checkout do código
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      working-directory: ./app
+      run: dotnet restore
+
+    - name: Install EF Core tools
+      run: dotnet tool install --global dotnet-ef || dotnet tool update --global dotnet-ef
+
+    - name: Build project
+      working-directory: ./app
+      run: dotnet build --no-restore --configuration Release
+
+    - name: Generate migration bundle
+      working-directory: ./app
+      run: dotnet ef migrations bundle --configuration Release --force --self-contained -o ./efbundle
+      env:
+        ASPNETCORE_ENVIRONMENT: Production
+
+    - name: Apply migrations to database
+      working-directory: ./app
+      run: ./efbundle --connection "${{ secrets.DATABASE_CONNECTION_STRING }}"
+      env:
+        ASPNETCORE_ENVIRONMENT: Production
+
+    - name: Cleanup bundle
+      if: always()
+      working-directory: ./app
+      run: rm -f ./efbundle
