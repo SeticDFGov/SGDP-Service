@@ -39,7 +39,10 @@ public class AuthController : ControllerBase
         );
         var user = _authRepositorio.GetUser(adResponse.Email);
         var token = _authRepositorio.GerarJwt(user);
-        return Ok(new { token, user });
+        var refreshToken = _authRepositorio.GerarRefreshToken();
+        await _authRepositorio.SalvarRefreshTokenAsync(user, refreshToken);
+
+        return Ok(new { token, refreshToken, user });
     }
 
     [HttpPost("unidade")]
@@ -164,5 +167,36 @@ public class AuthController : ControllerBase
         };
 
         return Ok(permissoes);
+    }
+
+    [HttpPost("refresh")]
+    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
+    {
+        if (string.IsNullOrEmpty(request.RefreshToken))
+            return BadRequest("Refresh token é obrigatório.");
+
+        var user = await _authRepositorio.ValidarRefreshTokenAsync(request.RefreshToken);
+
+        if (user == null)
+            return Unauthorized("Refresh token inválido ou expirado.");
+
+        await _authRepositorio.RevogarRefreshTokenAsync(request.RefreshToken);
+
+        var newToken = _authRepositorio.GerarJwt(user);
+        var newRefreshToken = _authRepositorio.GerarRefreshToken();
+        await _authRepositorio.SalvarRefreshTokenAsync(user, newRefreshToken);
+
+        return Ok(new { token = newToken, refreshToken = newRefreshToken, user });
+    }
+
+    [HttpPost("revoke")]
+    [Authorize]
+    public async Task<IActionResult> RevokeToken([FromBody] RefreshTokenRequest request)
+    {
+        if (string.IsNullOrEmpty(request.RefreshToken))
+            return BadRequest("Refresh token é obrigatório.");
+
+        await _authRepositorio.RevogarRefreshTokenAsync(request.RefreshToken);
+        return Ok("Refresh token revogado com sucesso.");
     }
 }

@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using api.Auth;
 using app.Models;
@@ -163,5 +164,47 @@ public class AuthRepositorio : IAuthRepositorio
         _context.Users.Update(usuario);
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public string GerarRefreshToken()
+    {
+        var randomNumber = new byte[64];
+        using var rng = RandomNumberGenerator.Create();
+        rng.GetBytes(randomNumber);
+        return Convert.ToBase64String(randomNumber);
+    }
+
+    public async Task<User?> ValidarRefreshTokenAsync(string refreshToken)
+    {
+        var usuario = await _context.Users
+            .Include(u => u.Unidade)
+            .FirstOrDefaultAsync(u => u.RefreshToken == refreshToken);
+
+        if (usuario == null || !usuario.HasValidRefreshToken())
+            return null;
+
+        return usuario;
+    }
+
+    public async Task SalvarRefreshTokenAsync(User usuario, string refreshToken)
+    {
+        usuario.RefreshToken = refreshToken;
+        usuario.RefreshTokenCreatedAt = DateTime.UtcNow;
+        usuario.RefreshTokenExpiresAt = DateTime.UtcNow.AddDays(7);
+        usuario.RefreshTokenRevokedAt = null;
+
+        _context.Users.Update(usuario);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task RevogarRefreshTokenAsync(string refreshToken)
+    {
+        var usuario = await _context.Users.FirstOrDefaultAsync(u => u.RefreshToken == refreshToken);
+        if (usuario != null)
+        {
+            usuario.RefreshTokenRevokedAt = DateTime.UtcNow;
+            _context.Users.Update(usuario);
+            await _context.SaveChangesAsync();
+        }
     }
 }

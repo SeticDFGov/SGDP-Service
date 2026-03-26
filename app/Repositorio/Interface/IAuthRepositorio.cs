@@ -17,5 +17,9 @@ namespace Repositorio
         Task<bool> VerificarSeAdminAsync(string email);
         Task<List<User>?> ListarUsuariosAsync(string emailAdmin);
         Task<bool> ModificarUnidadeUsuario(string email, string unidadeId, string adminEmail);
+        string GerarRefreshToken();
+        Task<User?> ValidarRefreshTokenAsync(string refreshToken);
+        Task SalvarRefreshTokenAsync(User usuario, string refreshToken);
+        Task RevogarRefreshTokenAsync(string refreshToken);
     }
 }
