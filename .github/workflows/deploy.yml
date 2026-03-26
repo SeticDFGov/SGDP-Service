@@ -1,15 +1,14 @@
-name: Deploy
+name: Build and push image
 
 on:
   push:
     branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]  
+    branches: [ "main" ]
+
 jobs:
   build:
-    
-
-    runs-on: self-hosted   
+    runs-on: ubuntu-latest   
 
     steps:
     - name: Checkout do código
@@ -21,25 +20,29 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+    - name: Set Image Tag
+      run: |
+        echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
     - name: Build da imagem
       run: |
-        docker build -f Dockerfile.prod -t ${{ secrets.DOCKERHUB_USERNAME }}/sgpd_service:latest .
+        docker build -f Dockerfile.prod -t ${{ secrets.DOCKERHUB_USERNAME }}/sgpd_service:${{ env.IMAGE_TAG }} .
 
     - name: Push da imagem
       run: |
-        docker push ${{ secrets.DOCKERHUB_USERNAME }}/sgpd_service:latest 
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/sgpd_service:${{ env.IMAGE_TAG }}
 
-    - name: Configurar Acesso Kubernetes
-      env : 
-        KUBECONFIG_CONTENT: ${{ secrets.KUBE_CONFIG_RAW }} 
+    - name: Update deployment manifest
       run: |
-        KUBE_PATH="$HOME/.kube/ci-config"
-        mkdir -p $(dirname $KUBE_PATH)
+        git config --global user.email "ci@example.com"
+        git config --global user.name "CI Bot"
         
-        echo "$KUBECONFIG_CONTENT" > $KUBE_PATH
-        
-        echo "Kubeconfig injetado em $KUBE_PATH. Executando restart..."
-        
-        kubectl --kubeconfig=$KUBE_PATH rollout restart deployment/meu-backend-deployment
-        
-        rm $KUBE_PATH
+        git clone https://${{ secrets.GH_TOKEN }}@github.com/SeticDFGov/k8s-manifests.git
+        cd k8s-manifests
+
+        yq eval ".spec.template.spec.containers[0].image = \"${{ secrets.DOCKERHUB_USERNAME }}/sgpd_service:${{ env.IMAGE_TAG }}\"" \
+          -i backend/deployment.yaml
+
+        git add backend/deployment.yaml
+        git commit -m "deploy: update sgpd_service to ${{ env.IMAGE_TAG }}"
+        git push origin main
