@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -141,25 +142,37 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             {
                 var identity = context.Principal?.Identity as ClaimsIdentity;
                 if (identity == null) return Task.CompletedTask;
-                var resourceAccessClaim = identity.FindFirst("resource_access")?.Value;
-                if (!string.IsNullOrEmpty(resourceAccessClaim))
+
+                try
                 {
-                    try
+                    JsonElement resourceAccess = default;
+
+                    // .NET 8 usa JsonWebToken — lê diretamente do payload
+                    if (context.SecurityToken is JsonWebToken jwt)
+                        jwt.TryGetPayloadValue(keycloakClientId == null ? "" : "resource_access", out resourceAccess);
+
+                    // Fallback: tenta via claim serializado
+                    if (resourceAccess.ValueKind == JsonValueKind.Undefined)
                     {
-                        var ra = JsonSerializer.Deserialize<JsonElement>(resourceAccessClaim);
-                        if (ra.TryGetProperty(keycloakClientId, out var client) &&
-                            client.TryGetProperty("roles", out var roles))
+                        var raw = identity.FindFirst("resource_access")?.Value;
+                        if (!string.IsNullOrEmpty(raw))
+                            resourceAccess = JsonSerializer.Deserialize<JsonElement>(raw);
+                    }
+
+                    if (resourceAccess.ValueKind != JsonValueKind.Undefined &&
+                        resourceAccess.TryGetProperty(keycloakClientId, out var client) &&
+                        client.TryGetProperty("roles", out var roles))
+                    {
+                        foreach (var role in roles.EnumerateArray())
                         {
-                            foreach (var role in roles.EnumerateArray())
-                            {
-                                var r = role.GetString();
-                                if (!string.IsNullOrEmpty(r))
-                                    identity.AddClaim(new Claim(ClaimTypes.Role, r));
-                            }
+                            var r = role.GetString();
+                            if (!string.IsNullOrEmpty(r))
+                                identity.AddClaim(new Claim(ClaimTypes.Role, r));
                         }
                     }
-                    catch { }
                 }
+                catch { }
+
                 return Task.CompletedTask;
             }
         };

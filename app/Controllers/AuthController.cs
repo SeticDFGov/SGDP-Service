@@ -69,6 +69,13 @@ public class AuthController : ControllerBase
         return Content(content, "application/json");
     }
 
+    [HttpGet("claims")]
+    public IActionResult GetClaims()
+    {
+        var claims = User.Claims.Select(c => new { c.Type, c.Value });
+        return Ok(claims);
+    }
+
     [HttpGet("me")]
     public async Task<IActionResult> GetCurrentUser()
     {
