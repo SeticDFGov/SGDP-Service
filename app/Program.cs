@@ -1,4 +1,5 @@
-using System.Text;
+using System.Security.Claims;
+using System.Text.Json;
 using Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -132,19 +133,48 @@ builder.Services.AddSwaggerGen(c =>
 
 var authSettingsSection = builder.Configuration.GetSection(AuthSettings.SectionName);
 builder.Services.Configure<AuthSettings>(authSettingsSection);
+var keycloakAuthority = authSettingsSection["Authority"]!;
+var keycloakClientId = authSettingsSection["ClientId"]!;
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.Authority = keycloakAuthority;
+        options.RequireHttpsMetadata = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidIssuer = authSettingsSection["Issuer"],
-            ValidAudience = authSettingsSection["Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authSettingsSection["Key"]!)),
-            ValidateIssuer = bool.Parse(authSettingsSection["ValidateIssuer"] ?? "false"),
-            ValidateAudience = bool.Parse(authSettingsSection["ValidateAudience"] ?? "false"),
+            ValidateIssuer = true,
+            ValidIssuer = keycloakAuthority,
+            ValidateAudience = false,
             ValidateLifetime = true,
-            ValidateIssuerSigningKey = bool.Parse(authSettingsSection["ValidateIssuerSigningKey"] ?? "false")
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = context =>
+            {
+                var identity = context.Principal?.Identity as ClaimsIdentity;
+                if (identity == null) return Task.CompletedTask;
+                var resourceAccessClaim = identity.FindFirst("resource_access")?.Value;
+                if (!string.IsNullOrEmpty(resourceAccessClaim))
+                {
+                    try
+                    {
+                        var ra = JsonSerializer.Deserialize<JsonElement>(resourceAccessClaim);
+                        if (ra.TryGetProperty(keycloakClientId, out var client) &&
+                            client.TryGetProperty("roles", out var roles))
+                        {
+                            foreach (var role in roles.EnumerateArray())
+                            {
+                                var r = role.GetString();
+                                if (!string.IsNullOrEmpty(r))
+                                    identity.AddClaim(new Claim(ClaimTypes.Role, r));
+                            }
+                        }
+                    }
+                    catch { }
+                }
+                return Task.CompletedTask;
+            }
         };
     });
 

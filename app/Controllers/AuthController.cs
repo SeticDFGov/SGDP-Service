@@ -3,200 +3,74 @@ using api.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Repositorio;
-using service.Interface;
 
 namespace Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class AuthController : ControllerBase
 {
-    public readonly IAuthRepositorio _authRepositorio;
-    private readonly IPermissionService _permissionService;
+    private readonly IAuthRepositorio _authRepositorio;
 
-    public AuthController(IAuthRepositorio authRepositorio, IPermissionService permissionService)
+    public AuthController(IAuthRepositorio authRepositorio)
     {
         _authRepositorio = authRepositorio;
-        _permissionService = permissionService;
     }
 
-    private string? GetUserEmail()
+    [HttpGet("me")]
+    public async Task<IActionResult> GetCurrentUser()
     {
-        return User.FindFirst(ClaimTypes.Email)?.Value;
-    }
+        var keycloakId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var email = User.FindFirst(ClaimTypes.Email)?.Value ?? User.FindFirst("email")?.Value;
+        var nome = User.FindFirst(ClaimTypes.Name)?.Value ?? User.FindFirst("name")?.Value
+            ?? User.FindFirst("preferred_username")?.Value ?? "";
+        var perfil = User.FindFirst(ClaimTypes.Role)?.Value ?? "basico";
 
-    [HttpPost]
-    public async Task<IActionResult> LoginAd([FromBody] LdapRequestDto request)
-    {
-        var adResponse = await _authRepositorio.ConsultarUsuarioNoAdAsync(request.Email, request.Senha);
+        if (string.IsNullOrEmpty(keycloakId))
+            return Unauthorized();
 
-        if (adResponse == null)
-            return Unauthorized("Usuário não encontrado no AD.");
-
-        await _authRepositorio.CriarOuAtualizarUsuarioAsync(
-            adResponse.Nome,
-            adResponse.Email
-        );
-        var user = _authRepositorio.GetUser(adResponse.Email);
-        var token = _authRepositorio.GerarJwt(user);
-        var refreshToken = _authRepositorio.GerarRefreshToken();
-        await _authRepositorio.SalvarRefreshTokenAsync(user, refreshToken);
-
-        return Ok(new { token, refreshToken, user });
+        var user = await _authRepositorio.GetOrCreateUserAsync(keycloakId, nome, email ?? "", perfil);
+        return Ok(new { user.Id, user.Nome, user.Email, user.Perfil, user.Unidade });
     }
 
     [HttpPost("unidade")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> CriarUnidade([FromBody] UnidadeDTO unidade)
     {
         await _authRepositorio.CriarUnidade(unidade);
         return Ok();
     }
 
-    [HttpPost("informar-unidade")]
-    public async Task<IActionResult> InformarUnidadeUsuario([FromBody] InformUnidadeUsuario request)
-    {
-        await _authRepositorio.InformarUnidadeUsuario(request.email, request.unidadeId);
-        return Ok();
-    }
-
     [HttpGet("unidades")]
-    public async Task<IActionResult> GetUnidadesAsync()
+    public async Task<IActionResult> GetUnidades()
     {
         var unidades = await _authRepositorio.GetUnidadesAsync();
         return Ok(unidades);
     }
 
-    [HttpGet("user/{email}")]
-    public async Task<IActionResult> GetUserByEmail(string email)
+    [HttpPost("informar-unidade")]
+    public async Task<IActionResult> InformarUnidade([FromBody] InformUnidadeUsuario request)
     {
-        var user = _authRepositorio.GetUser(email);
-        if (user == null)
-        {
-            return NotFound("Usuário não encontrado.");
-        }
-        return Ok(user);
-    }
-
-    [HttpPut("alterar-perfil")]
-    public async Task<IActionResult> AlterarPerfilUsuario([FromBody] PerfilDTO request, [FromHeader] string adminEmail)
-    {
-        if (string.IsNullOrEmpty(adminEmail))
-        {
-            return BadRequest("Email do administrador é obrigatório.");
-        }
-
-        var sucesso = await _authRepositorio.AlterarPerfilUsuarioAsync(request.Email, request.Perfil, adminEmail);
-        
-        if (!sucesso)
-        {
-            return BadRequest("Não foi possível alterar o perfil. Verifique se você é admin e se o usuário existe.");
-        }
-
-        return Ok("Perfil alterado com sucesso.");
-    }
-
-    [HttpGet("verificar-admin/{email}")]
-    public async Task<IActionResult> VerificarSeAdmin(string email)
-    {
-        var isAdmin = await _authRepositorio.VerificarSeAdminAsync(email);
-        return Ok(new { isAdmin });
+        await _authRepositorio.InformarUnidadeUsuario(request.email, request.unidadeId);
+        return Ok();
     }
 
     [HttpGet("usuarios")]
-    public async Task<IActionResult> ListarUsuarios([FromHeader] string adminEmail)
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> ListarUsuarios()
     {
-        if (string.IsNullOrEmpty(adminEmail))
-        {
-            return BadRequest("Email do administrador é obrigatório.");
-        }
-
-        var usuarios = await _authRepositorio.ListarUsuariosAsync(adminEmail);
-        
-        if (usuarios == null)
-        {
-           return Unauthorized("Apenas administradores podem listar usuários.");
- 
-        }
-
+        var usuarios = await _authRepositorio.ListarUsuariosAsync();
         return Ok(usuarios);
     }
 
     [HttpPut("modificar-unidade")]
-    public async Task<IActionResult> ModificarUnidadeUsuario([FromBody] InformUnidadeUsuario request, [FromHeader] string adminEmail)
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> ModificarUnidade([FromBody] InformUnidadeUsuario request)
     {
-        if (string.IsNullOrEmpty(adminEmail))
-        {
-            return BadRequest("Email do administrador é obrigatório.");
-        }
-
-        var sucesso = await _authRepositorio.ModificarUnidadeUsuario(request.email, request.unidadeId, adminEmail);
-
+        var sucesso = await _authRepositorio.ModificarUnidadeUsuario(request.email, request.unidadeId);
         if (!sucesso)
-        {
-            return BadRequest("Não foi possível alterar a unidade do usuário. Verifique se você é admin e se o usuário e a unidade existem.");
-        }
-
-        return Ok("Unidade do usuário alterada com sucesso.");
-    }
-
-    /// <summary>
-    /// Retorna as permissões do usuário atual baseado no seu perfil
-    /// </summary>
-    [HttpGet("permissoes")]
-    [Authorize]
-    public async Task<IActionResult> GetPermissoes()
-    {
-        var email = GetUserEmail();
-        if (string.IsNullOrEmpty(email))
-            return Unauthorized();
-
-        var perfil = await _permissionService.GetUserPerfilAsync(email);
-
-        var permissoes = new
-        {
-            Perfil = perfil,
-            CanCreateProjeto = _permissionService.CanCreate(perfil, "projeto"),
-            CanEditProjeto = _permissionService.CanEdit(perfil, "projeto"),
-            CanDeleteProjeto = _permissionService.CanDelete(perfil, "projeto"),
-            CanCreateEtapa = _permissionService.CanCreate(perfil, "etapa"),
-            CanEditEtapa = _permissionService.CanEdit(perfil, "etapa"),
-            CanDeleteEtapa = _permissionService.CanDelete(perfil, "etapa"),
-            CanCreateAtividade = _permissionService.CanCreate(perfil, "atividade"),
-            CanEditAtividade = _permissionService.CanEdit(perfil, "atividade"),
-            CanDeleteAtividade = _permissionService.CanDelete(perfil, "atividade")
-        };
-
-        return Ok(permissoes);
-    }
-
-    [HttpPost("refresh")]
-    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
-    {
-        if (string.IsNullOrEmpty(request.RefreshToken))
-            return BadRequest("Refresh token é obrigatório.");
-
-        var user = await _authRepositorio.ValidarRefreshTokenAsync(request.RefreshToken);
-
-        if (user == null)
-            return Unauthorized("Refresh token inválido ou expirado.");
-
-        await _authRepositorio.RevogarRefreshTokenAsync(request.RefreshToken);
-
-        var newToken = _authRepositorio.GerarJwt(user);
-        var newRefreshToken = _authRepositorio.GerarRefreshToken();
-        await _authRepositorio.SalvarRefreshTokenAsync(user, newRefreshToken);
-
-        return Ok(new { token = newToken, refreshToken = newRefreshToken, user });
-    }
-
-    [HttpPost("revoke")]
-    [Authorize]
-    public async Task<IActionResult> RevokeToken([FromBody] RefreshTokenRequest request)
-    {
-        if (string.IsNullOrEmpty(request.RefreshToken))
-            return BadRequest("Refresh token é obrigatório.");
-
-        await _authRepositorio.RevogarRefreshTokenAsync(request.RefreshToken);
-        return Ok("Refresh token revogado com sucesso.");
+            return BadRequest("Usuário ou unidade não encontrados.");
+        return Ok();
     }
 }

@@ -5,21 +5,11 @@ namespace Repositorio
 {
     public interface IAuthRepositorio
     {
-        Task<User?> GetUsuarioByAdUsernameAsync(string adUsername);
-        Task<User> CriarOuAtualizarUsuarioAsync(string nome, string email);
-        string GerarJwt(User usuario);
-        Task<LdapResponseDto?> ConsultarUsuarioNoAdAsync(string username, string senha);
+        Task<User> GetOrCreateUserAsync(string keycloakId, string nome, string email, string perfil);
         Task CriarUnidade(UnidadeDTO unidade);
-        User GetUser(string email);
-        Task InformarUnidadeUsuario(string email, string unidadeId);
         Task<List<Unidade>> GetUnidadesAsync();
-        Task<bool> AlterarPerfilUsuarioAsync(string emailUsuario, string novoPerfil, string emailAdmin);
-        Task<bool> VerificarSeAdminAsync(string email);
-        Task<List<User>?> ListarUsuariosAsync(string emailAdmin);
-        Task<bool> ModificarUnidadeUsuario(string email, string unidadeId, string adminEmail);
-        string GerarRefreshToken();
-        Task<User?> ValidarRefreshTokenAsync(string refreshToken);
-        Task SalvarRefreshTokenAsync(User usuario, string refreshToken);
-        Task RevogarRefreshTokenAsync(string refreshToken);
+        Task InformarUnidadeUsuario(string email, string unidadeId);
+        Task<List<User>> ListarUsuariosAsync();
+        Task<bool> ModificarUnidadeUsuario(string email, string unidadeId);
     }
 }
