@@ -1,7 +1,9 @@
 using System.Security.Claims;
+using System.Text.Json;
 using api.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Repositorio;
 
 namespace Controllers;
@@ -12,10 +14,59 @@ namespace Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthRepositorio _authRepositorio;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly AuthSettings _authSettings;
 
-    public AuthController(IAuthRepositorio authRepositorio)
+    public AuthController(IAuthRepositorio authRepositorio, IHttpClientFactory httpClientFactory, IOptions<AuthSettings> authSettings)
     {
         _authRepositorio = authRepositorio;
+        _httpClientFactory = httpClientFactory;
+        _authSettings = authSettings.Value;
+    }
+
+    private string KeycloakTokenUrl => $"{_authSettings.Authority}/protocol/openid-connect/token";
+
+    [HttpPost("token")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Token([FromBody] KeycloakLoginRequest request)
+    {
+        var client = _httpClientFactory.CreateClient("keycloak");
+        var body = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "password",
+            ["client_id"] = _authSettings.ClientId,
+            ["username"] = request.Email,
+            ["password"] = request.Senha
+        });
+
+        var response = await client.PostAsync(KeycloakTokenUrl, body);
+        var content = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+            return Unauthorized(JsonSerializer.Deserialize<JsonElement>(content));
+
+        return Content(content, "application/json");
+    }
+
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Refresh([FromBody] KeycloakRefreshRequest request)
+    {
+        var client = _httpClientFactory.CreateClient("keycloak");
+        var body = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "refresh_token",
+            ["client_id"] = _authSettings.ClientId,
+            ["refresh_token"] = request.RefreshToken
+        });
+
+        var response = await client.PostAsync(KeycloakTokenUrl, body);
+        var content = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+            return Unauthorized(JsonSerializer.Deserialize<JsonElement>(content));
+
+        return Content(content, "application/json");
     }
 
     [HttpGet("me")]

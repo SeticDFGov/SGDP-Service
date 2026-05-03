@@ -68,20 +68,7 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
     });
 
-builder.Services.AddHttpClient("NomeDoSeuServicoExterno", client =>
-{
-    client.BaseAddress = new Uri("https://subgd-api.df.gov.br/autenticar");
-})
-.ConfigurePrimaryHttpMessageHandler(() =>
-{
-    var handler = new HttpClientHandler();
-    if (builder.Environment.IsDevelopment())
-    {
-        handler.ServerCertificateCustomValidationCallback =
-            HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
-    }
-    return handler;
-});
+builder.Services.AddHttpClient("keycloak");
 
 // Repositórios
 builder.Services.AddScoped<IDemandanteRepositorio, DemandanteRepositorio>();
