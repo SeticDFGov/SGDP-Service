@@ -28,6 +28,14 @@ public class Etapa
     [StringLength(1000)]
     public string? Descricao { get; set; }
 
+    public DateTime CriadoEm { get; set; }
+
+    [StringLength(200)] public string? CriadoPor { get; set; }
+
+    public DateTime? AlteradoEm { get; set; }
+
+    [StringLength(200)] public string? AlteradoPor { get; set; }
+
     [NotMapped]
     public string SITUACAO
     {

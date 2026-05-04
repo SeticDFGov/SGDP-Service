@@ -37,6 +37,14 @@ namespace Models
 
             // Demandas table mapping (renamed from Projetos)
             modelBuilder.Entity<Demanda>().ToTable("Demandas");
+
+            modelBuilder.Entity<Demanda>()
+                .Property(d => d.CriadoEm)
+                .HasDefaultValueSql("NOW()");
+
+            modelBuilder.Entity<Etapa>()
+                .Property(e => e.CriadoEm)
+                .HasDefaultValueSql("NOW()");
         }
     }
 

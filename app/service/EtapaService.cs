@@ -34,7 +34,7 @@ public class EtapaService : IEtapaService
             ?? throw new ApiException(ErrorCode.EtapaNaoEncontrada);
     }
 
-    public async Task CreateEntregavelAsync(EntregavelCreateDTO dto)
+    public async Task CreateEntregavelAsync(EntregavelCreateDTO dto, string userEmail)
     {
         var demanda = await _etapaRepositorio.GetDemandaByIdAsync(dto.DemandaId)
             ?? throw new ApiException(ErrorCode.ProjetoNaoEncontrado);
@@ -51,14 +51,16 @@ public class EtapaService : IEtapaService
             DT_INICIO = DateTimeHelper.ToUtc(dto.DT_INICIO),
             DT_FIM = DateTimeHelper.ToUtc(dto.DT_FIM),
             Descricao = dto.Descricao,
-            PERCENT_EXECUTADO = 0
+            PERCENT_EXECUTADO = 0,
+            CriadoEm = DateTime.UtcNow,
+            CriadoPor = userEmail
         };
 
         _etapaRepositorio.Add(etapa);
         await _etapaRepositorio.SaveChangesAsync();
     }
 
-    public async Task UpdateEntregavelAsync(int id, EntregavelUpdateDTO dto)
+    public async Task UpdateEntregavelAsync(int id, EntregavelUpdateDTO dto, string userEmail)
     {
         var etapa = await _etapaRepositorio.GetByIdAsync(id)
             ?? throw new ApiException(ErrorCode.EtapaNaoEncontrada);
@@ -72,11 +74,13 @@ public class EtapaService : IEtapaService
         etapa.DT_INICIO = DateTimeHelper.ToUtc(dto.DT_INICIO);
         etapa.DT_FIM = DateTimeHelper.ToUtc(dto.DT_FIM);
         etapa.Descricao = dto.Descricao;
+        etapa.AlteradoEm = DateTime.UtcNow;
+        etapa.AlteradoPor = userEmail;
 
         await _etapaRepositorio.SaveChangesAsync();
     }
 
-    public async Task UpdatePercentualAsync(int id, EntregavelUpdatePercentDTO dto)
+    public async Task UpdatePercentualAsync(int id, EntregavelUpdatePercentDTO dto, string userEmail)
     {
         var etapa = await _etapaRepositorio.GetByIdAsync(id)
             ?? throw new ApiException(ErrorCode.EtapaNaoEncontrada);
@@ -84,6 +88,8 @@ public class EtapaService : IEtapaService
         etapa.PERCENT_EXECUTADO = Math.Clamp(dto.PERCENT_EXECUTADO, 0, 100);
         if (dto.Descricao != null)
             etapa.Descricao = dto.Descricao;
+        etapa.AlteradoEm = DateTime.UtcNow;
+        etapa.AlteradoPor = userEmail;
 
         await _etapaRepositorio.SaveChangesAsync();
     }

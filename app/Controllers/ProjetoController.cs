@@ -78,7 +78,7 @@ public class DemandaController : ControllerBase
         if (!_permissionService.CanCreate(perfil, "demanda"))
             return Forbid();
 
-        await _service.CreateDemandaAsync(dto);
+        await _service.CreateDemandaAsync(dto, email);
         return Ok();
     }
 

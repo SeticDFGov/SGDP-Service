@@ -8,6 +8,6 @@ public interface IDemandaService
 {
     Task<List<Demanda>> GetDemandasAsync();
     Task<Demanda> GetDemandaByIdAsync(int id);
-    Task CreateDemandaAsync(DemandaCreateDTO dto);
+    Task CreateDemandaAsync(DemandaCreateDTO dto, string userEmail);
     IQueryable<Demanda> GetFilteredDemandasQuery(string perfil, string? unidadeNome);
 }

@@ -20,4 +20,8 @@ public class Demanda
     public ICollection<Etapa>? Entregaveis { get; set; }
 
     [NotMapped] public string? SITUACAO { get; set; }
+
+    public DateTime CriadoEm { get; set; }
+
+    [StringLength(200)] public string? CriadoPor { get; set; }
 }

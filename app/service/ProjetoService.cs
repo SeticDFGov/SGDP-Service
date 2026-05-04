@@ -30,7 +30,7 @@ public class DemandaService : IDemandaService
             ?? throw new ApiException(ErrorCode.ProjetoNaoEncontrado);
     }
 
-    public async Task CreateDemandaAsync(DemandaCreateDTO dto)
+    public async Task CreateDemandaAsync(DemandaCreateDTO dto, string userEmail)
     {
         var esteira = await _context.Esteiras.FindAsync(dto.EsteiraId)
             ?? throw new ApiException(ErrorCode.ProjetoNaoEncontrado);
@@ -43,7 +43,9 @@ public class DemandaService : IDemandaService
             NM_PROJETO = dto.NM_PROJETO,
             NR_PROCESSO_SEI = dto.NR_PROCESSO_SEI,
             AREA_DEMANDANTE = demandante,
-            Esteira = esteira
+            Esteira = esteira,
+            CriadoEm = DateTime.UtcNow,
+            CriadoPor = userEmail
         };
 
         await _demandaRepositorio.AddAsync(demanda);

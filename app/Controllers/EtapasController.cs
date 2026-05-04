@@ -65,7 +65,7 @@ public class EntregaveisController : ControllerBase
         if (!_permissionService.CanCreate(perfil, "entregavel"))
             return Forbid();
 
-        await _service.CreateEntregavelAsync(dto);
+        await _service.CreateEntregavelAsync(dto, email);
         return Ok();
     }
 
@@ -82,7 +82,7 @@ public class EntregaveisController : ControllerBase
         if (!_permissionService.CanEdit(perfil, "entregavel"))
             return Forbid();
 
-        await _service.UpdateEntregavelAsync(id, dto);
+        await _service.UpdateEntregavelAsync(id, dto, email);
         return Ok();
     }
 
@@ -99,7 +99,7 @@ public class EntregaveisController : ControllerBase
         if (!_permissionService.CanEdit(perfil, "percentual"))
             return Forbid();
 
-        await _service.UpdatePercentualAsync(id, dto);
+        await _service.UpdatePercentualAsync(id, dto, email);
         return Ok();
     }
 
