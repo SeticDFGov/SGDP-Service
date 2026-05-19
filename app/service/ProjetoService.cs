@@ -51,6 +51,25 @@ public class DemandaService : IDemandaService
         await _demandaRepositorio.AddAsync(demanda);
     }
 
+    public async Task UpdateDemandaAsync(int id, DemandaUpdateDTO dto, string userEmail)
+    {
+        var demanda = await _context.Demandas.FindAsync(id)
+            ?? throw new ApiException(ErrorCode.ProjetoNaoEncontrado);
+
+        var esteira = await _context.Esteiras.FindAsync(dto.EsteiraId)
+            ?? throw new ApiException(ErrorCode.ProjetoNaoEncontrado);
+
+        var demandante = await _context.AreaDemandantes.FindAsync(dto.NM_AREA_DEMANDANTE)
+            ?? throw new ApiException(ErrorCode.ProjetoNaoEncontrado);
+
+        demanda.NM_PROJETO = dto.NM_PROJETO;
+        demanda.NR_PROCESSO_SEI = dto.NR_PROCESSO_SEI;
+        demanda.AREA_DEMANDANTE = demandante;
+        demanda.Esteira = esteira;
+
+        await _context.SaveChangesAsync();
+    }
+
     public IQueryable<Demanda> GetFilteredDemandasQuery(string perfil, string? unidadeNome)
     {
         var query = _context.Demandas

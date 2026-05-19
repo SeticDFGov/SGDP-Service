@@ -26,3 +26,9 @@ public class EntregavelUpdatePercentDTO
     public int PERCENT_EXECUTADO { get; set; }
     public string? Descricao { get; set; }
 }
+
+public class EntregavelUpdateBasicoDTO
+{
+    public string NM_ETAPA { get; set; } = string.Empty;
+    public string TIPO_ENTREGA { get; set; } = string.Empty;
+}

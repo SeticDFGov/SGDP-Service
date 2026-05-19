@@ -80,6 +80,19 @@ public class EtapaService : IEtapaService
         await _etapaRepositorio.SaveChangesAsync();
     }
 
+    public async Task UpdateEntregavelBasicoAsync(int id, EntregavelUpdateBasicoDTO dto, string userEmail)
+    {
+        var etapa = await _etapaRepositorio.GetByIdAsync(id)
+            ?? throw new ApiException(ErrorCode.EtapaNaoEncontrada);
+
+        etapa.NM_ETAPA = dto.NM_ETAPA;
+        etapa.TIPO_ENTREGA = dto.TIPO_ENTREGA;
+        etapa.AlteradoEm = DateTime.UtcNow;
+        etapa.AlteradoPor = userEmail;
+
+        await _etapaRepositorio.SaveChangesAsync();
+    }
+
     public async Task UpdatePercentualAsync(int id, EntregavelUpdatePercentDTO dto, string userEmail)
     {
         var etapa = await _etapaRepositorio.GetByIdAsync(id)

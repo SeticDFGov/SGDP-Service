@@ -87,6 +87,23 @@ public class EntregaveisController : ControllerBase
     }
 
     /// <summary>
+    /// Atualiza apenas nome e tipo de entrega (restrito)
+    /// </summary>
+    [HttpPut("{id}/basico")]
+    public async Task<IActionResult> UpdateEntregavelBasico(int id, [FromBody] EntregavelUpdateBasicoDTO dto)
+    {
+        var email = GetUserEmail();
+        if (string.IsNullOrEmpty(email)) return Unauthorized();
+
+        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        if (!_permissionService.CanEdit(perfil, "entregavel"))
+            return Forbid();
+
+        await _service.UpdateEntregavelBasicoAsync(id, dto, email);
+        return Ok();
+    }
+
+    /// <summary>
     /// Atualiza percentual executado e descrição (CentralIT)
     /// </summary>
     [HttpPut("{id}/percentual")]

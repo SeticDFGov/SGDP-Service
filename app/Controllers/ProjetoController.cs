@@ -82,6 +82,23 @@ public class DemandaController : ControllerBase
         return Ok();
     }
 
+    /// <summary>
+    /// Atualiza uma demanda existente
+    /// </summary>
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateDemanda(int id, [FromBody] DemandaUpdateDTO dto)
+    {
+        var email = GetUserEmail();
+        if (string.IsNullOrEmpty(email)) return Unauthorized();
+
+        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        if (!_permissionService.CanEdit(perfil, "demanda"))
+            return Forbid();
+
+        await _service.UpdateDemandaAsync(id, dto, email);
+        return Ok();
+    }
+
     private string CalcularSituacaoDemanda(ICollection<Etapa> entregaveis)
     {
         if (!entregaveis.Any()) return "Não Iniciado";
