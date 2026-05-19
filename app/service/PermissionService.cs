@@ -38,7 +38,7 @@ public class PermissionService : IPermissionService
         {
             Perfis.Admin => true,
             Perfis.Gestor => true,
-            Perfis.CentralIT => resource is "entregavel",
+            Perfis.CentralIT => resource is "entregavel" or "demanda",
             Perfis.Parceiro => false,
             _ => false
         };
@@ -50,7 +50,7 @@ public class PermissionService : IPermissionService
         {
             Perfis.Admin => true,
             Perfis.Gestor => true,
-            Perfis.CentralIT => resource is "entregavel" or "percentual",
+            Perfis.CentralIT => resource is "entregavel" or "percentual" or "demanda",
             Perfis.Parceiro => false,
             _ => false
         };
