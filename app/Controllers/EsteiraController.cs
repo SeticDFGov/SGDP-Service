@@ -30,6 +30,13 @@ namespace Controllers
             return Ok();
         }
 
+        [HttpPatch("{id}/centralit")]
+        public async Task<IActionResult> ToggleCentralIT(Guid id)
+        {
+            await _service.ToggleCentralITAsync(id);
+            return Ok();
+        }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {

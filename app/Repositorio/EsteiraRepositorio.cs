@@ -31,6 +31,12 @@ namespace Repositorio
             await _context.SaveChangesAsync();
         }
 
+        public async Task UpdateEsteiraAsync(Esteira esteira)
+        {
+            _context.Esteiras.Update(esteira);
+            await _context.SaveChangesAsync();
+        }
+
         public async Task DeleteEsteiraAsync(Guid id)
         {
             var esteira = await _context.Esteiras.FindAsync(id);

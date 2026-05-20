@@ -10,6 +10,7 @@ namespace Repositorio.Interface
         Task<List<Esteira>> GetAllEsteirasAsync();
         Task<Esteira?> GetEsteiraByIdAsync(Guid id);
         Task AddEsteiraAsync(Esteira esteira);
+        Task UpdateEsteiraAsync(Esteira esteira);
         Task DeleteEsteiraAsync(Guid id);
     }
 } 

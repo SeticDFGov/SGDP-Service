@@ -82,7 +82,7 @@ public class PermissionService : IPermissionService
         {
             Perfis.Admin => query,
             Perfis.Gestor => query,
-            Perfis.CentralIT => query.Where(d => d.Entregaveis != null && d.Entregaveis.Any(e => e.Responsavel != null && e.Responsavel.Nome == unidadeNome)),
+            Perfis.CentralIT => query.Where(d => d.Esteira != null && d.Esteira.IsCentralIT),
             Perfis.Parceiro => query.Where(d => d.AREA_DEMANDANTE != null && d.AREA_DEMANDANTE.NM_DEMANDANTE == unidadeNome),
             _ => query.Where(d => d.AREA_DEMANDANTE != null && d.AREA_DEMANDANTE.NM_DEMANDANTE == unidadeNome)
         };

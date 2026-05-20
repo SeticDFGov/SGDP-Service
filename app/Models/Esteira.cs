@@ -9,4 +9,6 @@ public class Esteira
     [Required]
     [StringLength(100)]
     public string Nome { get; set; }
+
+    public bool IsCentralIT { get; set; } = false;
 } 

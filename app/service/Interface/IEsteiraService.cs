@@ -10,6 +10,7 @@ namespace service.Interface
         Task<List<Esteira>> GetAllEsteirasAsync();
         Task<Esteira?> GetEsteiraByIdAsync(Guid id);
         Task AddEsteiraAsync(Esteira esteira);
+        Task ToggleCentralITAsync(Guid id);
         Task DeleteEsteiraAsync(Guid id);
     }
 } 

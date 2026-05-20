@@ -19,5 +19,13 @@ namespace service
         public Task<Esteira?> GetEsteiraByIdAsync(Guid id) => _repo.GetEsteiraByIdAsync(id);
         public Task AddEsteiraAsync(Esteira esteira) => _repo.AddEsteiraAsync(esteira);
         public Task DeleteEsteiraAsync(Guid id) => _repo.DeleteEsteiraAsync(id);
+
+        public async Task ToggleCentralITAsync(Guid id)
+        {
+            var esteira = await _repo.GetEsteiraByIdAsync(id)
+                ?? throw new KeyNotFoundException("Esteira não encontrada.");
+            esteira.IsCentralIT = !esteira.IsCentralIT;
+            await _repo.UpdateEsteiraAsync(esteira);
+        }
     }
 } 
