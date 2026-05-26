@@ -48,8 +48,9 @@ public class EtapaService : IEtapaService
             NM_ETAPA = dto.NM_ETAPA,
             Responsavel = areaExecutora,
             TIPO_ENTREGA = dto.TIPO_ENTREGA,
-            DT_INICIO = DateTimeHelper.ToUtc(dto.DT_INICIO),
-            DT_FIM = DateTimeHelper.ToUtc(dto.DT_FIM),
+            // JsonConverter já faz a conversão de Brasília para UTC automaticamente
+            DT_INICIO = dto.DT_INICIO,
+            DT_FIM = dto.DT_FIM,
             Descricao = dto.Descricao,
             PERCENT_EXECUTADO = 0,
             CriadoEm = DateTime.UtcNow,
@@ -71,8 +72,9 @@ public class EtapaService : IEtapaService
         etapa.NM_ETAPA = dto.NM_ETAPA;
         etapa.Responsavel = areaExecutora;
         etapa.TIPO_ENTREGA = dto.TIPO_ENTREGA;
-        etapa.DT_INICIO = DateTimeHelper.ToUtc(dto.DT_INICIO);
-        etapa.DT_FIM = DateTimeHelper.ToUtc(dto.DT_FIM);
+        // JsonConverter já faz a conversão de Brasília para UTC automaticamente
+        etapa.DT_INICIO = dto.DT_INICIO;
+        etapa.DT_FIM = dto.DT_FIM;
         etapa.Descricao = dto.Descricao;
         etapa.AlteradoEm = DateTime.UtcNow;
         etapa.AlteradoPor = userEmail;
