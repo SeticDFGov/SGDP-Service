@@ -67,6 +67,9 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = null;
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        // Adiciona conversor de datas para sempre retornar/receber datas no horário de Brasília
+        options.JsonSerializerOptions.Converters.Add(new demanda_service.Helpers.BrasiliaDateTimeConverter());
+        options.JsonSerializerOptions.Converters.Add(new demanda_service.Helpers.BrasiliaDateTimeNullableConverter());
     });
 
 builder.Services.AddHttpClient("keycloak");

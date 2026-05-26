@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using api.Entregavel;
+using demanda_service.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using service.Interface;
@@ -29,7 +30,8 @@ public class EntregaveisController : ControllerBase
     public async Task<IActionResult> GetEntregaveis(int demandaId)
     {
         var items = await _service.GetEntregaveisByDemandaAsync(demandaId);
-        return Ok(items);
+        var response = items.Select(e => e.ToEntregavelResponse()).ToList();
+        return Ok(response);
     }
 
     /// <summary>
@@ -39,7 +41,8 @@ public class EntregaveisController : ControllerBase
     public async Task<IActionResult> GetEntregaveisCentralIT([FromQuery] string areaExecutoraNome)
     {
         var items = await _service.GetEntregaveisByCentralITAsync(areaExecutoraNome);
-        return Ok(items);
+        var response = items.Select(e => e.ToEntregavelResponse()).ToList();
+        return Ok(response);
     }
 
     /// <summary>
@@ -49,7 +52,7 @@ public class EntregaveisController : ControllerBase
     public async Task<IActionResult> GetById(int id)
     {
         var item = await _service.GetByIdAsync(id);
-        return Ok(item);
+        return Ok(item.ToEntregavelResponse());
     }
 
     /// <summary>
