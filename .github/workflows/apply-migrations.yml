@@ -17,6 +17,11 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Configurar .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
     - name: Verificar versão do .NET
       run: dotnet --version
 
@@ -25,9 +30,7 @@ jobs:
       run: dotnet restore
 
     - name: Install EF Core tools
-      run: |
-        export PATH="$PATH:$HOME/.dotnet/tools"
-        dotnet tool install --global dotnet-ef || dotnet tool update --global dotnet-ef
+      run: dotnet tool install --global dotnet-ef || dotnet tool update --global dotnet-ef
 
     - name: Build project
       working-directory: ./app
@@ -35,9 +38,7 @@ jobs:
 
     - name: Generate migration bundle
       working-directory: ./app
-      run: |
-        export PATH="$PATH:$HOME/.dotnet/tools"
-        dotnet ef migrations bundle --configuration Release --force --self-contained -o ./efbundle
+      run: dotnet ef migrations bundle --configuration Release --force --self-contained -o ./efbundle
       env:
         ASPNETCORE_ENVIRONMENT: Production
 
