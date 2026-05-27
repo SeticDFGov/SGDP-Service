@@ -11,6 +11,10 @@ jobs:
   apply-migrations:
     runs-on: self-hosted
 
+    env:
+      DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
+      PATH: ${{ runner.temp }}/.dotnet:${{ runner.temp }}/.dotnet/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
     steps:
     - name: Checkout do código
       uses: actions/checkout@v4
