@@ -11,23 +11,11 @@ jobs:
   apply-migrations:
     runs-on: self-hosted
 
-    env:
-      DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
-      PATH: ${{ runner.temp }}/.dotnet:${{ runner.temp }}/.dotnet/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-
     steps:
     - name: Checkout do código
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-
-    - name: Configurar .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
-
-    - name: Verificar versão do .NET
-      run: dotnet --version
 
     - name: Restore dependencies
       working-directory: ./app
