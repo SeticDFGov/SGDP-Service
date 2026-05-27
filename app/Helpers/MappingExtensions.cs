@@ -30,8 +30,8 @@ public static class MappingExtensions
             etapa.PERCENT_EXECUTADO,
             etapa.SITUACAO,
             etapa.Descricao,
-            DT_INICIO = DateTimeHelper.ToBrasilia(etapa.DT_INICIO),
-            DT_FIM = DateTimeHelper.ToBrasilia(etapa.DT_FIM),
+            DT_INICIO = etapa.DT_INICIO,
+            DT_FIM = etapa.DT_FIM,
             Responsavel = etapa.Responsavel,
             DemandaId = etapa.NM_PROJETO?.demandaId,
             DemandaNome = etapa.NM_PROJETO?.NM_PROJETO

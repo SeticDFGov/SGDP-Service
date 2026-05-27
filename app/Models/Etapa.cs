@@ -21,9 +21,9 @@ public class Etapa
     [StringLength(50)]
     public string TIPO_ENTREGA { get; set; } = string.Empty;
 
-    public DateTime DT_INICIO { get; set; }
+    public DateOnly DT_INICIO { get; set; }
 
-    public DateTime DT_FIM { get; set; }
+    public DateOnly DT_FIM { get; set; }
 
     [StringLength(1000)]
     public string? Descricao { get; set; }
@@ -47,7 +47,7 @@ public class Etapa
         if (PERCENT_EXECUTADO >= 100)
             return "Concluído";
 
-        var hoje = DateTime.UtcNow;
+        var hoje = DateOnly.FromDateTime(DateTime.UtcNow);
         if (hoje > DT_FIM && PERCENT_EXECUTADO < 100)
             return "Atrasado";
 
