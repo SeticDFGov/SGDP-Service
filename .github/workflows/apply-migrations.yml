@@ -17,6 +17,9 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Adicionar .NET ao PATH
+      run: echo "/usr/share/dotnet" >> $GITHUB_PATH
+
     - name: Verificar versão do .NET
       run: dotnet --version
 
