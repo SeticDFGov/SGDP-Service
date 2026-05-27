@@ -40,7 +40,7 @@ jobs:
       working-directory: ./app
       run: |
         export PATH="$PATH:$HOME/.dotnet/tools"
-        dotnet ef migrations bundle --configuration Release --force --self-contained -o ./efbundle
+        dotnet ef migrations bundle --configuration Release --force -o ./efbundle
       env:
         ASPNETCORE_ENVIRONMENT: Production
 
