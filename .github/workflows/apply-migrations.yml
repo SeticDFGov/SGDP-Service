@@ -36,21 +36,10 @@ jobs:
       working-directory: ./app
       run: dotnet build --no-restore --configuration Release
 
-    - name: Generate migration bundle
+    - name: Apply migrations to database
       working-directory: ./app
       run: |
         export PATH="$PATH:$HOME/.dotnet/tools"
-        dotnet ef migrations bundle --configuration Release --force -o ./efbundle
+        dotnet ef database update --connection "${{ secrets.DATABASE_CONNECTION_STRING }}"
       env:
         ASPNETCORE_ENVIRONMENT: Production
-
-    - name: Apply migrations to database
-      working-directory: ./app
-      run: ./efbundle --connection "${{ secrets.DATABASE_CONNECTION_STRING }}"
-      env:
-        ASPNETCORE_ENVIRONMENT: Production
-
-    - name: Cleanup bundle
-      if: always()
-      working-directory: ./app
-      run: rm -f ./efbundle
