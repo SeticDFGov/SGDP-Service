@@ -48,6 +48,6 @@ jobs:
 
     - name: Apply migrations to database
       working-directory: ./app
-      run: dotnet ef database update --connection "${{ secrets.DATABASE_CONNECTION_STRING }}"
+      run: dotnet ef database update --connection "${{ secrets.DATABASE_CONNECTION_STRING }}" --verbose
       env:
         ASPNETCORE_ENVIRONMENT: Production
