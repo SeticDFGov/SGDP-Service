@@ -39,10 +39,15 @@ jobs:
       working-directory: ./app
       run: dotnet build --no-restore --configuration Release
 
+    - name: Verificar dotnet-ef
+      run: |
+        which dotnet-ef || echo "dotnet-ef não encontrado no PATH"
+        dotnet ef --version || echo "dotnet ef falhou"
+        echo "PATH: $PATH"
+        echo "DOTNET_ROOT: $DOTNET_ROOT"
+
     - name: Apply migrations to database
       working-directory: ./app
-      run: |
-        export PATH="$PATH:$HOME/.dotnet/tools"
-        dotnet ef database update --connection "${{ secrets.DATABASE_CONNECTION_STRING }}"
+      run: dotnet ef database update --connection "${{ secrets.DATABASE_CONNECTION_STRING }}"
       env:
         ASPNETCORE_ENVIRONMENT: Production
