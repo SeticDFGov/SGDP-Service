@@ -52,7 +52,13 @@ Abre em `http://localhost:4200` (o `environment.ts` já aponta para `http://loca
 
 ## 5. Entrar com usuários de teste
 
-Abra `http://localhost:4200/auth/local` (há um link "entrar no modo local" na tela de login quando o build não é de produção). A tela oferece cinco personas prontas (uma por perfil) e um formulário para criar qualquer usuário de teste (nome + e-mail + perfil). O primeiro acesso cria o usuário no banco local; **papéis PGIA são atribuídos depois, pela tela de admin — exatamente como em produção**. Para trocar de usuário: Sair → `/auth/local` de novo.
+Abra `http://localhost:4200/auth/local` (há um link "entrar no modo local" na tela de login quando o build não é de produção). A tela tem três blocos:
+
+- **Papéis do PGIA** — uma persona por papel do decreto, que entra **direto na tela do papel**: Otávio (`pgia_orgao` → área do órgão), Sofia (`pgia_sgdi` → governança central), Caio (`pgia_cgtic` → comitê), Alice (agente pública **sem** papel → registrar uso/incidentes do art. 13), Aurélio (`pgia_auditoria` → auditorias designadas) e o botão **Cidadão** (página pública, sem login). O backend provisiona tudo sozinho no primeiro clique: papel, unidade e um "Órgão de Teste do PGIA" (sigla TESTE) já com os 6 prazos de adesão.
+- **Perfis do SGDP** — as cinco personas originais (admin, gestor, centralit, parceiro, básico), para a regressão do sistema existente.
+- **Formulário livre** — nome + e-mail + perfil + papel PGIA opcional.
+
+Para trocar de usuário: Sair → `/auth/local` de novo. Papéis também podem ser trocados a qualquer momento pela tela de admin, como em produção (relogar com uma persona **não** apaga papel atribuído manualmente — o campo só é aplicado quando vem preenchido).
 
 ## 6. Roteiro de fumaça do PGIA
 
