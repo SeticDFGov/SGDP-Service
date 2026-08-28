@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -11,6 +13,7 @@ using service.Interface;
 using service;
 using Repositorio.Interface;
 using api.Auth;
+using app.Auth;
 using demanda_service.service;
 using Microsoft.OpenApi.Models;
 using QuestPDF.Infrastructure;
@@ -82,11 +85,34 @@ builder.Services.AddScoped<IAreaExecutoraRepositorio, AreaExecutoraRepositorio>(
 builder.Services.AddScoped<IAuthRepositorio, AuthRepositorio>();
 builder.Services.AddScoped<IEsteiraRepositorio, EsteiraRepositorio>();
 
+// Repositórios do módulo PGIA
+builder.Services.AddScoped<IPgiaOrgaoRepositorio, Repositorio.Pgia.PgiaOrgaoRepositorio>();
+builder.Services.AddScoped<IPgiaDesignacaoRepositorio, Repositorio.Pgia.PgiaDesignacaoRepositorio>();
+builder.Services.AddScoped<IPgiaPrazoRepositorio, Repositorio.Pgia.PgiaPrazoRepositorio>();
+builder.Services.AddScoped<IPgiaSistemaRepositorio, Repositorio.Pgia.PgiaSistemaRepositorio>();
+builder.Services.AddScoped<IPgiaGovernancaRepositorio, Repositorio.Pgia.PgiaGovernancaRepositorio>();
+builder.Services.AddScoped<IPgiaOperacaoRepositorio, Repositorio.Pgia.PgiaOperacaoRepositorio>();
+builder.Services.AddScoped<IPgiaContratoRepositorio, Repositorio.Pgia.PgiaContratoRepositorio>();
+builder.Services.AddScoped<IPgiaRelatorioRepositorio, Repositorio.Pgia.PgiaRelatorioRepositorio>();
+builder.Services.AddScoped<IPgiaPublicoRepositorio, Repositorio.Pgia.PgiaPublicoRepositorio>();
+
 // Serviços
 builder.Services.AddScoped<IDemandaService, DemandaService>();
 builder.Services.AddScoped<IEtapaService, EtapaService>();
 builder.Services.AddScoped<IEsteiraService, EsteiraService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
+
+// Serviços do módulo PGIA
+builder.Services.AddScoped<IPgiaPermissionService, service.Pgia.PgiaPermissionService>();
+builder.Services.AddScoped<IPgiaAdminService, service.Pgia.PgiaAdminService>();
+builder.Services.AddScoped<IPgiaOrgaoService, service.Pgia.PgiaOrgaoService>();
+builder.Services.AddScoped<IPgiaSistemaService, service.Pgia.PgiaSistemaService>();
+builder.Services.AddScoped<IPgiaGovernancaService, service.Pgia.PgiaGovernancaService>();
+builder.Services.AddScoped<IPgiaOperacaoService, service.Pgia.PgiaOperacaoService>();
+builder.Services.AddScoped<IPgiaContratoService, service.Pgia.PgiaContratoService>();
+builder.Services.AddScoped<IPgiaRelatorioService, service.Pgia.PgiaRelatorioService>();
+builder.Services.AddScoped<IPgiaPublicoService, service.Pgia.PgiaPublicoService>();
+
 builder.Services.AddScoped<HttpClient>();
 
 builder.Services.AddEndpointsApiExplorer();
@@ -127,18 +153,43 @@ builder.Services.Configure<AuthSettings>(authSettingsSection);
 var keycloakAuthority = authSettingsSection["Authority"]!;
 var keycloakClientId = authSettingsSection["ClientId"]!;
 
+// MODO LOCAL (execução independente para testes, sem Keycloak): opt-in explícito
+// via Auth:ModoLocal=true e proibido fora de Development — a aplicação nem sobe.
+var modoLocal = builder.Configuration.GetValue<bool>("Auth:ModoLocal");
+if (modoLocal && !builder.Environment.IsDevelopment())
+{
+    throw new InvalidOperationException(
+        "Auth:ModoLocal=true só é permitido em ASPNETCORE_ENVIRONMENT=Development.");
+}
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.Authority = keycloakAuthority;
-        options.RequireHttpsMetadata = false;
-        options.TokenValidationParameters = new TokenValidationParameters
+        if (modoLocal)
         {
-            ValidateIssuer = true,
-            ValidIssuer = keycloakAuthority,
-            ValidateAudience = false,
-            ValidateLifetime = true,
-        };
+            // Valida os tokens emitidos pelo AuthLocalController (chave por processo);
+            // todo o restante do pipeline (roles, /me, perfis) permanece idêntico.
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuer = ModoLocalTokens.Issuer,
+                IssuerSigningKey = ModoLocalTokens.Key,
+                ValidateAudience = false,
+                ValidateLifetime = true,
+            };
+        }
+        else
+        {
+            options.Authority = keycloakAuthority;
+            options.RequireHttpsMetadata = false;
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuer = keycloakAuthority,
+                ValidateAudience = false,
+                ValidateLifetime = true,
+            };
+        }
         options.Events = new JwtBearerEvents
         {
             OnTokenValidated = context =>
@@ -183,6 +234,28 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+// Política usada SÓ pela superfície anônima do PGIA ([EnableRateLimiting] no
+// PgiaPublicoController); nenhum endpoint existente passa pelo limitador.
+// Atrás do proxy o IP real vem no X-Forwarded-For (espoofável — é atrito contra
+// abuso, não fronteira de segurança; a credencial real é a entropia do protocolo).
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("pgia-publico", httpContext =>
+    {
+        var ip = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim();
+        if (string.IsNullOrEmpty(ip))
+            ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "anon";
+
+        return RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 30,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        });
+    });
+});
+
 var app = builder.Build();
 
 app.UseSwagger();
@@ -192,5 +265,6 @@ app.UseHttpsRedirection();
 app.UseCors("CorsPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.MapControllers();
 app.Run();
