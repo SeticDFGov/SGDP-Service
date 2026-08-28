@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Models;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace demanda_service.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260828132240_PgiaFase3Operacao")]
+    partial class PgiaFase3Operacao
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -372,103 +375,6 @@ namespace demanda_service.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Models.Pgia.PgiaAuditoriaTecnica", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime?>("AlteradoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("alterado_em");
-
-                    b.Property<string>("AlteradoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("alterado_por");
-
-                    b.Property<bool?>("ApoioFapdf")
-                        .HasColumnType("boolean")
-                        .HasColumnName("apoio_fapdf");
-
-                    b.Property<Guid?>("AuditorUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("auditor_user_id");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("criado_em")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<string>("CriadoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("criado_por");
-
-                    b.Property<DateOnly?>("DataFim")
-                        .HasColumnType("date")
-                        .HasColumnName("data_fim");
-
-                    b.Property<DateOnly>("DataInicio")
-                        .HasColumnType("date")
-                        .HasColumnName("data_inicio");
-
-                    b.Property<DateOnly?>("DataPublicacao")
-                        .HasColumnType("date")
-                        .HasColumnName("data_publicacao");
-
-                    b.Property<string>("EntidadeAuditora")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("entidade_auditora");
-
-                    b.Property<bool>("ExternaFornecedor")
-                        .HasColumnType("boolean")
-                        .HasColumnName("externa_fornecedor");
-
-                    b.Property<string>("Parecer")
-                        .HasColumnType("text")
-                        .HasColumnName("parecer");
-
-                    b.Property<bool>("PublicadoPortal")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("publicado_portal");
-
-                    b.Property<long>("SistemaIaId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("sistema_ia_id");
-
-                    b.Property<string>("Tipo")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("tipo");
-
-                    b.Property<string>("Url")
-                        .HasColumnType("text")
-                        .HasColumnName("url");
-
-                    b.HasKey("Id")
-                        .HasName("pk_pgia_auditoria_tecnica");
-
-                    b.HasIndex("AuditorUserId")
-                        .HasDatabaseName("ix_pgia_auditoria_auditor");
-
-                    b.HasIndex("SistemaIaId")
-                        .HasDatabaseName("ix_pgia_auditoria_sistema");
-
-                    b.ToTable("pgia_auditoria_tecnica", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_pgia_auditoria_tipo", "tipo IN ('Periódica','Independente contratual')");
-                        });
-                });
-
             modelBuilder.Entity("Models.Pgia.PgiaAutorizacaoExcepcional", b =>
                 {
                     b.Property<long>("Id")
@@ -502,10 +408,6 @@ namespace demanda_service.Migrations
                     b.Property<long?>("AvaliacaoRiscosDocId")
                         .HasColumnType("bigint")
                         .HasColumnName("avaliacao_riscos_doc_id");
-
-                    b.Property<long?>("ContratoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("contrato_id");
 
                     b.Property<DateTime>("CriadoEm")
                         .ValueGeneratedOnAdd()
@@ -554,9 +456,6 @@ namespace demanda_service.Migrations
 
                     b.HasIndex("AvaliacaoRiscosDocId")
                         .HasDatabaseName("ix_pgia_autorizacao_doc");
-
-                    b.HasIndex("ContratoId")
-                        .HasDatabaseName("ix_pgia_autorizacao_contrato");
 
                     b.HasIndex("DeliberacaoCgticId")
                         .HasDatabaseName("ix_pgia_autorizacao_deliberacao");
@@ -759,158 +658,6 @@ namespace demanda_service.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Models.Pgia.PgiaContratoIa", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime?>("AlteradoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("alterado_em");
-
-                    b.Property<string>("AlteradoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("alterado_por");
-
-                    b.Property<long?>("AutorizacaoTreinamentoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("autorizacao_treinamento_id");
-
-                    b.Property<bool?>("ClausulaAuditoriaIndependente")
-                        .HasColumnType("boolean")
-                        .HasColumnName("clausula_auditoria_independente");
-
-                    b.Property<bool>("ClausulaVedacaoTreinamento")
-                        .HasColumnType("boolean")
-                        .HasColumnName("clausula_vedacao_treinamento");
-
-                    b.Property<bool?>("ConformeGuiaContratacoes")
-                        .HasColumnType("boolean")
-                        .HasColumnName("conforme_guia_contratacoes");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("criado_em")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<string>("CriadoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("criado_por");
-
-                    b.Property<string>("FornecedorNome")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("fornecedor_nome");
-
-                    b.Property<long?>("HomologacaoSgdiDocId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("homologacao_sgdi_doc_id");
-
-                    b.Property<string>("NumeroContrato")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("numero_contrato");
-
-                    b.Property<string>("Objeto")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("objeto");
-
-                    b.Property<long>("OrgaoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("orgao_id");
-
-                    b.Property<bool?>("PrevistoPdtic")
-                        .HasColumnType("boolean")
-                        .HasColumnName("previsto_pdtic");
-
-                    b.Property<string>("ProcessoSei")
-                        .IsRequired()
-                        .HasMaxLength(25)
-                        .HasColumnType("character varying(25)")
-                        .HasColumnName("processo_sei");
-
-                    b.Property<bool>("ReqAcessibilidade")
-                        .HasColumnType("boolean")
-                        .HasColumnName("req_acessibilidade");
-
-                    b.Property<bool>("ReqAuditabilidade")
-                        .HasColumnType("boolean")
-                        .HasColumnName("req_auditabilidade");
-
-                    b.Property<bool>("ReqExplicabilidade")
-                        .HasColumnType("boolean")
-                        .HasColumnName("req_explicabilidade");
-
-                    b.Property<bool>("ReqPortabilidade")
-                        .HasColumnType("boolean")
-                        .HasColumnName("req_portabilidade");
-
-                    b.Property<bool>("ReqSemAprisionamento")
-                        .HasColumnType("boolean")
-                        .HasColumnName("req_sem_aprisionamento");
-
-                    b.Property<long?>("SistemaIaId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("sistema_ia_id");
-
-                    b.Property<decimal?>("SlaAcuracia")
-                        .HasColumnType("numeric")
-                        .HasColumnName("sla_acuracia");
-
-                    b.Property<decimal?>("SlaDesempenho")
-                        .HasColumnType("numeric")
-                        .HasColumnName("sla_desempenho");
-
-                    b.Property<decimal?>("SlaDisponibilidade")
-                        .HasColumnType("numeric")
-                        .HasColumnName("sla_disponibilidade");
-
-                    b.Property<decimal?>("SlaEquidade")
-                        .HasColumnType("numeric")
-                        .HasColumnName("sla_equidade");
-
-                    b.Property<string>("SlaPenalidades")
-                        .HasColumnType("text")
-                        .HasColumnName("sla_penalidades");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("Vigente")
-                        .HasColumnName("status");
-
-                    b.HasKey("Id")
-                        .HasName("pk_pgia_contrato_ia");
-
-                    b.HasIndex("AutorizacaoTreinamentoId")
-                        .HasDatabaseName("ix_pgia_contrato_autorizacao");
-
-                    b.HasIndex("HomologacaoSgdiDocId")
-                        .HasDatabaseName("ix_pgia_contrato_homologacao_doc");
-
-                    b.HasIndex("OrgaoId")
-                        .HasDatabaseName("ix_pgia_contrato_orgao");
-
-                    b.HasIndex("SistemaIaId")
-                        .HasDatabaseName("ix_pgia_contrato_sistema");
-
-                    b.ToTable("pgia_contrato_ia", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_pgia_contrato_status", "status IN ('Vigente','Suspenso','Encerrado')");
-                        });
-                });
-
             modelBuilder.Entity("Models.Pgia.PgiaDeliberacaoCgtic", b =>
                 {
                     b.Property<long>("Id")
@@ -928,10 +675,6 @@ namespace demanda_service.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("alterado_por");
-
-                    b.Property<long?>("ContratoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("contrato_id");
 
                     b.Property<DateTime>("CriadoEm")
                         .ValueGeneratedOnAdd()
@@ -979,9 +722,6 @@ namespace demanda_service.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_pgia_deliberacao_cgtic");
-
-                    b.HasIndex("ContratoId")
-                        .HasDatabaseName("ix_pgia_deliberacao_contrato");
 
                     b.HasIndex("DocumentoId")
                         .HasDatabaseName("ix_pgia_deliberacao_doc");
@@ -1296,210 +1036,6 @@ namespace demanda_service.Migrations
                             t.HasCheckConstraint("ck_pgia_incidente_hipotese", "hipotese IN ('I','II','III','IV','V')");
 
                             t.HasCheckConstraint("ck_pgia_incidente_status", "status_apuracao IN ('Recebida','Em apuração','Concluída com recomendações','Concluída sem medidas','Encaminhada ao CGTIC')");
-                        });
-                });
-
-            modelBuilder.Entity("Models.Pgia.PgiaIndicadorDesempenho", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime?>("AlteradoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("alterado_em");
-
-                    b.Property<string>("AlteradoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("alterado_por");
-
-                    b.Property<string>("Categoria")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("categoria");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("criado_em")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<string>("CriadoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("criado_por");
-
-                    b.Property<decimal?>("Meta")
-                        .HasColumnType("numeric")
-                        .HasColumnName("meta");
-
-                    b.Property<string>("Nome")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("nome");
-
-                    b.Property<DateOnly>("PeriodoFim")
-                        .HasColumnType("date")
-                        .HasColumnName("periodo_fim");
-
-                    b.Property<DateOnly>("PeriodoInicio")
-                        .HasColumnType("date")
-                        .HasColumnName("periodo_inicio");
-
-                    b.Property<bool>("PublicadoRegistroPublico")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("publicado_registro_publico");
-
-                    b.Property<long>("SistemaIaId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("sistema_ia_id");
-
-                    b.Property<string>("Unidade")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("unidade");
-
-                    b.Property<decimal>("Valor")
-                        .HasColumnType("numeric")
-                        .HasColumnName("valor");
-
-                    b.HasKey("Id")
-                        .HasName("pk_pgia_indicador_desempenho");
-
-                    b.HasIndex("SistemaIaId")
-                        .HasDatabaseName("ix_pgia_indicador_sistema");
-
-                    b.ToTable("pgia_indicador_desempenho", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_pgia_indicador_categoria", "categoria IN ('Desempenho','Adoção','Conformidade','Impacto','Acurácia','Equidade','Disponibilidade')");
-
-                            t.HasCheckConstraint("ck_pgia_indicador_periodo", "periodo_fim >= periodo_inicio");
-                        });
-                });
-
-            modelBuilder.Entity("Models.Pgia.PgiaInstrumentoLegado", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<bool?>("AditivoClausulaTreinamento")
-                        .HasColumnType("boolean")
-                        .HasColumnName("aditivo_clausula_treinamento");
-
-                    b.Property<DateTime?>("AlteradoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("alterado_em");
-
-                    b.Property<string>("AlteradoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("alterado_por");
-
-                    b.Property<long?>("ComprovacaoDocId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("comprovacao_doc_id");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("criado_em")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<string>("CriadoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("criado_por");
-
-                    b.Property<DateOnly?>("DataAditivo")
-                        .HasColumnType("date")
-                        .HasColumnName("data_aditivo");
-
-                    b.Property<DateOnly?>("DataRevisao")
-                        .HasColumnType("date")
-                        .HasColumnName("data_revisao");
-
-                    b.Property<DateOnly?>("DataTriagem")
-                        .HasColumnType("date")
-                        .HasColumnName("data_triagem");
-
-                    b.Property<string>("Descricao")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("descricao");
-
-                    b.Property<string>("EnvolveIa")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
-                        .HasDefaultValue("Incerto")
-                        .HasColumnName("envolve_ia");
-
-                    b.Property<string>("Numero")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("numero");
-
-                    b.Property<long>("OrgaoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("orgao_id");
-
-                    b.Property<string>("ProcessoSei")
-                        .HasMaxLength(25)
-                        .HasColumnType("character varying(25)")
-                        .HasColumnName("processo_sei");
-
-                    b.Property<bool>("Revisado")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("revisado");
-
-                    b.Property<long?>("SistemaIaId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("sistema_ia_id");
-
-                    b.Property<string>("TipoInstrumento")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("tipo_instrumento");
-
-                    b.Property<Guid?>("TriadoPor")
-                        .HasColumnType("uuid")
-                        .HasColumnName("triado_por");
-
-                    b.HasKey("Id")
-                        .HasName("pk_pgia_instrumento_legado");
-
-                    b.HasIndex("ComprovacaoDocId")
-                        .HasDatabaseName("ix_pgia_legado_doc");
-
-                    b.HasIndex("OrgaoId")
-                        .HasDatabaseName("ix_pgia_legado_orgao");
-
-                    b.HasIndex("SistemaIaId")
-                        .HasDatabaseName("ix_pgia_legado_sistema");
-
-                    b.HasIndex("TriadoPor")
-                        .HasDatabaseName("ix_pgia_legado_triador");
-
-                    b.ToTable("pgia_instrumento_legado", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_pgia_legado_envolve_ia", "envolve_ia IN ('Sim','Não','Incerto')");
-
-                            t.HasCheckConstraint("ck_pgia_legado_tipo", "tipo_instrumento IN ('Contrato','Ato normativo','Convênio ou instrumento congênere')");
                         });
                 });
 
@@ -2037,168 +1573,6 @@ namespace demanda_service.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Models.Pgia.PgiaRelatorioAnual", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("AgendaInovacao")
-                        .HasColumnType("text")
-                        .HasColumnName("agenda_inovacao");
-
-                    b.Property<DateTime?>("AlteradoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("alterado_em");
-
-                    b.Property<string>("AlteradoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("alterado_por");
-
-                    b.Property<short>("Ano")
-                        .HasColumnType("smallint")
-                        .HasColumnName("ano");
-
-                    b.Property<DateOnly?>("ApreciadoCgticEm")
-                        .HasColumnType("date")
-                        .HasColumnName("apreciado_cgtic_em");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("criado_em")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<string>("CriadoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("criado_por");
-
-                    b.Property<DateOnly?>("DataPublicacao")
-                        .HasColumnType("date")
-                        .HasColumnName("data_publicacao");
-
-                    b.Property<long?>("DocumentoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("documento_id");
-
-                    b.Property<string>("Recomendacoes")
-                        .HasColumnType("text")
-                        .HasColumnName("recomendacoes");
-
-                    b.Property<string>("UrlPublicacao")
-                        .HasColumnType("text")
-                        .HasColumnName("url_publicacao");
-
-                    b.HasKey("Id")
-                        .HasName("pk_pgia_relatorio_anual");
-
-                    b.HasIndex("Ano")
-                        .IsUnique()
-                        .HasDatabaseName("ux_pgia_relatorio_anual_ano");
-
-                    b.HasIndex("DocumentoId")
-                        .HasDatabaseName("ix_pgia_relatorio_anual_doc");
-
-                    b.ToTable("pgia_relatorio_anual", (string)null);
-                });
-
-            modelBuilder.Entity("Models.Pgia.PgiaRelatorioSemestral", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime?>("AlteradoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("alterado_em");
-
-                    b.Property<string>("AlteradoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("alterado_por");
-
-                    b.Property<short>("Ano")
-                        .HasColumnType("smallint")
-                        .HasColumnName("ano");
-
-                    b.Property<DateOnly?>("ComunicadoControleInternoEm")
-                        .HasColumnType("date")
-                        .HasColumnName("comunicado_controle_interno_em");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("criado_em")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<string>("CriadoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("criado_por");
-
-                    b.Property<DateOnly?>("DataEnvio")
-                        .HasColumnType("date")
-                        .HasColumnName("data_envio");
-
-                    b.Property<long?>("DocumentoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("documento_id");
-
-                    b.Property<long>("OrgaoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("orgao_id");
-
-                    b.Property<DateOnly>("PrazoEnvio")
-                        .HasColumnType("date")
-                        .HasColumnName("prazo_envio");
-
-                    b.Property<string>("ProcessoSei")
-                        .HasMaxLength(25)
-                        .HasColumnType("character varying(25)")
-                        .HasColumnName("processo_sei");
-
-                    b.Property<DateOnly?>("RegistradoPainelEm")
-                        .HasColumnType("date")
-                        .HasColumnName("registrado_painel_em");
-
-                    b.Property<short>("Semestre")
-                        .HasColumnType("smallint")
-                        .HasColumnName("semestre");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasDefaultValue("Pendente")
-                        .HasColumnName("status");
-
-                    b.HasKey("Id")
-                        .HasName("pk_pgia_relatorio_semestral");
-
-                    b.HasIndex("DocumentoId")
-                        .HasDatabaseName("ix_pgia_relatorio_semestral_doc");
-
-                    b.HasIndex("OrgaoId", "Ano", "Semestre")
-                        .IsUnique()
-                        .HasDatabaseName("ux_pgia_relatorio_semestral");
-
-                    b.ToTable("pgia_relatorio_semestral", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_pgia_relatorio_semestre", "semestre IN (1, 2)");
-
-                            t.HasCheckConstraint("ck_pgia_relatorio_status", "status IN ('Pendente','Enviado no prazo','Enviado em atraso','Inadimplente')");
-                        });
-                });
-
             modelBuilder.Entity("Models.Pgia.PgiaResponsavelIa", b =>
                 {
                     b.Property<long>("Id")
@@ -2543,123 +1917,6 @@ namespace demanda_service.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Models.Pgia.PgiaSolicitacaoCidadao", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime?>("AlteradoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("alterado_em");
-
-                    b.Property<string>("AlteradoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("alterado_por");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("criado_em")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<string>("CriadoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("criado_por");
-
-                    b.Property<DateTime>("DataAbertura")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("data_abertura")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<DateTime?>("DataResposta")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("data_resposta");
-
-                    b.Property<string>("Descricao")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("descricao");
-
-                    b.Property<bool>("EncaminhadaDpo")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("encaminhada_dpo");
-
-                    b.Property<string>("Protocolo")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("protocolo");
-
-                    b.Property<string>("ReferenciaDecisao")
-                        .HasColumnType("text")
-                        .HasColumnName("referencia_decisao");
-
-                    b.Property<Guid?>("RespondidoPor")
-                        .HasColumnType("uuid")
-                        .HasColumnName("respondido_por");
-
-                    b.Property<string>("Resposta")
-                        .HasColumnType("text")
-                        .HasColumnName("resposta");
-
-                    b.Property<long>("SistemaIaId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("sistema_ia_id");
-
-                    b.Property<string>("SolicitanteContato")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("solicitante_contato");
-
-                    b.Property<string>("SolicitanteNome")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("solicitante_nome");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasDefaultValue("Recebida")
-                        .HasColumnName("status");
-
-                    b.Property<string>("Tipo")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("tipo");
-
-                    b.HasKey("Id")
-                        .HasName("pk_pgia_solicitacao_cidadao");
-
-                    b.HasIndex("Protocolo")
-                        .IsUnique()
-                        .HasDatabaseName("ux_pgia_solicitacao_protocolo");
-
-                    b.HasIndex("RespondidoPor")
-                        .HasDatabaseName("ix_pgia_solicitacao_agente");
-
-                    b.HasIndex("SistemaIaId")
-                        .HasDatabaseName("ix_pgia_solicitacao_sistema");
-
-                    b.ToTable("pgia_solicitacao_cidadao", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_pgia_solicitacao_status", "status IN ('Recebida','Em análise','Respondida','Encaminhada ao Encarregado de Dados')");
-
-                            t.HasCheckConstraint("ck_pgia_solicitacao_tipo", "tipo IN ('Informação sobre uso de IA','Revisão de decisão','Explicação da decisão','Impugnação por discriminação ou erro','Reclamação de titular de dados')");
-                        });
-                });
-
             modelBuilder.Entity("app.Models.Unidade", b =>
                 {
                     b.Property<Guid>("id")
@@ -2796,26 +2053,6 @@ namespace demanda_service.Migrations
                     b.Navigation("Sistema");
                 });
 
-            modelBuilder.Entity("Models.Pgia.PgiaAuditoriaTecnica", b =>
-                {
-                    b.HasOne("app.Models.User", "AuditorUser")
-                        .WithMany()
-                        .HasForeignKey("AuditorUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_auditoria_auditor");
-
-                    b.HasOne("Models.Pgia.PgiaSistemaIa", "Sistema")
-                        .WithMany()
-                        .HasForeignKey("SistemaIaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_pgia_auditoria_sistema");
-
-                    b.Navigation("AuditorUser");
-
-                    b.Navigation("Sistema");
-                });
-
             modelBuilder.Entity("Models.Pgia.PgiaAutorizacaoExcepcional", b =>
                 {
                     b.HasOne("Models.Pgia.PgiaDocumento", null)
@@ -2823,12 +2060,6 @@ namespace demanda_service.Migrations
                         .HasForeignKey("AvaliacaoRiscosDocId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_pgia_autorizacao_doc");
-
-                    b.HasOne("Models.Pgia.PgiaContratoIa", null)
-                        .WithMany()
-                        .HasForeignKey("ContratoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_autorizacao_contrato");
 
                     b.HasOne("Models.Pgia.PgiaDeliberacaoCgtic", null)
                         .WithMany()
@@ -2908,46 +2139,8 @@ namespace demanda_service.Migrations
                     b.Navigation("Sistema");
                 });
 
-            modelBuilder.Entity("Models.Pgia.PgiaContratoIa", b =>
-                {
-                    b.HasOne("Models.Pgia.PgiaAutorizacaoExcepcional", null)
-                        .WithMany()
-                        .HasForeignKey("AutorizacaoTreinamentoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_contrato_autorizacao");
-
-                    b.HasOne("Models.Pgia.PgiaDocumento", null)
-                        .WithMany()
-                        .HasForeignKey("HomologacaoSgdiDocId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_contrato_homologacao_doc");
-
-                    b.HasOne("Models.Pgia.PgiaOrgao", "Orgao")
-                        .WithMany()
-                        .HasForeignKey("OrgaoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_pgia_contrato_orgao");
-
-                    b.HasOne("Models.Pgia.PgiaSistemaIa", "Sistema")
-                        .WithMany()
-                        .HasForeignKey("SistemaIaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_contrato_sistema");
-
-                    b.Navigation("Orgao");
-
-                    b.Navigation("Sistema");
-                });
-
             modelBuilder.Entity("Models.Pgia.PgiaDeliberacaoCgtic", b =>
                 {
-                    b.HasOne("Models.Pgia.PgiaContratoIa", null)
-                        .WithMany()
-                        .HasForeignKey("ContratoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_deliberacao_contrato");
-
                     b.HasOne("Models.Pgia.PgiaDocumento", null)
                         .WithMany()
                         .HasForeignKey("DocumentoId")
@@ -3043,52 +2236,6 @@ namespace demanda_service.Migrations
                     b.Navigation("Sistema");
                 });
 
-            modelBuilder.Entity("Models.Pgia.PgiaIndicadorDesempenho", b =>
-                {
-                    b.HasOne("Models.Pgia.PgiaSistemaIa", "Sistema")
-                        .WithMany()
-                        .HasForeignKey("SistemaIaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_pgia_indicador_sistema");
-
-                    b.Navigation("Sistema");
-                });
-
-            modelBuilder.Entity("Models.Pgia.PgiaInstrumentoLegado", b =>
-                {
-                    b.HasOne("Models.Pgia.PgiaDocumento", null)
-                        .WithMany()
-                        .HasForeignKey("ComprovacaoDocId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_legado_doc");
-
-                    b.HasOne("Models.Pgia.PgiaOrgao", "Orgao")
-                        .WithMany()
-                        .HasForeignKey("OrgaoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_pgia_legado_orgao");
-
-                    b.HasOne("Models.Pgia.PgiaSistemaIa", "Sistema")
-                        .WithMany()
-                        .HasForeignKey("SistemaIaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_legado_sistema");
-
-                    b.HasOne("app.Models.User", "TriadoPorUser")
-                        .WithMany()
-                        .HasForeignKey("TriadoPor")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_legado_triador");
-
-                    b.Navigation("Orgao");
-
-                    b.Navigation("Sistema");
-
-                    b.Navigation("TriadoPorUser");
-                });
-
             modelBuilder.Entity("Models.Pgia.PgiaNaoConformidade", b =>
                 {
                     b.HasOne("Models.Pgia.PgiaOrgao", "Orgao")
@@ -3160,33 +2307,6 @@ namespace demanda_service.Migrations
                     b.Navigation("Sistema");
                 });
 
-            modelBuilder.Entity("Models.Pgia.PgiaRelatorioAnual", b =>
-                {
-                    b.HasOne("Models.Pgia.PgiaDocumento", null)
-                        .WithMany()
-                        .HasForeignKey("DocumentoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_relatorio_anual_doc");
-                });
-
-            modelBuilder.Entity("Models.Pgia.PgiaRelatorioSemestral", b =>
-                {
-                    b.HasOne("Models.Pgia.PgiaDocumento", null)
-                        .WithMany()
-                        .HasForeignKey("DocumentoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_relatorio_semestral_doc");
-
-                    b.HasOne("Models.Pgia.PgiaOrgao", "Orgao")
-                        .WithMany()
-                        .HasForeignKey("OrgaoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_pgia_relatorio_semestral_orgao");
-
-                    b.Navigation("Orgao");
-                });
-
             modelBuilder.Entity("Models.Pgia.PgiaResponsavelIa", b =>
                 {
                     b.HasOne("app.Models.User", "Agente")
@@ -3241,26 +2361,6 @@ namespace demanda_service.Migrations
                     b.Navigation("Orgao");
 
                     b.Navigation("Responsavel");
-                });
-
-            modelBuilder.Entity("Models.Pgia.PgiaSolicitacaoCidadao", b =>
-                {
-                    b.HasOne("app.Models.User", "RespondidoPorUser")
-                        .WithMany()
-                        .HasForeignKey("RespondidoPor")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_solicitacao_agente");
-
-                    b.HasOne("Models.Pgia.PgiaSistemaIa", "Sistema")
-                        .WithMany()
-                        .HasForeignKey("SistemaIaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_pgia_solicitacao_sistema");
-
-                    b.Navigation("RespondidoPorUser");
-
-                    b.Navigation("Sistema");
                 });
 
             modelBuilder.Entity("app.Models.User", b =>

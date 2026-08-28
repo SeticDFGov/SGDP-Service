@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Models;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace demanda_service.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260828142708_PgiaFase4Relatorios")]
+    partial class PgiaFase4Relatorios
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2543,123 +2546,6 @@ namespace demanda_service.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Models.Pgia.PgiaSolicitacaoCidadao", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime?>("AlteradoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("alterado_em");
-
-                    b.Property<string>("AlteradoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("alterado_por");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("criado_em")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<string>("CriadoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("criado_por");
-
-                    b.Property<DateTime>("DataAbertura")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("data_abertura")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<DateTime?>("DataResposta")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("data_resposta");
-
-                    b.Property<string>("Descricao")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("descricao");
-
-                    b.Property<bool>("EncaminhadaDpo")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("encaminhada_dpo");
-
-                    b.Property<string>("Protocolo")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("protocolo");
-
-                    b.Property<string>("ReferenciaDecisao")
-                        .HasColumnType("text")
-                        .HasColumnName("referencia_decisao");
-
-                    b.Property<Guid?>("RespondidoPor")
-                        .HasColumnType("uuid")
-                        .HasColumnName("respondido_por");
-
-                    b.Property<string>("Resposta")
-                        .HasColumnType("text")
-                        .HasColumnName("resposta");
-
-                    b.Property<long>("SistemaIaId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("sistema_ia_id");
-
-                    b.Property<string>("SolicitanteContato")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("solicitante_contato");
-
-                    b.Property<string>("SolicitanteNome")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("solicitante_nome");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasDefaultValue("Recebida")
-                        .HasColumnName("status");
-
-                    b.Property<string>("Tipo")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("tipo");
-
-                    b.HasKey("Id")
-                        .HasName("pk_pgia_solicitacao_cidadao");
-
-                    b.HasIndex("Protocolo")
-                        .IsUnique()
-                        .HasDatabaseName("ux_pgia_solicitacao_protocolo");
-
-                    b.HasIndex("RespondidoPor")
-                        .HasDatabaseName("ix_pgia_solicitacao_agente");
-
-                    b.HasIndex("SistemaIaId")
-                        .HasDatabaseName("ix_pgia_solicitacao_sistema");
-
-                    b.ToTable("pgia_solicitacao_cidadao", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_pgia_solicitacao_status", "status IN ('Recebida','Em análise','Respondida','Encaminhada ao Encarregado de Dados')");
-
-                            t.HasCheckConstraint("ck_pgia_solicitacao_tipo", "tipo IN ('Informação sobre uso de IA','Revisão de decisão','Explicação da decisão','Impugnação por discriminação ou erro','Reclamação de titular de dados')");
-                        });
-                });
-
             modelBuilder.Entity("app.Models.Unidade", b =>
                 {
                     b.Property<Guid>("id")
@@ -3241,26 +3127,6 @@ namespace demanda_service.Migrations
                     b.Navigation("Orgao");
 
                     b.Navigation("Responsavel");
-                });
-
-            modelBuilder.Entity("Models.Pgia.PgiaSolicitacaoCidadao", b =>
-                {
-                    b.HasOne("app.Models.User", "RespondidoPorUser")
-                        .WithMany()
-                        .HasForeignKey("RespondidoPor")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_solicitacao_agente");
-
-                    b.HasOne("Models.Pgia.PgiaSistemaIa", "Sistema")
-                        .WithMany()
-                        .HasForeignKey("SistemaIaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_pgia_solicitacao_sistema");
-
-                    b.Navigation("RespondidoPorUser");
-
-                    b.Navigation("Sistema");
                 });
 
             modelBuilder.Entity("app.Models.User", b =>
