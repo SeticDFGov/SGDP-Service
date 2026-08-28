@@ -136,6 +136,47 @@ public class PgiaGovernancaRepositorio : IPgiaGovernancaRepositorio
             .ToListAsync();
     }
 
+    public async Task<List<PgiaSistemaIa>> ListarCasosCgticAsync()
+    {
+        // Rota do comitê: a classificação vigente desnormalizada é Alto/Excessivo
+        // (PgiaDominios.SituacaoHomologacao.RotaInicial) e a homologação está com o CGTIC
+        var riscos = new[]
+        {
+            PgiaDominios.ResultadoRisco.Alto,
+            PgiaDominios.ResultadoRisco.Excessivo
+        };
+        var situacoes = new[]
+        {
+            PgiaDominios.SituacaoHomologacao.AguardandoCgtic,
+            PgiaDominios.SituacaoHomologacao.Aprovado,
+            PgiaDominios.SituacaoHomologacao.Vetado
+        };
+
+        return await _context.PgiaSistemasIa
+            .Include(s => s.Orgao)
+            .Where(s => s.ClassificacaoRiscoAtual != null
+                && riscos.Contains(s.ClassificacaoRiscoAtual)
+                && situacoes.Contains(s.SituacaoHomologacao))
+            .ToListAsync();
+    }
+
+    public async Task<Dictionary<long, DateOnly>> ListarDatasClassificacaoVigenteAsync(IEnumerable<long> sistemaIds)
+    {
+        var ids = sistemaIds.Distinct().ToList();
+        if (ids.Count == 0) return new Dictionary<long, DateOnly>();
+
+        // Uma consulta para todos os casos; a vigente é a de maior Id (mesma
+        // regra do PgiaSistemaRepositorio.ListarClassificacoesVigentesAsync)
+        var classificacoes = await _context.PgiaClassificacoesRisco
+            .Where(c => ids.Contains(c.SistemaIaId))
+            .Select(c => new { c.SistemaIaId, c.Id, c.DataClassificacao })
+            .ToListAsync();
+
+        return classificacoes
+            .GroupBy(c => c.SistemaIaId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.Id).First().DataClassificacao);
+    }
+
     public async Task<PgiaSistemaIa?> GetSistemaByIdAsync(long id)
     {
         return await _context.PgiaSistemasIa

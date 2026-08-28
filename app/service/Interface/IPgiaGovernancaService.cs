@@ -29,6 +29,14 @@ public interface IPgiaGovernancaService
     /// <summary>Resumo de todos os sistemas, para o painel das instâncias centrais.</summary>
     Task<List<PgiaSistemaResumoResponse>> ListarSistemasResumoAsync();
 
+    // Histórico de decisões do CGTIC (relatório de auditoria)
+
+    /// <summary>Casos submetidos ao comitê, contagens e demais deliberações.</summary>
+    Task<PgiaCgticHistoricoResponse> ObterHistoricoCgticAsync();
+
+    /// <summary>O mesmo histórico em PDF, para juntada ao processo.</summary>
+    Task<byte[]> GerarPdfHistoricoCgticAsync();
+
     /// <summary>Entidade crua do sistema, para o controller checar o escopo de órgão.</summary>
     Task<PgiaSistemaIa?> GetSistemaEntidadeAsync(long sistemaId);
 }

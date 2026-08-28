@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using api.Pgia;
-using app.Auth;
+using demanda_service.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using service.Interface;
@@ -47,7 +47,7 @@ public class PgiaGovernancaController : ControllerBase
 
     /// <summary>Instâncias centrais: SGDI, CGTIC e admin veem o painel inteiro.</summary>
     private static bool EhEscopoCentral(PgiaUserContext ctx) =>
-        ctx.PapelEfetivo is Perfis.Admin or PapeisPgia.Sgdi or PapeisPgia.Cgtic;
+        PgiaGovernancaService.EhEscopoCentral(ctx);
 
     // ── Homologação do inventário ─────────────────────────────────────────────
 
@@ -156,6 +156,39 @@ public class PgiaGovernancaController : ControllerBase
         if (!_permissionService.CanCreate(ctx, PgiaResources.Deliberacao)) return Forbid();
 
         return Ok(await _service.CriarDeliberacaoAsync(dto, ctx));
+    }
+
+    // ── Histórico de decisões do CGTIC (relatório de auditoria) ───────────────
+
+    /// <summary>
+    /// Histórico de decisões do comitê: contagens, casos submetidos ao CGTIC com
+    /// as respectivas deliberações e as demais deliberações do colegiado
+    /// </summary>
+    [HttpGet("cgtic/historico")]
+    public async Task<IActionResult> ObterHistoricoCgtic()
+    {
+        var ctx = await GetContextAsync();
+        if (ctx == null) return Unauthorized();
+        if (!_permissionService.CanView(ctx, PgiaResources.Deliberacao)) return Forbid();
+        if (!EhEscopoCentral(ctx)) return Forbid();
+
+        return Ok(await _service.ObterHistoricoCgticAsync());
+    }
+
+    /// <summary>
+    /// O mesmo histórico de decisões do CGTIC em PDF, para juntada ao processo
+    /// </summary>
+    [HttpGet("cgtic/historico/pdf")]
+    public async Task<IActionResult> GerarPdfHistoricoCgtic()
+    {
+        var ctx = await GetContextAsync();
+        if (ctx == null) return Unauthorized();
+        if (!_permissionService.CanView(ctx, PgiaResources.Deliberacao)) return Forbid();
+        if (!EhEscopoCentral(ctx)) return Forbid();
+
+        var bytes = await _service.GerarPdfHistoricoCgticAsync();
+        return File(bytes, "application/pdf",
+            $"historico-decisoes-cgtic-{DateTimeHelper.NowBrasilia():yyyy-MM-dd}.pdf");
     }
 
     // ── Plataformas públicas de IA generativa ─────────────────────────────────

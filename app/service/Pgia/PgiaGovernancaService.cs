@@ -1,4 +1,6 @@
 using api.Pgia;
+using app.Auth;
+using demanda_service.Helpers;
 using Models.Pgia;
 using Repositorio.Interface;
 using service.Interface;
@@ -18,6 +20,13 @@ public class PgiaGovernancaService : IPgiaGovernancaService
     {
         _repositorio = repositorio;
     }
+
+    /// <summary>
+    /// Instâncias centrais (SGDI, CGTIC e admin) enxergam o painel do comitê inteiro.
+    /// Fonte única da regra que o PgiaGovernancaController aplica nas suas actions.
+    /// </summary>
+    public static bool EhEscopoCentral(PgiaUserContext ctx) =>
+        ctx.PapelEfetivo is Perfis.Admin or PapeisPgia.Sgdi or PapeisPgia.Cgtic;
 
     public async Task<PgiaSistemaIa?> GetSistemaEntidadeAsync(long sistemaId)
     {
@@ -382,6 +391,96 @@ public class PgiaGovernancaService : IPgiaGovernancaService
         autorizacao.DeliberacaoCgticId = dto.DeliberacaoCgticId;
         autorizacao.DataAutorizacao = dto.DataAutorizacao;
         autorizacao.VigenciaFim = dto.VigenciaFim;
+    }
+
+    // ── Histórico de decisões do CGTIC (relatório de auditoria) ───────────────
+
+    /// <summary>
+    /// Monta o histórico do comitê: os casos que passam por ele (Alto Risco e
+    /// Risco Excessivo, cuja homologação é delegada ao CGTIC), com as respectivas
+    /// deliberações, e as demais deliberações do colegiado.
+    /// </summary>
+    public async Task<PgiaCgticHistoricoResponse> ObterHistoricoCgticAsync()
+    {
+        var casos = await _repositorio.ListarCasosCgticAsync();
+        var idsCasos = casos.Select(s => s.Id).ToHashSet();
+
+        // Entrada na pauta e deliberações em lote: nenhuma consulta por caso
+        var datasEntrada = await _repositorio.ListarDatasClassificacaoVigenteAsync(idsCasos);
+        var deliberacoes = await _repositorio.ListarDeliberacoesAsync();
+
+        var porSistema = deliberacoes
+            .Where(d => d.SistemaIaId != null && idsCasos.Contains(d.SistemaIaId.Value))
+            .GroupBy(d => d.SistemaIaId!.Value)
+            .ToDictionary(g => g.Key, g => g.Select(MapDeliberacao).ToList());
+
+        var lista = casos.Select(sistema => new PgiaCgticCasoHistorico
+        {
+            SistemaIaId = sistema.Id,
+            Denominacao = sistema.Denominacao,
+            OrgaoSigla = sistema.Orgao?.Sigla ?? string.Empty,
+            OrgaoNome = sistema.Orgao?.Nome ?? string.Empty,
+            ClassificacaoRiscoAtual = sistema.ClassificacaoRiscoAtual,
+            SituacaoHomologacao = sistema.SituacaoHomologacao,
+            Situacao = SituacaoDoCaso(sistema.SituacaoHomologacao),
+            DataEntrada = DataEntradaDoCaso(sistema, datasEntrada),
+            Deliberacoes = porSistema.TryGetValue(sistema.Id, out var doCaso)
+                ? doCaso
+                : new List<PgiaDeliberacaoResponse>()
+        })
+        // Pendentes primeiro (é a pauta a decidir); depois do mais recente ao mais antigo
+        .OrderByDescending(c => c.Situacao == PgiaCgticSituacaoCaso.Pendente)
+        .ThenByDescending(c => c.DataEntrada)
+        .ThenBy(c => c.SistemaIaId)
+        .ToList();
+
+        return new PgiaCgticHistoricoResponse
+        {
+            Contagens = new PgiaCgticContagens
+            {
+                Pendentes = lista.Count(c => c.Situacao == PgiaCgticSituacaoCaso.Pendente),
+                // Analisada = já houve deliberação, mesmo que ainda em diligência
+                Analisadas = lista.Count(c => c.Deliberacoes.Count > 0),
+                Aprovadas = lista.Count(c => c.Situacao == PgiaCgticSituacaoCaso.Aprovada),
+                Negadas = lista.Count(c => c.Situacao == PgiaCgticSituacaoCaso.Negada),
+                Total = lista.Count
+            },
+            Casos = lista,
+            // Tudo que o comitê deliberou fora dos casos: contratos, diretrizes,
+            // guias e também sistemas que não correm pela rota do CGTIC
+            OutrasDeliberacoes = deliberacoes
+                .Where(d => d.SistemaIaId == null || !idsCasos.Contains(d.SistemaIaId.Value))
+                .Select(MapDeliberacao)
+                .ToList()
+        };
+    }
+
+    public async Task<byte[]> GerarPdfHistoricoCgticAsync()
+    {
+        return PgiaCgticHistoricoPdf.Gerar(await ObterHistoricoCgticAsync());
+    }
+
+    private static string SituacaoDoCaso(string situacaoHomologacao) => situacaoHomologacao switch
+    {
+        PgiaDominios.SituacaoHomologacao.Aprovado => PgiaCgticSituacaoCaso.Aprovada,
+        PgiaDominios.SituacaoHomologacao.Vetado => PgiaCgticSituacaoCaso.Negada,
+        _ => PgiaCgticSituacaoCaso.Pendente
+    };
+
+    /// <summary>
+    /// Entrada do caso na pauta: a data da classificação de risco vigente, que é o
+    /// ato que enquadra o sistema em Alto Risco/Risco Excessivo e delega a
+    /// homologação ao comitê. Sem histórico de classificação (registro anterior à
+    /// fase 1), cai na data de cadastro do sistema no dia civil de Brasília.
+    /// </summary>
+    private static DateOnly? DataEntradaDoCaso(PgiaSistemaIa sistema, IReadOnlyDictionary<long, DateOnly> datas)
+    {
+        if (datas.TryGetValue(sistema.Id, out var dataClassificacao))
+            return dataClassificacao;
+
+        return sistema.CriadoEm == default
+            ? null
+            : DateOnly.FromDateTime(DateTimeHelper.ToBrasilia(sistema.CriadoEm));
     }
 
     // ── Mapeamentos ───────────────────────────────────────────────────────────

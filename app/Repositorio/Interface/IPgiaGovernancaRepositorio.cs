@@ -30,6 +30,20 @@ public interface IPgiaGovernancaRepositorio
     /// <summary>Todos os sistemas do inventário, para o painel central escolher sobre quem deliberar.</summary>
     Task<List<PgiaSistemaIa>> ListarSistemasAsync();
 
+    // Histórico de decisões do CGTIC (relatório de auditoria)
+
+    /// <summary>
+    /// Casos do comitê: sistemas de classificação vigente Alto Risco ou Risco
+    /// Excessivo cuja homologação corre pelo CGTIC (aguardando, aprovada ou vetada).
+    /// </summary>
+    Task<List<PgiaSistemaIa>> ListarCasosCgticAsync();
+
+    /// <summary>
+    /// Data da classificação de risco vigente de vários sistemas numa consulta só
+    /// (entrada do caso na pauta do comitê).
+    /// </summary>
+    Task<Dictionary<long, DateOnly>> ListarDatasClassificacaoVigenteAsync(IEnumerable<long> sistemaIds);
+
     // Apoio: existência das entidades referenciadas
     Task<PgiaSistemaIa?> GetSistemaByIdAsync(long id);
     Task<PgiaOrgao?> GetOrgaoByIdAsync(long id);

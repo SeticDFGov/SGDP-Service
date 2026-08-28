@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace api.Pgia;
 
@@ -235,4 +235,84 @@ public class PgiaRegistroPublicoDTO
     public bool Publicado { get; set; }
 
     public DateOnly? DataPublicacao { get; set; }
+}
+
+// ── Histórico de decisões do CGTIC (relatório de auditoria) ──────────────────
+
+/// <summary>
+/// Situação do caso na pauta do comitê, derivada da situação de homologação
+/// do sistema (art. 7º, III e IV).
+/// </summary>
+public static class PgiaCgticSituacaoCaso
+{
+    public const string Pendente = "Pendente";
+    public const string Aprovada = "Aprovada";
+    public const string Negada = "Negada";
+}
+
+/// <summary>
+/// Contagens do histórico. Analisadas conta os casos com ao menos uma
+/// deliberação registrada — inclusive os que seguem pendentes (diligência).
+/// </summary>
+public class PgiaCgticContagens
+{
+    public int Pendentes { get; set; }
+
+    public int Analisadas { get; set; }
+
+    public int Aprovadas { get; set; }
+
+    public int Negadas { get; set; }
+
+    public int Total { get; set; }
+}
+
+/// <summary>
+/// Caso submetido ao comitê: sistema de Alto Risco ou Risco Excessivo cuja
+/// homologação é decidida pelo CGTIC, com as deliberações que o trataram.
+/// </summary>
+public class PgiaCgticCasoHistorico
+{
+    public long SistemaIaId { get; set; }
+
+    public string Denominacao { get; set; } = string.Empty;
+
+    public string OrgaoSigla { get; set; } = string.Empty;
+
+    public string OrgaoNome { get; set; } = string.Empty;
+
+    public string? ClassificacaoRiscoAtual { get; set; }
+
+    public string SituacaoHomologacao { get; set; } = string.Empty;
+
+    // PgiaCgticSituacaoCaso: Pendente, Aprovada ou Negada
+    public string Situacao { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Entrada do caso na pauta: data da classificação de risco vigente — o ato
+    /// que enquadra o sistema em Alto Risco/Risco Excessivo e, por isso, delega
+    /// a homologação ao comitê (SituacaoHomologacao.RotaInicial). Sem histórico
+    /// de classificação, cai na data de cadastro do sistema (Brasília).
+    /// </summary>
+    public DateOnly? DataEntrada { get; set; }
+
+    public List<PgiaDeliberacaoResponse> Deliberacoes { get; set; } = new();
+}
+
+/// <summary>
+/// Histórico de decisões do CGTIC (relatório de auditoria): contagens, casos
+/// submetidos ao comitê e as demais deliberações do colegiado.
+/// </summary>
+public class PgiaCgticHistoricoResponse
+{
+    public PgiaCgticContagens Contagens { get; set; } = new();
+
+    public List<PgiaCgticCasoHistorico> Casos { get; set; } = new();
+
+    /// <summary>
+    /// Deliberações fora dos casos delegados — sem sistema como objeto (contratos,
+    /// diretrizes, guias) OU sobre sistema que não corre pela rota do comitê —,
+    /// da mais recente para a mais antiga.
+    /// </summary>
+    public List<PgiaDeliberacaoResponse> OutrasDeliberacoes { get; set; } = new();
 }
