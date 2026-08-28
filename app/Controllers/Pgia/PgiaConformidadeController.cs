@@ -182,8 +182,9 @@ public class PgiaConformidadeController : ControllerBase
     {
         var ctx = await GetContextAsync();
         if (ctx == null) return Unauthorized();
-        // Mesmo alcance do POST uso: dever de todo agente público, sem papel PGIA
-        if (!_permissionService.PodeRegistrarUso(ctx)) return Forbid();
+        // Sem gate de órgão: unidade ainda não vinculada a órgão PGIA recebe
+        // OrgaoId nulo e listas vazias, e a tela mostra o aviso de vínculo em vez
+        // de o 403 expulsar o agente confinado (art. 13). O POST continua com o gate.
 
         return Ok(await _service.ListarFontesDeUsoAsync(ctx));
     }
@@ -196,7 +197,7 @@ public class PgiaConformidadeController : ControllerBase
     {
         var ctx = await GetContextAsync();
         if (ctx == null) return Unauthorized();
-        if (!_permissionService.PodeRegistrarUso(ctx)) return Forbid();
+        // Escopo próprio (só os registros do agente): sem órgão vinculado, lista vazia
 
         return Ok(await _service.ListarMeusUsosAsync(ctx, request));
     }
