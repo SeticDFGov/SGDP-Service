@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Models;
 using service.Interface;
@@ -7,6 +8,7 @@ using System.Threading.Tasks;
 namespace Controllers
 {
     [ApiController]
+    [Authorize]
     [Route("api/[controller]")]
     public class EsteiraController : ControllerBase
     {

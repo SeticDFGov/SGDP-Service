@@ -111,6 +111,17 @@ public class AuthController : ControllerBase
     [HttpPost("informar-unidade")]
     public async Task<IActionResult> InformarUnidade([FromBody] InformUnidadeUsuario request)
     {
+        // Onboarding: cada usuário informa a PRÓPRIA unidade. Sem esta checagem,
+        // qualquer autenticado passava o e-mail de outro no corpo e trocava a
+        // unidade alheia (que também é o escopo de dados do sistema). Trocas de
+        // unidade de terceiros são só do admin, por PUT modificar-unidade.
+        var emailToken = User.FindFirst(ClaimTypes.Email)?.Value;
+        if (string.IsNullOrEmpty(emailToken))
+            return Unauthorized();
+
+        if (!string.Equals(emailToken, request.email, StringComparison.OrdinalIgnoreCase))
+            return Forbid();
+
         await _authRepositorio.InformarUnidadeUsuario(request.email, request.unidadeId);
         return Ok();
     }
