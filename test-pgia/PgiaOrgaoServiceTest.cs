@@ -20,7 +20,8 @@ public class PgiaOrgaoServiceTest : PgiaTestBase
             new PgiaOrgaoRepositorio(Context),
             new PgiaDesignacaoRepositorio(Context),
             new PgiaPrazoRepositorio(Context),
-            _permissionService);
+            _permissionService,
+            Context);
     }
 
     private PgiaResponsavelIaCreateDTO NovoResponsavelDto(Guid agenteId) => new()

@@ -1,3 +1,4 @@
+using app.Models;
 using Models.Pgia;
 
 namespace Repositorio.Interface;
@@ -43,6 +44,44 @@ public interface IPgiaGovernancaRepositorio
     /// (entrada do caso na pauta do comitê).
     /// </summary>
     Task<Dictionary<long, DateOnly>> ListarDatasClassificacaoVigenteAsync(IEnumerable<long> sistemaIds);
+
+    // Gestão de pessoas pela SGDI (papel PGIA + unidade)
+
+    /// <summary>
+    /// Usuários do SGDP para a tela de vínculos, inclusive os sem unidade e sem
+    /// papel PGIA. Ordena por Nome.
+    /// </summary>
+    /// <param name="filtro">Trecho do nome ou do e-mail, sem diferenciar maiúsculas; null não filtra.</param>
+    /// <param name="unidadeId">Unidade do órgão pesquisado; null não filtra por unidade.</param>
+    /// <param name="limite">Teto de linhas (cap de segurança da listagem sem filtro); null traz tudo.</param>
+    Task<List<User>> ListarUsuariosAsync(string? filtro, Guid? unidadeId, int? limite);
+
+    Task<User?> GetUserByIdAsync(Guid userId);
+
+    /// <summary>Usuário pelo e-mail, sem diferenciar maiúsculas (evita pré-cadastro duplicado).</summary>
+    Task<User?> GetUserByEmailAsync(string email);
+
+    /// <summary>Pré-cadastro de pessoa pela SGDI; o AuthRepositorio não é tocado.</summary>
+    void AddUser(User user);
+
+    Task<Unidade?> GetUnidadeByIdAsync(Guid unidadeId);
+
+    /// <summary>
+    /// Órgãos ativos com unidade vinculada, para resolver Unidade → órgão em lote.
+    /// </summary>
+    Task<List<PgiaOrgao>> ListarOrgaosAtivosComUnidadeAsync();
+
+    /// <summary>Dados de agente público de vários usuários numa consulta (pré-preenchimento da tela).</summary>
+    Task<Dictionary<Guid, PgiaAgenteInfo>> ListarAgenteInfosAsync(IEnumerable<Guid> userIds);
+
+    /// <summary>Dados de agente público de um usuário (null se ainda não preenchidos).</summary>
+    Task<PgiaAgenteInfo?> GetAgenteInfoAsync(Guid userId);
+
+    // Designações vigentes de uma pessoa, para barrar a troca de órgão que as deixaria órfãs
+
+    Task<PgiaResponsavelIa?> GetResponsavelVigenteDoAgenteAsync(Guid agenteId);
+
+    Task<PgiaEncarregadoDados?> GetEncarregadoVigenteDoAgenteAsync(Guid agenteId);
 
     // Apoio: existência das entidades referenciadas
     Task<PgiaSistemaIa?> GetSistemaByIdAsync(long id);

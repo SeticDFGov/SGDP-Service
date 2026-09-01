@@ -22,6 +22,7 @@ public enum ErrorCode
     PgiaPrazoNaoEncontrado = 607,
     PgiaUnidadeNaoEncontrada = 608,
     PgiaOrgaoSemUnidadeVinculada = 609,
+    PgiaDesignacaoVigenteImpedeTroca = 610,
 
     // Módulo PGIA — fase 1 (inventário e classificação de risco)
     PgiaSistemaNaoEncontrado = 620,

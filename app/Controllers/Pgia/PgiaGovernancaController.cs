@@ -3,6 +3,7 @@ using api.Pgia;
 using demanda_service.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using service;
 using service.Interface;
 using service.Pgia;
 
@@ -22,17 +23,20 @@ public class PgiaGovernancaController : ControllerBase
     private readonly IPgiaGovernancaService _service;
     private readonly IPgiaSistemaService _sistemaService;
     private readonly IPgiaRelatorioService _relatorioService;
+    private readonly IPgiaAdminService _adminService;
     private readonly IPgiaPermissionService _permissionService;
 
     public PgiaGovernancaController(
         IPgiaGovernancaService service,
         IPgiaSistemaService sistemaService,
         IPgiaRelatorioService relatorioService,
+        IPgiaAdminService adminService,
         IPgiaPermissionService permissionService)
     {
         _service = service;
         _sistemaService = sistemaService;
         _relatorioService = relatorioService;
+        _adminService = adminService;
         _permissionService = permissionService;
     }
 
@@ -110,6 +114,82 @@ public class PgiaGovernancaController : ControllerBase
         if (!EhEscopoCentral(ctx)) return Forbid();
 
         return Ok(await _service.ListarSistemasResumoAsync());
+    }
+
+    // ── Cadastro de órgãos pela SGDI ──────────────────────────────────────────
+
+    /// <summary>
+    /// Cadastra um órgão PGIA e instancia as obrigações com prazo do art. 35.
+    /// Mesmo DTO e mesmo service do <c>POST api/pgia/admin/orgao</c> (valida sigla e
+    /// unidade duplicadas), aberto à SGDI: é ela quem entrega o órgão pronto. Aqui a
+    /// unidade é OBRIGATÓRIA — órgão sem unidade não tem como receber pessoas nem
+    /// designações; a tela "Dados dos órgãos" só consertaria depois.
+    /// </summary>
+    [HttpPost("orgao")]
+    public async Task<IActionResult> CriarOrgao([FromBody] PgiaOrgaoCreateDTO dto)
+    {
+        var ctx = await GetContextAsync();
+        if (ctx == null) return Unauthorized();
+        // CanCreate(Orgao) já era só sgdi/admin na matriz
+        if (!_permissionService.CanCreate(ctx, PgiaResources.Orgao)) return Forbid();
+
+        if (dto.UnidadeId == null)
+            throw new ApiException(ErrorCode.PgiaDominioInvalido,
+                "A unidade vinculada é obrigatória para o órgão criado pela SGDI.");
+
+        return Ok(await _adminService.CriarOrgaoAsync(dto, ctx.Email));
+    }
+
+    // ── Gestão de pessoas pela SGDI (papel PGIA + unidade) ────────────────────
+
+    /// <summary>
+    /// Pessoas do SGDP para a SGDI vincular a um órgão: todos os usuários,
+    /// inclusive os sem unidade e sem papel PGIA (é assim que se encontra quem
+    /// acabou de chegar). <paramref name="filtro"/> busca em nome e e-mail sem
+    /// diferenciar maiúsculas; <paramref name="orgaoId"/> restringe ao órgão.
+    /// Sem filtro e sem órgão, devolve no máximo os 200 primeiros nomes
+    /// (cap de segurança da listagem).
+    /// </summary>
+    [HttpGet("pessoas")]
+    public async Task<IActionResult> ListarPessoas([FromQuery] string? filtro, [FromQuery] long? orgaoId)
+    {
+        var ctx = await GetContextAsync();
+        if (ctx == null) return Unauthorized();
+        // Quem administra o vínculo é quem enxerga a lista: só SGDI e admin
+        if (!_permissionService.CanEdit(ctx, PgiaResources.PessoaVinculo)) return Forbid();
+
+        return Ok(await _service.ListarPessoasAcessoAsync(filtro, orgaoId));
+    }
+
+    /// <summary>
+    /// Pré-cadastra uma pessoa por e-mail, para a SGDI vinculá-la ao órgão antes
+    /// do primeiro login no Keycloak. E-mail já existente não vira segunda pessoa:
+    /// o vínculo é aplicado no cadastro que já está lá. O cadastro prévio nasce com
+    /// Perfil "basico" e sem KeycloakId — o primeiro login assume a linha pelo
+    /// e-mail e escreve o perfil real, preservando unidade e papel PGIA.
+    /// </summary>
+    [HttpPost("pessoa")]
+    public async Task<IActionResult> CriarPessoa([FromBody] PgiaPessoaCadastroDTO dto)
+    {
+        var ctx = await GetContextAsync();
+        if (ctx == null) return Unauthorized();
+        if (!_permissionService.CanEdit(ctx, PgiaResources.PessoaVinculo)) return Forbid();
+
+        return Ok(await _service.CriarOuVincularPessoaAsync(dto));
+    }
+
+    /// <summary>
+    /// Define o vínculo de acesso de uma pessoa: papel PGIA (nulo limpa) e
+    /// unidade do SGDP (nula desvincula). O Perfil do SGDP não é tocado.
+    /// </summary>
+    [HttpPut("pessoa/{userId:guid}/vinculo")]
+    public async Task<IActionResult> AtualizarVinculoPessoa(Guid userId, [FromBody] PgiaPessoaVinculoDTO dto)
+    {
+        var ctx = await GetContextAsync();
+        if (ctx == null) return Unauthorized();
+        if (!_permissionService.CanEdit(ctx, PgiaResources.PessoaVinculo)) return Forbid();
+
+        return Ok(await _service.AtualizarVinculoPessoaAsync(userId, dto));
     }
 
     // ── Deliberações do CGTIC (art. 7º) ───────────────────────────────────────

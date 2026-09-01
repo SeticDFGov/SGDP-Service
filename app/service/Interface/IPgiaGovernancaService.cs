@@ -29,6 +29,25 @@ public interface IPgiaGovernancaService
     /// <summary>Resumo de todos os sistemas, para o painel das instâncias centrais.</summary>
     Task<List<PgiaSistemaResumoResponse>> ListarSistemasResumoAsync();
 
+    // Gestão de pessoas pela SGDI (papel PGIA + unidade)
+
+    /// <summary>
+    /// Usuários do SGDP com o vínculo do PGIA e o órgão resolvido pela unidade.
+    /// Devolve no máximo os primeiros <see cref="PgiaGovernancaService.LimitePessoas"/>
+    /// nomes (cap aplicado sempre, com ou sem filtro/órgão).
+    /// </summary>
+    Task<List<PgiaPessoaAcesso>> ListarPessoasAcessoAsync(string? filtro, long? orgaoId);
+
+    /// <summary>Define papel PGIA e unidade de uma pessoa; o Perfil do SGDP não é tocado.</summary>
+    Task<PgiaPessoaAcesso> AtualizarVinculoPessoaAsync(Guid userId, PgiaPessoaVinculoDTO dto);
+
+    /// <summary>
+    /// Pré-cadastra a pessoa por e-mail (antes do primeiro login no Keycloak) ou,
+    /// se o e-mail já existir, aplica no cadastro existente APENAS os campos
+    /// informados (não nulos). O <c>JaExistia</c> do retorno diz se a pessoa já existia.
+    /// </summary>
+    Task<PgiaPessoaAcesso> CriarOuVincularPessoaAsync(PgiaPessoaCadastroDTO dto);
+
     // Histórico de decisões do CGTIC (relatório de auditoria)
 
     /// <summary>Casos submetidos ao comitê, contagens e demais deliberações.</summary>

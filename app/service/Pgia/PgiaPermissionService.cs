@@ -36,9 +36,13 @@ public class PgiaUserContext
 public static class PgiaResources
 {
     public const string Orgao = "orgao";               // cadastro de órgãos (admin)
-    public const string OrgaoDados = "orgao_dados";    // dados do próprio órgão (etapa 1)
+    public const string OrgaoDados = "orgao_dados";    // dados do órgão (etapa 1) — edição da SGDI
     public const string Designacao = "designacao";     // Responsável de IA e Encarregado de Dados
     public const string AgenteInfo = "agente_info";    // matrícula, cargo e vínculo das pessoas
+    // Papel PGIA e unidade de um usuário. Sem visualização própria na matriz
+    // (CanView é permissivo por papel): quem administra o vínculo é quem o enxerga,
+    // então os endpoints de gestão de pessoas usam CanEdit(PessoaVinculo).
+    public const string PessoaVinculo = "pessoa_vinculo";
     public const string Prazo = "prazo";               // painel de prazos de conformidade
     public const string Sistema = "sistema";           // inventário de sistemas de IA (etapa 2)
     public const string Classificacao = "classificacao"; // classificação de risco (arts. 14 a 18)
@@ -67,6 +71,11 @@ public static class PgiaResources
 /// Autorização do módulo PGIA, espelhando o desenho do PermissionService do SGDP
 /// (papel + ação + recurso, com filtro de dados por órgão) sem tocá-lo.
 /// Toda validação acontece no backend; a checagem do front é só usabilidade.
+///
+/// Modelo de administração (decisão do dono do produto, a SGDI): a SGDI pré-cadastra
+/// tudo e entrega o órgão pronto — dados do órgão (orgao_dados), dados de agente
+/// público (agente_info) e vínculo de acesso das pessoas (pessoa_vinculo) são
+/// escritos pela SGDI/admin; ao papel do órgão restam as designações e a operação.
 /// </summary>
 public class PgiaPermissionService : IPgiaPermissionService
 {
@@ -96,8 +105,10 @@ public class PgiaPermissionService : IPgiaPermissionService
 
         if (ctx.UnidadeId != null)
         {
+            // Só órgão ATIVO resolve o escopo: órgão desativado não pode continuar
+            // dando acesso ao papel de órgão (falha fechada).
             ctx.OrgaoId = await _context.PgiaOrgaos
-                .Where(o => o.UnidadeId == ctx.UnidadeId)
+                .Where(o => o.UnidadeId == ctx.UnidadeId && o.Ativo)
                 .Select(o => (long?)o.Id)
                 .FirstOrDefaultAsync();
         }
@@ -124,12 +135,14 @@ public class PgiaPermissionService : IPgiaPermissionService
         return ctx.PapelEfetivo switch
         {
             Perfis.Admin => true,
-            PapeisPgia.Sgdi => resource is PgiaResources.Orgao or PgiaResources.Plataforma
+            // A SGDI pré-cadastra as pessoas do órgão (agente_info) junto com o órgão
+            PapeisPgia.Sgdi => resource is PgiaResources.Orgao or PgiaResources.AgenteInfo
+                or PgiaResources.Plataforma
                 or PgiaResources.Autorizacao or PgiaResources.Norma or PgiaResources.NaoConformidade
                 or PgiaResources.Relatorio or PgiaResources.AuditoriaTecnica,
             PapeisPgia.Cgtic => resource is PgiaResources.Deliberacao or PgiaResources.Norma,
             // O inventário, a classificação, a AIA e a operação contínua são do órgão
-            PapeisPgia.Orgao => resource is PgiaResources.Designacao or PgiaResources.AgenteInfo
+            PapeisPgia.Orgao => resource is PgiaResources.Designacao
                 or PgiaResources.Sistema or PgiaResources.Classificacao or PgiaResources.Documento
                 or PgiaResources.Aia or PgiaResources.Incidente or PgiaResources.NaoConformidade
                 or PgiaResources.Capacitacao or PgiaResources.Contrato or PgiaResources.Legado
@@ -143,14 +156,19 @@ public class PgiaPermissionService : IPgiaPermissionService
         return ctx.PapelEfetivo switch
         {
             Perfis.Admin => true,
-            PapeisPgia.Sgdi => resource is PgiaResources.Orgao or PgiaResources.OrgaoDados or PgiaResources.Prazo
+            // Cadastro do órgão pronto: dados do órgão, dados de agente público e
+            // vínculo de acesso (papel PGIA + unidade) são escrita da SGDI, em qualquer órgão
+            PapeisPgia.Sgdi => resource is PgiaResources.Orgao or PgiaResources.OrgaoDados
+                or PgiaResources.AgenteInfo or PgiaResources.PessoaVinculo or PgiaResources.Prazo
                 or PgiaResources.Plataforma or PgiaResources.Autorizacao or PgiaResources.Norma
                 or PgiaResources.Homologacao or PgiaResources.Publicacao
                 or PgiaResources.Apuracao or PgiaResources.NaoConformidade
                 or PgiaResources.Relatorio or PgiaResources.AuditoriaTecnica,
             PapeisPgia.Cgtic => resource is PgiaResources.Deliberacao or PgiaResources.Norma,
-            PapeisPgia.Orgao => resource is PgiaResources.OrgaoDados or PgiaResources.Designacao
-                or PgiaResources.AgenteInfo or PgiaResources.Prazo or PgiaResources.Sistema
+            // Ao órgão restam as designações e a operação: ele vê os próprios dados
+            // e as próprias pessoas (CanView), mas não edita orgao_dados nem agente_info
+            PapeisPgia.Orgao => resource is PgiaResources.Designacao
+                or PgiaResources.Prazo or PgiaResources.Sistema
                 or PgiaResources.Aia or PgiaResources.Incidente or PgiaResources.NaoConformidade
                 or PgiaResources.Capacitacao or PgiaResources.Contrato or PgiaResources.Legado
                 or PgiaResources.Indicador or PgiaResources.Relatorio or PgiaResources.Solicitacao,

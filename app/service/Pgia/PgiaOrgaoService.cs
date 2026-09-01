@@ -1,6 +1,7 @@
 using api.Pgia;
 using demanda_service.Helpers;
 using Microsoft.EntityFrameworkCore;
+using Models;
 using Models.Pgia;
 using Repositorio.Interface;
 using service.Interface;
@@ -13,17 +14,20 @@ public class PgiaOrgaoService : IPgiaOrgaoService
     private readonly IPgiaDesignacaoRepositorio _designacaoRepositorio;
     private readonly IPgiaPrazoRepositorio _prazoRepositorio;
     private readonly IPgiaPermissionService _permissionService;
+    private readonly AppDbContext _context;
 
     public PgiaOrgaoService(
         IPgiaOrgaoRepositorio orgaoRepositorio,
         IPgiaDesignacaoRepositorio designacaoRepositorio,
         IPgiaPrazoRepositorio prazoRepositorio,
-        IPgiaPermissionService permissionService)
+        IPgiaPermissionService permissionService,
+        AppDbContext context)
     {
         _orgaoRepositorio = orgaoRepositorio;
         _designacaoRepositorio = designacaoRepositorio;
         _prazoRepositorio = prazoRepositorio;
         _permissionService = permissionService;
+        _context = context;
     }
 
     public async Task<PgiaMeuOrgaoResponse> GetMeuOrgaoAsync(PgiaUserContext ctx)
@@ -68,6 +72,22 @@ public class PgiaOrgaoService : IPgiaOrgaoService
         var mesmaSigla = await _orgaoRepositorio.GetBySiglaAsync(dto.Sigla.Trim());
         if (mesmaSigla != null && mesmaSigla.Id != orgaoId)
             throw new ApiException(ErrorCode.PgiaOrgaoJaExiste, $"Já existe órgão com a sigla {dto.Sigla.Trim()}.");
+
+        // Unidade: nula NÃO desvincula (mantém a atual) — o front antigo não envia o
+        // campo; com valor, liga/troca, validando existência e unicidade (1 unidade
+        // ↔ 1 órgão, ux_pgia_orgao_unidade). É o conserto de órgão criado sem unidade.
+        if (dto.UnidadeId != null && dto.UnidadeId != orgao.UnidadeId)
+        {
+            _ = await _context.Unidades.FirstOrDefaultAsync(u => u.id == dto.UnidadeId)
+                ?? throw new ApiException(ErrorCode.PgiaUnidadeNaoEncontrada);
+
+            var mesmaUnidade = await _orgaoRepositorio.GetByUnidadeIdAsync(dto.UnidadeId.Value);
+            if (mesmaUnidade != null && mesmaUnidade.Id != orgaoId)
+                throw new ApiException(ErrorCode.PgiaOrgaoJaExiste,
+                    $"A unidade já está vinculada ao órgão {mesmaUnidade.Sigla}.");
+
+            orgao.UnidadeId = dto.UnidadeId;
+        }
 
         var prestaAplicavel = dto.NaturezaJuridica is PgiaDominios.NaturezaJuridica.EmpresaPublica
             or PgiaDominios.NaturezaJuridica.SociedadeEconomiaMista;

@@ -1,5 +1,7 @@
+using System.Net.Mail;
 using api.Pgia;
 using app.Auth;
+using app.Models;
 using demanda_service.Helpers;
 using Models.Pgia;
 using Repositorio.Interface;
@@ -46,6 +48,221 @@ public class PgiaGovernancaService : IPgiaGovernancaService
             SituacaoHomologacao = s.SituacaoHomologacao
         }).ToList();
     }
+
+    // ── Gestão de pessoas pela SGDI (papel PGIA + unidade) ────────────────────
+
+    /// <summary>
+    /// Cap de segurança da listagem: a base de usuários do SGDP é grande, então a
+    /// tela abre com os primeiros nomes e a busca refina. Aplicado SEMPRE (com ou
+    /// sem filtro/órgão) para não devolver a base inteira a um filtro largo (ex. "@").
+    /// </summary>
+    public const int LimitePessoas = 200;
+
+    public async Task<List<PgiaPessoaAcesso>> ListarPessoasAcessoAsync(string? filtro, long? orgaoId)
+    {
+        // Uma consulta só para todos os órgãos ativos: resolve Unidade → órgão em
+        // lote, sem uma ida ao banco por pessoa
+        var orgaoPorUnidade = await MapaOrgaoPorUnidadeAsync();
+
+        Guid? unidadeId = null;
+        if (orgaoId != null)
+        {
+            // Órgão inexistente, inativo ou sem unidade vinculada não tem pessoa alguma
+            var orgao = orgaoPorUnidade.Values.FirstOrDefault(o => o.Id == orgaoId);
+            if (orgao?.UnidadeId == null) return new List<PgiaPessoaAcesso>();
+            unidadeId = orgao.UnidadeId;
+        }
+
+        // Cap sempre: qualquer combinação de filtro devolve no máximo LimitePessoas
+        var usuarios = await _repositorio.ListarUsuariosAsync(filtro, unidadeId, LimitePessoas);
+        var infos = await _repositorio.ListarAgenteInfosAsync(usuarios.Select(u => u.Id));
+
+        return usuarios
+            .Select(u => MapPessoaAcesso(u, ResolverOrgao(orgaoPorUnidade, u), InfoDe(infos, u.Id)))
+            .ToList();
+    }
+
+    public async Task<PgiaPessoaAcesso> AtualizarVinculoPessoaAsync(Guid userId, PgiaPessoaVinculoDTO dto)
+    {
+        ValidarPapel(dto.PapelPgia);
+
+        var user = await _repositorio.GetUserByIdAsync(userId)
+            ?? throw new ApiException(ErrorCode.PgiaUsuarioNaoEncontrado);
+
+        var unidade = await ResolverUnidadeAsync(dto.UnidadeId);
+
+        // O PUT sempre grava a unidade (null limpa): a nova unidade não pode deixar
+        // órfã uma designação vigente da pessoa
+        await GarantirQueNaoOrfanizaDesignacaoAsync(userId, dto.UnidadeId);
+
+        AplicarVinculo(user, dto.PapelPgia, unidade);
+        await _repositorio.SaveChangesAsync();
+
+        return await MapPessoaComOrgaoAsync(user);
+    }
+
+    public async Task<PgiaPessoaAcesso> CriarOuVincularPessoaAsync(PgiaPessoaCadastroDTO dto)
+    {
+        var email = (dto.Email ?? string.Empty).Trim();
+        var nome = (dto.Nome ?? string.Empty).Trim();
+
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(nome))
+            throw new ApiException(ErrorCode.PgiaDominioInvalido,
+                "E-mail e nome da pessoa são obrigatórios.");
+
+        if (!EmailValido(email))
+            throw new ApiException(ErrorCode.PgiaDominioInvalido, $"E-mail inválido: {email}");
+
+        ValidarPapel(dto.PapelPgia);
+        var unidade = await ResolverUnidadeAsync(dto.UnidadeId);
+
+        // E-mail já conhecido não vira segunda pessoa: aplica o vínculo no cadastro
+        // que já está lá — mas SÓ os campos informados (ver AplicarVinculoParcial)
+        var user = await _repositorio.GetUserByEmailAsync(email);
+        var jaExistia = user != null;
+
+        if (user == null)
+        {
+            user = new User
+            {
+                Nome = nome,
+                // Normalizado para minúsculas: o Keycloak também normaliza, então
+                // gravar como digitado (caixa diferente) geraria um 2º cadastro no
+                // 1º login. Corrige o dedup do lado do pré-cadastro, sem tocar no
+                // GetOrCreateUserAsync (cujo fallback por e-mail assume esta linha).
+                Email = email.ToLowerInvariant(),
+                // Placeholder: o Perfil real vem da primeira role do token no primeiro
+                // login, quando o GetOrCreateUserAsync (intocado) sobrescreve Nome e
+                // Perfil. Com KeycloakId nulo, é o fallback por e-mail daquele método
+                // que assume esta linha — e ele preserva Unidade e PapelPgia.
+                Perfil = Perfis.Basico,
+                KeycloakId = null
+            };
+            _repositorio.AddUser(user);
+
+            // Cadastro novo: aplica o vínculo por inteiro (papel/unidade informados)
+            AplicarVinculo(user, dto.PapelPgia, unidade);
+        }
+        else
+        {
+            // Pessoa já existente: NUNCA limpar por omissão. Papel/unidade nulos no
+            // corpo significam "não mexer"; só o que veio preenchido é aplicado.
+            if (dto.UnidadeId != null)
+                await GarantirQueNaoOrfanizaDesignacaoAsync(user.Id, dto.UnidadeId);
+
+            AplicarVinculoParcial(user, dto.PapelPgia, dto.UnidadeId, unidade);
+        }
+
+        await _repositorio.SaveChangesAsync();
+
+        var pessoa = await MapPessoaComOrgaoAsync(user);
+        pessoa.JaExistia = jaExistia;
+        return pessoa;
+    }
+
+    private static void ValidarPapel(string? papelPgia)
+    {
+        if (!PapeisPgia.EhValido(papelPgia))
+            throw new ApiException(ErrorCode.PgiaPapelInvalido, $"Papel PGIA inválido: {papelPgia}");
+    }
+
+    private async Task<Unidade?> ResolverUnidadeAsync(Guid? unidadeId)
+    {
+        if (unidadeId == null) return null;
+
+        return await _repositorio.GetUnidadeByIdAsync(unidadeId.Value)
+            ?? throw new ApiException(ErrorCode.PgiaUnidadeNaoEncontrada);
+    }
+
+    /// <summary>
+    /// Trocar a unidade de quem é Responsável de IA ou Encarregado de Dados VIGENTE
+    /// deixaria a designação órfã (apontando para fora do órgão). Recusa a troca; a
+    /// designação precisa ser encerrada antes (art. 10). Sem troca de órgão (nova
+    /// unidade == a do órgão da designação) nada é barrado.
+    /// </summary>
+    private async Task GarantirQueNaoOrfanizaDesignacaoAsync(Guid agenteId, Guid? novaUnidadeId)
+    {
+        var responsavel = await _repositorio.GetResponsavelVigenteDoAgenteAsync(agenteId);
+        if (responsavel != null && responsavel.Orgao?.UnidadeId != novaUnidadeId)
+            throw new ApiException(ErrorCode.PgiaDesignacaoVigenteImpedeTroca,
+                $"Esta pessoa é Responsável de IA vigente da {responsavel.Orgao?.Sigla}; " +
+                "encerre a designação antes de mudar o órgão dela.");
+
+        var encarregado = await _repositorio.GetEncarregadoVigenteDoAgenteAsync(agenteId);
+        if (encarregado != null && encarregado.Orgao?.UnidadeId != novaUnidadeId)
+            throw new ApiException(ErrorCode.PgiaDesignacaoVigenteImpedeTroca,
+                $"Esta pessoa é Encarregado de Dados vigente da {encarregado.Orgao?.Sigla}; " +
+                "encerre a designação antes de mudar o órgão dela.");
+    }
+
+    /// <summary>
+    /// Só o vínculo do PGIA muda; o Perfil do SGDP nunca é tocado aqui (ele vem das
+    /// roles do Keycloak, reescrito a cada login pelo GetOrCreateUserAsync) — mesma
+    /// regra do AtribuirPapelAsync do PgiaAdminService.
+    /// </summary>
+    private static void AplicarVinculo(User user, string? papelPgia, Unidade? unidade)
+    {
+        user.PapelPgia = papelPgia;
+        user.Unidade = unidade; // null desvincula a pessoa do órgão
+    }
+
+    /// <summary>
+    /// Aplicação parcial (pré-cadastro sobre pessoa existente): campo nulo = não
+    /// mexer. Evita apagar o vínculo de alguém ao "pré-cadastrar" um e-mail já ativo.
+    /// </summary>
+    private static void AplicarVinculoParcial(User user, string? papelPgia, Guid? unidadeId, Unidade? unidade)
+    {
+        if (papelPgia != null) user.PapelPgia = papelPgia;
+        if (unidadeId != null) user.Unidade = unidade;
+    }
+
+    /// <summary>Formato mínimo de e-mail: endereço único, sem apelido, com domínio pontuado.</summary>
+    private static bool EmailValido(string email) =>
+        MailAddress.TryCreate(email, out var endereco)
+        && endereco.Address == email
+        && endereco.Host.Contains('.');
+
+    private async Task<PgiaPessoaAcesso> MapPessoaComOrgaoAsync(User user)
+    {
+        var orgaoPorUnidade = await MapaOrgaoPorUnidadeAsync();
+        var info = await _repositorio.GetAgenteInfoAsync(user.Id);
+        return MapPessoaAcesso(user, ResolverOrgao(orgaoPorUnidade, user), info);
+    }
+
+    private async Task<Dictionary<Guid, PgiaOrgao>> MapaOrgaoPorUnidadeAsync()
+    {
+        var orgaos = await _repositorio.ListarOrgaosAtivosComUnidadeAsync();
+        // ux_pgia_orgao_unidade garante 1 unidade ↔ 1 órgão; o agrupamento só
+        // protege o mapa em bases sem o índice relacional (testes InMemory)
+        return orgaos
+            .GroupBy(o => o.UnidadeId!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+    }
+
+    private static PgiaOrgao? ResolverOrgao(Dictionary<Guid, PgiaOrgao> orgaoPorUnidade, User user)
+    {
+        if (user.Unidade == null) return null;
+        return orgaoPorUnidade.TryGetValue(user.Unidade.id, out var orgao) ? orgao : null;
+    }
+
+    private static PgiaAgenteInfo? InfoDe(Dictionary<Guid, PgiaAgenteInfo> infos, Guid userId) =>
+        infos.TryGetValue(userId, out var info) ? info : null;
+
+    private static PgiaPessoaAcesso MapPessoaAcesso(User user, PgiaOrgao? orgao, PgiaAgenteInfo? info) => new()
+    {
+        UserId = user.Id,
+        Nome = user.Nome,
+        Email = user.Email,
+        Perfil = user.Perfil,
+        PapelPgia = user.PapelPgia,
+        UnidadeId = user.Unidade?.id,
+        UnidadeNome = user.Unidade?.Nome,
+        OrgaoId = orgao?.Id,
+        OrgaoSigla = orgao?.Sigla,
+        Matricula = info?.Matricula,
+        CargoFuncao = info?.CargoFuncao,
+        Vinculo = info?.Vinculo
+    };
 
     // ── Deliberações do CGTIC ─────────────────────────────────────────────────
 

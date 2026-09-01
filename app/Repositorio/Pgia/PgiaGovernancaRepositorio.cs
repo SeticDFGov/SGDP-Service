@@ -1,3 +1,4 @@
+using app.Models;
 using Microsoft.EntityFrameworkCore;
 using Models;
 using Models.Pgia;
@@ -123,6 +124,101 @@ public class PgiaGovernancaRepositorio : IPgiaGovernancaRepositorio
     public void AddAutorizacao(PgiaAutorizacaoExcepcional autorizacao)
     {
         _context.PgiaAutorizacoesExcepcionais.Add(autorizacao);
+    }
+
+    // ── Gestão de pessoas (papel PGIA + unidade) ──────────────────────────────
+
+    public async Task<List<User>> ListarUsuariosAsync(string? filtro, Guid? unidadeId, int? limite)
+    {
+        // Todos os usuários do SGDP, inclusive sem unidade e sem papel PGIA: é
+        // assim que a SGDI encontra quem acabou de chegar para vincular ao órgão.
+        var query = _context.Users
+            .Include(u => u.Unidade)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(filtro))
+        {
+            // ToLower().Contains() em vez de ILike: o mesmo LINQ vale no Npgsql
+            // (vira lower(...) like ...) e no provedor InMemory dos testes
+            var termo = filtro.Trim().ToLower();
+            query = query.Where(u => u.Nome.ToLower().Contains(termo)
+                || u.Email.ToLower().Contains(termo));
+        }
+
+        if (unidadeId != null)
+            query = query.Where(u => u.Unidade != null && u.Unidade.id == unidadeId);
+
+        query = query.OrderBy(u => u.Nome);
+
+        if (limite != null)
+            query = query.Take(limite.Value);
+
+        return await query.ToListAsync();
+    }
+
+    public async Task<User?> GetUserByIdAsync(Guid userId)
+    {
+        return await _context.Users
+            .Include(u => u.Unidade)
+            .FirstOrDefaultAsync(u => u.Id == userId);
+    }
+
+    public async Task<User?> GetUserByEmailAsync(string email)
+    {
+        // Sem diferenciar maiúsculas: o pré-cadastro não pode gerar uma segunda
+        // pessoa só porque o e-mail foi digitado com outra caixa
+        var alvo = email.Trim().ToLower();
+        return await _context.Users
+            .Include(u => u.Unidade)
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == alvo);
+    }
+
+    public void AddUser(User user)
+    {
+        _context.Users.Add(user);
+    }
+
+    public async Task<Unidade?> GetUnidadeByIdAsync(Guid unidadeId)
+    {
+        return await _context.Unidades.FirstOrDefaultAsync(u => u.id == unidadeId);
+    }
+
+    public async Task<List<PgiaOrgao>> ListarOrgaosAtivosComUnidadeAsync()
+    {
+        return await _context.PgiaOrgaos
+            .Where(o => o.Ativo && o.UnidadeId != null)
+            .ToListAsync();
+    }
+
+    public async Task<Dictionary<Guid, PgiaAgenteInfo>> ListarAgenteInfosAsync(IEnumerable<Guid> userIds)
+    {
+        var ids = userIds.Distinct().ToList();
+        if (ids.Count == 0) return new Dictionary<Guid, PgiaAgenteInfo>();
+
+        var infos = await _context.PgiaAgenteInfos
+            .Where(a => ids.Contains(a.UserId))
+            .ToListAsync();
+
+        return infos.ToDictionary(a => a.UserId);
+    }
+
+    public async Task<PgiaAgenteInfo?> GetAgenteInfoAsync(Guid userId)
+    {
+        return await _context.PgiaAgenteInfos.FirstOrDefaultAsync(a => a.UserId == userId);
+    }
+
+    public async Task<PgiaResponsavelIa?> GetResponsavelVigenteDoAgenteAsync(Guid agenteId)
+    {
+        return await _context.PgiaResponsaveisIa
+            .Include(r => r.Orgao)
+            .FirstOrDefaultAsync(r => r.AgenteId == agenteId && r.Ativo);
+    }
+
+    public async Task<PgiaEncarregadoDados?> GetEncarregadoVigenteDoAgenteAsync(Guid agenteId)
+    {
+        return await _context.PgiaEncarregadosDados
+            .Include(e => e.Orgao)
+            .FirstOrDefaultAsync(e => e.AgenteId == agenteId && e.Ativo);
     }
 
     // ── Apoio ─────────────────────────────────────────────────────────────────

@@ -65,13 +65,17 @@ public class PgiaOrgaoController : ControllerBase
     }
 
     /// <summary>
-    /// Atualiza os dados do órgão (etapa 1: identificação do órgão ou entidade)
+    /// Atualiza os dados do órgão (etapa 1: identificação do órgão ou entidade).
+    /// Escrita da SGDI (ou admin), em qualquer órgão: a SGDI entrega o órgão pronto.
+    /// O papel do órgão só visualiza — recebe Forbid aqui.
     /// </summary>
     [HttpPut("{orgaoId:long}/dados")]
     public async Task<IActionResult> AtualizarDados(long orgaoId, [FromBody] PgiaOrgaoDadosDTO dto)
     {
         var ctx = await GetContextAsync();
         if (ctx == null) return Unauthorized();
+        // CanEdit(OrgaoDados) admite só sgdi/admin; CanAccessOrgao é sempre verdadeiro
+        // para esses papéis (qualquer órgão) e barra qualquer outro que apareça na matriz
         if (!_permissionService.CanEdit(ctx, PgiaResources.OrgaoDados)) return Forbid();
         if (!_permissionService.CanAccessOrgao(ctx, orgaoId)) return Forbid();
 
@@ -93,13 +97,17 @@ public class PgiaOrgaoController : ControllerBase
     }
 
     /// <summary>
-    /// Salva matrícula, cargo e vínculo de uma pessoa do órgão (art. 3º)
+    /// Salva matrícula, cargo e vínculo de uma pessoa do órgão (art. 3º).
+    /// Escrita da SGDI (ou admin), em qualquer órgão; o papel do órgão só visualiza
+    /// a lista de pessoas e recebe Forbid aqui.
     /// </summary>
     [HttpPut("{orgaoId:long}/pessoas/{userId:guid}/info")]
     public async Task<IActionResult> SalvarAgenteInfo(long orgaoId, Guid userId, [FromBody] PgiaAgenteInfoDTO dto)
     {
         var ctx = await GetContextAsync();
         if (ctx == null) return Unauthorized();
+        // Mesmo par de gates do PUT de dados do órgão: CanEdit(AgenteInfo) é só
+        // sgdi/admin e CanAccessOrgao libera qualquer órgão para esses papéis
         if (!_permissionService.CanEdit(ctx, PgiaResources.AgenteInfo)) return Forbid();
         if (!_permissionService.CanAccessOrgao(ctx, orgaoId)) return Forbid();
 
