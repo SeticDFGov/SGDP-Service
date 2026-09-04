@@ -1,4 +1,4 @@
-using app.Models;
+﻿using app.Models;
 
 namespace Models.Pgia;
 
@@ -39,6 +39,9 @@ public class PgiaAuditoriaTecnica
     public DateOnly? DataFim { get; set; }
 
     public string? Parecer { get; set; }
+
+    // Relatório completo da auditoria anexado (pgia_documento); opcional
+    public long? DocumentoId { get; set; }
 
     // Resultado no Portal da Transparência (art. 34)
     public bool PublicadoPortal { get; set; }

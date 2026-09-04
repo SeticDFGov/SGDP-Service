@@ -1,4 +1,4 @@
-using app.Models;
+﻿using app.Models;
 using Models.Pgia;
 
 namespace Repositorio.Interface;
@@ -15,6 +15,7 @@ public interface IPgiaDesignacaoRepositorio
 
     Task<User?> GetUserByIdAsync(Guid userId);
     Task<List<User>> ListarUsersDaUnidadeAsync(Guid unidadeId);
+    Task<PgiaDocumento?> GetDocumentoByIdAsync(long documentoId);
     Task<PgiaAgenteInfo?> GetAgenteInfoAsync(Guid userId);
     Task<List<PgiaAgenteInfo>> ListarAgenteInfosAsync(IEnumerable<Guid> userIds);
     void AddAgenteInfo(PgiaAgenteInfo info);

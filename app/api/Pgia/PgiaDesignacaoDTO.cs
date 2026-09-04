@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace api.Pgia;
 
@@ -23,6 +23,9 @@ public class PgiaDesignacaoCreateDTO
     public string ProcessoSeiComunicacao { get; set; } = string.Empty;
 
     public DateOnly DataComunicacaoSgdi { get; set; }
+
+    // Cópia do ato de designação já registrada como documento DO MESMO ÓRGÃO
+    public long? DocumentoId { get; set; }
 
     public DateOnly InicioVigencia { get; set; }
 }
@@ -64,6 +67,9 @@ public class PgiaDesignacaoResponse
     public bool? AcumulaFuncaoTic { get; set; }
 
     public bool? CapacitacaoAdequada { get; set; }
+
+    // Cópia do ato de designação anexada (null = ainda não anexada)
+    public long? DocumentoId { get; set; }
 
     public DateOnly InicioVigencia { get; set; }
 

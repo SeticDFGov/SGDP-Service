@@ -30,6 +30,7 @@ namespace Models
         public DbSet<PgiaClassificacaoRisco> PgiaClassificacoesRisco { get; set; }
         public DbSet<PgiaRiscoOutro> PgiaRiscosOutros { get; set; }
         public DbSet<PgiaDocumento> PgiaDocumentos { get; set; }
+        public DbSet<PgiaDocumentoArquivo> PgiaDocumentoArquivos { get; set; }
         public DbSet<PgiaAia> PgiaAias { get; set; }
         public DbSet<PgiaDeliberacaoCgtic> PgiaDeliberacoesCgtic { get; set; }
         public DbSet<PgiaPlataformaIaGenerativa> PgiaPlataformasIaGenerativa { get; set; }

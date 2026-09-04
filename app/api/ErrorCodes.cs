@@ -32,6 +32,7 @@ public enum ErrorCode
     PgiaRiscoExcessivoBloqueado = 624,
     PgiaResponsavelNaoDesignado = 625,
     PgiaDocumentoNaoEncontrado = 626,
+    PgiaArquivoInvalido = 627,
 
     // Módulo PGIA — fase 2 (governança central e homologação)
     PgiaAiaNaoEncontrada = 640,

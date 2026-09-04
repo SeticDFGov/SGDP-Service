@@ -1,4 +1,4 @@
-using api.Common;
+﻿using api.Common;
 using api.Pgia;
 using app.Auth;
 using demanda_service.Helpers;
@@ -396,7 +396,7 @@ public class PgiaOperacaoService : IPgiaOperacaoService
             throw new ApiException(ErrorCode.PgiaCapacitacaoJaExiste,
                 "Esta pessoa já tem registro desta trilha de capacitação.");
 
-        await ValidarCertificadoAsync(dto.CertificadoDocId);
+        await ValidarCertificadoAsync(dto.CertificadoDocId, orgao.Id);
 
         var capacitacao = new PgiaCapacitacao
         {
@@ -425,7 +425,7 @@ public class PgiaOperacaoService : IPgiaOperacaoService
             ?? throw new ApiException(ErrorCode.PgiaCapacitacaoNaoEncontrada);
 
         ValidarStatusCapacitacao(dto.Status, dto.DataConclusao);
-        await ValidarCertificadoAsync(dto.CertificadoDocId);
+        await ValidarCertificadoAsync(dto.CertificadoDocId, capacitacao.OrgaoId);
 
         // Agente e trilha são a identidade do registro (índice único): trocar um deles
         // é criar outro registro, não editar este.
@@ -460,12 +460,20 @@ public class PgiaOperacaoService : IPgiaOperacaoService
                 "Trilha concluída exige a data de conclusão.");
     }
 
-    private async Task ValidarCertificadoAsync(long? certificadoDocId)
+    /// <summary>
+    /// Certificado de capacitação: além de existir, tem de ser documento DO ÓRGÃO
+    /// da capacitação — mesmo escopo dos demais validadores de documento do módulo.
+    /// </summary>
+    private async Task ValidarCertificadoAsync(long? certificadoDocId, long orgaoId)
     {
         if (certificadoDocId == null) return;
 
-        _ = await _repositorio.GetDocumentoByIdAsync(certificadoDocId.Value)
+        var documento = await _repositorio.GetDocumentoByIdAsync(certificadoDocId.Value)
             ?? throw new ApiException(ErrorCode.PgiaDocumentoNaoEncontrado);
+
+        if (documento.OrgaoId != orgaoId)
+            throw new ApiException(ErrorCode.PgiaDominioInvalido,
+                "O certificado precisa ser um documento do próprio órgão.");
     }
 
     // ── Registro de uso de IA ─────────────────────────────────────────────────

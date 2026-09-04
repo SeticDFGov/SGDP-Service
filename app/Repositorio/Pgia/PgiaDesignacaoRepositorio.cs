@@ -1,4 +1,4 @@
-using app.Models;
+﻿using app.Models;
 using Microsoft.EntityFrameworkCore;
 using Models;
 using Models.Pgia;
@@ -73,6 +73,11 @@ public class PgiaDesignacaoRepositorio : IPgiaDesignacaoRepositorio
             .Where(u => u.Unidade != null && u.Unidade.id == unidadeId)
             .OrderBy(u => u.Nome)
             .ToListAsync();
+    }
+
+    public async Task<PgiaDocumento?> GetDocumentoByIdAsync(long documentoId)
+    {
+        return await _context.PgiaDocumentos.FirstOrDefaultAsync(d => d.Id == documentoId);
     }
 
     public async Task<PgiaAgenteInfo?> GetAgenteInfoAsync(Guid userId)

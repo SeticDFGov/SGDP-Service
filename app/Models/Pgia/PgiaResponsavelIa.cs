@@ -1,4 +1,4 @@
-using app.Models;
+﻿using app.Models;
 
 namespace Models.Pgia;
 
@@ -36,6 +36,9 @@ public class PgiaResponsavelIa
 
     // Condicional: exigida quando acumula a função de TIC (arts. 10, § 2º e 29, III)
     public bool? CapacitacaoAdequada { get; set; }
+
+    // Cópia do ato de designação anexada (pgia_documento); opcional
+    public long? DocumentoId { get; set; }
 
     public DateOnly InicioVigencia { get; set; }
 

@@ -1,4 +1,4 @@
-using api.Pgia;
+﻿using api.Pgia;
 using app.Auth;
 using demanda_service.Helpers;
 using Models.Pgia;
@@ -432,6 +432,7 @@ public class PgiaRelatorioService : IPgiaRelatorioService
             ?? throw new ApiException(ErrorCode.PgiaSistemaNaoEncontrado);
 
         await ValidarAuditoriaAsync(dto);
+        await ValidarDocumentoDaAuditoriaAsync(dto.DocumentoId, sistema.OrgaoId);
 
         var auditoria = new PgiaAuditoriaTecnica
         {
@@ -461,6 +462,7 @@ public class PgiaRelatorioService : IPgiaRelatorioService
 
         // Revalida a designação (papel de auditoria externa) também na edição
         await ValidarAuditoriaAsync(dto);
+        await ValidarDocumentoDaAuditoriaAsync(dto.DocumentoId, sistema.OrgaoId);
 
         // A nova data de início não pode passar a conclusão já registrada
         if (auditoria.DataFim != null && dto.DataInicio > auditoria.DataFim)
@@ -502,6 +504,25 @@ public class PgiaRelatorioService : IPgiaRelatorioService
                 "Designe um usuário com papel de auditoria externa.");
     }
 
+    /// <summary>
+    /// Relatório completo da auditoria: aceita documento DO ÓRGÃO DO SISTEMA
+    /// auditado ou documento CENTRAL (sem órgão). Quem designa e publica a
+    /// auditoria é a SGDI — o relatório pode nascer como peça central dela ou
+    /// como documento do órgão auditado; o que não vale é documento de um
+    /// terceiro órgão, que não tem relação com a auditoria.
+    /// </summary>
+    private async Task ValidarDocumentoDaAuditoriaAsync(long? documentoId, long orgaoDoSistema)
+    {
+        if (documentoId == null) return;
+
+        var documento = await _repositorio.GetDocumentoByIdAsync(documentoId.Value)
+            ?? throw new ApiException(ErrorCode.PgiaDocumentoNaoEncontrado);
+
+        if (documento.OrgaoId != null && documento.OrgaoId != orgaoDoSistema)
+            throw new ApiException(ErrorCode.PgiaDominioInvalido,
+                "O relatório da auditoria precisa ser um documento do órgão auditado ou um documento central.");
+    }
+
     private static void AplicarDadosAuditoria(PgiaAuditoriaTecnica auditoria, PgiaAuditoriaCreateDTO dto)
     {
         auditoria.Tipo = dto.Tipo;
@@ -509,6 +530,7 @@ public class PgiaRelatorioService : IPgiaRelatorioService
         auditoria.AuditorUserId = dto.AuditorUserId;
         auditoria.ExternaFornecedor = dto.ExternaFornecedor;
         auditoria.ApoioFapdf = dto.ApoioFapdf;
+        auditoria.DocumentoId = dto.DocumentoId;
         auditoria.DataInicio = dto.DataInicio;
     }
 
@@ -645,6 +667,7 @@ public class PgiaRelatorioService : IPgiaRelatorioService
         DataInicio = a.DataInicio,
         DataFim = a.DataFim,
         Parecer = a.Parecer,
+        DocumentoId = a.DocumentoId,
         PublicadoPortal = a.PublicadoPortal,
         DataPublicacao = a.DataPublicacao,
         Url = a.Url,
