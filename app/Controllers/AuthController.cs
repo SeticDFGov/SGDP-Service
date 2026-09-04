@@ -89,8 +89,9 @@ public class AuthController : ControllerBase
             return Unauthorized();
 
         var user = await _authRepositorio.GetOrCreateUserAsync(keycloakId, nome, email ?? "", perfil);
-        // PapelPgia é campo adicional na resposta; o front atual ignora campos extras
-        return Ok(new { user.Id, user.Nome, user.Email, user.Perfil, user.PapelPgia, user.Unidade });
+        // PapelPgia e PapelContratacoes são campos adicionais na resposta; o front
+        // atual ignora campos extras
+        return Ok(new { user.Id, user.Nome, user.Email, user.Perfil, user.PapelPgia, user.PapelContratacoes, user.Unidade });
     }
 
     [HttpPost("unidade")]

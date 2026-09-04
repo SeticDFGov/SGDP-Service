@@ -22,5 +22,10 @@ public class User
     [StringLength(30)]
     public string? PapelPgia { get; set; }
 
+    // Papel no módulo Análises de Contratações (ctr_analise); null = sem acesso.
+    // Administrado pela tela de admin do próprio sistema, nunca pelo Keycloak.
+    [StringLength(30)]
+    public string? PapelContratacoes { get; set; }
+
     public Unidade? Unidade { get; set; }
 }

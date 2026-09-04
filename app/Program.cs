@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+﻿﻿using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
@@ -101,6 +101,9 @@ builder.Services.AddScoped<IPgiaRelatorioRepositorio, Repositorio.Pgia.PgiaRelat
 builder.Services.AddScoped<IPgiaPublicoRepositorio, Repositorio.Pgia.PgiaPublicoRepositorio>();
 builder.Services.AddScoped<IPgiaDocumentoRepositorio, Repositorio.Pgia.PgiaDocumentoRepositorio>();
 
+// Repositório do módulo Análises de Contratações
+builder.Services.AddScoped<ICtrProcessoRepositorio, Repositorio.Contratacoes.CtrProcessoRepositorio>();
+
 // Serviços
 builder.Services.AddScoped<IDemandaService, DemandaService>();
 builder.Services.AddScoped<IEtapaService, EtapaService>();
@@ -122,6 +125,13 @@ builder.Services.AddScoped<IPgiaDocumentoService, service.Pgia.PgiaDocumentoServ
 // do responsável pelo sistema. Trocar pelo futuro servidor de arquivos da Infra é
 // só registrar outra implementação de IPgiaArquivoStorage aqui.
 builder.Services.AddScoped<IPgiaArquivoStorage, service.Pgia.PgiaArquivoStorage>();
+
+// Serviços do módulo Análises de Contratações
+builder.Services.AddScoped<ICtrPermissionService, service.Contratacoes.CtrPermissionService>();
+builder.Services.AddScoped<ICtrAdminService, service.Contratacoes.CtrAdminService>();
+builder.Services.AddScoped<ICtrProcessoService, service.Contratacoes.CtrProcessoService>();
+builder.Services.AddScoped<ICtrManifestacaoService, service.Contratacoes.CtrManifestacaoService>();
+builder.Services.AddScoped<ICtrImportacaoService, service.Contratacoes.CtrImportacaoService>();
 
 builder.Services.AddScoped<HttpClient>();
 

@@ -17,9 +17,10 @@ namespace Controllers;
 /// O Program.cs recusa a inicialização com a flag ligada fora de Development,
 /// então este controller nunca opera em produção.
 ///
-/// Além de emitir o token, provisiona o usuário de teste: papel PGIA, unidade
-/// e um Órgão de Teste (com os prazos de adesão, via o serviço real) — para as
-/// personas da tela /auth/local entrarem direto na visão de cada papel.
+/// Além de emitir o token, provisiona o usuário de teste: papel PGIA, papel do
+/// módulo Análises de Contratações, unidade e um Órgão de Teste (com os prazos de
+/// adesão, via o serviço real) — para as personas da tela /auth/local entrarem
+/// direto na visão de cada papel.
 /// Usa o AppDbContext diretamente de propósito: é ferramenta de teste, e criar
 /// camada de serviço própria só para isso espalharia código de teste no módulo.
 /// </summary>
@@ -63,6 +64,10 @@ public class AuthLocalController : ControllerBase
         // Vincula o usuário à unidade do Órgão de Teste (persona de órgão e
         // persona de agente público do art. 13, que precisa pertencer a um órgão).
         public bool VincularAoOrgaoDeTeste { get; set; }
+
+        // Papel do módulo Análises de Contratações (ctr_analise). Mesma semântica
+        // do PapelPgia: ausente/null não mexe no papel já existente.
+        public string? PapelContratacoes { get; set; }
     }
 
     /// <summary>
@@ -82,6 +87,9 @@ public class AuthLocalController : ControllerBase
 
         if (request.PapelPgia != null && !PapeisPgia.Todos.Contains(request.PapelPgia))
             return BadRequest("Papel PGIA inválido (pgia_orgao, pgia_sgdi, pgia_cgtic ou pgia_auditoria).");
+
+        if (!PapeisContratacoes.EhValido(request.PapelContratacoes))
+            return BadRequest("Papel de análise de contratações inválido (use ctr_analise ou deixe vazio).");
 
         await ProvisionarUsuarioDeTesteAsync(request);
 
@@ -111,7 +119,9 @@ public class AuthLocalController : ControllerBase
     {
         var email = request.Email.Trim();
         var precisaOrgao = request.PapelPgia == PapeisPgia.Orgao || request.VincularAoOrgaoDeTeste;
-        var precisaUnidade = precisaOrgao || request.PapelPgia != null;
+        // O userConfiguredGuard do front exige unidade: a persona de contratações
+        // também precisa de uma (a central de teste).
+        var precisaUnidade = precisaOrgao || request.PapelPgia != null || request.PapelContratacoes != null;
 
         Unidade? unidade = null;
         if (precisaOrgao)
@@ -132,6 +142,7 @@ public class AuthLocalController : ControllerBase
         }
 
         if (request.PapelPgia != null) user.PapelPgia = request.PapelPgia;
+        if (request.PapelContratacoes != null) user.PapelContratacoes = request.PapelContratacoes;
         if (unidade != null) user.Unidade = unidade;
 
         await _context.SaveChangesAsync();
