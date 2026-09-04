@@ -1,4 +1,4 @@
-using api.Common;
+﻿using api.Common;
 using api.Pgia;
 using app.Models;
 using Microsoft.EntityFrameworkCore;
@@ -59,12 +59,12 @@ public class PgiaSistemaServiceTest : PgiaTestBase
     private static PgiaClassificacaoCreateDTO NovaClassificacaoDto(
         List<string>? q15 = null, List<string>? q16 = null, List<string>? q17 = null) => new()
     {
-        Checklist = new PgiaChecklistDTO
+        Checklist = ChecklistRespondido(new PgiaChecklistDTO
         {
             Q15 = q15 ?? new List<string>(),
             Q16 = q16 ?? new List<string>(),
             Q17 = q17 ?? new List<string>()
-        },
+        }),
         Motivo = "Classificação inicial",
         DataClassificacao = new DateOnly(2026, 9, 1),
         Justificativa = "Enquadramento avaliado pelo Responsável de IA do órgão."
@@ -250,7 +250,9 @@ public class PgiaSistemaServiceTest : PgiaTestBase
         var sistema = await _service.CriarSistemaAsync(OrgaoSes.Id, dto, ctx);
 
         var salva = await Context.PgiaClassificacoesRisco.SingleAsync(c => c.SistemaIaId == sistema.Id);
-        Assert.Equal("{\"q15\":[],\"q16\":[],\"q17\":[\"I\",\"III\"]}", salva.RespostasChecklist);
+        Assert.Equal(
+            "{\"q15\":[],\"q16\":[],\"q17\":[\"I\",\"III\"],\"q15_nenhuma\":true,\"q16_nenhuma\":true,\"q17_nenhuma\":false}",
+            salva.RespostasChecklist);
         Assert.Equal(ctx.UserId, salva.ClassificadoPor);
         Assert.Equal(UserOrgaoSes.Email, salva.CriadoPor);
 

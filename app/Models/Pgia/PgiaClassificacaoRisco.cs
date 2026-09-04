@@ -44,6 +44,10 @@ public class PgiaClassificacaoRisco
     // Condicional: Alto Risco é classificado pelo CGTIC (art. 7º, III)
     public long? DeliberacaoCgticId { get; set; }
 
+    // Grupo "Outros" do questionário: riscos declarados pelo órgão (matriz da CGDF).
+    // Complementares — não entram no cálculo do resultado nem na pontuação.
+    public List<PgiaRiscoOutro> OutrosRiscos { get; set; } = new();
+
     public DateTime CriadoEm { get; set; }
 
     public string? CriadoPor { get; set; }

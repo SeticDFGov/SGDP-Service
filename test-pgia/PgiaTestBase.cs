@@ -1,3 +1,4 @@
+using api.Pgia;
 using app.Models;
 using Microsoft.EntityFrameworkCore;
 using Models;
@@ -66,6 +67,21 @@ public abstract class PgiaTestBase : IDisposable
         UserSemPapel = NovoUser("comum@ses.df.gov.br", "Carlos Comum", "gestor", null, UnidadeSes);
 
         Context.SaveChanges();
+    }
+
+    /// <summary>
+    /// Completa o checklist como a tela agrupada faz: os grupos sem nenhum inciso
+    /// marcado recebem "Nenhuma das alternativas acima". O questionário exige
+    /// resposta explícita por grupo (incisos XOR nenhuma), então os fixtures que
+    /// só marcam um artigo precisam responder os outros dois.
+    /// </summary>
+    protected static PgiaChecklistDTO ChecklistRespondido(PgiaChecklistDTO? checklist = null)
+    {
+        var c = checklist ?? new PgiaChecklistDTO();
+        c.Q15Nenhuma = c.Q15.Count == 0;
+        c.Q16Nenhuma = c.Q16.Count == 0;
+        c.Q17Nenhuma = c.Q17.Count == 0;
+        return c;
     }
 
     private User NovoUser(string email, string nome, string perfil, string? papelPgia, Unidade? unidade)

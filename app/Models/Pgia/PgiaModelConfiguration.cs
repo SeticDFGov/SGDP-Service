@@ -375,6 +375,40 @@ public static class PgiaModelConfiguration
                 .HasConstraintName("fk_pgia_classificacao_deliberacao");
         });
 
+        modelBuilder.Entity<PgiaRiscoOutro>(entity =>
+        {
+            entity.ToTable("pgia_risco_outro", t =>
+            {
+                // Subconjunto da escala da CGDF aceito no grupo "Outros"
+                // (o service valida antes, com mensagem; o CHECK é a trava do banco)
+                t.HasCheckConstraint("ck_pgia_risco_outro_probabilidade",
+                    "probabilidade IN ('Improvável','Raro','Possível')");
+                t.HasCheckConstraint("ck_pgia_risco_outro_consequencia",
+                    "consequencia IN ('Desprezível','Menor','Moderada')");
+            });
+
+            entity.HasKey(r => r.Id).HasName("pk_pgia_risco_outro");
+            entity.Property(r => r.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(r => r.ClassificacaoRiscoId).HasColumnName("classificacao_risco_id");
+            entity.Property(r => r.DescricaoRisco).HasColumnName("descricao_risco").IsRequired();
+            entity.Property(r => r.AcaoMitigacao).HasColumnName("acao_mitigacao").IsRequired();
+            entity.Property(r => r.ResponsavelNome).HasColumnName("responsavel_nome").HasMaxLength(200).IsRequired();
+            entity.Property(r => r.ResponsavelEmail).HasColumnName("responsavel_email").HasMaxLength(200).IsRequired();
+            entity.Property(r => r.Probabilidade).HasColumnName("probabilidade").HasMaxLength(15).IsRequired();
+            entity.Property(r => r.Consequencia).HasColumnName("consequencia").HasMaxLength(15).IsRequired();
+            entity.Property(r => r.CriadoEm).HasColumnName("criado_em").HasDefaultValueSql("NOW()");
+            entity.Property(r => r.CriadoPor).HasColumnName("criado_por").HasMaxLength(200);
+
+            entity.HasIndex(r => r.ClassificacaoRiscoId).HasDatabaseName("ix_pgia_risco_outro_classificacao");
+
+            // Os riscos declarados pertencem à classificação: somem com ela
+            entity.HasOne(r => r.Classificacao)
+                .WithMany(c => c.OutrosRiscos)
+                .HasForeignKey(r => r.ClassificacaoRiscoId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pgia_risco_outro_classificacao");
+        });
+
         modelBuilder.Entity<PgiaDocumento>(entity =>
         {
             entity.ToTable("pgia_documento", t =>

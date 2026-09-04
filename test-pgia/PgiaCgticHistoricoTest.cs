@@ -1,4 +1,4 @@
-using api.Pgia;
+﻿using api.Pgia;
 using app.Models;
 using Models.Pgia;
 using Repositorio.Pgia;
@@ -77,7 +77,7 @@ public class PgiaCgticHistoricoTest : PgiaTestBase
             SupervisaoHumanaDescricao = "Servidor revisa cada decisão.",
             Classificacao = new PgiaClassificacaoCreateDTO
             {
-                Checklist = checklist ?? new PgiaChecklistDTO(),
+                Checklist = ChecklistRespondido(checklist),
                 Motivo = "Classificação inicial",
                 DataClassificacao = dataClassificacao,
                 Justificativa = "Enquadramento conforme os arts. 15 a 17."

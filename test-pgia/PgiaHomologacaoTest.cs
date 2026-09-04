@@ -1,4 +1,4 @@
-using api.Pgia;
+﻿using api.Pgia;
 using app.Models;
 using Microsoft.EntityFrameworkCore;
 using Models.Pgia;
@@ -58,12 +58,12 @@ public class PgiaHomologacaoTest : PgiaTestBase
     private static PgiaClassificacaoCreateDTO Checklist(
         List<string>? q15 = null, List<string>? q16 = null, List<string>? q17 = null) => new()
     {
-        Checklist = new PgiaChecklistDTO
+        Checklist = ChecklistRespondido(new PgiaChecklistDTO
         {
             Q15 = q15 ?? new List<string>(),
             Q16 = q16 ?? new List<string>(),
             Q17 = q17 ?? new List<string>()
-        },
+        }),
         Motivo = "Classificação inicial",
         DataClassificacao = new DateOnly(2026, 9, 1),
         Justificativa = "Enquadramento avaliado pelo Responsável de IA."

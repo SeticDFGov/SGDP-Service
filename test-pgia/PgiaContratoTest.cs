@@ -1,4 +1,4 @@
-using api.Pgia;
+﻿using api.Pgia;
 using app.Models;
 using Microsoft.EntityFrameworkCore;
 using Models.Pgia;
@@ -80,11 +80,11 @@ public class PgiaContratoTest : PgiaTestBase
             AvisoInteracaoIa = true,
             Classificacao = new PgiaClassificacaoCreateDTO
             {
-                Checklist = new PgiaChecklistDTO
+                Checklist = ChecklistRespondido(new PgiaChecklistDTO
                 {
                     Q16 = q16 ?? new List<string>(),
                     Q17 = q17 ?? new List<string>()
-                },
+                }),
                 Motivo = "Classificação inicial",
                 DataClassificacao = new DateOnly(2026, 9, 1),
                 Justificativa = "Enquadramento avaliado."

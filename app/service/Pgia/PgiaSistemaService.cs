@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using api.Common;
 using api.Pgia;
 using Microsoft.EntityFrameworkCore;
@@ -91,7 +92,9 @@ public class PgiaSistemaService : IPgiaSistemaService
             throw new ApiException(ErrorCode.PgiaSistemaJaExiste,
                 $"O órgão já tem um sistema chamado {denominacao} no inventário.");
 
-        var (resultado, enquadramento, checklistJson, pontuacao) = AvaliarClassificacao(dto.Classificacao);
+        var avaliada = AvaliarClassificacao(dto.Classificacao, ctx.Email);
+        var (resultado, enquadramento, checklistJson, pontuacao) =
+            (avaliada.Resultado, avaliada.Enquadramento, avaliada.ChecklistJson, avaliada.Pontuacao);
         ValidarEAjustarCondicionais(dto, resultado);
 
         // O cadastro de sistema em uso com Risco Excessivo é aceito de propósito:
@@ -126,6 +129,8 @@ public class PgiaSistemaService : IPgiaSistemaService
             EnquadramentoLegal = enquadramento,
             Justificativa = dto.Classificacao.Justificativa.Trim(),
             ClassificadoPor = ctx.UserId,
+            // Riscos declarados no grupo "Outros" entram no mesmo SaveChanges
+            OutrosRiscos = avaliada.OutrosRiscos,
             CriadoEm = agora,
             CriadoPor = ctx.Email
         };
@@ -183,7 +188,9 @@ public class PgiaSistemaService : IPgiaSistemaService
         var sistema = await _sistemaRepositorio.GetByIdAsync(id)
             ?? throw new ApiException(ErrorCode.PgiaSistemaNaoEncontrado);
 
-        var (resultado, enquadramento, checklistJson, pontuacao) = AvaliarClassificacao(dto);
+        var avaliada = AvaliarClassificacao(dto, ctx.Email);
+        var (resultado, enquadramento, checklistJson, pontuacao) =
+            (avaliada.Resultado, avaliada.Enquadramento, avaliada.ChecklistJson, avaliada.Pontuacao);
 
         var agora = DateTime.UtcNow;
         var classificacao = new PgiaClassificacaoRisco
@@ -198,6 +205,8 @@ public class PgiaSistemaService : IPgiaSistemaService
             EnquadramentoLegal = enquadramento,
             Justificativa = dto.Justificativa.Trim(),
             ClassificadoPor = ctx.UserId,
+            // Riscos declarados no grupo "Outros" entram no mesmo SaveChanges
+            OutrosRiscos = avaliada.OutrosRiscos,
             CriadoEm = agora,
             CriadoPor = ctx.Email
         };
@@ -570,12 +579,22 @@ public class PgiaSistemaService : IPgiaSistemaService
 
     // ── Regra de risco (arts. 15 a 18) ────────────────────────────────────────
 
+    /// <summary>Resultado da avaliação do questionário, pronto para virar entidade.</summary>
+    private sealed record ClassificacaoAvaliada(
+        string Resultado,
+        string? Enquadramento,
+        string ChecklistJson,
+        int Pontuacao,
+        List<PgiaRiscoOutro> OutrosRiscos);
+
     /// <summary>
-    /// Valida o checklist e devolve resultado, enquadramento legal e o jsonb das respostas.
+    /// Valida o questionário e devolve resultado, enquadramento legal, o jsonb das
+    /// respostas e os riscos declarados no grupo "Outros".
     /// Art. 15 vence art. 16, que vence art. 17; sem marcação, Baixo Risco (art. 18).
+    /// O "Nenhuma das alternativas acima" só atesta que o grupo foi respondido:
+    /// não pontua e não altera o resultado.
     /// </summary>
-    private static (string Resultado, string? Enquadramento, string ChecklistJson, int Pontuacao) AvaliarClassificacao(
-        PgiaClassificacaoCreateDTO dto)
+    private static ClassificacaoAvaliada AvaliarClassificacao(PgiaClassificacaoCreateDTO dto, string? userEmail)
     {
         if (!PgiaDominios.MotivoClassificacao.Todos.Contains(dto.Motivo))
             throw new ApiException(ErrorCode.PgiaDominioInvalido, $"Motivo da classificação inválido: {dto.Motivo}");
@@ -591,6 +610,11 @@ public class PgiaSistemaService : IPgiaSistemaService
         var q15 = NormalizarIncisos(checklist.Q15, PgiaDominios.ChecklistIncisos.Art15, 15);
         var q16 = NormalizarIncisos(checklist.Q16, PgiaDominios.ChecklistIncisos.Art16, 16);
         var q17 = NormalizarIncisos(checklist.Q17, PgiaDominios.ChecklistIncisos.Art17, 17);
+
+        // Completude: cada grupo respondido com incisos XOR "nenhuma das alternativas"
+        ValidarCompletudeDoGrupo(15, q15, checklist.Q15Nenhuma);
+        ValidarCompletudeDoGrupo(16, q16, checklist.Q16Nenhuma);
+        ValidarCompletudeDoGrupo(17, q17, checklist.Q17Nenhuma);
 
         string resultado;
         string? enquadramento;
@@ -615,18 +639,111 @@ public class PgiaSistemaService : IPgiaSistemaService
             enquadramento = null;
         }
 
-        // Formato do schema: {"q15":[...],"q16":[...],"q17":[...]}
-        var json = JsonSerializer.Serialize(new Dictionary<string, List<string>>
+        // Formato do schema mais os "nenhuma" de cada grupo, no MESMO jsonb
+        var json = JsonSerializer.Serialize(new ChecklistPersistido
         {
-            ["q15"] = q15,
-            ["q16"] = q16,
-            ["q17"] = q17
+            Q15 = q15,
+            Q16 = q16,
+            Q17 = q17,
+            Q15Nenhuma = checklist.Q15Nenhuma,
+            Q16Nenhuma = checklist.Q16Nenhuma,
+            Q17Nenhuma = checklist.Q17Nenhuma
         });
 
-        // Métrica de acompanhamento da SGDI, paralela ao resultado dos arts. 15 a 18
+        // Métrica de acompanhamento da SGDI, paralela ao resultado dos arts. 15 a 18.
+        // Os "nenhuma" e os riscos do grupo "Outros" não entram nesta soma.
         var pontuacao = PgiaQuesitos.CalcularPontuacao(q15, q16, q17);
 
-        return (resultado, enquadramento, json, pontuacao);
+        var outros = MontarOutrosRiscos(dto.OutrosRiscos, userEmail);
+
+        return new ClassificacaoAvaliada(resultado, enquadramento, json, pontuacao, outros);
+    }
+
+    /// <summary>
+    /// Cada grupo do questionário precisa de uma resposta explícita: ou o órgão
+    /// marca os incisos que se aplicam, ou marca "Nenhuma das alternativas acima".
+    /// Os dois juntos, ou nenhum dos dois, deixam o grupo ambíguo.
+    /// </summary>
+    private static void ValidarCompletudeDoGrupo(int artigo, List<string> incisos, bool nenhuma)
+    {
+        if (incisos.Count > 0 && nenhuma)
+            throw new ApiException(ErrorCode.PgiaChecklistInvalido,
+                $"No grupo do art. {artigo}, marque os incisos aplicáveis ou \"Nenhuma das alternativas acima\", não os dois.");
+
+        if (incisos.Count == 0 && !nenhuma)
+            throw new ApiException(ErrorCode.PgiaChecklistInvalido,
+                $"Responda o grupo do art. {artigo}: marque os incisos aplicáveis ou \"Nenhuma das alternativas acima\".");
+    }
+
+    /// <summary>
+    /// Grupo "Outros": riscos que o órgão declara, pela matriz da CGDF. São registro
+    /// complementar — não entram no cálculo do resultado nem na pontuação. A escala
+    /// aceita aqui é o subconjunto permitido (probabilidade e consequência baixas a
+    /// médias); risco alto tem grupo próprio nos arts. 15 a 17.
+    /// </summary>
+    private static List<PgiaRiscoOutro> MontarOutrosRiscos(List<PgiaRiscoOutroDTO>? itens, string? userEmail)
+    {
+        var lista = new List<PgiaRiscoOutro>();
+        if (itens == null || itens.Count == 0) return lista;
+
+        var agora = DateTime.UtcNow;
+        foreach (var item in itens)
+        {
+            var descricao = (item.DescricaoRisco ?? string.Empty).Trim();
+            var mitigacao = (item.AcaoMitigacao ?? string.Empty).Trim();
+            var nome = (item.ResponsavelNome ?? string.Empty).Trim();
+            var email = (item.ResponsavelEmail ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(descricao) || string.IsNullOrWhiteSpace(mitigacao))
+                throw new ApiException(ErrorCode.PgiaDominioInvalido,
+                    "Em cada risco declarado, a descrição do risco e a ação de mitigação são obrigatórias.");
+
+            if (string.IsNullOrWhiteSpace(nome))
+                throw new ApiException(ErrorCode.PgiaDominioInvalido,
+                    "Informe o responsável pela ação de mitigação de cada risco declarado.");
+
+            if (!PgiaValidacoes.EmailValido(email))
+                throw new ApiException(ErrorCode.PgiaDominioInvalido,
+                    $"E-mail do responsável pelo risco declarado inválido: {email}");
+
+            if (!PgiaDominios.EscalaCgdf.Probabilidade.Permitidos.Contains(item.Probabilidade))
+                throw new ApiException(ErrorCode.PgiaDominioInvalido,
+                    $"Probabilidade inválida para risco declarado: {item.Probabilidade}. " +
+                    $"Use {string.Join(", ", PgiaDominios.EscalaCgdf.Probabilidade.Permitidos)}.");
+
+            if (!PgiaDominios.EscalaCgdf.Consequencia.Permitidos.Contains(item.Consequencia))
+                throw new ApiException(ErrorCode.PgiaDominioInvalido,
+                    $"Consequência inválida para risco declarado: {item.Consequencia}. " +
+                    $"Use {string.Join(", ", PgiaDominios.EscalaCgdf.Consequencia.Permitidos)}.");
+
+            lista.Add(new PgiaRiscoOutro
+            {
+                DescricaoRisco = descricao,
+                AcaoMitigacao = mitigacao,
+                ResponsavelNome = nome,
+                ResponsavelEmail = email,
+                Probabilidade = item.Probabilidade,
+                Consequencia = item.Consequencia,
+                CriadoEm = agora,
+                CriadoPor = userEmail
+            });
+        }
+
+        return lista;
+    }
+
+    /// <summary>
+    /// Forma do jsonb de respostas_checklist. Linhas antigas, sem os "nenhuma",
+    /// desserializam com os bools em false (compatível para trás).
+    /// </summary>
+    private sealed class ChecklistPersistido
+    {
+        [JsonPropertyName("q15")] public List<string> Q15 { get; set; } = new();
+        [JsonPropertyName("q16")] public List<string> Q16 { get; set; } = new();
+        [JsonPropertyName("q17")] public List<string> Q17 { get; set; } = new();
+        [JsonPropertyName("q15_nenhuma")] public bool Q15Nenhuma { get; set; }
+        [JsonPropertyName("q16_nenhuma")] public bool Q16Nenhuma { get; set; }
+        [JsonPropertyName("q17_nenhuma")] public bool Q17Nenhuma { get; set; }
     }
 
     /// <summary>
@@ -845,6 +962,8 @@ public class PgiaSistemaService : IPgiaSistemaService
             DataClassificacao = c.DataClassificacao,
             Motivo = c.Motivo,
             Checklist = DesserializarChecklist(c.RespostasChecklist),
+            OutrosRiscos = (c.OutrosRiscos ?? new List<PgiaRiscoOutro>())
+                .OrderBy(r => r.Id).Select(MapRiscoOutro).ToList(),
             Resultado = c.Resultado,
             // O órgão preenche o checklist mas não enxerga a pontuação
             Pontuacao = incluirPontuacao ? c.Pontuacao : null,
@@ -859,16 +978,30 @@ public class PgiaSistemaService : IPgiaSistemaService
     {
         if (string.IsNullOrWhiteSpace(json)) return new PgiaChecklistDTO();
 
-        var mapa = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(json);
-        if (mapa == null) return new PgiaChecklistDTO();
+        var persistido = JsonSerializer.Deserialize<ChecklistPersistido>(json);
+        if (persistido == null) return new PgiaChecklistDTO();
 
         return new PgiaChecklistDTO
         {
-            Q15 = mapa.TryGetValue("q15", out var q15) ? q15 : new List<string>(),
-            Q16 = mapa.TryGetValue("q16", out var q16) ? q16 : new List<string>(),
-            Q17 = mapa.TryGetValue("q17", out var q17) ? q17 : new List<string>()
+            Q15 = persistido.Q15,
+            Q16 = persistido.Q16,
+            Q17 = persistido.Q17,
+            Q15Nenhuma = persistido.Q15Nenhuma,
+            Q16Nenhuma = persistido.Q16Nenhuma,
+            Q17Nenhuma = persistido.Q17Nenhuma
         };
     }
+
+    private static PgiaRiscoOutroResponse MapRiscoOutro(PgiaRiscoOutro r) => new()
+    {
+        Id = r.Id,
+        DescricaoRisco = r.DescricaoRisco,
+        AcaoMitigacao = r.AcaoMitigacao,
+        ResponsavelNome = r.ResponsavelNome,
+        ResponsavelEmail = r.ResponsavelEmail,
+        Probabilidade = r.Probabilidade,
+        Consequencia = r.Consequencia
+    };
 
     private static PgiaDocumentoResponse MapDocumento(PgiaDocumento d)
     {

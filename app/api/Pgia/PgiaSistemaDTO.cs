@@ -4,8 +4,11 @@ namespace api.Pgia;
 
 /// <summary>
 /// Respostas do questionário de classificação (arts. 15 a 17): incisos marcados
-/// por artigo, em algarismos romanos ("I".."IX"). Grava em jsonb como
-/// {"q15":[...],"q16":[...],"q17":[...]} (formato do schema_pgia_48901.sql).
+/// por artigo, em algarismos romanos ("I".."IX"), mais o "Nenhuma das alternativas
+/// acima" de cada grupo. Grava em jsonb como
+/// {"q15":[...],"q16":[...],"q17":[...],"q15_nenhuma":bool,...}.
+/// Cada grupo precisa estar RESPONDIDO: incisos marcados XOR "nenhuma" (validado
+/// no service). Os "nenhuma" não pontuam e não alteram o cálculo do risco.
 /// </summary>
 public class PgiaChecklistDTO
 {
@@ -14,6 +17,46 @@ public class PgiaChecklistDTO
     public List<string> Q16 { get; set; } = new();
 
     public List<string> Q17 { get; set; } = new();
+
+    public bool Q15Nenhuma { get; set; }
+
+    public bool Q16Nenhuma { get; set; }
+
+    public bool Q17Nenhuma { get; set; }
+}
+
+/// <summary>
+/// Risco declarado pelo órgão no grupo "Outros", pela matriz da CGDF.
+/// Complementar: não entra no cálculo do risco do sistema nem na pontuação.
+/// </summary>
+public class PgiaRiscoOutroDTO
+{
+    // Teto generoso para texto livre: sem ele, um único registro inflado
+    // degradaria a fila de homologação da SGDI (que carrega estes filhos)
+    [StringLength(4000)]
+    public string DescricaoRisco { get; set; } = string.Empty;
+
+    [StringLength(4000)]
+    public string AcaoMitigacao { get; set; } = string.Empty;
+
+    [StringLength(200)]
+    public string ResponsavelNome { get; set; } = string.Empty;
+
+    [StringLength(200)]
+    public string ResponsavelEmail { get; set; } = string.Empty;
+
+    // Subconjunto da escala CGDF: Improvável, Raro ou Possível
+    [StringLength(15)]
+    public string Probabilidade { get; set; } = string.Empty;
+
+    // Subconjunto da escala CGDF: Desprezível, Menor ou Moderada
+    [StringLength(15)]
+    public string Consequencia { get; set; } = string.Empty;
+}
+
+public class PgiaRiscoOutroResponse : PgiaRiscoOutroDTO
+{
+    public long Id { get; set; }
 }
 
 /// <summary>
@@ -23,6 +66,10 @@ public class PgiaChecklistDTO
 public class PgiaClassificacaoCreateDTO
 {
     public PgiaChecklistDTO Checklist { get; set; } = new();
+
+    // Grupo "Outros" do questionário; pode vir vazia
+    [MaxLength(20)]
+    public List<PgiaRiscoOutroDTO> OutrosRiscos { get; set; } = new();
 
     // D31 (PgiaDominios.MotivoClassificacao)
     [StringLength(40)]
@@ -220,6 +267,9 @@ public class PgiaClassificacaoResponse
     public string Motivo { get; set; } = string.Empty;
 
     public PgiaChecklistDTO Checklist { get; set; } = new();
+
+    // Grupo "Outros": riscos declarados pelo órgão (complementares ao resultado)
+    public List<PgiaRiscoOutroResponse> OutrosRiscos { get; set; } = new();
 
     public string Resultado { get; set; } = string.Empty;
 
