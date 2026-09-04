@@ -160,14 +160,72 @@ public class PgiaQuestionarioRiscoTest : PgiaTestBase
         Assert.Equal((int)ErrorCode.PgiaChecklistInvalido, ex.Error.Code);
     }
 
+    // ── Tudo "nenhuma" exige ao menos um risco declarado ──────────────────────
+
+    /// <summary>
+    /// Sistema sem risco algum não existe: com os três grupos em "nenhuma", o grupo
+    /// "Outros" deixa de ser opcional.
+    /// </summary>
     [Fact]
-    public async Task Completude_TodosOsGruposComNenhumaEhValidoEDaBaixoRisco()
+    public async Task TudoNenhuma_SemRiscoDeclaradoEhRejeitado()
     {
-        var id = await CriarSistemaAsync(NovaClassificacao(ChecklistRespondido()));
+        var ex = await Assert.ThrowsAsync<ApiException>(() =>
+            CriarSistemaAsync(NovaClassificacao(ChecklistRespondido())));
+
+        Assert.Equal((int)ErrorCode.PgiaChecklistInvalido, ex.Error.Code);
+        Assert.Contains("descreva ao menos um risco", ex.Error.Message);
+        Assert.Empty(await Context.PgiaSistemasIa.ToListAsync());
+    }
+
+    [Fact]
+    public async Task TudoNenhuma_ComRiscoDeclaradoEhValidoEDaBaixoRisco()
+    {
+        var outros = new List<PgiaRiscoOutroDTO> { NovoRiscoDeclarado("Dependência de fornecedor único") };
+        var id = await CriarSistemaAsync(NovaClassificacao(ChecklistRespondido(), outros));
 
         var sistema = await Context.PgiaSistemasIa.FirstAsync(s => s.Id == id);
         Assert.Equal(PgiaDominios.ResultadoRisco.Baixo, sistema.ClassificacaoRiscoAtual);
         Assert.Null(sistema.EnquadramentoLegal);
+
+        var declarado = await Context.PgiaRiscosOutros.SingleAsync();
+        Assert.Equal("Dependência de fornecedor único", declarado.DescricaoRisco);
+    }
+
+    [Fact]
+    public async Task TudoNenhuma_ReclassificacaoSemRiscoDeclaradoEhRejeitada()
+    {
+        // Nasce com art. 17 marcado, então a classificação inicial dispensa "Outros"
+        var id = await CriarSistemaAsync(NovaClassificacao(
+            ChecklistRespondido(new PgiaChecklistDTO { Q17 = new List<string> { "I" } })));
+        var ctx = await CtxAsync();
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() =>
+            _service.ReclassificarAsync(id, NovaClassificacao(ChecklistRespondido()), ctx));
+
+        Assert.Equal((int)ErrorCode.PgiaChecklistInvalido, ex.Error.Code);
+        Assert.Contains("descreva ao menos um risco", ex.Error.Message);
+        // Segue valendo a classificação anterior
+        var sistema = await Context.PgiaSistemasIa.FirstAsync(s => s.Id == id);
+        Assert.Equal(PgiaDominios.ResultadoRisco.Moderado, sistema.ClassificacaoRiscoAtual);
+        Assert.Single(await Context.PgiaClassificacoesRisco.Where(c => c.SistemaIaId == id).ToListAsync());
+    }
+
+    [Fact]
+    public async Task TudoNenhuma_ReclassificacaoComRiscoDeclaradoEhAceita()
+    {
+        var id = await CriarSistemaAsync(NovaClassificacao(
+            ChecklistRespondido(new PgiaChecklistDTO { Q17 = new List<string> { "I" } })));
+        var ctx = await CtxAsync();
+
+        var nova = await _service.ReclassificarAsync(id, NovaClassificacao(
+            ChecklistRespondido(),
+            new List<PgiaRiscoOutroDTO> { NovoRiscoDeclarado("Risco residual monitorado") }), ctx);
+
+        Assert.Equal(PgiaDominios.ResultadoRisco.Baixo, nova.Resultado);
+        Assert.Equal("Risco residual monitorado", nova.OutrosRiscos.Single().DescricaoRisco);
+
+        var sistema = await Context.PgiaSistemasIa.FirstAsync(s => s.Id == id);
+        Assert.Equal(PgiaDominios.ResultadoRisco.Baixo, sistema.ClassificacaoRiscoAtual);
     }
 
     [Fact]
@@ -185,7 +243,8 @@ public class PgiaQuestionarioRiscoTest : PgiaTestBase
     [Fact]
     public async Task Completude_ValeTambemNaReclassificacao()
     {
-        var id = await CriarSistemaAsync(NovaClassificacao(ChecklistRespondido()));
+        var id = await CriarSistemaAsync(NovaClassificacao(
+            ChecklistRespondido(new PgiaChecklistDTO { Q17 = new List<string> { "I" } })));
 
         var incompleto = ChecklistRespondido();
         incompleto.Q17Nenhuma = false;
@@ -240,7 +299,8 @@ public class PgiaQuestionarioRiscoTest : PgiaTestBase
     [Fact]
     public async Task Nenhuma_ChecklistAntigoSemOsCamposNaoQuebra()
     {
-        var id = await CriarSistemaAsync(NovaClassificacao(ChecklistRespondido()));
+        var id = await CriarSistemaAsync(NovaClassificacao(
+            ChecklistRespondido(new PgiaChecklistDTO { Q17 = new List<string> { "I" } })));
         var salva = await Context.PgiaClassificacoesRisco.SingleAsync(c => c.SistemaIaId == id);
         salva.RespostasChecklist = "{\"q15\":[],\"q16\":[],\"q17\":[\"I\"]}";
         await Context.SaveChangesAsync();
@@ -285,10 +345,16 @@ public class PgiaQuestionarioRiscoTest : PgiaTestBase
         Assert.Equal("responsavel@ses.df.gov.br", devolvida.OutrosRiscos[0].ResponsavelEmail);
     }
 
+    /// <summary>
+    /// Lista vazia continua válida quando algum grupo dos arts. 15 a 17 foi marcado
+    /// — o grupo "Outros" só é exigido quando os três ficam em "nenhuma".
+    /// </summary>
     [Fact]
-    public async Task OutrosRiscos_ListaVaziaEhValida()
+    public async Task OutrosRiscos_ListaVaziaEhValidaComGrupoMarcado()
     {
-        var id = await CriarSistemaAsync(NovaClassificacao(ChecklistRespondido(), new List<PgiaRiscoOutroDTO>()));
+        var id = await CriarSistemaAsync(NovaClassificacao(
+            ChecklistRespondido(new PgiaChecklistDTO { Q17 = new List<string> { "I" } }),
+            new List<PgiaRiscoOutroDTO>()));
 
         Assert.Empty(await Context.PgiaRiscosOutros.ToListAsync());
         var historico = await _service.ListarClassificacoesAsync(id, incluirPontuacao: false);

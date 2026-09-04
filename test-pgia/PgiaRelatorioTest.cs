@@ -79,6 +79,7 @@ public class PgiaRelatorioTest : PgiaTestBase
             Classificacao = new PgiaClassificacaoCreateDTO
             {
                 Checklist = ChecklistRespondido(new PgiaChecklistDTO { Q16 = q16 ?? new List<string>() }),
+                OutrosRiscos = OutrosRiscosSeNecessario(q16: q16),
                 Motivo = "Classificação inicial",
                 DataClassificacao = new DateOnly(2026, 9, 1),
                 Justificativa = "Enquadramento avaliado."

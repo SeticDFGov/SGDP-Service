@@ -616,6 +616,13 @@ public class PgiaSistemaService : IPgiaSistemaService
         ValidarCompletudeDoGrupo(16, q16, checklist.Q16Nenhuma);
         ValidarCompletudeDoGrupo(17, q17, checklist.Q17Nenhuma);
 
+        // Sistema sem risco algum não existe: se os três grupos ficaram em
+        // "nenhuma", o órgão declara ao menos um risco próprio no grupo "Outros"
+        if (checklist.Q15Nenhuma && checklist.Q16Nenhuma && checklist.Q17Nenhuma
+            && (dto.OutrosRiscos == null || dto.OutrosRiscos.Count == 0))
+            throw new ApiException(ErrorCode.PgiaChecklistInvalido,
+                "Como nenhuma das situações dos três grupos se aplica, descreva ao menos um risco no grupo \"Outros riscos identificados pelo órgão\".");
+
         string resultado;
         string? enquadramento;
         if (q15.Count > 0)

@@ -85,6 +85,7 @@ public class PgiaPublicoTest : PgiaTestBase
             Classificacao = new PgiaClassificacaoCreateDTO
             {
                 Checklist = ChecklistRespondido(),
+                OutrosRiscos = OutrosRiscosSeNecessario(),
                 Motivo = "Classificação inicial",
                 DataClassificacao = new DateOnly(2026, 9, 1),
                 Justificativa = "Sem enquadramento nos arts. 15 a 17."

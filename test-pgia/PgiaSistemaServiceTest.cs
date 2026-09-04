@@ -65,6 +65,7 @@ public class PgiaSistemaServiceTest : PgiaTestBase
             Q16 = q16 ?? new List<string>(),
             Q17 = q17 ?? new List<string>()
         }),
+        OutrosRiscos = OutrosRiscosSeNecessario(q15, q16, q17),
         Motivo = "Classificação inicial",
         DataClassificacao = new DateOnly(2026, 9, 1),
         Justificativa = "Enquadramento avaliado pelo Responsável de IA do órgão."

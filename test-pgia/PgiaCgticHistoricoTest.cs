@@ -78,6 +78,7 @@ public class PgiaCgticHistoricoTest : PgiaTestBase
             Classificacao = new PgiaClassificacaoCreateDTO
             {
                 Checklist = ChecklistRespondido(checklist),
+                OutrosRiscos = OutrosRiscosSeNecessario(ChecklistRespondido(checklist)),
                 Motivo = "Classificação inicial",
                 DataClassificacao = dataClassificacao,
                 Justificativa = "Enquadramento conforme os arts. 15 a 17."
