@@ -1,4 +1,3 @@
-using System.Net.Mail;
 using api.Pgia;
 using app.Auth;
 using app.Models;
@@ -215,11 +214,8 @@ public class PgiaGovernancaService : IPgiaGovernancaService
         if (unidadeId != null) user.Unidade = unidade;
     }
 
-    /// <summary>Formato mínimo de e-mail: endereço único, sem apelido, com domínio pontuado.</summary>
-    private static bool EmailValido(string email) =>
-        MailAddress.TryCreate(email, out var endereco)
-        && endereco.Address == email
-        && endereco.Host.Contains('.');
+    /// <summary>Formato mínimo de e-mail; regra única em PgiaValidacoes.</summary>
+    private static bool EmailValido(string email) => PgiaValidacoes.EmailValido(email);
 
     private async Task<PgiaPessoaAcesso> MapPessoaComOrgaoAsync(User user)
     {

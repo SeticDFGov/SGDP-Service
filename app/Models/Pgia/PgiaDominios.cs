@@ -161,6 +161,63 @@ public static class PgiaDominios
         public static readonly string[] Art17 = { "I", "II", "III", "IV" };
     }
 
+    /// <summary>
+    /// Matriz de riscos da CGDF, usada no grupo "Outros" do questionário (riscos
+    /// declarados pelo órgão). A escala completa fica registrada como constante;
+    /// neste grupo só vale o SUBCONJUNTO permitido — riscos que o órgão declara
+    /// aqui não podem ser de probabilidade ou consequência alta (esses são os dos
+    /// arts. 15 a 17, que têm grupo próprio).
+    /// </summary>
+    public static class EscalaCgdf
+    {
+        public static class Probabilidade
+        {
+            public const string Improvavel = "Improvável";
+            public const string Raro = "Raro";
+            public const string Possivel = "Possível";
+            public const string Provavel = "Provável";
+            public const string QuaseCerto = "Quase certo";
+
+            // Escala completa da CGDF, com o peso de cada grau (1..5)
+            public static readonly IReadOnlyDictionary<string, int> Pesos = new Dictionary<string, int>
+            {
+                [Improvavel] = 1,
+                [Raro] = 2,
+                [Possivel] = 3,
+                [Provavel] = 4,
+                [QuaseCerto] = 5
+            };
+
+            public static readonly string[] Todos = { Improvavel, Raro, Possivel, Provavel, QuaseCerto };
+
+            // Subconjunto aceito no grupo "Outros"
+            public static readonly string[] Permitidos = { Improvavel, Raro, Possivel };
+        }
+
+        public static class Consequencia
+        {
+            public const string Desprezivel = "Desprezível";
+            public const string Menor = "Menor";
+            public const string Moderada = "Moderada";
+            public const string Maior = "Maior";
+            public const string Catastrofica = "Catastrófica";
+
+            public static readonly IReadOnlyDictionary<string, int> Pesos = new Dictionary<string, int>
+            {
+                [Desprezivel] = 1,
+                [Menor] = 2,
+                [Moderada] = 3,
+                [Maior] = 4,
+                [Catastrofica] = 5
+            };
+
+            public static readonly string[] Todos = { Desprezivel, Menor, Moderada, Maior, Catastrofica };
+
+            // Subconjunto aceito no grupo "Outros"
+            public static readonly string[] Permitidos = { Desprezivel, Menor, Moderada };
+        }
+    }
+
     // ── Fase 2: governança central ─────────────────────────────────────────────
 
     // Fluxo de homologação do inventário (desenho da chefia): o órgão sempre envia;

@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using api.Pgia;
 using app.Models;
 using demanda_service.Helpers;
@@ -78,7 +78,8 @@ public class PgiaRelatorioTest : PgiaTestBase
             SupervisaoHumanaDescricao = "Servidor revisa cada decisão.",
             Classificacao = new PgiaClassificacaoCreateDTO
             {
-                Checklist = new PgiaChecklistDTO { Q16 = q16 ?? new List<string>() },
+                Checklist = ChecklistRespondido(new PgiaChecklistDTO { Q16 = q16 ?? new List<string>() }),
+                OutrosRiscos = OutrosRiscosSeNecessario(q16: q16),
                 Motivo = "Classificação inicial",
                 DataClassificacao = new DateOnly(2026, 9, 1),
                 Justificativa = "Enquadramento avaliado."

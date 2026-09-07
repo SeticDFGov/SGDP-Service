@@ -28,6 +28,7 @@ namespace Models
         public DbSet<PgiaPrazoConformidade> PgiaPrazosConformidade { get; set; }
         public DbSet<PgiaSistemaIa> PgiaSistemasIa { get; set; }
         public DbSet<PgiaClassificacaoRisco> PgiaClassificacoesRisco { get; set; }
+        public DbSet<PgiaRiscoOutro> PgiaRiscosOutros { get; set; }
         public DbSet<PgiaDocumento> PgiaDocumentos { get; set; }
         public DbSet<PgiaAia> PgiaAias { get; set; }
         public DbSet<PgiaDeliberacaoCgtic> PgiaDeliberacoesCgtic { get; set; }

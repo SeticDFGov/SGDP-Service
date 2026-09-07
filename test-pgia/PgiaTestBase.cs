@@ -1,3 +1,4 @@
+using api.Pgia;
 using app.Models;
 using Microsoft.EntityFrameworkCore;
 using Models;
@@ -73,6 +74,52 @@ public abstract class PgiaTestBase : IDisposable
 
         Context.SaveChanges();
     }
+
+    /// <summary>
+    /// Completa o checklist como a tela agrupada faz: os grupos sem nenhum inciso
+    /// marcado recebem "Nenhuma das alternativas acima". O questionário exige
+    /// resposta explícita por grupo (incisos XOR nenhuma), então os fixtures que
+    /// só marcam um artigo precisam responder os outros dois.
+    /// </summary>
+    protected static PgiaChecklistDTO ChecklistRespondido(PgiaChecklistDTO? checklist = null)
+    {
+        var c = checklist ?? new PgiaChecklistDTO();
+        c.Q15Nenhuma = c.Q15.Count == 0;
+        c.Q16Nenhuma = c.Q16.Count == 0;
+        c.Q17Nenhuma = c.Q17.Count == 0;
+        return c;
+    }
+
+    /// <summary>
+    /// Risco declarado válido para o grupo "Outros" (matriz da CGDF, dentro do
+    /// subconjunto permitido). Serve às fixtures que respondem "nenhuma" nos três
+    /// grupos, onde declarar ao menos um risco virou obrigatório.
+    /// </summary>
+    protected static PgiaRiscoOutroDTO RiscoOutroExemplo(
+        string descricao = "Indisponibilidade do serviço em horário de pico") => new()
+    {
+        DescricaoRisco = descricao,
+        AcaoMitigacao = "Monitoramento contínuo e plano de contingência",
+        ResponsavelNome = "Maria Andrade",
+        ResponsavelEmail = "maria@ses.df.gov.br",
+        Probabilidade = PgiaDominios.EscalaCgdf.Probabilidade.Raro,
+        Consequencia = PgiaDominios.EscalaCgdf.Consequencia.Menor
+    };
+
+    /// <summary>
+    /// Riscos declarados a anexar à classificação: sistema sem nenhuma situação dos
+    /// arts. 15 a 17 precisa declarar ao menos um risco próprio. Só acrescenta onde
+    /// a regra exige, para não mexer no que cada fixture já exercitava.
+    /// </summary>
+    protected static List<PgiaRiscoOutroDTO> OutrosRiscosSeNecessario(PgiaChecklistDTO checklist) =>
+        OutrosRiscosSeNecessario(checklist.Q15, checklist.Q16, checklist.Q17);
+
+    /// <inheritdoc cref="OutrosRiscosSeNecessario(PgiaChecklistDTO)"/>
+    protected static List<PgiaRiscoOutroDTO> OutrosRiscosSeNecessario(
+        List<string>? q15 = null, List<string>? q16 = null, List<string>? q17 = null) =>
+        (q15?.Count ?? 0) == 0 && (q16?.Count ?? 0) == 0 && (q17?.Count ?? 0) == 0
+            ? new List<PgiaRiscoOutroDTO> { RiscoOutroExemplo() }
+            : new List<PgiaRiscoOutroDTO>();
 
     private User NovoUser(string email, string nome, string perfil, string? papelPgia, Unidade? unidade)
     {

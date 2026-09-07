@@ -1,4 +1,4 @@
-using api.Pgia;
+﻿using api.Pgia;
 using app.Models;
 using Microsoft.EntityFrameworkCore;
 using Models.Pgia;
@@ -73,7 +73,8 @@ public class PgiaGovernancaServiceTest : PgiaTestBase
             SupervisaoHumanaDescricao = "Servidor revisa cada decisão.",
             Classificacao = new PgiaClassificacaoCreateDTO
             {
-                Checklist = new PgiaChecklistDTO { Q16 = new List<string> { "IV" } },
+                Checklist = ChecklistRespondido(new PgiaChecklistDTO { Q16 = new List<string> { "IV" } }),
+                OutrosRiscos = OutrosRiscosSeNecessario(q16: new List<string> { "IV" }),
                 Motivo = "Classificação inicial",
                 DataClassificacao = new DateOnly(2026, 9, 1),
                 Justificativa = "Apoio a diagnóstico com risco relevante."
@@ -357,6 +358,8 @@ public class PgiaGovernancaServiceTest : PgiaTestBase
             InteroperavelPadroesSgdi = true,
             Classificacao = new PgiaClassificacaoCreateDTO
             {
+                Checklist = ChecklistRespondido(),
+                OutrosRiscos = OutrosRiscosSeNecessario(),
                 Motivo = "Classificação inicial",
                 DataClassificacao = new DateOnly(2026, 9, 1),
                 Justificativa = "Sem enquadramento nos arts. 15 a 17."
@@ -375,6 +378,8 @@ public class PgiaGovernancaServiceTest : PgiaTestBase
             InteroperavelPadroesSgdi = true,
             Classificacao = new PgiaClassificacaoCreateDTO
             {
+                Checklist = ChecklistRespondido(),
+                OutrosRiscos = OutrosRiscosSeNecessario(),
                 Motivo = "Classificação inicial",
                 DataClassificacao = new DateOnly(2026, 9, 1),
                 Justificativa = "Sem enquadramento nos arts. 15 a 17."

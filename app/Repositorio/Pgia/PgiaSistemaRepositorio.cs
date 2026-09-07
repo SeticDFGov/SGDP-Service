@@ -40,6 +40,7 @@ public class PgiaSistemaRepositorio : IPgiaSistemaRepositorio
         // Histórico do mais recente para o mais antigo (arts. 14 e 16, § 2º)
         return await _context.PgiaClassificacoesRisco
             .Include(c => c.ClassificadoPorUser)
+            .Include(c => c.OutrosRiscos)
             .Where(c => c.SistemaIaId == sistemaId)
             .OrderByDescending(c => c.Id)
             .ToListAsync();
@@ -49,6 +50,7 @@ public class PgiaSistemaRepositorio : IPgiaSistemaRepositorio
     {
         return await _context.PgiaClassificacoesRisco
             .Include(c => c.ClassificadoPorUser)
+            .Include(c => c.OutrosRiscos)
             .Where(c => c.SistemaIaId == sistemaId)
             .OrderByDescending(c => c.Id)
             .FirstOrDefaultAsync();
@@ -62,6 +64,7 @@ public class PgiaSistemaRepositorio : IPgiaSistemaRepositorio
         // Uma consulta para todos os sistemas da fila; a vigente é a de maior Id
         var classificacoes = await _context.PgiaClassificacoesRisco
             .Include(c => c.ClassificadoPorUser)
+            .Include(c => c.OutrosRiscos)
             .Where(c => ids.Contains(c.SistemaIaId))
             .ToListAsync();
 
