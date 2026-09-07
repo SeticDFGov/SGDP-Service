@@ -53,7 +53,7 @@ public class PgiaQuestionarioRiscoTest : PgiaTestBase
     }
 
     private async Task<PgiaUserContext> CtxAsync() =>
-        (await _permissionService.GetContextAsync(UserOrgaoSes.Email))!;
+        (await _permissionService.GetContextAsync(UserOrgaoSes.Email, PerfilDe(UserOrgaoSes)))!;
 
     private static PgiaRiscoOutroDTO NovoRiscoDeclarado(
         string descricao = "Viés na priorização de atendimentos",
