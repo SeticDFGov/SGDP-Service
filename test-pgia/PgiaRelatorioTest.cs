@@ -58,7 +58,7 @@ public class PgiaRelatorioTest : PgiaTestBase
     }
 
     private async Task<PgiaUserContext> CtxAsync(string email) =>
-        (await _permissionService.GetContextAsync(email))!;
+        (await _permissionService.GetContextAsync(email, PerfilDe(email)))!;
 
     private async Task<PgiaSistemaResponse> NovoSistemaAsync(
         long orgaoId, string email, string denominacao, List<string>? q16 = null)

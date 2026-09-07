@@ -53,7 +53,7 @@ public class PgiaSistemaServiceTest : PgiaTestBase
 
     private async Task<PgiaUserContext> ContextoSesAsync()
     {
-        return (await _permissionService.GetContextAsync(UserOrgaoSes.Email))!;
+        return (await _permissionService.GetContextAsync(UserOrgaoSes.Email, PerfilDe(UserOrgaoSes)))!;
     }
 
     private static PgiaClassificacaoCreateDTO NovaClassificacaoDto(

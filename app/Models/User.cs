@@ -15,8 +15,6 @@ public class User
     [Required]
     public string Email { get; set; }
 
-    public string Perfil { get; set; } = "basico";
-
     // Papel no módulo PGIA (Decreto nº 48.901/2026); null = sem função no PGIA.
     // Administrado por endpoint do próprio sistema, nunca pelo Keycloak.
     [StringLength(30)]

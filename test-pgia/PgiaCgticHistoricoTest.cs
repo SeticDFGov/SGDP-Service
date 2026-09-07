@@ -52,7 +52,7 @@ public class PgiaCgticHistoricoTest : PgiaTestBase
     }
 
     private async Task<PgiaUserContext> CtxAsync(string email) =>
-        (await _permissionService.GetContextAsync(email))!;
+        (await _permissionService.GetContextAsync(email, PerfilDe(email)))!;
 
     /// <summary>
     /// Cria um sistema com o checklist informado. Sem checklist o resultado é

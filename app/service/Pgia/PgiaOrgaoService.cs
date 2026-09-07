@@ -63,22 +63,20 @@ public class PgiaOrgaoService : IPgiaOrgaoService
         var orgao = await _orgaoRepositorio.GetByIdAsync(orgaoId)
             ?? throw new ApiException(ErrorCode.PgiaOrgaoNaoEncontrado);
 
-        if (string.IsNullOrWhiteSpace(dto.Sigla) || string.IsNullOrWhiteSpace(dto.Nome))
-            throw new ApiException(ErrorCode.PgiaDominioInvalido, "Sigla e nome do órgão são obrigatórios.");
+        if (string.IsNullOrWhiteSpace(dto.Nome))
+            throw new ApiException(ErrorCode.PgiaDominioInvalido, "Nome do órgão é obrigatório.");
 
         if (!PgiaDominios.NaturezaJuridica.Todos.Contains(dto.NaturezaJuridica))
             throw new ApiException(ErrorCode.PgiaDominioInvalido, $"Natureza jurídica inválida: {dto.NaturezaJuridica}");
 
-        var mesmaSigla = await _orgaoRepositorio.GetBySiglaAsync(dto.Sigla.Trim());
-        if (mesmaSigla != null && mesmaSigla.Id != orgaoId)
-            throw new ApiException(ErrorCode.PgiaOrgaoJaExiste, $"Já existe órgão com a sigla {dto.Sigla.Trim()}.");
-
         // Unidade: nula NÃO desvincula (mantém a atual) — o front antigo não envia o
         // campo; com valor, liga/troca, validando existência e unicidade (1 unidade
         // ↔ 1 órgão, ux_pgia_orgao_unidade). É o conserto de órgão criado sem unidade.
+        // A sigla é sempre o código do grupo Keycloak da unidade vigente — nunca
+        // digitada; sem unidade (caso legado), a sigla existente é preservada.
         if (dto.UnidadeId != null && dto.UnidadeId != orgao.UnidadeId)
         {
-            _ = await _context.Unidades.FirstOrDefaultAsync(u => u.id == dto.UnidadeId)
+            var novaUnidade = await _context.Unidades.FirstOrDefaultAsync(u => u.id == dto.UnidadeId)
                 ?? throw new ApiException(ErrorCode.PgiaUnidadeNaoEncontrada);
 
             var mesmaUnidade = await _orgaoRepositorio.GetByUnidadeIdAsync(dto.UnidadeId.Value);
@@ -87,12 +85,17 @@ public class PgiaOrgaoService : IPgiaOrgaoService
                     $"A unidade já está vinculada ao órgão {mesmaUnidade.Sigla}.");
 
             orgao.UnidadeId = dto.UnidadeId;
+            orgao.Sigla = novaUnidade.CodigoExterno ?? novaUnidade.Nome;
+        }
+        else if (orgao.UnidadeId != null)
+        {
+            var unidadeAtual = await _context.Unidades.FirstAsync(u => u.id == orgao.UnidadeId);
+            orgao.Sigla = unidadeAtual.CodigoExterno ?? unidadeAtual.Nome;
         }
 
         var prestaAplicavel = dto.NaturezaJuridica is PgiaDominios.NaturezaJuridica.EmpresaPublica
             or PgiaDominios.NaturezaJuridica.SociedadeEconomiaMista;
 
-        orgao.Sigla = dto.Sigla.Trim();
         orgao.Nome = dto.Nome.Trim();
         orgao.NaturezaJuridica = dto.NaturezaJuridica;
         orgao.PrestaServicoCidadao = prestaAplicavel ? dto.PrestaServicoCidadao : null;

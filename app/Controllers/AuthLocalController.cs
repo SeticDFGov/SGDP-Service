@@ -75,19 +75,26 @@ public class AuthLocalController : ControllerBase
     {
         if (!ModoLocalAtivo) return NotFound();
 
-        var perfis = new[] { Perfis.Admin, Perfis.Gestor, Perfis.CentralIT, Perfis.Parceiro, Perfis.Basico };
+        var perfis = new[] { Perfis.Admin, Perfis.Gestor, Perfis.Basico };
         if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Nome)
             || !perfis.Contains(request.Perfil))
-            return BadRequest("Informe e-mail, nome e um perfil válido (admin, gestor, centralit, parceiro ou basico).");
+            return BadRequest("Informe e-mail, nome e um perfil válido (admin, gestor ou basico).");
 
         if (request.PapelPgia != null && !PapeisPgia.Todos.Contains(request.PapelPgia))
             return BadRequest("Papel PGIA inválido (pgia_orgao, pgia_sgdi, pgia_cgtic ou pgia_auditoria).");
 
         await ProvisionarUsuarioDeTesteAsync(request);
 
+        // A role "pgia" (portão de entrada do módulo) acompanha qualquer persona
+        // que envolva PGIA, igual ao Keycloak real: quem recebe papel PGIA ou é
+        // vinculado ao órgão de teste também recebe a role de acesso ao módulo.
+        var roles = new List<string> { request.Perfil };
+        if (request.PapelPgia != null || request.VincularAoOrgaoDeTeste)
+            roles.Add("pgia");
+
         var validade = TimeSpan.FromHours(8);
         var token = ModoLocalTokens.EmitirToken(
-            request.Email.Trim(), request.Nome.Trim(), request.Perfil,
+            request.Email.Trim(), request.Nome.Trim(), roles,
             _authSettings.ClientId, validade);
 
         // Mesmo formato do token do Keycloak que o front já consome
@@ -105,7 +112,8 @@ public class AuthLocalController : ControllerBase
     /// <summary>
     /// Deixa o usuário de teste pronto ANTES do /me: papel PGIA e unidade.
     /// O /me (GetOrCreateUserAsync) encontra o usuário pelo mesmo sub
-    /// determinístico e preserva Unidade e PapelPgia — só atualiza o Perfil.
+    /// determinístico e preserva Unidade e PapelPgia; o Perfil nunca é
+    /// persistido — vem sempre da claim do token, em ambos os fluxos.
     /// </summary>
     private async Task ProvisionarUsuarioDeTesteAsync(LoginLocalRequest request)
     {
@@ -127,7 +135,7 @@ public class AuthLocalController : ControllerBase
 
         if (user == null)
         {
-            user = new User { KeycloakId = keycloakId, Nome = request.Nome.Trim(), Email = email, Perfil = request.Perfil };
+            user = new User { KeycloakId = keycloakId, Nome = request.Nome.Trim(), Email = email };
             _context.Users.Add(user);
         }
 
@@ -137,12 +145,12 @@ public class AuthLocalController : ControllerBase
         await _context.SaveChangesAsync();
     }
 
-    private async Task<Unidade> GarantirUnidadeAsync(string nome)
+    private async Task<Unidade> GarantirUnidadeAsync(string nome, string? codigoExterno = null)
     {
         var unidade = await _context.Unidades.FirstOrDefaultAsync(u => u.Nome == nome);
         if (unidade == null)
         {
-            unidade = new Unidade { Nome = nome };
+            unidade = new Unidade { Nome = nome, CodigoExterno = codigoExterno };
             _context.Unidades.Add(unidade);
             await _context.SaveChangesAsync();
         }
@@ -163,7 +171,7 @@ public class AuthLocalController : ControllerBase
         if (orgao?.UnidadeId != null)
             return (await _context.Unidades.FirstAsync(u => u.id == orgao.UnidadeId));
 
-        var unidade = await GarantirUnidadeAsync(NomeUnidadeOrgao);
+        var unidade = await GarantirUnidadeAsync(NomeUnidadeOrgao, codigoExterno: SiglaOrgaoDeTeste);
 
         if (orgao != null)
         {
@@ -177,9 +185,9 @@ public class AuthLocalController : ControllerBase
         var orgaoDaUnidade = await _context.PgiaOrgaos
             .AnyAsync(o => o.Ativo && o.UnidadeId == unidade.id);
         if (!orgaoDaUnidade)
+            // A sigla nasce sozinha a partir do CodigoExterno da unidade (SiglaOrgaoDeTeste).
             await _adminService.CriarOrgaoAsync(new PgiaOrgaoCreateDTO
             {
-                Sigla = SiglaOrgaoDeTeste,
                 Nome = "Secretaria de Teste do PGIA",
                 NaturezaJuridica = "Administração direta",
                 UnidadeId = unidade.id

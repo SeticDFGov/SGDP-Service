@@ -53,7 +53,7 @@ public class PgiaGovernancaServiceTest : PgiaTestBase
     }
 
     private async Task<PgiaUserContext> CtxAsync(string email) =>
-        (await _permissionService.GetContextAsync(email))!;
+        (await _permissionService.GetContextAsync(email, PerfilDe(email)))!;
 
     /// <summary>Cria um sistema de Alto Risco, que nasce aguardando o comitê.</summary>
     private async Task<PgiaSistemaResponse> NovoSistemaAltoRiscoAsync(string denominacao = "Triagem clínica")

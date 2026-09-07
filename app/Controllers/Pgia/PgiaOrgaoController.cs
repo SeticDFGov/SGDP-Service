@@ -14,7 +14,7 @@ namespace Controllers.Pgia;
 /// no PgiaPermissionService.
 /// </summary>
 [ApiController]
-[Authorize]
+[Authorize(Roles = "admin,pgia")]
 [Route("api/pgia/orgao")]
 public class PgiaOrgaoController : ControllerBase
 {
@@ -28,12 +28,13 @@ public class PgiaOrgaoController : ControllerBase
     }
 
     private string? GetUserEmail() => User.FindFirst(ClaimTypes.Email)?.Value;
+    private string GetUserPerfil() => User.FindFirst(ClaimTypes.Role)?.Value ?? Perfis.Basico;
 
     private async Task<PgiaUserContext?> GetContextAsync()
     {
         var email = GetUserEmail();
         if (string.IsNullOrEmpty(email)) return null;
-        return await _permissionService.GetContextAsync(email);
+        return await _permissionService.GetContextAsync(email, GetUserPerfil());
     }
 
     /// <summary>

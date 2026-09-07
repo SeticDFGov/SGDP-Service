@@ -15,14 +15,6 @@ public class PermissionService : IPermissionService
         _context = context;
     }
 
-    public async Task<string> GetUserPerfilAsync(string email)
-    {
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Email == email);
-
-        return user?.Perfil ?? Perfis.Basico;
-    }
-
     public async Task<Unidade?> GetUserUnidadeAsync(string email)
     {
         var user = await _context.Users
@@ -38,8 +30,6 @@ public class PermissionService : IPermissionService
         {
             Perfis.Admin => true,
             Perfis.Gestor => true,
-            Perfis.CentralIT => resource is "entregavel" or "demanda",
-            Perfis.Parceiro => false,
             _ => false
         };
     }
@@ -50,8 +40,6 @@ public class PermissionService : IPermissionService
         {
             Perfis.Admin => true,
             Perfis.Gestor => true,
-            Perfis.CentralIT => resource is "entregavel" or "percentual" or "demanda",
-            Perfis.Parceiro => false,
             _ => false
         };
     }
@@ -62,29 +50,18 @@ public class PermissionService : IPermissionService
         {
             Perfis.Admin => true,
             Perfis.Gestor => true,
-            Perfis.CentralIT => false,
-            Perfis.Parceiro => false,
             _ => false
         };
     }
 
     public IQueryable<Demanda> GetFilteredDemandasQuery(string perfil, string? unidadeNome)
     {
-        var query = _context.Demandas
+        return _context.Demandas
             .Include(d => d.AREA_DEMANDANTE)
             .Include(d => d.Esteira)
             .Include(d => d.Entregaveis!)
                 .ThenInclude(e => e.Responsavel)
             .AsSplitQuery()
             .AsQueryable();
-
-        return perfil switch
-        {
-            Perfis.Admin => query,
-            Perfis.Gestor => query,
-            Perfis.CentralIT => query.Where(d => d.Esteira != null && d.Esteira.IsCentralIT),
-            Perfis.Parceiro => query.Where(d => d.AREA_DEMANDANTE != null && d.AREA_DEMANDANTE.NM_DEMANDANTE == unidadeNome),
-            _ => query.Where(d => d.AREA_DEMANDANTE != null && d.AREA_DEMANDANTE.NM_DEMANDANTE == unidadeNome)
-        };
     }
 }

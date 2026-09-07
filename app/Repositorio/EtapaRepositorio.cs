@@ -21,15 +21,6 @@ public class EtapaRepositorio : IEtapaRepositorio
             .ToListAsync();
     }
 
-    public async Task<List<Etapa>> GetEntregaveisByAreaExecutoraAsync(string areaExecutoraNome)
-    {
-        return await _context.Etapas
-            .Include(e => e.Responsavel)
-            .Include(e => e.NM_PROJETO)
-            .Where(e => e.Responsavel != null && e.Responsavel.Nome == areaExecutoraNome)
-            .ToListAsync();
-    }
-
     public async Task<Etapa?> GetByIdAsync(int id)
     {
         return await _context.Etapas

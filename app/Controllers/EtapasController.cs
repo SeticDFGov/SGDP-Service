@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using api.Entregavel;
+using app.Auth;
 using demanda_service.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -22,6 +23,7 @@ public class EntregaveisController : ControllerBase
     }
 
     private string? GetUserEmail() => User.FindFirst(ClaimTypes.Email)?.Value;
+    private string GetUserPerfil() => User.FindFirst(ClaimTypes.Role)?.Value ?? Perfis.Basico;
 
     /// <summary>
     /// Lista entregáveis de uma demanda
@@ -30,17 +32,6 @@ public class EntregaveisController : ControllerBase
     public async Task<IActionResult> GetEntregaveis(int demandaId)
     {
         var items = await _service.GetEntregaveisByDemandaAsync(demandaId);
-        var response = items.Select(e => e.ToEntregavelResponse()).ToList();
-        return Ok(response);
-    }
-
-    /// <summary>
-    /// Lista entregáveis da AreaExecutora do usuário CentralIT
-    /// </summary>
-    [HttpGet("centralit")]
-    public async Task<IActionResult> GetEntregaveisCentralIT([FromQuery] string areaExecutoraNome)
-    {
-        var items = await _service.GetEntregaveisByCentralITAsync(areaExecutoraNome);
         var response = items.Select(e => e.ToEntregavelResponse()).ToList();
         return Ok(response);
     }
@@ -64,7 +55,7 @@ public class EntregaveisController : ControllerBase
         var email = GetUserEmail();
         if (string.IsNullOrEmpty(email)) return Unauthorized();
 
-        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        var perfil = GetUserPerfil();
         if (!_permissionService.CanCreate(perfil, "entregavel"))
             return Forbid();
 
@@ -81,7 +72,7 @@ public class EntregaveisController : ControllerBase
         var email = GetUserEmail();
         if (string.IsNullOrEmpty(email)) return Unauthorized();
 
-        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        var perfil = GetUserPerfil();
         if (!_permissionService.CanEdit(perfil, "entregavel"))
             return Forbid();
 
@@ -98,7 +89,7 @@ public class EntregaveisController : ControllerBase
         var email = GetUserEmail();
         if (string.IsNullOrEmpty(email)) return Unauthorized();
 
-        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        var perfil = GetUserPerfil();
         if (!_permissionService.CanEdit(perfil, "entregavel"))
             return Forbid();
 
@@ -107,7 +98,7 @@ public class EntregaveisController : ControllerBase
     }
 
     /// <summary>
-    /// Atualiza percentual executado e descrição (CentralIT)
+    /// Atualiza percentual executado e descrição
     /// </summary>
     [HttpPut("{id}/percentual")]
     public async Task<IActionResult> UpdatePercentual(int id, [FromBody] EntregavelUpdatePercentDTO dto)
@@ -115,7 +106,7 @@ public class EntregaveisController : ControllerBase
         var email = GetUserEmail();
         if (string.IsNullOrEmpty(email)) return Unauthorized();
 
-        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        var perfil = GetUserPerfil();
         if (!_permissionService.CanEdit(perfil, "percentual"))
             return Forbid();
 
@@ -132,7 +123,7 @@ public class EntregaveisController : ControllerBase
         var email = GetUserEmail();
         if (string.IsNullOrEmpty(email)) return Unauthorized();
 
-        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        var perfil = GetUserPerfil();
         if (!_permissionService.CanDelete(perfil, "entregavel"))
             return Forbid();
 

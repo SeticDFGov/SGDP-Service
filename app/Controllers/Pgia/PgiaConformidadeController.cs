@@ -14,7 +14,7 @@ namespace Controllers.Pgia;
 /// trilhas ProCapIA/DF (arts. 28 e 29) e registro de uso de IA (art. 13, IV e V).
 /// </summary>
 [ApiController]
-[Authorize]
+[Authorize(Roles = "admin,pgia")]
 [Route("api/pgia/conformidade")]
 public class PgiaConformidadeController : ControllerBase
 {
@@ -39,12 +39,13 @@ public class PgiaConformidadeController : ControllerBase
     }
 
     private string? GetUserEmail() => User.FindFirst(ClaimTypes.Email)?.Value;
+    private string GetUserPerfil() => User.FindFirst(ClaimTypes.Role)?.Value ?? Perfis.Basico;
 
     private async Task<PgiaUserContext?> GetContextAsync()
     {
         var email = GetUserEmail();
         if (string.IsNullOrEmpty(email)) return null;
-        return await _permissionService.GetContextAsync(email);
+        return await _permissionService.GetContextAsync(email, GetUserPerfil());
     }
 
     private static bool EhEscopoCentral(PgiaUserContext ctx) =>

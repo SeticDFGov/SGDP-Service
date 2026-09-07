@@ -26,6 +26,12 @@ public abstract class PgiaTestBase : IDisposable
     protected readonly User UserAdmin;         // perfil admin do SGDP, sem papel PGIA
     protected readonly User UserSemPapel;      // usuário comum, sem papel PGIA
 
+    // Perfil nunca é persistido (vem da claim do token a cada requisição); a
+    // fixture guarda o perfil de cada persona à parte, para os testes passarem
+    // ao GetContextAsync do mesmo jeito que um controller leria do token.
+    protected readonly Dictionary<Guid, string> PerfilPorUserId = new();
+    protected readonly Dictionary<string, string> PerfilPorEmail = new();
+
     protected PgiaTestBase()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
@@ -74,13 +80,20 @@ public abstract class PgiaTestBase : IDisposable
         {
             Email = email,
             Nome = nome,
-            Perfil = perfil,
             PapelPgia = papelPgia,
             Unidade = unidade
         };
         Context.Users.Add(user);
+        PerfilPorUserId[user.Id] = perfil;
+        PerfilPorEmail[email] = perfil;
         return user;
     }
+
+    /// <summary>Perfil da persona (equivalente ao que um controller leria da claim do token).</summary>
+    protected string PerfilDe(User user) => PerfilPorUserId[user.Id];
+
+    /// <summary>Perfil da persona pelo e-mail (para testes parametrizados por [InlineData]).</summary>
+    protected string PerfilDe(string email) => PerfilPorEmail[email];
 
     public void Dispose()
     {

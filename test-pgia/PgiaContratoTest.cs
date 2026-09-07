@@ -56,7 +56,7 @@ public class PgiaContratoTest : PgiaTestBase
     }
 
     private async Task<PgiaUserContext> CtxAsync(string email) =>
-        (await _permissionService.GetContextAsync(email))!;
+        (await _permissionService.GetContextAsync(email, PerfilDe(email)))!;
 
     /// <param name="incisoQ16">Marcado, o sistema nasce Alto Risco.</param>
     private async Task<PgiaSistemaResponse> NovoSistemaAsync(
