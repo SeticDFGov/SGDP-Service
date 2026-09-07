@@ -1,6 +1,7 @@
 using Models;
 using Microsoft.EntityFrameworkCore;
 using app.Models;
+using Models.Pgia;
 
 namespace Models
 {
@@ -18,6 +19,33 @@ namespace Models
         public DbSet<User> Users { get; set; }
         public DbSet<Unidade> Unidades { get; set; }
         public DbSet<Esteira> Esteiras { get; set; }
+
+        // Módulo PGIA (Decreto nº 48.901/2026) — tabelas com prefixo pgia_
+        public DbSet<PgiaOrgao> PgiaOrgaos { get; set; }
+        public DbSet<PgiaAgenteInfo> PgiaAgenteInfos { get; set; }
+        public DbSet<PgiaResponsavelIa> PgiaResponsaveisIa { get; set; }
+        public DbSet<PgiaEncarregadoDados> PgiaEncarregadosDados { get; set; }
+        public DbSet<PgiaPrazoConformidade> PgiaPrazosConformidade { get; set; }
+        public DbSet<PgiaSistemaIa> PgiaSistemasIa { get; set; }
+        public DbSet<PgiaClassificacaoRisco> PgiaClassificacoesRisco { get; set; }
+        public DbSet<PgiaRiscoOutro> PgiaRiscosOutros { get; set; }
+        public DbSet<PgiaDocumento> PgiaDocumentos { get; set; }
+        public DbSet<PgiaAia> PgiaAias { get; set; }
+        public DbSet<PgiaDeliberacaoCgtic> PgiaDeliberacoesCgtic { get; set; }
+        public DbSet<PgiaPlataformaIaGenerativa> PgiaPlataformasIaGenerativa { get; set; }
+        public DbSet<PgiaAutorizacaoExcepcional> PgiaAutorizacoesExcepcionais { get; set; }
+        public DbSet<PgiaNormaComplementar> PgiaNormasComplementares { get; set; }
+        public DbSet<PgiaIncidente> PgiaIncidentes { get; set; }
+        public DbSet<PgiaNaoConformidade> PgiaNaoConformidades { get; set; }
+        public DbSet<PgiaCapacitacao> PgiaCapacitacoes { get; set; }
+        public DbSet<PgiaRegistroUsoIa> PgiaRegistrosUsoIa { get; set; }
+        public DbSet<PgiaContratoIa> PgiaContratosIa { get; set; }
+        public DbSet<PgiaInstrumentoLegado> PgiaInstrumentosLegados { get; set; }
+        public DbSet<PgiaIndicadorDesempenho> PgiaIndicadoresDesempenho { get; set; }
+        public DbSet<PgiaRelatorioSemestral> PgiaRelatoriosSemestrais { get; set; }
+        public DbSet<PgiaRelatorioAnual> PgiaRelatoriosAnuais { get; set; }
+        public DbSet<PgiaAuditoriaTecnica> PgiaAuditoriasTecnicas { get; set; }
+        public DbSet<PgiaSolicitacaoCidadao> PgiaSolicitacoesCidadao { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -45,6 +73,9 @@ namespace Models
             modelBuilder.Entity<Etapa>()
                 .Property(e => e.CriadoEm)
                 .HasDefaultValueSql("NOW()");
+
+            // Módulo PGIA: mapeamento isolado em PgiaModelConfiguration
+            modelBuilder.ApplyPgiaConfiguration(Database.IsNpgsql());
         }
     }
 

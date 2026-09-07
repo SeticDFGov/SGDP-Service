@@ -72,21 +72,12 @@ public class DemandaService : IDemandaService
 
     public IQueryable<Demanda> GetFilteredDemandasQuery(string perfil, string? unidadeNome)
     {
-        var query = _context.Demandas
+        return _context.Demandas
             .Include(d => d.AREA_DEMANDANTE)
             .Include(d => d.Esteira)
             .Include(d => d.Entregaveis!)
                 .ThenInclude(e => e.Responsavel)
             .AsSplitQuery()
             .AsQueryable();
-
-        return perfil switch
-        {
-            "admin" => query,
-            "gestor" => query,
-            "centralit" => query,
-            "parceiro" => query.Where(d => d.AREA_DEMANDANTE != null && d.AREA_DEMANDANTE.NM_DEMANDANTE == unidadeNome),
-            _ => query.Where(d => d.AREA_DEMANDANTE != null && d.AREA_DEMANDANTE.NM_DEMANDANTE == unidadeNome)
-        };
     }
 }

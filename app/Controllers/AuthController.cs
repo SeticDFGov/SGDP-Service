@@ -84,12 +84,17 @@ public class AuthController : ControllerBase
         var nome = User.FindFirst(ClaimTypes.Name)?.Value ?? User.FindFirst("name")?.Value
             ?? User.FindFirst("preferred_username")?.Value ?? "";
         var perfil = User.FindFirst(ClaimTypes.Role)?.Value ?? "basico";
+        var unidadeCodigo = User.FindFirst("unidade_codigo")?.Value;
+        // Acesso ao módulo PGIA = role "pgia" do Keycloak (portão de entrada,
+        // checado via [Authorize(Roles = "admin,pgia")] nos controllers PGIA).
+        var acessoPgia = User.IsInRole("admin") || User.IsInRole("pgia");
 
         if (string.IsNullOrEmpty(keycloakId))
             return Unauthorized();
 
-        var user = await _authRepositorio.GetOrCreateUserAsync(keycloakId, nome, email ?? "", perfil);
-        return Ok(new { user.Id, user.Nome, user.Email, user.Perfil, user.Unidade });
+        var user = await _authRepositorio.GetOrCreateUserAsync(keycloakId, nome, email ?? "", unidadeCodigo);
+        // PapelPgia e AcessoPgia são campos adicionais na resposta; o front atual ignora campos extras
+        return Ok(new { user.Id, user.Nome, user.Email, Perfil = perfil, user.PapelPgia, AcessoPgia = acessoPgia, user.Unidade });
     }
 
     [HttpPost("unidade")]
@@ -110,6 +115,17 @@ public class AuthController : ControllerBase
     [HttpPost("informar-unidade")]
     public async Task<IActionResult> InformarUnidade([FromBody] InformUnidadeUsuario request)
     {
+        // Onboarding: cada usuário informa a PRÓPRIA unidade. Sem esta checagem,
+        // qualquer autenticado passava o e-mail de outro no corpo e trocava a
+        // unidade alheia (que também é o escopo de dados do sistema). Trocas de
+        // unidade de terceiros são só do admin, por PUT modificar-unidade.
+        var emailToken = User.FindFirst(ClaimTypes.Email)?.Value;
+        if (string.IsNullOrEmpty(emailToken))
+            return Unauthorized();
+
+        if (!string.Equals(emailToken, request.email, StringComparison.OrdinalIgnoreCase))
+            return Forbid();
+
         await _authRepositorio.InformarUnidadeUsuario(request.email, request.unidadeId);
         return Ok();
     }

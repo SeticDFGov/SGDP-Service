@@ -33,6 +33,7 @@ public class AreaExecutoraController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> Create([FromBody] AreaExecutoraDTO dto)
     {
         var area = new AreaExecutora { Nome = dto.Nome };
@@ -41,6 +42,7 @@ public class AreaExecutoraController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> Update(int id, [FromBody] AreaExecutoraDTO dto)
     {
         var area = await _repositorio.GetByIdAsync(id);
@@ -52,6 +54,7 @@ public class AreaExecutoraController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> Delete(int id)
     {
         var area = await _repositorio.GetByIdAsync(id);

@@ -5,7 +5,6 @@ namespace service.Interface;
 
 public interface IPermissionService
 {
-    Task<string> GetUserPerfilAsync(string email);
     Task<Unidade?> GetUserUnidadeAsync(string email);
     bool CanCreate(string perfil, string resource);
     bool CanEdit(string perfil, string resource);
