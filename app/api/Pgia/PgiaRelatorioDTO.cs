@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace api.Pgia;
 
@@ -176,6 +176,10 @@ public class PgiaAuditoriaCreateDTO
 
     public bool? ApoioFapdf { get; set; }
 
+    // Relatório completo da auditoria: documento do órgão do sistema auditado
+    // ou documento central da SGDI (quem designa e publica a auditoria)
+    public long? DocumentoId { get; set; }
+
     public DateOnly DataInicio { get; set; }
 }
 
@@ -230,6 +234,9 @@ public class PgiaAuditoriaResponse
     public DateOnly? DataFim { get; set; }
 
     public string? Parecer { get; set; }
+
+    // Relatório completo anexado (null = ainda não anexado)
+    public long? DocumentoId { get; set; }
 
     public bool PublicadoPortal { get; set; }
 

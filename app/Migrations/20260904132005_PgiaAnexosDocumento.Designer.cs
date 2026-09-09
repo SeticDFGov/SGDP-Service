@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Models;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace demanda_service.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260904132005_PgiaAnexosDocumento")]
+    partial class PgiaAnexosDocumento
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -421,10 +424,6 @@ namespace demanda_service.Migrations
                         .HasColumnType("date")
                         .HasColumnName("data_publicacao");
 
-                    b.Property<long?>("DocumentoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("documento_id");
-
                     b.Property<string>("EntidadeAuditora")
                         .IsRequired()
                         .HasColumnType("text")
@@ -463,9 +462,6 @@ namespace demanda_service.Migrations
 
                     b.HasIndex("AuditorUserId")
                         .HasDatabaseName("ix_pgia_auditoria_auditor");
-
-                    b.HasIndex("DocumentoId")
-                        .HasDatabaseName("ix_pgia_auditoria_doc");
 
                     b.HasIndex("SistemaIaId")
                         .HasDatabaseName("ix_pgia_auditoria_sistema");
@@ -1174,10 +1170,6 @@ namespace demanda_service.Migrations
                         .HasColumnType("date")
                         .HasColumnName("data_comunicacao_sgdi");
 
-                    b.Property<long?>("DocumentoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("documento_id");
-
                     b.Property<DateOnly?>("FimVigencia")
                         .HasColumnType("date")
                         .HasColumnName("fim_vigencia");
@@ -1201,9 +1193,6 @@ namespace demanda_service.Migrations
 
                     b.HasIndex("AgenteId")
                         .HasDatabaseName("ix_pgia_encarregado_agente");
-
-                    b.HasIndex("DocumentoId")
-                        .HasDatabaseName("ix_pgia_encarregado_dados_doc");
 
                     b.HasIndex("OrgaoId")
                         .IsUnique()
@@ -2308,10 +2297,6 @@ namespace demanda_service.Migrations
                         .HasColumnType("date")
                         .HasColumnName("data_comunicacao_sgdi");
 
-                    b.Property<long?>("DocumentoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("documento_id");
-
                     b.Property<DateOnly?>("FimVigencia")
                         .HasColumnType("date")
                         .HasColumnName("fim_vigencia");
@@ -2335,9 +2320,6 @@ namespace demanda_service.Migrations
 
                     b.HasIndex("AgenteId")
                         .HasDatabaseName("ix_pgia_responsavel_ia_agente");
-
-                    b.HasIndex("DocumentoId")
-                        .HasDatabaseName("ix_pgia_responsavel_ia_doc");
 
                     b.HasIndex("OrgaoId")
                         .IsUnique()
@@ -2785,9 +2767,6 @@ namespace demanda_service.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("CodigoExterno")
-                        .HasColumnType("text");
-
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasColumnType("text");
@@ -2817,6 +2796,10 @@ namespace demanda_service.Migrations
                     b.Property<string>("PapelPgia")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Perfil")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<Guid?>("Unidadeid")
                         .HasColumnType("uuid");
@@ -2921,12 +2904,6 @@ namespace demanda_service.Migrations
                         .HasForeignKey("AuditorUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_pgia_auditoria_auditor");
-
-                    b.HasOne("Models.Pgia.PgiaDocumento", null)
-                        .WithMany()
-                        .HasForeignKey("DocumentoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_auditoria_doc");
 
                     b.HasOne("Models.Pgia.PgiaSistemaIa", "Sistema")
                         .WithMany()
@@ -3136,12 +3113,6 @@ namespace demanda_service.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_pgia_encarregado_agente");
 
-                    b.HasOne("Models.Pgia.PgiaDocumento", null)
-                        .WithMany()
-                        .HasForeignKey("DocumentoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_encarregado_doc");
-
                     b.HasOne("Models.Pgia.PgiaOrgao", "Orgao")
                         .WithMany()
                         .HasForeignKey("OrgaoId")
@@ -3336,12 +3307,6 @@ namespace demanda_service.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_pgia_responsavel_ia_agente");
-
-                    b.HasOne("Models.Pgia.PgiaDocumento", null)
-                        .WithMany()
-                        .HasForeignKey("DocumentoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_responsavel_ia_doc");
 
                     b.HasOne("Models.Pgia.PgiaOrgao", "Orgao")
                         .WithMany()

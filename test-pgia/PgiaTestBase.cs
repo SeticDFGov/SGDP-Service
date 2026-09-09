@@ -14,6 +14,9 @@ public abstract class PgiaTestBase : IDisposable
 {
     protected readonly AppDbContext Context;
 
+    /// <summary>Nome do banco InMemory, para abrir um segundo contexto sobre a mesma base.</summary>
+    protected readonly string NomeBanco;
+
     protected readonly Unidade UnidadeSes;
     protected readonly Unidade UnidadeSeec;
     protected readonly PgiaOrgao OrgaoSes;
@@ -35,8 +38,9 @@ public abstract class PgiaTestBase : IDisposable
 
     protected PgiaTestBase()
     {
+        NomeBanco = Guid.NewGuid().ToString();
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .UseInMemoryDatabase(databaseName: NomeBanco)
             .Options;
         Context = new AppDbContext(options);
         // Aplica o seed (HasData) das obrigações-modelo de prazo

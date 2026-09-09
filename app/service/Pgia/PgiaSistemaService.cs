@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using api.Common;
 using api.Pgia;
@@ -267,8 +267,9 @@ public class PgiaSistemaService : IPgiaSistemaService
             OrgaoId = sistema.OrgaoId,
             SistemaIaId = sistema.Id,
             ProcessoSei = string.IsNullOrWhiteSpace(dto.ProcessoSei) ? null : dto.ProcessoSei.Trim(),
-            NomeArquivo = dto.NomeArquivo.Trim(),
-            UrlStorage = string.IsNullOrWhiteSpace(dto.UrlStorage) ? null : dto.UrlStorage.Trim(),
+            NomeArquivo = PgiaDocumentoService.SanearNomeArquivo(dto.NomeArquivo),
+            // UrlStorage é interno do armazenamento: o cliente não o define
+            UrlStorage = null,
             DataEnvio = agora,
             EnviadoPor = ctx.UserId,
             CriadoEm = agora,
@@ -1010,19 +1011,6 @@ public class PgiaSistemaService : IPgiaSistemaService
         Consequencia = r.Consequencia
     };
 
-    private static PgiaDocumentoResponse MapDocumento(PgiaDocumento d)
-    {
-        return new PgiaDocumentoResponse
-        {
-            Id = d.Id,
-            Tipo = d.Tipo,
-            OrgaoId = d.OrgaoId,
-            SistemaIaId = d.SistemaIaId,
-            ProcessoSei = d.ProcessoSei,
-            NomeArquivo = d.NomeArquivo,
-            UrlStorage = d.UrlStorage,
-            DataEnvio = d.DataEnvio,
-            EnviadoPorNome = d.EnviadoPorUser?.Nome ?? string.Empty
-        };
-    }
+    // Mapeamento único, no PgiaDocumentoService (que também trata o anexo)
+    private static PgiaDocumentoResponse MapDocumento(PgiaDocumento d) => PgiaDocumentoService.Map(d);
 }

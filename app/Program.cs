@@ -1,3 +1,4 @@
+﻿using System.Security.Claims;
 using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
@@ -48,6 +49,9 @@ builder.Services.AddCors(options =>
                 )
                 .AllowAnyHeader()
                 .AllowAnyMethod()
+                // O front lê o nome do anexo no download (aditivo: só expõe
+                // um header de RESPOSTA ao JS; nada muda para chamadas atuais)
+                .WithExposedHeaders("Content-Disposition")
                 .AllowCredentials());
     }
     else
@@ -62,6 +66,7 @@ builder.Services.AddCors(options =>
                 )
                 .AllowAnyHeader()
                 .AllowAnyMethod()
+                .WithExposedHeaders("Content-Disposition")
                 .AllowCredentials());
     }
 });
@@ -96,6 +101,7 @@ builder.Services.AddScoped<IPgiaOperacaoRepositorio, Repositorio.Pgia.PgiaOperac
 builder.Services.AddScoped<IPgiaContratoRepositorio, Repositorio.Pgia.PgiaContratoRepositorio>();
 builder.Services.AddScoped<IPgiaRelatorioRepositorio, Repositorio.Pgia.PgiaRelatorioRepositorio>();
 builder.Services.AddScoped<IPgiaPublicoRepositorio, Repositorio.Pgia.PgiaPublicoRepositorio>();
+builder.Services.AddScoped<IPgiaDocumentoRepositorio, Repositorio.Pgia.PgiaDocumentoRepositorio>();
 
 // Serviços
 builder.Services.AddScoped<IDemandaService, DemandaService>();
@@ -113,6 +119,11 @@ builder.Services.AddScoped<IPgiaOperacaoService, service.Pgia.PgiaOperacaoServic
 builder.Services.AddScoped<IPgiaContratoService, service.Pgia.PgiaContratoService>();
 builder.Services.AddScoped<IPgiaRelatorioService, service.Pgia.PgiaRelatorioService>();
 builder.Services.AddScoped<IPgiaPublicoService, service.Pgia.PgiaPublicoService>();
+builder.Services.AddScoped<IPgiaDocumentoService, service.Pgia.PgiaDocumentoService>();
+// Anexos gravados no próprio banco (bytea em pgia_documento_arquivo), por decisão
+// do responsável pelo sistema. Trocar pelo futuro servidor de arquivos da Infra é
+// só registrar outra implementação de IPgiaArquivoStorage aqui.
+builder.Services.AddScoped<IPgiaArquivoStorage, service.Pgia.PgiaArquivoStorage>();
 
 builder.Services.AddScoped<HttpClient>();
 

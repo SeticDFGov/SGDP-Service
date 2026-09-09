@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 
 namespace Models.Pgia;
 
@@ -131,6 +131,17 @@ public static class PgiaModelConfiguration
                 .HasForeignKey(r => r.AgenteId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_pgia_responsavel_ia_agente");
+
+            entity.Property(r => r.DocumentoId).HasColumnName("documento_id");
+            entity.HasIndex(r => r.DocumentoId).HasDatabaseName("ix_pgia_responsavel_ia_doc");
+
+            // Restrict: a cópia do ato é prova da designação (art. 10) — apagar o
+            // documento não pode derrubar nem esvaziar silenciosamente a designação
+            entity.HasOne<PgiaDocumento>()
+                .WithMany()
+                .HasForeignKey(r => r.DocumentoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pgia_responsavel_ia_doc");
         });
 
         modelBuilder.Entity<PgiaEncarregadoDados>(entity =>
@@ -174,6 +185,16 @@ public static class PgiaModelConfiguration
                 .HasForeignKey(e => e.AgenteId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_pgia_encarregado_agente");
+
+            entity.Property(e => e.DocumentoId).HasColumnName("documento_id");
+            entity.HasIndex(e => e.DocumentoId).HasDatabaseName("ix_pgia_encarregado_dados_doc");
+
+            // Restrict, como nas demais FKs de documento do módulo
+            entity.HasOne<PgiaDocumento>()
+                .WithMany()
+                .HasForeignKey(e => e.DocumentoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pgia_encarregado_doc");
         });
 
         modelBuilder.Entity<PgiaPrazoConformidade>(entity =>
@@ -425,6 +446,8 @@ public static class PgiaModelConfiguration
             entity.Property(d => d.ProcessoSei).HasColumnName("processo_sei").HasMaxLength(25);
             entity.Property(d => d.NomeArquivo).HasColumnName("nome_arquivo").IsRequired();
             entity.Property(d => d.UrlStorage).HasColumnName("url_storage");
+            entity.Property(d => d.ContentType).HasColumnName("content_type").HasMaxLength(100);
+            entity.Property(d => d.TamanhoBytes).HasColumnName("tamanho_bytes");
             entity.Property(d => d.DataEnvio).HasColumnName("data_envio").HasDefaultValueSql("NOW()");
             entity.Property(d => d.EnviadoPor).HasColumnName("enviado_por");
             entity.Property(d => d.CriadoEm).HasColumnName("criado_em").HasDefaultValueSql("NOW()");
@@ -453,6 +476,24 @@ public static class PgiaModelConfiguration
                 .HasForeignKey(d => d.EnviadoPor)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_pgia_documento_agente");
+        });
+
+        modelBuilder.Entity<PgiaDocumentoArquivo>(entity =>
+        {
+            entity.ToTable("pgia_documento_arquivo");
+
+            // documento_id é PK e FK: 1:1 com o documento
+            entity.HasKey(a => a.DocumentoId).HasName("pk_pgia_documento_arquivo");
+            entity.Property(a => a.DocumentoId).HasColumnName("documento_id").ValueGeneratedNever();
+            entity.Property(a => a.Conteudo).HasColumnName("conteudo").HasColumnType("bytea").IsRequired();
+
+            // Sem navegação do lado do documento: nenhum Include alcança o blob.
+            // O arquivo some junto com o documento (cascade).
+            entity.HasOne(a => a.Documento)
+                .WithOne()
+                .HasForeignKey<PgiaDocumentoArquivo>(a => a.DocumentoId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pgia_documento_arquivo_documento");
         });
 
         // ── Fase 2: governança central ────────────────────────────────────────
@@ -1182,6 +1223,16 @@ public static class PgiaModelConfiguration
                 .HasForeignKey(a => a.AuditorUserId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_pgia_auditoria_auditor");
+
+            entity.Property(a => a.DocumentoId).HasColumnName("documento_id");
+            entity.HasIndex(a => a.DocumentoId).HasDatabaseName("ix_pgia_auditoria_doc");
+
+            // Relatório completo da auditoria (art. 34): Restrict preserva a prova
+            entity.HasOne<PgiaDocumento>()
+                .WithMany()
+                .HasForeignKey(a => a.DocumentoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pgia_auditoria_doc");
         });
 
         // ── Fase 5: transparência pública ─────────────────────────────────────

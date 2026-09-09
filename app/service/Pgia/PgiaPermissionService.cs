@@ -1,4 +1,4 @@
-using app.Auth;
+﻿using app.Auth;
 using Microsoft.EntityFrameworkCore;
 using Models;
 using Models.Pgia;
@@ -137,10 +137,12 @@ public class PgiaPermissionService : IPgiaPermissionService
             Perfis.Admin => true,
             // A SGDI pré-cadastra as pessoas do órgão (agente_info) junto com o órgão
             PapeisPgia.Sgdi => resource is PgiaResources.Orgao or PgiaResources.AgenteInfo
-                or PgiaResources.Plataforma
+                or PgiaResources.Plataforma or PgiaResources.Documento
                 or PgiaResources.Autorizacao or PgiaResources.Norma or PgiaResources.NaoConformidade
                 or PgiaResources.Relatorio or PgiaResources.AuditoriaTecnica,
-            PapeisPgia.Cgtic => resource is PgiaResources.Deliberacao or PgiaResources.Norma,
+            // O comitê registra a ata da própria deliberação (documento central)
+            PapeisPgia.Cgtic => resource is PgiaResources.Deliberacao or PgiaResources.Norma
+                or PgiaResources.Documento,
             // O inventário, a classificação, a AIA e a operação contínua são do órgão
             PapeisPgia.Orgao => resource is PgiaResources.Designacao
                 or PgiaResources.Sistema or PgiaResources.Classificacao or PgiaResources.Documento
@@ -163,15 +165,20 @@ public class PgiaPermissionService : IPgiaPermissionService
                 or PgiaResources.Plataforma or PgiaResources.Autorizacao or PgiaResources.Norma
                 or PgiaResources.Homologacao or PgiaResources.Publicacao
                 or PgiaResources.Apuracao or PgiaResources.NaoConformidade
-                or PgiaResources.Relatorio or PgiaResources.AuditoriaTecnica,
-            PapeisPgia.Cgtic => resource is PgiaResources.Deliberacao or PgiaResources.Norma,
+                or PgiaResources.Relatorio or PgiaResources.AuditoriaTecnica
+                or PgiaResources.Documento,
+            PapeisPgia.Cgtic => resource is PgiaResources.Deliberacao or PgiaResources.Norma
+                or PgiaResources.Documento,
             // Ao órgão restam as designações e a operação: ele vê os próprios dados
             // e as próprias pessoas (CanView), mas não edita orgao_dados nem agente_info
             PapeisPgia.Orgao => resource is PgiaResources.Designacao
                 or PgiaResources.Prazo or PgiaResources.Sistema
                 or PgiaResources.Aia or PgiaResources.Incidente or PgiaResources.NaoConformidade
                 or PgiaResources.Capacitacao or PgiaResources.Contrato or PgiaResources.Legado
-                or PgiaResources.Indicador or PgiaResources.Relatorio or PgiaResources.Solicitacao,
+                or PgiaResources.Indicador or PgiaResources.Relatorio or PgiaResources.Solicitacao
+                // Anexar/substituir o arquivo é escrita do documento (rodada de anexos):
+                // o órgão anexa nos documentos do próprio órgão (escopo em CanAccessOrgao)
+                or PgiaResources.Documento,
             // A auditoria externa edita só parecer e datas das auditorias designadas (restrição no service)
             PapeisPgia.Auditoria => resource is PgiaResources.AuditoriaTecnica,
             _ => false

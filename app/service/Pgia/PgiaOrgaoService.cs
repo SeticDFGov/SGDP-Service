@@ -1,4 +1,4 @@
-using api.Pgia;
+﻿using api.Pgia;
 using demanda_service.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Models;
@@ -205,6 +205,7 @@ public class PgiaOrgaoService : IPgiaOrgaoService
             AcumulaFuncaoTic = dto.AcumulaFuncaoTic,
             // Condicional: capacitação só se aplica quando acumula a função de TIC (art. 10, § 2º)
             CapacitacaoAdequada = dto.AcumulaFuncaoTic ? dto.CapacitacaoAdequada : null,
+            DocumentoId = dto.DocumentoId,
             InicioVigencia = dto.InicioVigencia,
             Ativo = true,
             CriadoEm = DateTime.UtcNow,
@@ -249,6 +250,7 @@ public class PgiaOrgaoService : IPgiaOrgaoService
             AtoData = dto.AtoData,
             ProcessoSeiComunicacao = dto.ProcessoSeiComunicacao.Trim(),
             DataComunicacaoSgdi = dto.DataComunicacaoSgdi,
+            DocumentoId = dto.DocumentoId,
             InicioVigencia = dto.InicioVigencia,
             Ativo = true,
             CriadoEm = DateTime.UtcNow,
@@ -319,6 +321,17 @@ public class PgiaOrgaoService : IPgiaOrgaoService
             throw new ApiException(ErrorCode.PgiaAgenteDeOutroOrgao,
                 "A pessoa designada não pertence à unidade vinculada ao órgão.");
 
+        // Cópia do ato: documento tem de existir e ser DO MESMO órgão da designação
+        if (dto.DocumentoId != null)
+        {
+            var documento = await _designacaoRepositorio.GetDocumentoByIdAsync(dto.DocumentoId.Value)
+                ?? throw new ApiException(ErrorCode.PgiaDocumentoNaoEncontrado);
+
+            if (documento.OrgaoId != orgao.Id)
+                throw new ApiException(ErrorCode.PgiaDominioInvalido,
+                    "A cópia do ato precisa ser um documento do próprio órgão.");
+        }
+
         return orgao;
     }
 
@@ -338,6 +351,7 @@ public class PgiaOrgaoService : IPgiaOrgaoService
             DataComunicacaoSgdi = r.DataComunicacaoSgdi,
             AcumulaFuncaoTic = r.AcumulaFuncaoTic,
             CapacitacaoAdequada = r.CapacitacaoAdequada,
+            DocumentoId = r.DocumentoId,
             InicioVigencia = r.InicioVigencia,
             FimVigencia = r.FimVigencia,
             Ativo = r.Ativo
@@ -358,6 +372,7 @@ public class PgiaOrgaoService : IPgiaOrgaoService
             AtoData = e.AtoData,
             ProcessoSeiComunicacao = e.ProcessoSeiComunicacao,
             DataComunicacaoSgdi = e.DataComunicacaoSgdi,
+            DocumentoId = e.DocumentoId,
             InicioVigencia = e.InicioVigencia,
             FimVigencia = e.FimVigencia,
             Ativo = e.Ativo

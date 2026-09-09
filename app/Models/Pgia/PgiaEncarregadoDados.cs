@@ -1,4 +1,4 @@
-using app.Models;
+﻿using app.Models;
 
 namespace Models.Pgia;
 
@@ -29,6 +29,9 @@ public class PgiaEncarregadoDados
 
     // Até 02/08/2026 (art. 35, I)
     public DateOnly DataComunicacaoSgdi { get; set; }
+
+    // Cópia do ato de designação anexada (pgia_documento); opcional
+    public long? DocumentoId { get; set; }
 
     public DateOnly InicioVigencia { get; set; }
 
