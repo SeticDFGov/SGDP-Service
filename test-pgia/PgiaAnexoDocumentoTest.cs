@@ -40,7 +40,11 @@ public class PgiaAnexoDocumentoTest : PgiaTestBase
 
     private PgiaDocumentoController Como(string email)
     {
-        var identidade = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Email, email) }, "Teste");
+        var identidade = new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.Email, email),
+            new Claim(ClaimTypes.Role, PerfilDe(email))
+        }, "Teste");
         _controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identidade) }
@@ -49,7 +53,7 @@ public class PgiaAnexoDocumentoTest : PgiaTestBase
     }
 
     private async Task<PgiaUserContext> CtxAsync(string email) =>
-        (await _permissionService.GetContextAsync(email))!;
+        (await _permissionService.GetContextAsync(email, PerfilDe(email)))!;
 
     /// <summary>Documento só com metadados, no órgão informado (null = central).</summary>
     private PgiaDocumento NovoDocumento(long? orgaoId, string nome = "parecer.pdf")

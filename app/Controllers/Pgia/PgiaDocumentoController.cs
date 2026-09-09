@@ -17,7 +17,7 @@ namespace Controllers.Pgia;
 /// <c>POST api/pgia/sistema/{id}/documentos</c>, que não mudou.
 /// </summary>
 [ApiController]
-[Authorize]
+[Authorize(Roles = "admin,pgia")]
 [Route("api/pgia/documento")]
 public class PgiaDocumentoController : ControllerBase
 {
@@ -31,12 +31,13 @@ public class PgiaDocumentoController : ControllerBase
     }
 
     private string? GetUserEmail() => User.FindFirst(ClaimTypes.Email)?.Value;
+    private string GetUserPerfil() => User.FindFirst(ClaimTypes.Role)?.Value ?? Perfis.Basico;
 
     private async Task<PgiaUserContext?> GetContextAsync()
     {
         var email = GetUserEmail();
         if (string.IsNullOrEmpty(email)) return null;
-        return await _permissionService.GetContextAsync(email);
+        return await _permissionService.GetContextAsync(email, GetUserPerfil());
     }
 
     /// <summary>Documento sem órgão (ata do CGTIC, relatório anual) é do escopo central.</summary>

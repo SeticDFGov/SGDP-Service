@@ -189,7 +189,7 @@ public class PgiaAnexoVinculoTest : PgiaTestBase
     {
         var sistema = await NovoSistemaAsync(OrgaoSes.Id);
         var documento = NovoDocumento(OrgaoSes.Id, "Parecer de auditoria");
-        var ctx = (await _permissionService.GetContextAsync(UserSgdi.Email))!;
+        var ctx = (await _permissionService.GetContextAsync(UserSgdi.Email, PerfilDe(UserSgdi)))!;
 
         var resposta = await _relatorioService.CriarAuditoriaAsync(
             NovaAuditoria(sistema.Id, documento.Id), ctx);
@@ -204,7 +204,7 @@ public class PgiaAnexoVinculoTest : PgiaTestBase
     {
         var sistema = await NovoSistemaAsync(OrgaoSes.Id);
         var central = NovoDocumento(orgaoId: null, "Parecer de auditoria");
-        var ctx = (await _permissionService.GetContextAsync(UserSgdi.Email))!;
+        var ctx = (await _permissionService.GetContextAsync(UserSgdi.Email, PerfilDe(UserSgdi)))!;
 
         var resposta = await _relatorioService.CriarAuditoriaAsync(
             NovaAuditoria(sistema.Id, central.Id), ctx);
@@ -217,7 +217,7 @@ public class PgiaAnexoVinculoTest : PgiaTestBase
     {
         var sistema = await NovoSistemaAsync(OrgaoSes.Id);
         var deOutroOrgao = NovoDocumento(OrgaoSeec.Id, "Parecer de auditoria");
-        var ctx = (await _permissionService.GetContextAsync(UserSgdi.Email))!;
+        var ctx = (await _permissionService.GetContextAsync(UserSgdi.Email, PerfilDe(UserSgdi)))!;
 
         var ex = await Assert.ThrowsAsync<ApiException>(() =>
             _relatorioService.CriarAuditoriaAsync(NovaAuditoria(sistema.Id, deOutroOrgao.Id), ctx));
@@ -230,7 +230,7 @@ public class PgiaAnexoVinculoTest : PgiaTestBase
     public async Task Auditoria_EdicaoAnexaORelatorioDepois()
     {
         var sistema = await NovoSistemaAsync(OrgaoSes.Id);
-        var ctx = (await _permissionService.GetContextAsync(UserSgdi.Email))!;
+        var ctx = (await _permissionService.GetContextAsync(UserSgdi.Email, PerfilDe(UserSgdi)))!;
         var criada = await _relatorioService.CriarAuditoriaAsync(NovaAuditoria(sistema.Id), ctx);
         Assert.Null(criada.DocumentoId);
 
