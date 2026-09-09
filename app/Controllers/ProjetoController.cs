@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using api.Common;
 using api.Demanda;
+using app.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +25,7 @@ public class DemandaController : ControllerBase
     }
 
     private string? GetUserEmail() => User.FindFirst(ClaimTypes.Email)?.Value;
+    private string GetUserPerfil() => User.FindFirst(ClaimTypes.Role)?.Value ?? Perfis.Basico;
 
     /// <summary>
     /// Lista demandas paginadas filtradas por perfil
@@ -34,7 +36,7 @@ public class DemandaController : ControllerBase
         var email = GetUserEmail();
         if (string.IsNullOrEmpty(email)) return Unauthorized();
 
-        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        var perfil = GetUserPerfil();
         var userUnidade = await _permissionService.GetUserUnidadeAsync(email);
 
         var query = _permissionService.GetFilteredDemandasQuery(perfil, userUnidade?.Nome);
@@ -74,7 +76,7 @@ public class DemandaController : ControllerBase
         var email = GetUserEmail();
         if (string.IsNullOrEmpty(email)) return Unauthorized();
 
-        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        var perfil = GetUserPerfil();
         if (!_permissionService.CanCreate(perfil, "demanda"))
             return Forbid();
 
@@ -91,7 +93,7 @@ public class DemandaController : ControllerBase
         var email = GetUserEmail();
         if (string.IsNullOrEmpty(email)) return Unauthorized();
 
-        var perfil = await _permissionService.GetUserPerfilAsync(email);
+        var perfil = GetUserPerfil();
         if (!_permissionService.CanEdit(perfil, "demanda"))
             return Forbid();
 

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Models;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace demanda_service.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260903222736_AddUnidadeCodigoExterno")]
+    partial class AddUnidadeCodigoExterno
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -421,10 +424,6 @@ namespace demanda_service.Migrations
                         .HasColumnType("date")
                         .HasColumnName("data_publicacao");
 
-                    b.Property<long?>("DocumentoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("documento_id");
-
                     b.Property<string>("EntidadeAuditora")
                         .IsRequired()
                         .HasColumnType("text")
@@ -463,9 +462,6 @@ namespace demanda_service.Migrations
 
                     b.HasIndex("AuditorUserId")
                         .HasDatabaseName("ix_pgia_auditoria_auditor");
-
-                    b.HasIndex("DocumentoId")
-                        .HasDatabaseName("ix_pgia_auditoria_doc");
 
                     b.HasIndex("SistemaIaId")
                         .HasDatabaseName("ix_pgia_auditoria_sistema");
@@ -1022,11 +1018,6 @@ namespace demanda_service.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("alterado_por");
 
-                    b.Property<string>("ContentType")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("content_type");
-
                     b.Property<DateTime>("CriadoEm")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1053,7 +1044,7 @@ namespace demanda_service.Migrations
                         .HasColumnType("text")
                         .HasColumnName("nome_arquivo");
 
-                    b.Property<long?>("OrgaoId")
+                    b.Property<long>("OrgaoId")
                         .HasColumnType("bigint")
                         .HasColumnName("orgao_id");
 
@@ -1065,10 +1056,6 @@ namespace demanda_service.Migrations
                     b.Property<long?>("SistemaIaId")
                         .HasColumnType("bigint")
                         .HasColumnName("sistema_ia_id");
-
-                    b.Property<long?>("TamanhoBytes")
-                        .HasColumnType("bigint")
-                        .HasColumnName("tamanho_bytes");
 
                     b.Property<string>("Tipo")
                         .IsRequired()
@@ -1096,23 +1083,6 @@ namespace demanda_service.Migrations
                         {
                             t.HasCheckConstraint("ck_pgia_documento_tipo", "tipo IN ('Ato de designação','AIA','RIPD','Ata ou deliberação','Relatório semestral','Relatório anual','Certificado de capacitação','Contrato','Termo aditivo','Parecer de auditoria','Avaliação de riscos','Comprovação de triagem','Outro')");
                         });
-                });
-
-            modelBuilder.Entity("Models.Pgia.PgiaDocumentoArquivo", b =>
-                {
-                    b.Property<long>("DocumentoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("documento_id");
-
-                    b.Property<byte[]>("Conteudo")
-                        .IsRequired()
-                        .HasColumnType("bytea")
-                        .HasColumnName("conteudo");
-
-                    b.HasKey("DocumentoId")
-                        .HasName("pk_pgia_documento_arquivo");
-
-                    b.ToTable("pgia_documento_arquivo", (string)null);
                 });
 
             modelBuilder.Entity("Models.Pgia.PgiaEncarregadoDados", b =>
@@ -1174,10 +1144,6 @@ namespace demanda_service.Migrations
                         .HasColumnType("date")
                         .HasColumnName("data_comunicacao_sgdi");
 
-                    b.Property<long?>("DocumentoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("documento_id");
-
                     b.Property<DateOnly?>("FimVigencia")
                         .HasColumnType("date")
                         .HasColumnName("fim_vigencia");
@@ -1201,9 +1167,6 @@ namespace demanda_service.Migrations
 
                     b.HasIndex("AgenteId")
                         .HasDatabaseName("ix_pgia_encarregado_agente");
-
-                    b.HasIndex("DocumentoId")
-                        .HasDatabaseName("ix_pgia_encarregado_dados_doc");
 
                     b.HasIndex("OrgaoId")
                         .IsUnique()
@@ -2308,10 +2271,6 @@ namespace demanda_service.Migrations
                         .HasColumnType("date")
                         .HasColumnName("data_comunicacao_sgdi");
 
-                    b.Property<long?>("DocumentoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("documento_id");
-
                     b.Property<DateOnly?>("FimVigencia")
                         .HasColumnType("date")
                         .HasColumnName("fim_vigencia");
@@ -2336,87 +2295,12 @@ namespace demanda_service.Migrations
                     b.HasIndex("AgenteId")
                         .HasDatabaseName("ix_pgia_responsavel_ia_agente");
 
-                    b.HasIndex("DocumentoId")
-                        .HasDatabaseName("ix_pgia_responsavel_ia_doc");
-
                     b.HasIndex("OrgaoId")
                         .IsUnique()
                         .HasDatabaseName("ux_pgia_responsavel_ia_vigente")
                         .HasFilter("ativo");
 
                     b.ToTable("pgia_responsavel_ia", (string)null);
-                });
-
-            modelBuilder.Entity("Models.Pgia.PgiaRiscoOutro", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("AcaoMitigacao")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("acao_mitigacao");
-
-                    b.Property<long>("ClassificacaoRiscoId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("classificacao_risco_id");
-
-                    b.Property<string>("Consequencia")
-                        .IsRequired()
-                        .HasMaxLength(15)
-                        .HasColumnType("character varying(15)")
-                        .HasColumnName("consequencia");
-
-                    b.Property<DateTime>("CriadoEm")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("criado_em")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<string>("CriadoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("criado_por");
-
-                    b.Property<string>("DescricaoRisco")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("descricao_risco");
-
-                    b.Property<string>("Probabilidade")
-                        .IsRequired()
-                        .HasMaxLength(15)
-                        .HasColumnType("character varying(15)")
-                        .HasColumnName("probabilidade");
-
-                    b.Property<string>("ResponsavelEmail")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("responsavel_email");
-
-                    b.Property<string>("ResponsavelNome")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("responsavel_nome");
-
-                    b.HasKey("Id")
-                        .HasName("pk_pgia_risco_outro");
-
-                    b.HasIndex("ClassificacaoRiscoId")
-                        .HasDatabaseName("ix_pgia_risco_outro_classificacao");
-
-                    b.ToTable("pgia_risco_outro", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_pgia_risco_outro_consequencia", "consequencia IN ('Desprezível','Menor','Moderada')");
-
-                            t.HasCheckConstraint("ck_pgia_risco_outro_probabilidade", "probabilidade IN ('Improvável','Raro','Possível')");
-                        });
                 });
 
             modelBuilder.Entity("Models.Pgia.PgiaSistemaIa", b =>
@@ -2818,6 +2702,10 @@ namespace demanda_service.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<string>("Perfil")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<Guid?>("Unidadeid")
                         .HasColumnType("uuid");
 
@@ -2921,12 +2809,6 @@ namespace demanda_service.Migrations
                         .HasForeignKey("AuditorUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_pgia_auditoria_auditor");
-
-                    b.HasOne("Models.Pgia.PgiaDocumento", null)
-                        .WithMany()
-                        .HasForeignKey("DocumentoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_auditoria_doc");
 
                     b.HasOne("Models.Pgia.PgiaSistemaIa", "Sistema")
                         .WithMany()
@@ -3100,6 +2982,7 @@ namespace demanda_service.Migrations
                         .WithMany()
                         .HasForeignKey("OrgaoId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
                         .HasConstraintName("fk_pgia_documento_orgao");
 
                     b.HasOne("Models.Pgia.PgiaSistemaIa", "Sistema")
@@ -3115,18 +2998,6 @@ namespace demanda_service.Migrations
                     b.Navigation("Sistema");
                 });
 
-            modelBuilder.Entity("Models.Pgia.PgiaDocumentoArquivo", b =>
-                {
-                    b.HasOne("Models.Pgia.PgiaDocumento", "Documento")
-                        .WithOne()
-                        .HasForeignKey("Models.Pgia.PgiaDocumentoArquivo", "DocumentoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_pgia_documento_arquivo_documento");
-
-                    b.Navigation("Documento");
-                });
-
             modelBuilder.Entity("Models.Pgia.PgiaEncarregadoDados", b =>
                 {
                     b.HasOne("app.Models.User", "Agente")
@@ -3135,12 +3006,6 @@ namespace demanda_service.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_pgia_encarregado_agente");
-
-                    b.HasOne("Models.Pgia.PgiaDocumento", null)
-                        .WithMany()
-                        .HasForeignKey("DocumentoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_encarregado_doc");
 
                     b.HasOne("Models.Pgia.PgiaOrgao", "Orgao")
                         .WithMany()
@@ -3337,12 +3202,6 @@ namespace demanda_service.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_pgia_responsavel_ia_agente");
 
-                    b.HasOne("Models.Pgia.PgiaDocumento", null)
-                        .WithMany()
-                        .HasForeignKey("DocumentoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_pgia_responsavel_ia_doc");
-
                     b.HasOne("Models.Pgia.PgiaOrgao", "Orgao")
                         .WithMany()
                         .HasForeignKey("OrgaoId")
@@ -3353,18 +3212,6 @@ namespace demanda_service.Migrations
                     b.Navigation("Agente");
 
                     b.Navigation("Orgao");
-                });
-
-            modelBuilder.Entity("Models.Pgia.PgiaRiscoOutro", b =>
-                {
-                    b.HasOne("Models.Pgia.PgiaClassificacaoRisco", "Classificacao")
-                        .WithMany("OutrosRiscos")
-                        .HasForeignKey("ClassificacaoRiscoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_pgia_risco_outro_classificacao");
-
-                    b.Navigation("Classificacao");
                 });
 
             modelBuilder.Entity("Models.Pgia.PgiaSistemaIa", b =>
@@ -3434,11 +3281,6 @@ namespace demanda_service.Migrations
             modelBuilder.Entity("Models.Demanda", b =>
                 {
                     b.Navigation("Entregaveis");
-                });
-
-            modelBuilder.Entity("Models.Pgia.PgiaClassificacaoRisco", b =>
-                {
-                    b.Navigation("OutrosRiscos");
                 });
 #pragma warning restore 612, 618
         }

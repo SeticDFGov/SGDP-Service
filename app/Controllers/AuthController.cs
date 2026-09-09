@@ -84,13 +84,17 @@ public class AuthController : ControllerBase
         var nome = User.FindFirst(ClaimTypes.Name)?.Value ?? User.FindFirst("name")?.Value
             ?? User.FindFirst("preferred_username")?.Value ?? "";
         var perfil = User.FindFirst(ClaimTypes.Role)?.Value ?? "basico";
+        var unidadeCodigo = User.FindFirst("unidade_codigo")?.Value;
+        // Acesso ao módulo PGIA = role "pgia" do Keycloak (portão de entrada,
+        // checado via [Authorize(Roles = "admin,pgia")] nos controllers PGIA).
+        var acessoPgia = User.IsInRole("admin") || User.IsInRole("pgia");
 
         if (string.IsNullOrEmpty(keycloakId))
             return Unauthorized();
 
-        var user = await _authRepositorio.GetOrCreateUserAsync(keycloakId, nome, email ?? "", perfil);
-        // PapelPgia é campo adicional na resposta; o front atual ignora campos extras
-        return Ok(new { user.Id, user.Nome, user.Email, user.Perfil, user.PapelPgia, user.Unidade });
+        var user = await _authRepositorio.GetOrCreateUserAsync(keycloakId, nome, email ?? "", unidadeCodigo);
+        // PapelPgia e AcessoPgia são campos adicionais na resposta; o front atual ignora campos extras
+        return Ok(new { user.Id, user.Nome, user.Email, Perfil = perfil, user.PapelPgia, AcessoPgia = acessoPgia, user.Unidade });
     }
 
     [HttpPost("unidade")]

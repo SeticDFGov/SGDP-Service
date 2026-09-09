@@ -7,9 +7,10 @@ public interface IPgiaPermissionService
 {
     /// <summary>
     /// Resolve o contexto PGIA do usuário: papel (Users.PapelPgia), perfil admin do SGDP
-    /// e o órgão vinculado à Unidade do usuário. Null se o usuário não existir.
+    /// (vindo da claim do token, nunca persistido) e o órgão vinculado à Unidade do
+    /// usuário. Null se o usuário não existir.
     /// </summary>
-    Task<PgiaUserContext?> GetContextAsync(string email);
+    Task<PgiaUserContext?> GetContextAsync(string email, string perfil);
 
     bool CanView(PgiaUserContext ctx, string resource);
     bool CanCreate(PgiaUserContext ctx, string resource);

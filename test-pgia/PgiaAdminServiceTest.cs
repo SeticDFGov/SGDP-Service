@@ -23,10 +23,8 @@ public class PgiaAdminServiceTest : PgiaTestBase
     // ── Papéis ────────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task AtribuirPapel_GravaPapelSemTocarNoPerfil()
+    public async Task AtribuirPapel_GravaPapel()
     {
-        var perfilAntes = UserSemPapel.Perfil;
-
         await _service.AtribuirPapelAsync(new AtribuirPapelPgiaDTO
         {
             Email = UserSemPapel.Email,
@@ -35,7 +33,6 @@ public class PgiaAdminServiceTest : PgiaTestBase
 
         var user = await Context.Users.FirstAsync(u => u.Email == UserSemPapel.Email);
         Assert.Equal("pgia_orgao", user.PapelPgia);
-        Assert.Equal(perfilAntes, user.Perfil);
     }
 
     [Fact]
@@ -82,13 +79,12 @@ public class PgiaAdminServiceTest : PgiaTestBase
     [Fact]
     public async Task CriarOrgao_InstanciaAsObrigacoesDoOrgao()
     {
-        var unidade = new app.Models.Unidade { id = Guid.NewGuid(), Nome = "Nova Unidade" };
+        var unidade = new app.Models.Unidade { id = Guid.NewGuid(), Nome = "Nova Unidade", CodigoExterno = "SEDES" };
         Context.Unidades.Add(unidade);
         await Context.SaveChangesAsync();
 
         var criado = await _service.CriarOrgaoAsync(new PgiaOrgaoCreateDTO
         {
-            Sigla = "SEDES",
             Nome = "Secretaria de Desenvolvimento Social",
             NaturezaJuridica = PgiaDominios.NaturezaJuridica.AdministracaoDireta,
             UnidadeId = unidade.id
@@ -105,17 +101,20 @@ public class PgiaAdminServiceTest : PgiaTestBase
     }
 
     [Fact]
-    public async Task CriarOrgao_SiglaDuplicadaEhRejeitada()
+    public async Task CriarOrgao_SiglaNasceDoCodigoExternoDaUnidade()
     {
-        var ex = await Assert.ThrowsAsync<ApiException>(() =>
-            _service.CriarOrgaoAsync(new PgiaOrgaoCreateDTO
-            {
-                Sigla = "SES",
-                Nome = "Outro órgão",
-                NaturezaJuridica = PgiaDominios.NaturezaJuridica.Autarquia
-            }, UserAdmin.Email));
+        var unidade = new app.Models.Unidade { id = Guid.NewGuid(), Nome = "Nova Unidade", CodigoExterno = "SEDES" };
+        Context.Unidades.Add(unidade);
+        await Context.SaveChangesAsync();
 
-        Assert.Equal((int)ErrorCode.PgiaOrgaoJaExiste, ex.Error.Code);
+        var criado = await _service.CriarOrgaoAsync(new PgiaOrgaoCreateDTO
+        {
+            Nome = "Secretaria de Desenvolvimento Social",
+            NaturezaJuridica = PgiaDominios.NaturezaJuridica.AdministracaoDireta,
+            UnidadeId = unidade.id
+        }, UserAdmin.Email);
+
+        Assert.Equal("SEDES", criado.Sigla);
     }
 
     [Fact]
@@ -124,7 +123,6 @@ public class PgiaAdminServiceTest : PgiaTestBase
         var ex = await Assert.ThrowsAsync<ApiException>(() =>
             _service.CriarOrgaoAsync(new PgiaOrgaoCreateDTO
             {
-                Sigla = "SES2",
                 Nome = "Órgão duplicando unidade",
                 NaturezaJuridica = PgiaDominios.NaturezaJuridica.AdministracaoDireta,
                 UnidadeId = UnidadeSes.id
@@ -134,14 +132,32 @@ public class PgiaAdminServiceTest : PgiaTestBase
     }
 
     [Fact]
-    public async Task CriarOrgao_NaturezaInvalidaEhRejeitada()
+    public async Task CriarOrgao_SemUnidadeEhRejeitada()
     {
+        // Não existe mais órgão sem unidade: é dela que a sigla nasce.
         var ex = await Assert.ThrowsAsync<ApiException>(() =>
             _service.CriarOrgaoAsync(new PgiaOrgaoCreateDTO
             {
-                Sigla = "XPTO",
+                Nome = "Órgão sem unidade",
+                NaturezaJuridica = PgiaDominios.NaturezaJuridica.Autarquia
+            }, UserAdmin.Email));
+
+        Assert.Equal((int)ErrorCode.PgiaDominioInvalido, ex.Error.Code);
+    }
+
+    [Fact]
+    public async Task CriarOrgao_NaturezaInvalidaEhRejeitada()
+    {
+        var unidade = new app.Models.Unidade { id = Guid.NewGuid(), Nome = "Unidade XPTO", CodigoExterno = "XPTO" };
+        Context.Unidades.Add(unidade);
+        await Context.SaveChangesAsync();
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() =>
+            _service.CriarOrgaoAsync(new PgiaOrgaoCreateDTO
+            {
                 Nome = "Órgão inválido",
-                NaturezaJuridica = "Organização social"
+                NaturezaJuridica = "Organização social",
+                UnidadeId = unidade.id
             }, UserAdmin.Email));
 
         Assert.Equal((int)ErrorCode.PgiaDominioInvalido, ex.Error.Code);
@@ -150,22 +166,27 @@ public class PgiaAdminServiceTest : PgiaTestBase
     [Fact]
     public async Task CriarOrgao_PrestaServicoSoValeParaEmpresaOuSem()
     {
+        var unidadeDireta = new app.Models.Unidade { id = Guid.NewGuid(), Nome = "Unidade Direta", CodigoExterno = "DIR" };
+        var unidadeEmpresa = new app.Models.Unidade { id = Guid.NewGuid(), Nome = "Unidade Empresa", CodigoExterno = "EMP" };
+        Context.Unidades.AddRange(unidadeDireta, unidadeEmpresa);
+        await Context.SaveChangesAsync();
+
         // Administração direta: o valor informado é descartado (CHECK do schema)
         var direta = await _service.CriarOrgaoAsync(new PgiaOrgaoCreateDTO
         {
-            Sigla = "DIR",
             Nome = "Órgão da administração direta",
             NaturezaJuridica = PgiaDominios.NaturezaJuridica.AdministracaoDireta,
-            PrestaServicoCidadao = true
+            PrestaServicoCidadao = true,
+            UnidadeId = unidadeDireta.id
         }, UserAdmin.Email);
         Assert.Null(direta.PrestaServicoCidadao);
 
         var empresa = await _service.CriarOrgaoAsync(new PgiaOrgaoCreateDTO
         {
-            Sigla = "EMP",
             Nome = "Empresa pública",
             NaturezaJuridica = PgiaDominios.NaturezaJuridica.EmpresaPublica,
-            PrestaServicoCidadao = true
+            PrestaServicoCidadao = true,
+            UnidadeId = unidadeEmpresa.id
         }, UserAdmin.Email);
         Assert.True(empresa.PrestaServicoCidadao);
     }

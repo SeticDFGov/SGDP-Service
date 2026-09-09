@@ -23,11 +23,6 @@ public class EtapaService : IEtapaService
         return await _etapaRepositorio.GetEntregaveisByDemandaIdAsync(demandaId);
     }
 
-    public async Task<List<Etapa>> GetEntregaveisByCentralITAsync(string areaExecutoraNome)
-    {
-        return await _etapaRepositorio.GetEntregaveisByAreaExecutoraAsync(areaExecutoraNome);
-    }
-
     public async Task<Etapa> GetByIdAsync(int id)
     {
         return await _etapaRepositorio.GetByIdAsync(id)

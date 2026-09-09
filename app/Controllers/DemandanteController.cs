@@ -25,6 +25,7 @@ public class DemandanteController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> CreateDemandante([FromBody] AreaDemandante demandante)
     {
        await  _repositorio.CreateDemandanteAsync(demandante);
@@ -33,6 +34,7 @@ public class DemandanteController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> DeleteDemandante(int id)
     {
         await _repositorio.DeleteDemandanteAsync(id);

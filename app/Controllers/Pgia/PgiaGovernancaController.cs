@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using api.Pgia;
+using app.Auth;
 using demanda_service.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +17,7 @@ namespace Controllers.Pgia;
 /// (arts. 18, § 2º e 21). Toda ação valida papel no PgiaPermissionService.
 /// </summary>
 [ApiController]
-[Authorize]
+[Authorize(Roles = "admin,pgia")]
 [Route("api/pgia/governanca")]
 public class PgiaGovernancaController : ControllerBase
 {
@@ -41,12 +42,13 @@ public class PgiaGovernancaController : ControllerBase
     }
 
     private string? GetUserEmail() => User.FindFirst(ClaimTypes.Email)?.Value;
+    private string GetUserPerfil() => User.FindFirst(ClaimTypes.Role)?.Value ?? Perfis.Basico;
 
     private async Task<PgiaUserContext?> GetContextAsync()
     {
         var email = GetUserEmail();
         if (string.IsNullOrEmpty(email)) return null;
-        return await _permissionService.GetContextAsync(email);
+        return await _permissionService.GetContextAsync(email, GetUserPerfil());
     }
 
     /// <summary>Instâncias centrais: SGDI, CGTIC e admin veem o painel inteiro.</summary>
@@ -120,10 +122,9 @@ public class PgiaGovernancaController : ControllerBase
 
     /// <summary>
     /// Cadastra um órgão PGIA e instancia as obrigações com prazo do art. 35.
-    /// Mesmo DTO e mesmo service do <c>POST api/pgia/admin/orgao</c> (valida sigla e
-    /// unidade duplicadas), aberto à SGDI: é ela quem entrega o órgão pronto. Aqui a
-    /// unidade é OBRIGATÓRIA — órgão sem unidade não tem como receber pessoas nem
-    /// designações; a tela "Dados dos órgãos" só consertaria depois.
+    /// Mesmo DTO e mesmo service do <c>POST api/pgia/admin/orgao</c> (valida unidade
+    /// obrigatória e duplicada; a sigla é sempre o código do grupo Keycloak da
+    /// unidade, nunca digitada), aberto à SGDI: é ela quem entrega o órgão pronto.
     /// </summary>
     [HttpPost("orgao")]
     public async Task<IActionResult> CriarOrgao([FromBody] PgiaOrgaoCreateDTO dto)
@@ -132,10 +133,6 @@ public class PgiaGovernancaController : ControllerBase
         if (ctx == null) return Unauthorized();
         // CanCreate(Orgao) já era só sgdi/admin na matriz
         if (!_permissionService.CanCreate(ctx, PgiaResources.Orgao)) return Forbid();
-
-        if (dto.UnidadeId == null)
-            throw new ApiException(ErrorCode.PgiaDominioInvalido,
-                "A unidade vinculada é obrigatória para o órgão criado pela SGDI.");
 
         return Ok(await _adminService.CriarOrgaoAsync(dto, ctx.Email));
     }

@@ -4,9 +4,6 @@ namespace api.Pgia;
 
 public class PgiaOrgaoCreateDTO
 {
-    [StringLength(20)]
-    public string Sigla { get; set; } = string.Empty;
-
     public string Nome { get; set; } = string.Empty;
 
     // D10 (PgiaDominios.NaturezaJuridica)
@@ -34,9 +31,6 @@ public class PgiaOrgaoUpdateDTO : PgiaOrgaoCreateDTO
 /// </summary>
 public class PgiaOrgaoDadosDTO
 {
-    [StringLength(20)]
-    public string Sigla { get; set; } = string.Empty;
-
     public string Nome { get; set; } = string.Empty;
 
     [StringLength(40)]

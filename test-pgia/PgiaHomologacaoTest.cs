@@ -53,7 +53,7 @@ public class PgiaHomologacaoTest : PgiaTestBase
     }
 
     private async Task<PgiaUserContext> CtxAsync(string email) =>
-        (await _permissionService.GetContextAsync(email))!;
+        (await _permissionService.GetContextAsync(email, PerfilDe(email)))!;
 
     private static PgiaClassificacaoCreateDTO Checklist(
         List<string>? q15 = null, List<string>? q16 = null, List<string>? q17 = null) => new()

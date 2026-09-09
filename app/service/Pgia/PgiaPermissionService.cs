@@ -86,7 +86,7 @@ public class PgiaPermissionService : IPgiaPermissionService
         _context = context;
     }
 
-    public async Task<PgiaUserContext?> GetContextAsync(string email)
+    public async Task<PgiaUserContext?> GetContextAsync(string email, string perfil)
     {
         var user = await _context.Users
             .Include(u => u.Unidade)
@@ -98,7 +98,7 @@ public class PgiaPermissionService : IPgiaPermissionService
         {
             UserId = user.Id,
             Email = user.Email,
-            Perfil = user.Perfil,
+            Perfil = perfil,
             PapelPgia = user.PapelPgia,
             UnidadeId = user.Unidade?.id
         };

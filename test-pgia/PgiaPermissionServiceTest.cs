@@ -18,7 +18,7 @@ public class PgiaPermissionServiceTest : PgiaTestBase
     [Fact]
     public async Task Contexto_ResolveOrgaoPelaUnidadeDoUsuario()
     {
-        var ctx = await _service.GetContextAsync(UserOrgaoSes.Email);
+        var ctx = await _service.GetContextAsync(UserOrgaoSes.Email, PerfilDe(UserOrgaoSes));
 
         Assert.NotNull(ctx);
         Assert.Equal("pgia_orgao", ctx!.PapelPgia);
@@ -36,7 +36,7 @@ public class PgiaPermissionServiceTest : PgiaTestBase
         OrgaoSes.Ativo = false;
         await Context.SaveChangesAsync();
 
-        var ctx = await _service.GetContextAsync(UserOrgaoSes.Email);
+        var ctx = await _service.GetContextAsync(UserOrgaoSes.Email, PerfilDe(UserOrgaoSes));
 
         Assert.NotNull(ctx);
         Assert.Equal(UnidadeSes.id, ctx!.UnidadeId); // a unidade continua
@@ -47,7 +47,7 @@ public class PgiaPermissionServiceTest : PgiaTestBase
     [Fact]
     public async Task Contexto_AdminDoSgdpTemPapelEfetivoAdmin()
     {
-        var ctx = await _service.GetContextAsync(UserAdmin.Email);
+        var ctx = await _service.GetContextAsync(UserAdmin.Email, PerfilDe(UserAdmin));
 
         Assert.NotNull(ctx);
         Assert.True(ctx!.IsAdmin);
@@ -58,7 +58,7 @@ public class PgiaPermissionServiceTest : PgiaTestBase
     [Fact]
     public async Task Contexto_UsuarioInexistenteRetornaNulo()
     {
-        var ctx = await _service.GetContextAsync("nao-existe@df.gov.br");
+        var ctx = await _service.GetContextAsync("nao-existe@df.gov.br", "basico");
         Assert.Null(ctx);
     }
 
@@ -73,7 +73,7 @@ public class PgiaPermissionServiceTest : PgiaTestBase
     [InlineData("comum@ses.df.gov.br", false)]
     public async Task CanView_Prazo_PorPapel(string email, bool esperado)
     {
-        var ctx = await _service.GetContextAsync(email);
+        var ctx = await _service.GetContextAsync(email, PerfilDe(email));
         Assert.Equal(esperado, _service.CanView(ctx!, PgiaResources.Prazo));
     }
 
@@ -86,7 +86,7 @@ public class PgiaPermissionServiceTest : PgiaTestBase
     [InlineData("comum@ses.df.gov.br", false)]
     public async Task CanCreate_Designacao_PorPapel(string email, bool esperado)
     {
-        var ctx = await _service.GetContextAsync(email);
+        var ctx = await _service.GetContextAsync(email, PerfilDe(email));
         Assert.Equal(esperado, _service.CanCreate(ctx!, PgiaResources.Designacao));
     }
 
@@ -102,7 +102,7 @@ public class PgiaPermissionServiceTest : PgiaTestBase
     [InlineData("comum@ses.df.gov.br", false)]
     public async Task CanEdit_DadosDoOrgao_PorPapel(string email, bool esperado)
     {
-        var ctx = await _service.GetContextAsync(email);
+        var ctx = await _service.GetContextAsync(email, PerfilDe(email));
         Assert.Equal(esperado, _service.CanEdit(ctx!, PgiaResources.OrgaoDados));
     }
 
@@ -119,14 +119,14 @@ public class PgiaPermissionServiceTest : PgiaTestBase
     [InlineData("comum@ses.df.gov.br", false)]
     public async Task CanEdit_AgenteInfo_PorPapel(string email, bool esperado)
     {
-        var ctx = await _service.GetContextAsync(email);
+        var ctx = await _service.GetContextAsync(email, PerfilDe(email));
         Assert.Equal(esperado, _service.CanEdit(ctx!, PgiaResources.AgenteInfo));
     }
 
     [Fact]
     public async Task CanView_AgenteInfo_OrgaoContinuaVendoAsPessoas()
     {
-        var orgao = await _service.GetContextAsync(UserOrgaoSes.Email);
+        var orgao = await _service.GetContextAsync(UserOrgaoSes.Email, PerfilDe(UserOrgaoSes));
         Assert.True(_service.CanView(orgao!, PgiaResources.AgenteInfo));
     }
 
@@ -143,7 +143,7 @@ public class PgiaPermissionServiceTest : PgiaTestBase
     [InlineData("comum@ses.df.gov.br", false)]
     public async Task CanEdit_PessoaVinculo_SomenteSgdiEAdmin(string email, bool esperado)
     {
-        var ctx = await _service.GetContextAsync(email);
+        var ctx = await _service.GetContextAsync(email, PerfilDe(email));
         Assert.Equal(esperado, _service.CanEdit(ctx!, PgiaResources.PessoaVinculo));
     }
 
@@ -153,7 +153,7 @@ public class PgiaPermissionServiceTest : PgiaTestBase
     [Fact]
     public async Task CanEdit_Designacao_ContinuaComOOrgao()
     {
-        var orgao = await _service.GetContextAsync(UserOrgaoSes.Email);
+        var orgao = await _service.GetContextAsync(UserOrgaoSes.Email, PerfilDe(UserOrgaoSes));
 
         Assert.True(_service.CanEdit(orgao!, PgiaResources.Designacao));
         Assert.True(_service.CanCreate(orgao!, PgiaResources.Designacao));
@@ -164,9 +164,9 @@ public class PgiaPermissionServiceTest : PgiaTestBase
     [Fact]
     public async Task CanCreate_Orgao_SomenteAdminESgdi()
     {
-        var admin = await _service.GetContextAsync(UserAdmin.Email);
-        var sgdi = await _service.GetContextAsync(UserSgdi.Email);
-        var orgao = await _service.GetContextAsync(UserOrgaoSes.Email);
+        var admin = await _service.GetContextAsync(UserAdmin.Email, PerfilDe(UserAdmin));
+        var sgdi = await _service.GetContextAsync(UserSgdi.Email, PerfilDe(UserSgdi));
+        var orgao = await _service.GetContextAsync(UserOrgaoSes.Email, PerfilDe(UserOrgaoSes));
 
         Assert.True(_service.CanCreate(admin!, PgiaResources.Orgao));
         Assert.True(_service.CanCreate(sgdi!, PgiaResources.Orgao));
@@ -178,7 +178,7 @@ public class PgiaPermissionServiceTest : PgiaTestBase
     [Fact]
     public async Task PapelOrgao_NaoAcessaOutroOrgao()
     {
-        var ctx = await _service.GetContextAsync(UserOrgaoSes.Email);
+        var ctx = await _service.GetContextAsync(UserOrgaoSes.Email, PerfilDe(UserOrgaoSes));
 
         Assert.True(_service.CanAccessOrgao(ctx!, OrgaoSes.Id));
         Assert.False(_service.CanAccessOrgao(ctx!, OrgaoSeec.Id));
@@ -189,7 +189,7 @@ public class PgiaPermissionServiceTest : PgiaTestBase
     {
         foreach (var email in new[] { UserSgdi.Email, UserCgtic.Email, UserAdmin.Email })
         {
-            var ctx = await _service.GetContextAsync(email);
+            var ctx = await _service.GetContextAsync(email, PerfilDe(email));
             Assert.True(_service.CanAccessOrgao(ctx!, OrgaoSes.Id));
             Assert.True(_service.CanAccessOrgao(ctx!, OrgaoSeec.Id));
         }
@@ -198,7 +198,7 @@ public class PgiaPermissionServiceTest : PgiaTestBase
     [Fact]
     public async Task UsuarioSemPapel_NaoAcessaOrgaoAlgum()
     {
-        var ctx = await _service.GetContextAsync(UserSemPapel.Email);
+        var ctx = await _service.GetContextAsync(UserSemPapel.Email, PerfilDe(UserSemPapel));
 
         Assert.False(_service.CanAccessOrgao(ctx!, OrgaoSes.Id));
         Assert.False(_service.CanAccessOrgao(ctx!, OrgaoSeec.Id));
@@ -207,7 +207,7 @@ public class PgiaPermissionServiceTest : PgiaTestBase
     [Fact]
     public async Task FiltroDeOrgaos_PapelOrgaoSoVeOProprio()
     {
-        var ctx = await _service.GetContextAsync(UserOrgaoSes.Email);
+        var ctx = await _service.GetContextAsync(UserOrgaoSes.Email, PerfilDe(UserOrgaoSes));
         var orgaos = await _service.GetFilteredOrgaosQuery(ctx!).ToListAsync();
 
         Assert.Single(orgaos);
@@ -217,7 +217,7 @@ public class PgiaPermissionServiceTest : PgiaTestBase
     [Fact]
     public async Task FiltroDeOrgaos_SgdiVeTodos()
     {
-        var ctx = await _service.GetContextAsync(UserSgdi.Email);
+        var ctx = await _service.GetContextAsync(UserSgdi.Email, PerfilDe(UserSgdi));
         var orgaos = await _service.GetFilteredOrgaosQuery(ctx!).ToListAsync();
 
         Assert.Equal(2, orgaos.Count);
@@ -226,7 +226,7 @@ public class PgiaPermissionServiceTest : PgiaTestBase
     [Fact]
     public async Task FiltroDeOrgaos_SemPapelNaoVeNada()
     {
-        var ctx = await _service.GetContextAsync(UserSemPapel.Email);
+        var ctx = await _service.GetContextAsync(UserSemPapel.Email, PerfilDe(UserSemPapel));
         var orgaos = await _service.GetFilteredOrgaosQuery(ctx!).ToListAsync();
 
         Assert.Empty(orgaos);

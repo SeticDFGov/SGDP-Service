@@ -62,7 +62,7 @@ public class PgiaSistemaPermissionTest : PgiaTestBase
     [Fact]
     public async Task FiltroDeSistemas_PapelOrgaoSoVeOsDoProprioOrgao()
     {
-        var ctx = await _service.GetContextAsync(UserOrgaoSes.Email);
+        var ctx = await _service.GetContextAsync(UserOrgaoSes.Email, PerfilDe(UserOrgaoSes));
         var sistemas = await _service.GetFilteredSistemasQuery(ctx!).ToListAsync();
 
         Assert.Single(sistemas);
@@ -73,7 +73,7 @@ public class PgiaSistemaPermissionTest : PgiaTestBase
     [Fact]
     public async Task FiltroDeSistemas_PapelOrgaoNaoEnxergaOOutroOrgao()
     {
-        var ctx = await _service.GetContextAsync(UserOrgaoSeec.Email);
+        var ctx = await _service.GetContextAsync(UserOrgaoSeec.Email, PerfilDe(UserOrgaoSeec));
         var sistemas = await _service.GetFilteredSistemasQuery(ctx!).ToListAsync();
 
         Assert.Single(sistemas);
@@ -87,7 +87,7 @@ public class PgiaSistemaPermissionTest : PgiaTestBase
     [InlineData("admin@subgd.df.gov.br")]
     public async Task FiltroDeSistemas_EscopoCentralVeTodos(string email)
     {
-        var ctx = await _service.GetContextAsync(email);
+        var ctx = await _service.GetContextAsync(email, PerfilDe(email));
         var sistemas = await _service.GetFilteredSistemasQuery(ctx!).ToListAsync();
 
         Assert.Equal(2, sistemas.Count);
@@ -98,7 +98,7 @@ public class PgiaSistemaPermissionTest : PgiaTestBase
     [InlineData("aud@auditoria.com")]
     public async Task FiltroDeSistemas_SemPapelNoInventarioNaoVeNada(string email)
     {
-        var ctx = await _service.GetContextAsync(email);
+        var ctx = await _service.GetContextAsync(email, PerfilDe(email));
         var sistemas = await _service.GetFilteredSistemasQuery(ctx!).ToListAsync();
 
         Assert.Empty(sistemas);
@@ -107,7 +107,7 @@ public class PgiaSistemaPermissionTest : PgiaTestBase
     [Fact]
     public async Task FiltroDeSistemas_TrazOOrgaoParaAListagem()
     {
-        var ctx = await _service.GetContextAsync(UserSgdi.Email);
+        var ctx = await _service.GetContextAsync(UserSgdi.Email, PerfilDe(UserSgdi));
         var sistemas = await _service.GetFilteredSistemasQuery(ctx!).ToListAsync();
 
         Assert.All(sistemas, s => Assert.NotNull(s.Orgao));

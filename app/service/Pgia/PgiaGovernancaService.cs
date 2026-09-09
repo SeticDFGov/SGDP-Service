@@ -130,11 +130,10 @@ public class PgiaGovernancaService : IPgiaGovernancaService
                 // 1º login. Corrige o dedup do lado do pré-cadastro, sem tocar no
                 // GetOrCreateUserAsync (cujo fallback por e-mail assume esta linha).
                 Email = email.ToLowerInvariant(),
-                // Placeholder: o Perfil real vem da primeira role do token no primeiro
-                // login, quando o GetOrCreateUserAsync (intocado) sobrescreve Nome e
-                // Perfil. Com KeycloakId nulo, é o fallback por e-mail daquele método
-                // que assume esta linha — e ele preserva Unidade e PapelPgia.
-                Perfil = Perfis.Basico,
+                // Perfil nunca é persistido: vem sempre da claim do token a cada
+                // requisição. Com KeycloakId nulo, é o fallback por e-mail do
+                // GetOrCreateUserAsync (intocado) que assume esta linha no
+                // primeiro login — e ele preserva Unidade e PapelPgia.
                 KeycloakId = null
             };
             _repositorio.AddUser(user);
@@ -249,7 +248,6 @@ public class PgiaGovernancaService : IPgiaGovernancaService
         UserId = user.Id,
         Nome = user.Nome,
         Email = user.Email,
-        Perfil = user.Perfil,
         PapelPgia = user.PapelPgia,
         UnidadeId = user.Unidade?.id,
         UnidadeNome = user.Unidade?.Nome,

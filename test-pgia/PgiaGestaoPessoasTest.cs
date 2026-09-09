@@ -59,10 +59,14 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
 
     // ── Apoio ─────────────────────────────────────────────────────────────────
 
-    /// <summary>Coloca o e-mail no ClaimsPrincipal, como o pipeline do JWT faz.</summary>
-    private static ControllerBase Autenticar(ControllerBase controller, string email)
+    /// <summary>Coloca e-mail e role no ClaimsPrincipal, como o pipeline do JWT faz.</summary>
+    private ControllerBase Autenticar(ControllerBase controller, string email)
     {
-        var identidade = new ClaimsIdentity(new[] { new Claim(ClaimTypes.Email, email) }, "Teste");
+        var identidade = new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.Email, email),
+            new Claim(ClaimTypes.Role, PerfilDe(email))
+        }, "Teste");
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identidade) }
@@ -82,9 +86,8 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
         return _governancaController;
     }
 
-    private static PgiaOrgaoDadosDTO NovoDadosDto(string sigla, string nome) => new()
+    private static PgiaOrgaoDadosDTO NovoDadosDto(string nome) => new()
     {
-        Sigla = sigla,
         Nome = nome,
         NaturezaJuridica = PgiaDominios.NaturezaJuridica.AdministracaoDireta
     };
@@ -144,7 +147,7 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
     public async Task DadosDoOrgao_PapelOrgaoRecebeForbidNoProprioOrgao()
     {
         var resultado = await ComoOrgaoController(UserOrgaoSes.Email)
-            .AtualizarDados(OrgaoSes.Id, NovoDadosDto("SES", "Nome novo do órgão"));
+            .AtualizarDados(OrgaoSes.Id, NovoDadosDto("Nome novo do órgão"));
 
         Assert.IsType<ForbidResult>(resultado);
 
@@ -158,9 +161,9 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
         var controller = ComoOrgaoController(UserSgdi.Email);
 
         var ses = Assert.IsType<OkObjectResult>(
-            await controller.AtualizarDados(OrgaoSes.Id, NovoDadosDto("SES", "Saúde (revisado pela SGDI)")));
+            await controller.AtualizarDados(OrgaoSes.Id, NovoDadosDto("Saúde (revisado pela SGDI)")));
         var seec = Assert.IsType<OkObjectResult>(
-            await controller.AtualizarDados(OrgaoSeec.Id, NovoDadosDto("SEEC", "Economia (revisado pela SGDI)")));
+            await controller.AtualizarDados(OrgaoSeec.Id, NovoDadosDto("Economia (revisado pela SGDI)")));
 
         Assert.Equal("Saúde (revisado pela SGDI)", Assert.IsType<PgiaOrgaoResponse>(ses.Value).Nome);
         Assert.Equal("Economia (revisado pela SGDI)", Assert.IsType<PgiaOrgaoResponse>(seec.Value).Nome);
@@ -180,7 +183,7 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
         Context.Unidades.Add(novaUnidade);
         await Context.SaveChangesAsync();
 
-        var dto = NovoDadosDto("SES", "Secretaria de Saúde");
+        var dto = NovoDadosDto("Secretaria de Saúde");
         dto.UnidadeId = novaUnidade.id;
 
         var resultado = await ComoOrgaoController(UserSgdi.Email).AtualizarDados(OrgaoSes.Id, dto);
@@ -194,7 +197,7 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
     [Fact]
     public async Task DadosDoOrgao_UnidadeJaOcupadaEhRejeitada()
     {
-        var dto = NovoDadosDto("SES", "Secretaria de Saúde");
+        var dto = NovoDadosDto("Secretaria de Saúde");
         dto.UnidadeId = UnidadeSeec.id; // já é do OrgaoSeec
 
         var ex = await Assert.ThrowsAsync<ApiException>(() =>
@@ -208,7 +211,7 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
     [Fact]
     public async Task DadosDoOrgao_UnidadeInexistenteEhRejeitada()
     {
-        var dto = NovoDadosDto("SES", "Secretaria de Saúde");
+        var dto = NovoDadosDto("Secretaria de Saúde");
         dto.UnidadeId = Guid.NewGuid();
 
         var ex = await Assert.ThrowsAsync<ApiException>(() =>
@@ -222,7 +225,7 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
     {
         // NovoDadosDto não informa UnidadeId (null): não desvincula
         var resultado = await ComoOrgaoController(UserSgdi.Email)
-            .AtualizarDados(OrgaoSes.Id, NovoDadosDto("SES", "Saúde revisada"));
+            .AtualizarDados(OrgaoSes.Id, NovoDadosDto("Saúde revisada"));
 
         var orgao = Assert.IsType<PgiaOrgaoResponse>(Assert.IsType<OkObjectResult>(resultado).Value);
         Assert.Equal(UnidadeSes.id, orgao.UnidadeId); // preservada
@@ -284,7 +287,6 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
 
         var maria = Assert.Single(pessoas);
         Assert.Equal(UserOrgaoSes.Id, maria.UserId);
-        Assert.Equal("gestor", maria.Perfil);
         Assert.Equal("pgia_orgao", maria.PapelPgia);
     }
 
@@ -367,8 +369,7 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
         var recemChegado = new User
         {
             Nome = "Zilda Recém-Chegada",
-            Email = "zilda@novo.df.gov.br",
-            Perfil = "basico"
+            Email = "zilda@novo.df.gov.br"
         };
         Context.Users.Add(recemChegado);
         await Context.SaveChangesAsync();
@@ -399,8 +400,7 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
             Context.Users.Add(new User
             {
                 Nome = $"Pessoa {i:D3}",
-                Email = $"pessoa{i:D3}@df.gov.br",
-                Perfil = "basico"
+                Email = $"pessoa{i:D3}@df.gov.br"
             });
         }
         await Context.SaveChangesAsync();
@@ -459,13 +459,12 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
     }
 
     [Fact]
-    public async Task AtualizarVinculo_NaoTocaNoPerfilDoSgdp()
+    public async Task AtualizarVinculo_GravaOPapelPgia()
     {
         await _governancaService.AtualizarVinculoPessoaAsync(
             UserOrgaoSes.Id, new PgiaPessoaVinculoDTO { PapelPgia = "pgia_sgdi", UnidadeId = UnidadeSeec.id });
 
         var salvo = await Context.Users.AsNoTracking().FirstAsync(u => u.Id == UserOrgaoSes.Id);
-        Assert.Equal("gestor", salvo.Perfil); // o Perfil vem do Keycloak e não é escrito aqui
         Assert.Equal("pgia_sgdi", salvo.PapelPgia);
     }
 
@@ -580,13 +579,12 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
     [Fact]
     public async Task CriarOrgao_SgdiCadastraComUnidadeEInstanciaOsPrazos()
     {
-        var unidade = new Unidade { id = Guid.NewGuid(), Nome = "Secretaria de Desenvolvimento Social" };
+        var unidade = new Unidade { id = Guid.NewGuid(), Nome = "Secretaria de Desenvolvimento Social", CodigoExterno = "SEDES" };
         Context.Unidades.Add(unidade);
         await Context.SaveChangesAsync();
 
         var resultado = await ComoGovernancaController(UserSgdi.Email).CriarOrgao(new PgiaOrgaoCreateDTO
         {
-            Sigla = "SEDES",
             Nome = "Secretaria de Estado de Desenvolvimento Social",
             NaturezaJuridica = PgiaDominios.NaturezaJuridica.AdministracaoDireta,
             UnidadeId = unidade.id
@@ -616,7 +614,6 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
         var ex = await Assert.ThrowsAsync<ApiException>(() =>
             ComoGovernancaController(UserSgdi.Email).CriarOrgao(new PgiaOrgaoCreateDTO
             {
-                Sigla = "AUTA",
                 Nome = "Autarquia sem unidade vinculada",
                 NaturezaJuridica = PgiaDominios.NaturezaJuridica.Autarquia
             }));
@@ -625,37 +622,12 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
         Assert.Equal(2, await Context.PgiaOrgaos.CountAsync()); // nada foi criado
     }
 
-    /// <summary>
-    /// As validações são as mesmas do admin: o service é o mesmo
-    /// (IPgiaAdminService.CriarOrgaoAsync), só o gate mudou.
-    /// </summary>
-    [Fact]
-    public async Task CriarOrgao_SiglaDuplicadaEhRejeitada()
-    {
-        var unidade = new Unidade { id = Guid.NewGuid(), Nome = "Unidade livre" };
-        Context.Unidades.Add(unidade);
-        await Context.SaveChangesAsync();
-
-        var ex = await Assert.ThrowsAsync<ApiException>(() =>
-            ComoGovernancaController(UserSgdi.Email).CriarOrgao(new PgiaOrgaoCreateDTO
-            {
-                Sigla = "SES",
-                Nome = "Outro órgão com a mesma sigla",
-                NaturezaJuridica = PgiaDominios.NaturezaJuridica.Autarquia,
-                UnidadeId = unidade.id
-            }));
-
-        Assert.Equal((int)ErrorCode.PgiaOrgaoJaExiste, ex.Error.Code);
-        Assert.Equal(2, await Context.PgiaOrgaos.CountAsync());
-    }
-
     [Fact]
     public async Task CriarOrgao_UnidadeJaVinculadaEhRejeitada()
     {
         var ex = await Assert.ThrowsAsync<ApiException>(() =>
             ComoGovernancaController(UserSgdi.Email).CriarOrgao(new PgiaOrgaoCreateDTO
             {
-                Sigla = "SES2",
                 Nome = "Órgão duplicando a unidade da SES",
                 NaturezaJuridica = PgiaDominios.NaturezaJuridica.AdministracaoDireta,
                 UnidadeId = UnidadeSes.id
@@ -674,13 +646,12 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
     [InlineData("comum@ses.df.gov.br", false)]   // sem papel PGIA
     public async Task CriarOrgao_SoSgdiEAdmin(string email, bool permitido)
     {
-        var unidade = new Unidade { id = Guid.NewGuid(), Nome = "Unidade do órgão novo" };
+        var unidade = new Unidade { id = Guid.NewGuid(), Nome = "Unidade do órgão novo", CodigoExterno = "NOVO" };
         Context.Unidades.Add(unidade);
         await Context.SaveChangesAsync();
 
         var resultado = await ComoGovernancaController(email).CriarOrgao(new PgiaOrgaoCreateDTO
         {
-            Sigla = "NOVO",
             Nome = "Órgão novo",
             NaturezaJuridica = PgiaDominios.NaturezaJuridica.Autarquia,
             UnidadeId = unidade.id
@@ -715,12 +686,10 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
         Assert.Equal("pgia_orgao", cadastro.PapelPgia);
         Assert.Equal(OrgaoSes.Id, cadastro.OrgaoId);
         Assert.Equal("SES", cadastro.OrgaoSigla);
-        Assert.Equal("basico", cadastro.Perfil);
 
         var salvo = await Context.Users.Include(u => u.Unidade)
             .FirstAsync(u => u.Email == "novo.responsavel@ses.df.gov.br");
-        Assert.Null(salvo.KeycloakId); // o primeiro login preenche
-        Assert.Equal("basico", salvo.Perfil); // placeholder até a role real do token
+        Assert.Null(salvo.KeycloakId); // o primeiro login preenche (inclusive o Perfil, via claim)
         Assert.Equal(UnidadeSes.id, salvo.Unidade?.id);
     }
 
@@ -838,13 +807,12 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
         });
 
         var logada = await new AuthRepositorio(Context).GetOrCreateUserAsync(
-            "keycloak-abc-123", "NARA NOVA DA SILVA", "nara@ses.df.gov.br", "gestor");
+            "keycloak-abc-123", "NARA NOVA DA SILVA", "nara@ses.df.gov.br");
 
         Assert.Equal(criada.UserId, logada.Id); // mesma linha, não um segundo cadastro
         Assert.Equal("keycloak-abc-123", logada.KeycloakId);
         Assert.Equal("pgia_orgao", logada.PapelPgia);       // vínculo do PGIA preservado
         Assert.Equal(UnidadeSes.id, logada.Unidade?.id);    // unidade preservada
-        Assert.Equal("gestor", logada.Perfil);              // perfil real vem do token
         Assert.Equal("NARA NOVA DA SILVA", logada.Nome);
         Assert.Single(await Context.Users.Where(u => u.Email == "nara@ses.df.gov.br").ToListAsync());
     }

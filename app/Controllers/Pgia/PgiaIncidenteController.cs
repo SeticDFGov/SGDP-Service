@@ -13,7 +13,7 @@ namespace Controllers.Pgia;
 /// comunicação formal à SGDI e apuração (arts. 8º, IX e 30).
 /// </summary>
 [ApiController]
-[Authorize]
+[Authorize(Roles = "admin,pgia")]
 [Route("api/pgia/incidente")]
 public class PgiaIncidenteController : ControllerBase
 {
@@ -27,12 +27,13 @@ public class PgiaIncidenteController : ControllerBase
     }
 
     private string? GetUserEmail() => User.FindFirst(ClaimTypes.Email)?.Value;
+    private string GetUserPerfil() => User.FindFirst(ClaimTypes.Role)?.Value ?? Perfis.Basico;
 
     private async Task<PgiaUserContext?> GetContextAsync()
     {
         var email = GetUserEmail();
         if (string.IsNullOrEmpty(email)) return null;
-        return await _permissionService.GetContextAsync(email);
+        return await _permissionService.GetContextAsync(email, GetUserPerfil());
     }
 
     private static bool EhEscopoCentral(PgiaUserContext ctx) =>

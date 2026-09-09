@@ -1,5 +1,6 @@
 using api.Pgia;
 using app.Auth;
+using app.Models;
 using Microsoft.EntityFrameworkCore;
 using Models;
 using Models.Pgia;
@@ -43,11 +44,13 @@ public class PgiaAdminService : IPgiaAdminService
 
     public async Task<PgiaOrgaoResponse> CriarOrgaoAsync(PgiaOrgaoCreateDTO dto, string adminEmail)
     {
-        await ValidarOrgaoAsync(dto.Sigla, dto.Nome, dto.NaturezaJuridica, dto.UnidadeId, orgaoId: null);
+        var unidade = await ValidarOrgaoAsync(dto.Nome, dto.NaturezaJuridica, dto.UnidadeId, orgaoId: null);
 
         var orgao = new PgiaOrgao
         {
-            Sigla = dto.Sigla.Trim(),
+            // A sigla é sempre o código do grupo Keycloak (a própria Unidade),
+            // nunca digitada — não existe mais órgão sem unidade.
+            Sigla = unidade.CodigoExterno ?? unidade.Nome,
             Nome = dto.Nome.Trim(),
             NaturezaJuridica = dto.NaturezaJuridica,
             PrestaServicoCidadao = PrestaServicoAplicavel(dto.NaturezaJuridica) ? dto.PrestaServicoCidadao : null,
@@ -84,9 +87,9 @@ public class PgiaAdminService : IPgiaAdminService
         var orgao = await _orgaoRepositorio.GetByIdAsync(id)
             ?? throw new ApiException(ErrorCode.PgiaOrgaoNaoEncontrado);
 
-        await ValidarOrgaoAsync(dto.Sigla, dto.Nome, dto.NaturezaJuridica, dto.UnidadeId, orgaoId: id);
+        var unidade = await ValidarOrgaoAsync(dto.Nome, dto.NaturezaJuridica, dto.UnidadeId, orgaoId: id);
 
-        orgao.Sigla = dto.Sigla.Trim();
+        orgao.Sigla = unidade.CodigoExterno ?? unidade.Nome;
         orgao.Nome = dto.Nome.Trim();
         orgao.NaturezaJuridica = dto.NaturezaJuridica;
         orgao.PrestaServicoCidadao = PrestaServicoAplicavel(dto.NaturezaJuridica) ? dto.PrestaServicoCidadao : null;
@@ -99,28 +102,28 @@ public class PgiaAdminService : IPgiaAdminService
         return MapOrgao(orgao);
     }
 
-    private async Task ValidarOrgaoAsync(string sigla, string nome, string natureza, Guid? unidadeId, long? orgaoId)
+    // Toda criação/edição de órgão exige unidade — não existe mais órgão sem
+    // unidade, e a sigla é sempre derivada dela (o código do grupo Keycloak).
+    private async Task<Unidade> ValidarOrgaoAsync(string nome, string natureza, Guid? unidadeId, long? orgaoId)
     {
-        if (string.IsNullOrWhiteSpace(sigla) || string.IsNullOrWhiteSpace(nome))
-            throw new ApiException(ErrorCode.PgiaDominioInvalido, "Sigla e nome do órgão são obrigatórios.");
+        if (string.IsNullOrWhiteSpace(nome))
+            throw new ApiException(ErrorCode.PgiaDominioInvalido, "Nome do órgão é obrigatório.");
 
         if (!PgiaDominios.NaturezaJuridica.Todos.Contains(natureza))
             throw new ApiException(ErrorCode.PgiaDominioInvalido, $"Natureza jurídica inválida: {natureza}");
 
-        var mesmaSigla = await _orgaoRepositorio.GetBySiglaAsync(sigla.Trim());
-        if (mesmaSigla != null && mesmaSigla.Id != orgaoId)
-            throw new ApiException(ErrorCode.PgiaOrgaoJaExiste, $"Já existe órgão com a sigla {sigla.Trim()}.");
+        if (unidadeId == null)
+            throw new ApiException(ErrorCode.PgiaDominioInvalido, "A unidade vinculada é obrigatória para o órgão.");
 
-        if (unidadeId != null)
-        {
-            var unidade = await _context.Unidades.FirstOrDefaultAsync(u => u.id == unidadeId)
-                ?? throw new ApiException(ErrorCode.PgiaUnidadeNaoEncontrada);
+        var unidade = await _context.Unidades.FirstOrDefaultAsync(u => u.id == unidadeId)
+            ?? throw new ApiException(ErrorCode.PgiaUnidadeNaoEncontrada);
 
-            var mesmaUnidade = await _orgaoRepositorio.GetByUnidadeIdAsync(unidade.id);
-            if (mesmaUnidade != null && mesmaUnidade.Id != orgaoId)
-                throw new ApiException(ErrorCode.PgiaOrgaoJaExiste,
-                    $"A unidade {unidade.Nome} já está vinculada ao órgão {mesmaUnidade.Sigla}.");
-        }
+        var mesmaUnidade = await _orgaoRepositorio.GetByUnidadeIdAsync(unidade.id);
+        if (mesmaUnidade != null && mesmaUnidade.Id != orgaoId)
+            throw new ApiException(ErrorCode.PgiaOrgaoJaExiste,
+                $"A unidade {unidade.Nome} já está vinculada ao órgão {mesmaUnidade.Sigla}.");
+
+        return unidade;
     }
 
     private static bool PrestaServicoAplicavel(string natureza) =>

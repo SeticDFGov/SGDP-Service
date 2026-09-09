@@ -35,9 +35,6 @@ public class PgiaPessoaAcesso
 
     public string Email { get; set; } = string.Empty;
 
-    // Perfil do SGDP (vem do Keycloak); exibido só para conferência, nunca alterado aqui
-    public string Perfil { get; set; } = string.Empty;
-
     public string? PapelPgia { get; set; }
 
     public Guid? UnidadeId { get; set; }

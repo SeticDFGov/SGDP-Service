@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -30,11 +31,12 @@ public static class ModoLocalTokens
         return new Guid(hash).ToString();
     }
 
-    public static string EmitirToken(string email, string nome, string perfil, string clientId, TimeSpan validade)
+    public static string EmitirToken(string email, string nome, IEnumerable<string> roles, string clientId, TimeSpan validade)
     {
         // resource_access serializado: o fallback do OnTokenValidated (Program.cs)
         // desserializa a claim e copia as roles — mesmo caminho dos tokens reais.
-        var resourceAccess = $"{{\"{clientId}\":{{\"roles\":[\"{perfil}\"]}}}}";
+        var rolesJson = string.Join(",", roles.Select(r => $"\"{r}\""));
+        var resourceAccess = $"{{\"{clientId}\":{{\"roles\":[{rolesJson}]}}}}";
 
         var claims = new[]
         {

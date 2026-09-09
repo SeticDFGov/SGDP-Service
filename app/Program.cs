@@ -1,4 +1,6 @@
 ﻿using System.Security.Claims;
+using System.Linq;
+using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
@@ -227,12 +229,46 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                         resourceAccess.TryGetProperty(keycloakClientId, out var client) &&
                         client.TryGetProperty("roles", out var roles))
                     {
-                        foreach (var role in roles.EnumerateArray())
-                        {
-                            var r = role.GetString();
-                            if (!string.IsNullOrEmpty(r))
-                                identity.AddClaim(new Claim(ClaimTypes.Role, r));
-                        }
+                        var rolesDoToken = roles.EnumerateArray()
+                            .Select(role => role.GetString())
+                            .Where(r => !string.IsNullOrEmpty(r))
+                            .Cast<string>()
+                            .ToList();
+
+                        foreach (var r in rolesDoToken)
+                            identity.AddClaim(new Claim(ClaimTypes.Role, r));
+
+                        // A role "pgia" é o portão de entrada do módulo PGIA (checado via
+                        // [Authorize(Roles = "pgia")] nos controllers PGIA) e também empresta
+                        // o perfil "basico" para reaproveitar o confinamento de tela do SGDP —
+                        // mas só quando o usuário não tem perfil próprio (admin/gestor): um
+                        // gestor que também está num grupo PGIA continua gestor no resto do
+                        // sistema, "basico" é só o fallback de quem não tem perfil nenhum.
+                        var temPerfilProprio = rolesDoToken.Contains(Perfis.Admin) || rolesDoToken.Contains(Perfis.Gestor);
+                        if (rolesDoToken.Contains("pgia") && !temPerfilProprio)
+                            identity.AddClaim(new Claim(ClaimTypes.Role, Perfis.Basico));
+                    }
+
+                    JsonElement groups = default;
+                    if (context.SecurityToken is JsonWebToken jwtGroups)
+                        jwtGroups.TryGetPayloadValue("groups", out groups);
+
+                    if (groups.ValueKind == JsonValueKind.Undefined)
+                    {
+                        var rawGroups = identity.FindFirst("groups")?.Value;
+                        if (!string.IsNullOrEmpty(rawGroups))
+                            groups = JsonSerializer.Deserialize<JsonElement>(rawGroups);
+                    }
+
+                    if (groups.ValueKind == JsonValueKind.Array)
+                    {
+                        // Claim "groups" traz o nome da unidade diretamente (sem path).
+                        var codigo = groups.EnumerateArray()
+                            .Select(g => g.GetString())
+                            .FirstOrDefault(g => !string.IsNullOrEmpty(g));
+
+                        if (!string.IsNullOrEmpty(codigo))
+                            identity.AddClaim(new Claim("unidade_codigo", codigo));
                     }
                 }
                 catch { }
