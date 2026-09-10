@@ -2,6 +2,7 @@ using Models;
 using Microsoft.EntityFrameworkCore;
 using app.Models;
 using Models.Pgia;
+using Models.Contratacoes;
 
 namespace Models
 {
@@ -48,6 +49,10 @@ namespace Models
         public DbSet<PgiaAuditoriaTecnica> PgiaAuditoriasTecnicas { get; set; }
         public DbSet<PgiaSolicitacaoCidadao> PgiaSolicitacoesCidadao { get; set; }
 
+        // Módulo Análises de Contratações — tabelas com prefixo ctr_
+        public DbSet<CtrProcesso> CtrProcessos { get; set; }
+        public DbSet<CtrManifestacaoTcdf> CtrManifestacoesTcdf { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -77,6 +82,9 @@ namespace Models
 
             // Módulo PGIA: mapeamento isolado em PgiaModelConfiguration
             modelBuilder.ApplyPgiaConfiguration(Database.IsNpgsql());
+
+            // Módulo Análises de Contratações: mapeamento isolado em CtrModelConfiguration
+            modelBuilder.ApplyCtrConfiguration(Database.IsNpgsql());
         }
     }
 

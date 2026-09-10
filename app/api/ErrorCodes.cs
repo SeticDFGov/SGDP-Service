@@ -70,4 +70,16 @@ public enum ErrorCode
     PgiaSolicitacaoNaoEncontrada = 700,
     PgiaSolicitacaoInvalida = 701,
     PgiaSistemaNaoPublicado = 702,
+
+    // Módulo Análises de Contratações (faixa 8xx)
+    CtrProcessoNaoEncontrado = 800,
+    CtrProcessoInvalido = 801,
+    CtrProcessoDuplicado = 802,
+    CtrDatasIncoerentes = 803,
+    CtrManifestacaoNaoEncontrada = 804,
+    CtrManifestacaoInvalida = 805,
+    CtrImportacaoInvalida = 806,
+    CtrPapelInvalido = 807,
+    CtrUsuarioNaoEncontrado = 808,
+    CtrDominioInvalido = 809,
 }
