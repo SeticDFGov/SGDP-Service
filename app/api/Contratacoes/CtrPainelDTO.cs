@@ -36,6 +36,9 @@ public class CtrPainelResponse
     /// <summary>As 7 situações, mesmo as com zero.</summary>
     public List<CtrContagem> PorSituacao { get; set; } = new();
 
+    /// <summary>As 2 fases (CtrDominios.Fase), mesmo as com zero.</summary>
+    public List<CtrContagem> PorFase { get; set; } = new();
+
     public List<CtrContagem> PorCategoria { get; set; } = new();
 
     public List<CtrContagem> PorOrgao { get; set; } = new();

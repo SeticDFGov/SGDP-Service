@@ -47,14 +47,22 @@ public class CtrProcessoService : ICtrProcessoService
     /// datas e da restituição, na ordem do desenho.
     /// </summary>
     public static string CalcularSituacao(CtrProcesso p) => CalcularSituacao(
-        p.Restituido, p.ChegadaSgdi, p.ChegadaSubgd, p.ChegadaUgtic, p.RetornoGabSgdi, p.RetornoOrgao);
+        p.Restituido, p.ChegadaSgdi, p.ChegadaSubgd, p.ChegadaUgtic, p.RetornoGabSgdi, p.RetornoOrgao,
+        p.RetornoOrgaoNaoSeAplica);
 
     /// <inheritdoc cref="CalcularSituacao(CtrProcesso)"/>
+    // Sem valor default de propósito: um chamador que esquecesse o flag receberia a
+    // situação ANTIGA em silêncio (o processo com devolução dispensada não concluiria)
     public static string CalcularSituacao(bool restituido, DateOnly? chegadaSgdi, DateOnly? chegadaSubgd,
-        DateOnly? chegadaUgtic, DateOnly? retornoGabSgdi, DateOnly? retornoOrgao)
+        DateOnly? chegadaUgtic, DateOnly? retornoGabSgdi, DateOnly? retornoOrgao,
+        bool retornoOrgaoNaoSeAplica)
     {
         if (restituido) return CtrDominios.Situacao.Restituido;
-        if (retornoOrgao != null) return CtrDominios.Situacao.Concluido;
+        // Concluído pela devolução ao órgão OU pela devolução dispensada — mas só com
+        // o retorno ao Gab SGDI: marcar "não se aplica" sozinho não conclui nada,
+        // o processo segue na etapa em que está.
+        if (retornoOrgao != null || (retornoOrgaoNaoSeAplica && retornoGabSgdi != null))
+            return CtrDominios.Situacao.Concluido;
         if (retornoGabSgdi != null) return CtrDominios.Situacao.RetornadoGabSgdi;
         if (chegadaUgtic != null) return CtrDominios.Situacao.EmAnaliseUgtic;
         // Vale também quando a UGTIC "não se aplica" (a etapa foi pulada de propósito)
@@ -62,6 +70,16 @@ public class CtrProcessoService : ICtrProcessoService
         if (chegadaSgdi != null) return CtrDominios.Situacao.EmAnaliseSgdi;
         return CtrDominios.Situacao.SemMovimentacao;
     }
+
+    /// <summary>
+    /// Fase da contratação — FONTE ÚNICA, nunca gravada: assinado o contrato, a
+    /// contratação está em execução; antes disso, em planejamento.
+    /// </summary>
+    public static string CalcularFase(CtrProcesso p) => CalcularFase(p.DataAssinaturaContrato);
+
+    /// <inheritdoc cref="CalcularFase(CtrProcesso)"/>
+    public static string CalcularFase(DateOnly? dataAssinaturaContrato) =>
+        dataAssinaturaContrato != null ? CtrDominios.Fase.Execucao : CtrDominios.Fase.Planejamento;
 
     /// <summary>Maior data entre os cinco checkpoints e a restituição; null sem nenhuma.</summary>
     public static DateOnly? CalcularUltimaMovimentacao(CtrProcesso p) => CalcularUltimaMovimentacao(
@@ -100,9 +118,13 @@ public class CtrProcessoService : ICtrProcessoService
     public static Expression<Func<CtrProcesso, bool>>? PredicadoSituacao(string? situacao) => situacao switch
     {
         CtrDominios.Situacao.Restituido => p => p.Restituido,
-        CtrDominios.Situacao.Concluido => p => !p.Restituido && p.RetornoOrgao != null,
+        // Concluído inclui a devolução dispensada com o retorno ao Gab SGDI feito
+        CtrDominios.Situacao.Concluido => p =>
+            !p.Restituido && (p.RetornoOrgao != null || (p.RetornoOrgaoNaoSeAplica && p.RetornoGabSgdi != null)),
         CtrDominios.Situacao.RetornadoGabSgdi => p =>
-            !p.Restituido && p.RetornoOrgao == null && p.RetornoGabSgdi != null,
+            !p.Restituido && p.RetornoOrgao == null && !p.RetornoOrgaoNaoSeAplica && p.RetornoGabSgdi != null,
+        // Sem retorno ao Gab SGDI o "não se aplica" não muda nada: as demais
+        // situações já exigem RetornoGabSgdi == null
         CtrDominios.Situacao.EmAnaliseUgtic => p =>
             !p.Restituido && p.RetornoOrgao == null && p.RetornoGabSgdi == null && p.ChegadaUgtic != null,
         CtrDominios.Situacao.EmAnaliseSubgd => p =>
@@ -114,6 +136,17 @@ public class CtrProcessoService : ICtrProcessoService
         CtrDominios.Situacao.SemMovimentacao => p =>
             !p.Restituido && p.RetornoOrgao == null && p.RetornoGabSgdi == null && p.ChegadaUgtic == null
             && p.ChegadaSubgd == null && p.ChegadaSgdi == null,
+        _ => null
+    };
+
+    /// <summary>
+    /// Traduz a fase derivada em predicado sobre a data de assinatura, como as
+    /// situações. Null quando o valor não é do domínio.
+    /// </summary>
+    public static Expression<Func<CtrProcesso, bool>>? PredicadoFase(string? fase) => fase switch
+    {
+        CtrDominios.Fase.Execucao => p => p.DataAssinaturaContrato != null,
+        CtrDominios.Fase.Planejamento => p => p.DataAssinaturaContrato == null,
         _ => null
     };
 
@@ -134,6 +167,10 @@ public class CtrProcessoService : ICtrProcessoService
         p.CategoriaObjeto = (p.CategoriaObjeto ?? string.Empty).Trim();
         p.Observacao = Limpar(p.Observacao);
         p.RestituidoMotivo = Limpar(p.RestituidoMotivo);
+        p.EtapaPlanejamento = Limpar(p.EtapaPlanejamento);
+        p.Criticidade = Limpar(p.Criticidade);
+        // Origem vazia = o caminho normal (o processo veio do órgão comunicante)
+        p.Origem = Limpar(p.Origem) ?? CtrDominios.Origem.OrgaoComunicante;
 
         // Desmarcar a restituição ANULA data e motivo (normalização, não erro)
         if (!p.Restituido)
@@ -170,6 +207,20 @@ public class CtrProcessoService : ICtrProcessoService
             throw new ApiException(ErrorCode.CtrProcessoInvalido,
                 "Chegada à UGTIC: marque \"não se aplica\" ou informe a data, não os dois.");
 
+        if (p.RetornoOrgaoNaoSeAplica && p.RetornoOrgao != null)
+            throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                "Retorno ao órgão comunicante: marque \"não se aplica\" ou informe a data, não os dois.");
+
+        if (p.EtapaPlanejamento != null && !CtrDominios.EtapaPlanejamento.Todos.Contains(p.EtapaPlanejamento))
+            throw new ApiException(ErrorCode.CtrDominioInvalido,
+                $"Etapa do planejamento inválida: {p.EtapaPlanejamento}");
+
+        if (p.Criticidade != null && !CtrDominios.Criticidade.Todos.Contains(p.Criticidade))
+            throw new ApiException(ErrorCode.CtrDominioInvalido, $"Criticidade inválida: {p.Criticidade}");
+
+        if (!CtrDominios.Origem.Todos.Contains(p.Origem))
+            throw new ApiException(ErrorCode.CtrDominioInvalido, $"Origem inválida: {p.Origem}");
+
         if (p.Restituido && p.RestituidoEm == null)
             throw new ApiException(ErrorCode.CtrProcessoInvalido,
                 "Processo restituído exige a data da restituição.");
@@ -204,6 +255,14 @@ public class CtrProcessoService : ICtrProcessoService
         if (p.RestituidoEm != null && p.RestituidoEm.Value > hoje)
             throw new ApiException(ErrorCode.CtrDatasIncoerentes,
                 $"A data da restituição ({p.RestituidoEm.Value:dd/MM/yyyy}) não pode ser futura.");
+
+        // A assinatura NÃO entra na cronologia do trâmite: o TCDF também analisa
+        // contrato já assinado (processo de origem TCDF), então assinatura anterior
+        // à chegada na SGDI é legítima. Só não pode ser futura.
+        if (p.DataAssinaturaContrato != null && p.DataAssinaturaContrato.Value > hoje)
+            throw new ApiException(ErrorCode.CtrDatasIncoerentes,
+                $"A data de assinatura do contrato ({p.DataAssinaturaContrato.Value:dd/MM/yyyy}) "
+                + "não pode ser futura.");
 
         // Cada etapa preenchida deve ser >= todas as anteriores preenchidas (lacunas são permitidas)
         for (var atual = 1; atual < etapas.Length; atual++)
@@ -302,6 +361,37 @@ public class CtrProcessoService : ICtrProcessoService
             // entende não pode virar "todos" em silêncio
             var predicado = PredicadoSituacao(filtro.Situacao);
             query = predicado != null ? query.Where(predicado) : query.Where(p => false);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filtro.Fase))
+        {
+            // Mesma regra da situação: fora do domínio, lista vazia
+            var predicado = PredicadoFase(filtro.Fase);
+            query = predicado != null ? query.Where(predicado) : query.Where(p => false);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filtro.EtapaPlanejamento))
+        {
+            var etapa = filtro.EtapaPlanejamento.Trim();
+            query = CtrDominios.EtapaPlanejamento.Todos.Contains(etapa)
+                ? query.Where(p => p.EtapaPlanejamento == etapa)
+                : query.Where(p => false);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filtro.Criticidade))
+        {
+            var criticidade = filtro.Criticidade.Trim();
+            query = CtrDominios.Criticidade.Todos.Contains(criticidade)
+                ? query.Where(p => p.Criticidade == criticidade)
+                : query.Where(p => false);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filtro.Origem))
+        {
+            var origem = filtro.Origem.Trim();
+            query = CtrDominios.Origem.Todos.Contains(origem)
+                ? query.Where(p => p.Origem == origem)
+                : query.Where(p => false);
         }
 
         return query;
@@ -408,9 +498,10 @@ public class CtrProcessoService : ICtrProcessoService
         if (!CtrDominios.Etapa.Todos.Contains(etapa))
             throw new ApiException(ErrorCode.CtrDominioInvalido, $"Etapa inválida: {dto.Etapa}");
 
-        if (dto.NaoSeAplica != null && etapa != CtrDominios.Etapa.ChegadaUgtic)
+        if (dto.NaoSeAplica != null
+            && etapa != CtrDominios.Etapa.ChegadaUgtic && etapa != CtrDominios.Etapa.RetornoOrgao)
             throw new ApiException(ErrorCode.CtrProcessoInvalido,
-                "\"Não se aplica\" só vale para a chegada à UGTIC.");
+                "\"Não se aplica\" só vale para a chegada à UGTIC e para o retorno ao órgão comunicante.");
 
         // Aplica no candidato e só grava depois de validar (checkpoint incoerente
         // não pode deixar rastro na entidade rastreada)
@@ -442,7 +533,18 @@ public class CtrProcessoService : ICtrProcessoService
                 candidato.RetornoGabSgdi = dto.Data;
                 break;
             case CtrDominios.Etapa.RetornoOrgao:
-                candidato.RetornoOrgao = dto.Data;
+                // Mesma simetria da UGTIC: marcar "não se aplica" limpa a data e
+                // informar a data desmarca o flag (é o gesto de reativar a etapa)
+                if (dto.NaoSeAplica == true)
+                {
+                    candidato.RetornoOrgaoNaoSeAplica = true;
+                    candidato.RetornoOrgao = null;
+                }
+                else
+                {
+                    if (dto.NaoSeAplica == false || dto.Data != null) candidato.RetornoOrgaoNaoSeAplica = false;
+                    candidato.RetornoOrgao = dto.Data;
+                }
                 break;
         }
 
@@ -471,6 +573,11 @@ public class CtrProcessoService : ICtrProcessoService
         processo.UgticNaoSeAplica = dto.UgticNaoSeAplica;
         processo.RetornoGabSgdi = dto.RetornoGabSgdi;
         processo.RetornoOrgao = dto.RetornoOrgao;
+        processo.RetornoOrgaoNaoSeAplica = dto.RetornoOrgaoNaoSeAplica;
+        processo.EtapaPlanejamento = dto.EtapaPlanejamento;
+        processo.DataAssinaturaContrato = dto.DataAssinaturaContrato;
+        processo.Criticidade = dto.Criticidade;
+        processo.Origem = dto.Origem ?? CtrDominios.Origem.OrgaoComunicante;
         processo.Restituido = dto.Restituido;
         processo.RestituidoEm = dto.RestituidoEm;
         processo.RestituidoMotivo = dto.RestituidoMotivo;
@@ -492,6 +599,11 @@ public class CtrProcessoService : ICtrProcessoService
         UgticNaoSeAplica = p.UgticNaoSeAplica,
         RetornoGabSgdi = p.RetornoGabSgdi,
         RetornoOrgao = p.RetornoOrgao,
+        RetornoOrgaoNaoSeAplica = p.RetornoOrgaoNaoSeAplica,
+        EtapaPlanejamento = p.EtapaPlanejamento,
+        DataAssinaturaContrato = p.DataAssinaturaContrato,
+        Criticidade = p.Criticidade,
+        Origem = p.Origem,
         Restituido = p.Restituido,
         RestituidoEm = p.RestituidoEm,
         RestituidoMotivo = p.RestituidoMotivo,
@@ -535,6 +647,8 @@ public class CtrProcessoService : ICtrProcessoService
                 ChegadaUgtic = p.ChegadaUgtic,
                 RetornoGabSgdi = p.RetornoGabSgdi,
                 RetornoOrgao = p.RetornoOrgao,
+                RetornoOrgaoNaoSeAplica = p.RetornoOrgaoNaoSeAplica,
+                DataAssinaturaContrato = p.DataAssinaturaContrato,
                 RestituidoEm = p.RestituidoEm,
                 CriadoEm = p.CriadoEm
             })
@@ -544,7 +658,7 @@ public class CtrProcessoService : ICtrProcessoService
         {
             Resumo = r,
             Situacao = CalcularSituacao(r.Restituido, r.ChegadaSgdi, r.ChegadaSubgd,
-                r.ChegadaUgtic, r.RetornoGabSgdi, r.RetornoOrgao),
+                r.ChegadaUgtic, r.RetornoGabSgdi, r.RetornoOrgao, r.RetornoOrgaoNaoSeAplica),
             Dias = CalcularDiasSemMovimento(
                 CalcularUltimaMovimentacao(r.ChegadaSgdi, r.ChegadaSubgd, r.ChegadaUgtic,
                     r.RetornoGabSgdi, r.RetornoOrgao, r.RestituidoEm),
@@ -561,6 +675,20 @@ public class CtrProcessoService : ICtrProcessoService
                 .Select((s, ordem) => new
                 {
                     Contagem = new CtrContagem { Chave = s, Quantidade = comSituacao.Count(x => x.Situacao == s) },
+                    Ordem = ordem
+                })
+                .OrderByDescending(c => c.Contagem.Quantidade).ThenBy(c => c.Ordem)
+                .Select(c => c.Contagem)
+                .ToList(),
+            // As 2 fases aparecem sempre, com o mesmo desempate das situações
+            PorFase = CtrDominios.Fase.Todos
+                .Select((f, ordem) => new
+                {
+                    Contagem = new CtrContagem
+                    {
+                        Chave = f,
+                        Quantidade = resumos.Count(r => CalcularFase(r.DataAssinaturaContrato) == f)
+                    },
                     Ordem = ordem
                 })
                 .OrderByDescending(c => c.Contagem.Quantidade).ThenBy(c => c.Ordem)
@@ -675,11 +803,17 @@ public class CtrProcessoService : ICtrProcessoService
             UgticNaoSeAplica = p.UgticNaoSeAplica,
             RetornoGabSgdi = p.RetornoGabSgdi,
             RetornoOrgao = p.RetornoOrgao,
+            RetornoOrgaoNaoSeAplica = p.RetornoOrgaoNaoSeAplica,
+            EtapaPlanejamento = p.EtapaPlanejamento,
+            DataAssinaturaContrato = p.DataAssinaturaContrato,
+            Criticidade = p.Criticidade,
+            Origem = p.Origem,
             Restituido = p.Restituido,
             RestituidoEm = p.RestituidoEm,
             RestituidoMotivo = p.RestituidoMotivo,
             Observacao = p.Observacao,
             Situacao = CalcularSituacao(p),
+            Fase = CalcularFase(p),
             UltimaMovimentacao = ultimaMovimentacao,
             DiasSemMovimento = CalcularDiasSemMovimento(ultimaMovimentacao, p.CriadoEm, hoje),
             CriadoEm = p.CriadoEm,
@@ -701,6 +835,8 @@ public class CtrProcessoService : ICtrProcessoService
         public DateOnly? ChegadaUgtic { get; set; }
         public DateOnly? RetornoGabSgdi { get; set; }
         public DateOnly? RetornoOrgao { get; set; }
+        public bool RetornoOrgaoNaoSeAplica { get; set; }
+        public DateOnly? DataAssinaturaContrato { get; set; }
         public DateOnly? RestituidoEm { get; set; }
         public DateTime CriadoEm { get; set; }
     }

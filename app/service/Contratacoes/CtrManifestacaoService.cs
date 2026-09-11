@@ -29,12 +29,15 @@ public class CtrManifestacaoService : ICtrManifestacaoService
     // ── Estágio derivado ──────────────────────────────────────────────────────
 
     /// <summary>
-    /// Estágio da manifestação — FONTE ÚNICA, nunca gravado: inciso II vira
-    /// "Notificação para regularizar"; no inciso I sai do resultado da análise e,
-    /// nos riscos significativos, do próprio desfecho.
+    /// Estágio da manifestação — FONTE ÚNICA, nunca gravado. O status no TCDF tem
+    /// PRECEDÊNCIA (suspensão e revogação são fato do Tribunal e valem em qualquer
+    /// inciso); sem ele, inciso II vira "Notificação para regularizar" e o inciso I
+    /// sai do resultado da análise e, nos riscos significativos, do próprio desfecho.
     /// </summary>
     public static string CalcularEstagio(CtrManifestacaoTcdf m)
     {
+        if (!string.IsNullOrWhiteSpace(m.StatusTcdf)) return m.StatusTcdf;
+
         if (m.SituacaoPortfolio == CtrDominios.SituacaoPortfolio.NaoComunicadaPreviamente)
             return CtrDominios.Estagio.NotificacaoRegularizar;
 
@@ -50,26 +53,38 @@ public class CtrManifestacaoService : ICtrManifestacaoService
     /// <summary>
     /// Traduz o estágio derivado em predicado sobre as colunas (é função delas),
     /// para o filtro rodar no banco. Null quando o valor não é do domínio.
+    /// Os seis estágios de análise exigem status_tcdf NULO — quem tem status foi
+    /// para um dos dois estágios novos (mesma precedência do CalcularEstagio).
     /// </summary>
     public static Expression<Func<CtrManifestacaoTcdf, bool>>? PredicadoEstagio(string? estagio) => estagio switch
     {
         CtrDominios.Estagio.NotificacaoRegularizar => m =>
-            m.SituacaoPortfolio == CtrDominios.SituacaoPortfolio.NaoComunicadaPreviamente,
+            m.StatusTcdf == null
+            && m.SituacaoPortfolio == CtrDominios.SituacaoPortfolio.NaoComunicadaPreviamente,
         CtrDominios.Estagio.Alinhada => m =>
-            m.SituacaoPortfolio == CtrDominios.SituacaoPortfolio.ComunicadaPreviamente
+            m.StatusTcdf == null
+            && m.SituacaoPortfolio == CtrDominios.SituacaoPortfolio.ComunicadaPreviamente
             && m.ResultadoAnalise == CtrDominios.ResultadoAnalise.Alinhada,
         CtrDominios.Estagio.InformacoesSolicitadas => m =>
-            m.SituacaoPortfolio == CtrDominios.SituacaoPortfolio.ComunicadaPreviamente
+            m.StatusTcdf == null
+            && m.SituacaoPortfolio == CtrDominios.SituacaoPortfolio.ComunicadaPreviamente
             && m.ResultadoAnalise == CtrDominios.ResultadoAnalise.InformacoesComplementares,
         CtrDominios.Estagio.AguardandoResposta => m =>
-            m.ResultadoAnalise == CtrDominios.ResultadoAnalise.RiscosSignificativos
+            m.StatusTcdf == null
+            && m.ResultadoAnalise == CtrDominios.ResultadoAnalise.RiscosSignificativos
             && m.DesfechoRisco == CtrDominios.DesfechoRisco.AguardandoResposta,
         CtrDominios.Estagio.RiscoResolvido => m =>
-            m.ResultadoAnalise == CtrDominios.ResultadoAnalise.RiscosSignificativos
+            m.StatusTcdf == null
+            && m.ResultadoAnalise == CtrDominios.ResultadoAnalise.RiscosSignificativos
             && m.DesfechoRisco == CtrDominios.DesfechoRisco.RiscoResolvido,
         CtrDominios.Estagio.NaoPodeProsseguir => m =>
-            m.ResultadoAnalise == CtrDominios.ResultadoAnalise.RiscosSignificativos
+            m.StatusTcdf == null
+            && m.ResultadoAnalise == CtrDominios.ResultadoAnalise.RiscosSignificativos
             && m.DesfechoRisco == CtrDominios.DesfechoRisco.NaoPodeProsseguir,
+        CtrDominios.Estagio.SuspensoIrregularidades => m =>
+            m.StatusTcdf == CtrDominios.StatusTcdf.SuspensoIrregularidades,
+        CtrDominios.Estagio.EditalRevogado => m =>
+            m.StatusTcdf == CtrDominios.StatusTcdf.EditalRevogado,
         _ => null
     };
 
@@ -79,11 +94,20 @@ public class CtrManifestacaoService : ICtrManifestacaoService
     /// Normaliza e valida a manifestação. Campo de bloco INATIVO preenchido é
     /// RECUSADO (nomeando o campo) — não anulado em silêncio.
     /// </summary>
-    public static void ValidarManifestacao(CtrManifestacaoTcdf m)
+    /// <param name="criticidadeProcesso">
+    /// Criticidade gravada no PROCESSO (art. 11 da IN). O inciso I a exige: o dado
+    /// nasce no cadastro do processo, a manifestação só o reporta.
+    /// </param>
+    public static void ValidarManifestacao(CtrManifestacaoTcdf m, string? criticidadeProcesso)
     {
         m.OficioTcdf = (m.OficioTcdf ?? string.Empty).Trim();
         m.Observacao = string.IsNullOrWhiteSpace(m.Observacao) ? null : m.Observacao.Trim();
         m.SituacaoPortfolio = (m.SituacaoPortfolio ?? string.Empty).Trim();
+
+        // Status no TCDF vale em QUALQUER inciso (é fato do Tribunal), então é
+        // validado aqui e não dentro dos blocos condicionais
+        if (m.StatusTcdf != null && !CtrDominios.StatusTcdf.Todos.Contains(m.StatusTcdf))
+            throw new ApiException(ErrorCode.CtrDominioInvalido, $"Status no TCDF inválido: {m.StatusTcdf}");
 
         if (string.IsNullOrWhiteSpace(m.OficioTcdf))
             throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
@@ -101,12 +125,12 @@ public class CtrManifestacaoService : ICtrManifestacaoService
                 $"Situação no portfólio inválida: {m.SituacaoPortfolio}");
 
         if (m.SituacaoPortfolio == CtrDominios.SituacaoPortfolio.ComunicadaPreviamente)
-            ValidarIncisoI(m);
+            ValidarIncisoI(m, criticidadeProcesso);
         else
             ValidarIncisoII(m);
     }
 
-    private static void ValidarIncisoI(CtrManifestacaoTcdf m)
+    private static void ValidarIncisoI(CtrManifestacaoTcdf m, string? criticidadeProcesso)
     {
         if (m.ComunicadaDesde == null)
             throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
@@ -124,12 +148,11 @@ public class CtrManifestacaoService : ICtrManifestacaoService
                 $"A data do monitoramento contínuo ({m.ComunicadaDesde.Value:dd/MM/yyyy}) não pode ser "
                 + $"posterior à data do ofício do TCDF ({m.DataOficio:dd/MM/yyyy}).");
 
-        if (string.IsNullOrWhiteSpace(m.Criticidade))
+        // A criticidade é do PROCESSO (art. 11 da IN): o despacho do inciso I a
+        // reporta, então ela precisa já estar definida no cadastro da contratação
+        if (string.IsNullOrWhiteSpace(criticidadeProcesso))
             throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
-                "Contratação comunicada previamente exige a criticidade (art. 11 da IN).");
-
-        if (!CtrDominios.Criticidade.Todos.Contains(m.Criticidade))
-            throw new ApiException(ErrorCode.CtrDominioInvalido, $"Criticidade inválida: {m.Criticidade}");
+                "Defina a criticidade no cadastro do processo antes de registrar a manifestação do inciso I.");
 
         if (string.IsNullOrWhiteSpace(m.ResultadoAnalise))
             throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
@@ -183,9 +206,8 @@ public class CtrManifestacaoService : ICtrManifestacaoService
             throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
                 "\"Comunicada desde\" só vale para contratação comunicada previamente (inciso I).");
 
-        if (m.Criticidade != null)
-            throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
-                "\"Criticidade\" só vale para contratação comunicada previamente (inciso I).");
+        // A criticidade não é mais campo da manifestação (vive no processo), então
+        // não há o que recusar aqui
 
         if (m.ResultadoAnalise != null)
             throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
@@ -280,7 +302,7 @@ public class CtrManifestacaoService : ICtrManifestacaoService
             CriadoPor = ctx.Email
         };
         AplicarDto(manifestacao, dto);
-        ValidarManifestacao(manifestacao);
+        ValidarManifestacao(manifestacao, processo.Criticidade);
 
         _repositorio.AddManifestacao(manifestacao);
         await _repositorio.SaveChangesAsync();
@@ -298,7 +320,7 @@ public class CtrManifestacaoService : ICtrManifestacaoService
         // a entidade rastreada com o estado inválido (mesma disciplina do processo)
         var candidato = Clonar(manifestacao);
         AplicarDto(candidato, dto);
-        ValidarManifestacao(candidato);
+        ValidarManifestacao(candidato, manifestacao.Processo?.Criticidade);
 
         AplicarDto(manifestacao, DtoDe(candidato));
         manifestacao.AlteradoEm = DateTime.UtcNow;
@@ -325,8 +347,8 @@ public class CtrManifestacaoService : ICtrManifestacaoService
         OficioTcdf = m.OficioTcdf,
         DataOficio = m.DataOficio,
         SituacaoPortfolio = m.SituacaoPortfolio,
+        StatusTcdf = m.StatusTcdf,
         ComunicadaDesde = m.ComunicadaDesde,
-        Criticidade = m.Criticidade,
         ResultadoAnalise = m.ResultadoAnalise,
         RecomendouSuspensao = m.RecomendouSuspensao,
         ComunicouControleInterno = m.ComunicouControleInterno,
@@ -356,8 +378,8 @@ public class CtrManifestacaoService : ICtrManifestacaoService
         m.OficioTcdf = dto.OficioTcdf;
         m.DataOficio = dto.DataOficio;
         m.SituacaoPortfolio = dto.SituacaoPortfolio;
+        m.StatusTcdf = string.IsNullOrWhiteSpace(dto.StatusTcdf) ? null : dto.StatusTcdf.Trim();
         m.ComunicadaDesde = dto.ComunicadaDesde;
-        m.Criticidade = string.IsNullOrWhiteSpace(dto.Criticidade) ? null : dto.Criticidade.Trim();
         m.ResultadoAnalise = string.IsNullOrWhiteSpace(dto.ResultadoAnalise) ? null : dto.ResultadoAnalise.Trim();
         m.RecomendouSuspensao = dto.RecomendouSuspensao;
         m.ComunicouControleInterno = dto.ComunicouControleInterno;
@@ -377,8 +399,10 @@ public class CtrManifestacaoService : ICtrManifestacaoService
         OficioTcdf = m.OficioTcdf,
         DataOficio = m.DataOficio,
         SituacaoPortfolio = m.SituacaoPortfolio,
+        StatusTcdf = m.StatusTcdf,
         ComunicadaDesde = m.ComunicadaDesde,
-        Criticidade = m.Criticidade,
+        // Espelho somente leitura: a criticidade é do processo
+        Criticidade = m.Processo?.Criticidade,
         ResultadoAnalise = m.ResultadoAnalise,
         RecomendouSuspensao = m.RecomendouSuspensao,
         ComunicouControleInterno = m.ComunicouControleInterno,

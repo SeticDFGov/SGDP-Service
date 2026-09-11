@@ -39,7 +39,7 @@ public class CtrManifestacaoTest : CtrTestBase
     }
 
     [Fact]
-    public async Task Criar_IncisoI_SemDataCriticidadeOuResultado_EhRecusado()
+    public async Task Criar_IncisoI_SemDataOuResultado_EhRecusado()
     {
         var ctx = await ContextoAnalistaAsync();
 
@@ -47,11 +47,6 @@ public class CtrManifestacaoTest : CtrTestBase
         semData.ComunicadaDesde = null;
         var ex1 = await Assert.ThrowsAsync<ApiException>(() => _service.CriarAsync(_processo.Id, semData, ctx));
         Assert.Equal((int)ErrorCode.CtrManifestacaoInvalida, ex1.Error.Code);
-
-        var semCriticidade = NovaManifestacaoIncisoI();
-        semCriticidade.Criticidade = null;
-        var ex2 = await Assert.ThrowsAsync<ApiException>(() => _service.CriarAsync(_processo.Id, semCriticidade, ctx));
-        Assert.Equal((int)ErrorCode.CtrManifestacaoInvalida, ex2.Error.Code);
 
         var semResultado = NovaManifestacaoIncisoI();
         semResultado.ResultadoAnalise = null;
@@ -73,14 +68,9 @@ public class CtrManifestacaoTest : CtrTestBase
     }
 
     [Fact]
-    public async Task Criar_CriticidadeOuResultadoForaDoDominio_EhRecusado()
+    public async Task Criar_ResultadoForaDoDominio_EhRecusado()
     {
         var ctx = await ContextoAnalistaAsync();
-
-        var criticidade = NovaManifestacaoIncisoI();
-        criticidade.Criticidade = "Altíssima";
-        var ex1 = await Assert.ThrowsAsync<ApiException>(() => _service.CriarAsync(_processo.Id, criticidade, ctx));
-        Assert.Equal((int)ErrorCode.CtrDominioInvalido, ex1.Error.Code);
 
         var resultado = NovaManifestacaoIncisoI();
         resultado.ResultadoAnalise = "Tudo certo";
@@ -150,7 +140,10 @@ public class CtrManifestacaoTest : CtrTestBase
 
         Assert.Equal(30, resposta.PrazoRegularizacaoDias);
         Assert.Equal(CtrDominios.Estagio.NotificacaoRegularizar, resposta.Estagio);
-        Assert.Null(resposta.Criticidade);
+        // A criticidade da resposta é espelho do processo (não é campo do inciso II)
+        Assert.Equal(CtrDominios.Criticidade.Alta, resposta.Criticidade);
+        Assert.Null(resposta.ComunicadaDesde);
+        Assert.Null(resposta.ResultadoAnalise);
     }
 
     [Fact]
@@ -179,10 +172,10 @@ public class CtrManifestacaoTest : CtrTestBase
     {
         var ctx = await ContextoAnalistaAsync();
 
-        var comCriticidade = NovaManifestacaoIncisoII();
-        comCriticidade.Criticidade = CtrDominios.Criticidade.Baixa;
-        var ex = await Assert.ThrowsAsync<ApiException>(() => _service.CriarAsync(_processo.Id, comCriticidade, ctx));
-        Assert.Contains("Criticidade", ex.Error.Message);
+        var comResultado = NovaManifestacaoIncisoII();
+        comResultado.ResultadoAnalise = CtrDominios.ResultadoAnalise.Alinhada;
+        var ex = await Assert.ThrowsAsync<ApiException>(() => _service.CriarAsync(_processo.Id, comResultado, ctx));
+        Assert.Contains("Resultado da análise", ex.Error.Message);
 
         var comData = NovaManifestacaoIncisoII();
         comData.ComunicadaDesde = DiasAtras(10);
@@ -326,7 +319,7 @@ public class CtrManifestacaoTest : CtrTestBase
     }
 
     [Fact]
-    public void CalcularEstagio_CobreOsSeisValores()
+    public void CalcularEstagio_CobreOsOitoValores()
     {
         Assert.Equal(CtrDominios.Estagio.NotificacaoRegularizar,
             CtrManifestacaoService.CalcularEstagio(new CtrManifestacaoTcdf
@@ -356,6 +349,18 @@ public class CtrManifestacaoTest : CtrTestBase
             }));
         }
 
-        Assert.Equal(6, CtrDominios.Estagio.Todos.Length);
+        // Os dois estágios novos vêm do status no TCDF, que tem PRECEDÊNCIA
+        foreach (var status in CtrDominios.StatusTcdf.Todos)
+        {
+            Assert.Equal(status, CtrManifestacaoService.CalcularEstagio(new CtrManifestacaoTcdf
+            {
+                SituacaoPortfolio = CtrDominios.SituacaoPortfolio.ComunicadaPreviamente,
+                ResultadoAnalise = CtrDominios.ResultadoAnalise.Alinhada,
+                StatusTcdf = status
+            }));
+        }
+
+        Assert.Equal(8, CtrDominios.Estagio.Todos.Length);
+        Assert.Equal(CtrDominios.StatusTcdf.Todos, CtrDominios.Estagio.Todos[^2..]);
     }
 }

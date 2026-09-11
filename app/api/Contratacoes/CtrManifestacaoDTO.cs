@@ -28,11 +28,16 @@ public class CtrManifestacaoCreateDTO
     [StringLength(30)]
     public string SituacaoPortfolio { get; set; } = string.Empty;
 
+    /// <summary>
+    /// CtrDominios.StatusTcdf (opcional, vale nos dois incisos). Registro de
+    /// acompanhamento: não altera o texto do despacho.
+    /// </summary>
+    [StringLength(30)]
+    public string? StatusTcdf { get; set; }
+
     public DateOnly? ComunicadaDesde { get; set; }
 
-    /// <summary>CtrDominios.Criticidade</summary>
-    [StringLength(10)]
-    public string? Criticidade { get; set; }
+    // A criticidade NÃO entra aqui: é do processo (CtrProcessoCreateDTO.Criticidade)
 
     /// <summary>CtrDominios.ResultadoAnalise</summary>
     [StringLength(30)]
@@ -76,8 +81,14 @@ public class CtrManifestacaoResponse
 
     public string SituacaoPortfolio { get; set; } = string.Empty;
 
+    public string? StatusTcdf { get; set; }
+
     public DateOnly? ComunicadaDesde { get; set; }
 
+    /// <summary>
+    /// Espelho SOMENTE LEITURA da criticidade do processo (art. 11 da IN): o front
+    /// mostra e o PDF imprime, mas o dado nasce e é editado no cadastro do processo.
+    /// </summary>
     public string? Criticidade { get; set; }
 
     public string? ResultadoAnalise { get; set; }

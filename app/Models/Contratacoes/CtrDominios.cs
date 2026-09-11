@@ -70,6 +70,44 @@ public static class CtrDominios
         };
     }
 
+    /// <summary>
+    /// Etapa do planejamento da contratação (siglas são o jargão da área): Documento de
+    /// Formalização da Demanda, Estudo Técnico Preliminar e Termo de Referência. Continua
+    /// registrada depois da assinatura do contrato — é onde o planejamento parou.
+    /// </summary>
+    public static class EtapaPlanejamento
+    {
+        public const string Dfd = "DFD";
+        public const string Etp = "ETP";
+        public const string Tr = "TR";
+
+        public static readonly string[] Todos = { Dfd, Etp, Tr };
+    }
+
+    /// <summary>
+    /// Fase da contratação — DERIVADA, nunca gravada. Fonte única do cálculo:
+    /// <c>CtrProcessoService.CalcularFase</c> (assinatura do contrato = execução).
+    /// </summary>
+    public static class Fase
+    {
+        public const string Planejamento = "Planejamento";
+        public const string Execucao = "Execução";
+
+        public static readonly string[] Todos = { Planejamento, Execucao };
+    }
+
+    /// <summary>
+    /// Como o processo chegou à SGDI: comunicado pelo órgão (o caminho normal) ou
+    /// cadastrado a partir de análise do próprio TCDF sobre o contrato.
+    /// </summary>
+    public static class Origem
+    {
+        public const string OrgaoComunicante = "Órgão comunicante";
+        public const string Tcdf = "TCDF";
+
+        public static readonly string[] Todos = { OrgaoComunicante, Tcdf };
+    }
+
     /// <summary>Situação no Portfólio Estratégico de Contratações de TIC (incisos I e II do despacho).</summary>
     public static class SituacaoPortfolio
     {
@@ -110,8 +148,21 @@ public static class CtrDominios
     }
 
     /// <summary>
+    /// Status do processo no TCDF: fato do Tribunal, não desfecho da análise da SGDI —
+    /// vale em qualquer inciso e com qualquer resultado. Nulo = sem status especial.
+    /// </summary>
+    public static class StatusTcdf
+    {
+        public const string SuspensoIrregularidades = "Suspenso por irregularidades";
+        public const string EditalRevogado = "Edital revogado";
+
+        public static readonly string[] Todos = { SuspensoIrregularidades, EditalRevogado };
+    }
+
+    /// <summary>
     /// Estágio derivado da manifestação — NUNCA gravado. Fonte única do cálculo:
-    /// <c>CtrManifestacaoService.CalcularEstagio</c>.
+    /// <c>CtrManifestacaoService.CalcularEstagio</c>. Os dois últimos valores vêm do
+    /// <see cref="StatusTcdf"/>, que tem PRECEDÊNCIA sobre o desfecho da análise.
     /// </summary>
     public static class Estagio
     {
@@ -121,11 +172,14 @@ public static class CtrDominios
         public const string AguardandoResposta = "Aguardando resposta";
         public const string RiscoResolvido = "Risco resolvido";
         public const string NaoPodeProsseguir = "Não pode prosseguir";
+        public const string SuspensoIrregularidades = StatusTcdf.SuspensoIrregularidades;
+        public const string EditalRevogado = StatusTcdf.EditalRevogado;
 
         public static readonly string[] Todos =
         {
             NotificacaoRegularizar, Alinhada, InformacoesSolicitadas,
-            AguardandoResposta, RiscoResolvido, NaoPodeProsseguir
+            AguardandoResposta, RiscoResolvido, NaoPodeProsseguir,
+            SuspensoIrregularidades, EditalRevogado
         };
     }
 }

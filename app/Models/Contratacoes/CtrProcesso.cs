@@ -41,6 +41,26 @@ public class CtrProcesso
 
     public DateOnly? RetornoOrgao { get; set; }
 
+    // Nem todo processo volta ao órgão comunicante: mesma semântica do "-" da UGTIC.
+    // Só conclui o processo junto do retorno ao Gab SGDI (CalcularSituacao).
+    public bool RetornoOrgaoNaoSeAplica { get; set; }
+
+    // ── Fase da contratação (planejamento -> execução) ────────────────────────
+    // CtrDominios.EtapaPlanejamento — onde o planejamento está (ou parou)
+    public string? EtapaPlanejamento { get; set; }
+
+    // Assinado = a contratação saiu do planejamento e está em execução.
+    // A Fase é DERIVADA daqui (CtrProcessoService.CalcularFase) e nunca gravada.
+    public DateOnly? DataAssinaturaContrato { get; set; }
+
+    // CtrDominios.Criticidade (art. 11 da IN SGDI nº 1/2026): atributo da
+    // CONTRATAÇÃO, não da resposta ao TCDF — o despacho apenas a reporta.
+    public string? Criticidade { get; set; }
+
+    // CtrDominios.Origem: nem toda contratação chega pelo órgão comunicante —
+    // há as que nascem de análise do próprio TCDF sobre o contrato.
+    public string Origem { get; set; } = CtrDominios.Origem.OrgaoComunicante;
+
     // Restituição ao órgão: conceito de primeira classe (hoje vive na Observação)
     public bool Restituido { get; set; }
 

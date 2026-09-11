@@ -30,9 +30,19 @@ public static class CtrModelConfiguration
                 // "Não se aplica" e data preenchida são mutuamente exclusivos
                 t.HasCheckConstraint("ck_ctr_processo_ugtic",
                     "NOT ugtic_nao_se_aplica OR chegada_ugtic IS NULL");
+                // Mesma simetria para a devolução ao órgão comunicante
+                t.HasCheckConstraint("ck_ctr_processo_retorno_orgao",
+                    "NOT retorno_orgao_nao_se_aplica OR retorno_orgao IS NULL");
                 // Restituição exige data e motivo
                 t.HasCheckConstraint("ck_ctr_processo_restituicao",
                     "NOT restituido OR (restituido_em IS NOT NULL AND restituido_motivo IS NOT NULL)");
+                t.HasCheckConstraint("ck_ctr_processo_etapa_planejamento",
+                    "etapa_planejamento IS NULL OR "
+                    + EmLista("etapa_planejamento", CtrDominios.EtapaPlanejamento.Todos));
+                t.HasCheckConstraint("ck_ctr_processo_criticidade",
+                    "criticidade IS NULL OR " + EmLista("criticidade", CtrDominios.Criticidade.Todos));
+                t.HasCheckConstraint("ck_ctr_processo_origem",
+                    EmLista("origem", CtrDominios.Origem.Todos));
             });
 
             entity.HasKey(p => p.Id).HasName("pk_ctr_processo");
@@ -49,6 +59,13 @@ public static class CtrModelConfiguration
             entity.Property(p => p.UgticNaoSeAplica).HasColumnName("ugtic_nao_se_aplica").HasDefaultValue(false);
             entity.Property(p => p.RetornoGabSgdi).HasColumnName("retorno_gab_sgdi");
             entity.Property(p => p.RetornoOrgao).HasColumnName("retorno_orgao");
+            entity.Property(p => p.RetornoOrgaoNaoSeAplica)
+                .HasColumnName("retorno_orgao_nao_se_aplica").HasDefaultValue(false);
+            entity.Property(p => p.EtapaPlanejamento).HasColumnName("etapa_planejamento").HasMaxLength(10);
+            entity.Property(p => p.DataAssinaturaContrato).HasColumnName("data_assinatura_contrato");
+            entity.Property(p => p.Criticidade).HasColumnName("criticidade").HasMaxLength(10);
+            entity.Property(p => p.Origem).HasColumnName("origem").HasMaxLength(20).IsRequired()
+                .HasDefaultValue(CtrDominios.Origem.OrgaoComunicante);
             entity.Property(p => p.Restituido).HasColumnName("restituido").HasDefaultValue(false);
             entity.Property(p => p.RestituidoEm).HasColumnName("restituido_em");
             entity.Property(p => p.RestituidoMotivo).HasColumnName("restituido_motivo");
@@ -82,8 +99,10 @@ public static class CtrModelConfiguration
             {
                 t.HasCheckConstraint("ck_ctr_manifestacao_situacao",
                     EmLista("situacao_portfolio", CtrDominios.SituacaoPortfolio.Todos));
-                t.HasCheckConstraint("ck_ctr_manifestacao_criticidade",
-                    "criticidade IS NULL OR " + EmLista("criticidade", CtrDominios.Criticidade.Todos));
+                // Fato do Tribunal: vale em QUALQUER inciso, por isso fica fora dos
+                // CHECKs condicionais dos incisos
+                t.HasCheckConstraint("ck_ctr_manifestacao_status",
+                    "status_tcdf IS NULL OR " + EmLista("status_tcdf", CtrDominios.StatusTcdf.Todos));
                 t.HasCheckConstraint("ck_ctr_manifestacao_resultado",
                     "resultado_analise IS NULL OR " + EmLista("resultado_analise", CtrDominios.ResultadoAnalise.Todos));
                 t.HasCheckConstraint("ck_ctr_manifestacao_desfecho",
@@ -92,12 +111,13 @@ public static class CtrModelConfiguration
                     "prazo_regularizacao_dias IS NULL OR prazo_regularizacao_dias > 0");
                 // Coerência dos incisos I e II do despacho (o provider InMemory ignora
                 // CHECKs, por isso o service valida exatamente o mesmo)
+                // A criticidade saiu daqui: passou a ser do PROCESSO (o despacho só a reporta)
                 t.HasCheckConstraint("ck_ctr_manifestacao_inciso",
                     "(situacao_portfolio = 'Comunicada previamente' AND comunicada_desde IS NOT NULL "
-                    + "AND criticidade IS NOT NULL AND resultado_analise IS NOT NULL "
+                    + "AND resultado_analise IS NOT NULL "
                     + "AND prazo_regularizacao_dias IS NULL) OR "
                     + "(situacao_portfolio = 'Não comunicada previamente' AND prazo_regularizacao_dias IS NOT NULL "
-                    + "AND comunicada_desde IS NULL AND criticidade IS NULL AND resultado_analise IS NULL "
+                    + "AND comunicada_desde IS NULL AND resultado_analise IS NULL "
                     + "AND desfecho_risco IS NULL AND NOT recomendou_suspensao AND NOT comunicou_controle_interno)");
                 t.HasCheckConstraint("ck_ctr_manifestacao_risco",
                     "(resultado_analise = 'Riscos significativos' AND desfecho_risco IS NOT NULL) OR "
@@ -111,8 +131,8 @@ public static class CtrModelConfiguration
             entity.Property(m => m.OficioTcdf).HasColumnName("oficio_tcdf").HasMaxLength(60).IsRequired();
             entity.Property(m => m.DataOficio).HasColumnName("data_oficio");
             entity.Property(m => m.SituacaoPortfolio).HasColumnName("situacao_portfolio").HasMaxLength(30).IsRequired();
+            entity.Property(m => m.StatusTcdf).HasColumnName("status_tcdf").HasMaxLength(30);
             entity.Property(m => m.ComunicadaDesde).HasColumnName("comunicada_desde");
-            entity.Property(m => m.Criticidade).HasColumnName("criticidade").HasMaxLength(10);
             entity.Property(m => m.ResultadoAnalise).HasColumnName("resultado_analise").HasMaxLength(30);
             entity.Property(m => m.RecomendouSuspensao).HasColumnName("recomendou_suspensao").HasDefaultValue(false);
             entity.Property(m => m.ComunicouControleInterno).HasColumnName("comunicou_controle_interno").HasDefaultValue(false);

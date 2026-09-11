@@ -98,6 +98,11 @@ public class CtrImportacaoService : ICtrImportacaoService
 
             var existente = ativos.TryGetValue(candidato.NumeroProcesso.Trim(), out var achado) ? achado : null;
 
+            // Coluna que o arquivo NÃO tem não pode apagar o que já está no banco.
+            // Aplicado ANTES de validar para que a prévia mostre o resultado real e
+            // a validação enxergue o estado final (ex.: criticidade preservada).
+            if (existente != null) PreservarColunasAusentes(candidato, existente, lida.ColunasOpcionais);
+
             try
             {
                 // Número repetido no arquivo já foi barrado pelo parser; o que existe
@@ -144,5 +149,27 @@ public class CtrImportacaoService : ICtrImportacaoService
         }
 
         return resultado;
+    }
+
+    /// <summary>
+    /// Herda do processo já gravado os campos cujas COLUNAS o arquivo nem traz.
+    ///
+    /// A planilha real da equipe tem 12 colunas e não sabe nada de etapa do
+    /// planejamento, assinatura, criticidade e origem: reimportá-la apagava esses
+    /// campos (inclusive a criticidade que o backfill da migration gravou), e como
+    /// a criticidade passou a ser exigida no inciso I, o fluxo do TCDF quebrava em
+    /// seguida. Coluna PRESENTE e vazia continua limpando o campo — é escolha de
+    /// quem exportou, e é o que mantém o round-trip export→importação fiel.
+    ///
+    /// As 12 colunas originais (datas, observação) e as 3 da restituição seguem
+    /// sendo sempre aplicadas: nelas a planilha é a fonte, como sempre foi.
+    /// </summary>
+    private static void PreservarColunasAusentes(CtrProcesso candidato, CtrProcesso existente,
+        CtrCsvColunasOpcionais colunas)
+    {
+        if (!colunas.EtapaPlanejamento) candidato.EtapaPlanejamento = existente.EtapaPlanejamento;
+        if (!colunas.DataAssinaturaContrato) candidato.DataAssinaturaContrato = existente.DataAssinaturaContrato;
+        if (!colunas.Criticidade) candidato.Criticidade = existente.Criticidade;
+        if (!colunas.Origem) candidato.Origem = existente.Origem;
     }
 }
