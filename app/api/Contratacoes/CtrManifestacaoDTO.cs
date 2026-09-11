@@ -29,6 +29,13 @@ public class CtrManifestacaoCreateDTO
     public string SituacaoPortfolio { get; set; } = string.Empty;
 
     /// <summary>
+    /// O que o TCDF apontou nesta comunicação. Vale em qualquer inciso e NÃO entra
+    /// no corpo do despacho (o template oficial não tem esse campo).
+    /// </summary>
+    [StringLength(4000)]
+    public string? PendenciasTcdf { get; set; }
+
+    /// <summary>
     /// CtrDominios.StatusTcdf (opcional, vale nos dois incisos). Registro de
     /// acompanhamento: não altera o texto do despacho.
     /// </summary>
@@ -80,6 +87,8 @@ public class CtrManifestacaoResponse
     public DateOnly DataOficio { get; set; }
 
     public string SituacaoPortfolio { get; set; } = string.Empty;
+
+    public string? PendenciasTcdf { get; set; }
 
     public string? StatusTcdf { get; set; }
 

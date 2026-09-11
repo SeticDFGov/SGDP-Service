@@ -61,6 +61,15 @@ public class CtrProcesso
     // há as que nascem de análise do próprio TCDF sobre o contrato.
     public string Origem { get; set; } = CtrDominios.Origem.OrgaoComunicante;
 
+    // ── Pedido de esclarecimentos ao órgão comunicante ────────────────────────
+    // Sinal PARALELO ao trâmite: não é etapa e NÃO muda a situação derivada — só
+    // marca que o processo está aguardando retorno do órgão.
+    public DateOnly? EsclarecimentoSolicitadoEm { get; set; }
+
+    public string? EsclarecimentoDescricao { get; set; }
+
+    public DateOnly? EsclarecimentoRespondidoEm { get; set; }
+
     // Restituição ao órgão: conceito de primeira classe (hoje vive na Observação)
     public bool Restituido { get; set; }
 

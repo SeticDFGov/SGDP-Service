@@ -618,12 +618,13 @@ public class CtrRodadaChefiaTest : CtrTestBase
     // ══ 5. CSV — as 4 colunas novas e o "-" no retorno ao órgão ═══════════════
 
     [Fact]
-    public void Csv_Cabecalho_TerminaComAsQuatroColunasNovas()
+    public void Csv_Cabecalho_TrazAsQuatroColunasDaRodadaNaPosicaoContratada()
     {
-        Assert.Equal(19, CtrCsv.Cabecalho.Length);
+        // As 4 desta rodada vêm logo depois das 15 originais (as 3 do esclarecimento,
+        // da rodada seguinte, entram DEPOIS delas — a ordem já existente é preservada)
         Assert.Equal(
             new[] { "Etapa do planejamento", "Assinatura do contrato", "Criticidade", "Origem" },
-            CtrCsv.Cabecalho[^4..]);
+            CtrCsv.Cabecalho[15..19]);
     }
 
     [Fact]
@@ -928,6 +929,8 @@ public class CtrRodadaChefiaTest : CtrTestBase
         Assert.True(opcionaisCompleta.DataAssinaturaContrato);
         Assert.True(opcionaisCompleta.Criticidade);
         Assert.True(opcionaisCompleta.Origem);
+        Assert.True(opcionaisCompleta.Esclarecimento);
+        Assert.False(opcionaisLegada.Esclarecimento);
     }
 
     [Fact]

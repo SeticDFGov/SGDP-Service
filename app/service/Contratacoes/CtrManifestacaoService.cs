@@ -36,7 +36,9 @@ public class CtrManifestacaoService : ICtrManifestacaoService
     /// </summary>
     public static string CalcularEstagio(CtrManifestacaoTcdf m)
     {
-        if (!string.IsNullOrWhiteSpace(m.StatusTcdf)) return m.StatusTcdf;
+        // Mesma comparação do PredicadoEstagio (== null): o valor já é normalizado
+        // para nulo no AplicarDto, então cálculo e filtro não podem divergir
+        if (m.StatusTcdf != null) return m.StatusTcdf;
 
         if (m.SituacaoPortfolio == CtrDominios.SituacaoPortfolio.NaoComunicadaPreviamente)
             return CtrDominios.Estagio.NotificacaoRegularizar;
@@ -337,6 +339,13 @@ public class CtrManifestacaoService : ICtrManifestacaoService
 
         var processo = CtrProcessoService.MapProcesso(manifestacao.Processo!, CtrProcessoService.HojeBrasilia());
 
+        // Cinto de segurança: sem a criticidade do processo o despacho do inciso I
+        // sairia com o "[Alta/Média/Baixa]" do formulário em branco
+        if (manifestacao.SituacaoPortfolio == CtrDominios.SituacaoPortfolio.ComunicadaPreviamente
+            && string.IsNullOrWhiteSpace(processo.Criticidade))
+            throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
+                "Defina a criticidade no cadastro do processo antes de gerar o despacho do inciso I.");
+
         return CtrDespachoPdf.Gerar(processo, Map(manifestacao), local.Trim(), nome.Trim(), cargo.Trim(),
             CtrProcessoService.HojeBrasilia());
     }
@@ -347,6 +356,7 @@ public class CtrManifestacaoService : ICtrManifestacaoService
         OficioTcdf = m.OficioTcdf,
         DataOficio = m.DataOficio,
         SituacaoPortfolio = m.SituacaoPortfolio,
+        PendenciasTcdf = m.PendenciasTcdf,
         StatusTcdf = m.StatusTcdf,
         ComunicadaDesde = m.ComunicadaDesde,
         ResultadoAnalise = m.ResultadoAnalise,
@@ -378,6 +388,7 @@ public class CtrManifestacaoService : ICtrManifestacaoService
         m.OficioTcdf = dto.OficioTcdf;
         m.DataOficio = dto.DataOficio;
         m.SituacaoPortfolio = dto.SituacaoPortfolio;
+        m.PendenciasTcdf = string.IsNullOrWhiteSpace(dto.PendenciasTcdf) ? null : dto.PendenciasTcdf.Trim();
         m.StatusTcdf = string.IsNullOrWhiteSpace(dto.StatusTcdf) ? null : dto.StatusTcdf.Trim();
         m.ComunicadaDesde = dto.ComunicadaDesde;
         m.ResultadoAnalise = string.IsNullOrWhiteSpace(dto.ResultadoAnalise) ? null : dto.ResultadoAnalise.Trim();
@@ -399,6 +410,7 @@ public class CtrManifestacaoService : ICtrManifestacaoService
         OficioTcdf = m.OficioTcdf,
         DataOficio = m.DataOficio,
         SituacaoPortfolio = m.SituacaoPortfolio,
+        PendenciasTcdf = m.PendenciasTcdf,
         StatusTcdf = m.StatusTcdf,
         ComunicadaDesde = m.ComunicadaDesde,
         // Espelho somente leitura: a criticidade é do processo

@@ -71,6 +71,9 @@ public class CtrImportacaoService : ICtrImportacaoService
             .GroupBy(p => p.NumeroProcesso)
             .ToDictionary(g => g.Key, g => g.First());
 
+        // Uma consulta só para a guarda da criticidade (sem N+1 no laço)
+        var comIncisoI = (await _repositorio.ListarProcessosComIncisoIAsync()).ToHashSet();
+
         var resultado = new List<CtrImportacaoLinha>();
 
         foreach (var lida in lidas)
@@ -101,13 +104,28 @@ public class CtrImportacaoService : ICtrImportacaoService
             // Coluna que o arquivo NÃO tem não pode apagar o que já está no banco.
             // Aplicado ANTES de validar para que a prévia mostre o resultado real e
             // a validação enxergue o estado final (ex.: criticidade preservada).
-            if (existente != null) PreservarColunasAusentes(candidato, existente, lida.ColunasOpcionais);
+            if (existente != null)
+            {
+                PreservarColunasAusentes(candidato, existente, lida.ColunasOpcionais);
+
+                // A coluna do retorno ao órgão EXISTE na planilha legada, então a
+                // regra de coluna ausente não a cobre: célula vazia preserva o flag
+                // (só data explícita desmarca e só "-" marca)
+                if (lida.RetornoOrgaoNaoInformado)
+                    candidato.RetornoOrgaoNaoSeAplica = existente.RetornoOrgaoNaoSeAplica;
+            }
 
             try
             {
                 // Número repetido no arquivo já foi barrado pelo parser; o que existe
                 // no banco é justamente o alvo do update, então nunca é "duplicado".
                 CtrProcessoService.ValidarProcesso(candidato, numeroDuplicado: false);
+
+                // Mesma guarda do PUT: a planilha não pode apagar a criticidade de
+                // processo que já tem manifestação do inciso I
+                if (existente != null)
+                    CtrProcessoService.ValidarCriticidadeNaoRemovida(existente.Criticidade,
+                        candidato.Criticidade, comIncisoI.Contains(existente.Id));
             }
             catch (ApiException ex)
             {
@@ -171,5 +189,13 @@ public class CtrImportacaoService : ICtrImportacaoService
         if (!colunas.DataAssinaturaContrato) candidato.DataAssinaturaContrato = existente.DataAssinaturaContrato;
         if (!colunas.Criticidade) candidato.Criticidade = existente.Criticidade;
         if (!colunas.Origem) candidato.Origem = existente.Origem;
+
+        // Bloco inteiro: herdar só parte dele produziria estado que o CHECK recusa
+        if (!colunas.Esclarecimento)
+        {
+            candidato.EsclarecimentoSolicitadoEm = existente.EsclarecimentoSolicitadoEm;
+            candidato.EsclarecimentoDescricao = existente.EsclarecimentoDescricao;
+            candidato.EsclarecimentoRespondidoEm = existente.EsclarecimentoRespondidoEm;
+        }
     }
 }

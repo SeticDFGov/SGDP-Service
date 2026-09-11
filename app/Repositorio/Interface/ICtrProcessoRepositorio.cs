@@ -36,6 +36,18 @@ public interface ICtrProcessoRepositorio
     /// </summary>
     Task<List<CtrManifestacaoTcdf>> ListarManifestacoesPorProcessosAsync(IReadOnlyCollection<long> processoIds);
 
+    /// <summary>
+    /// O processo tem manifestação do inciso I (que reporta a criticidade ao TCDF)?
+    /// Usado para recusar a remoção da criticidade do processo.
+    /// </summary>
+    Task<bool> TemManifestacaoIncisoIAsync(long processoId);
+
+    /// <summary>
+    /// Ids dos processos com manifestação do inciso I, em UMA consulta (a importação
+    /// precisa da mesma guarda em lote, sem N+1).
+    /// </summary>
+    Task<List<long>> ListarProcessosComIncisoIAsync();
+
     void AddManifestacao(CtrManifestacaoTcdf manifestacao);
 
     Task SaveChangesAsync();

@@ -26,16 +26,24 @@ public class CtrCsvColunasOpcionais
 
     public bool Origem { get; init; }
 
+    /// <summary>
+    /// As TRÊS colunas de esclarecimento, tratadas como bloco: um CHECK amarra
+    /// pedido/descrição/resposta, e herdar só parte delas produziria estado
+    /// incoerente. Presente só quando as três estão no cabeçalho.
+    /// </summary>
+    public bool Esclarecimento { get; init; }
+
     /// <summary>Nenhuma delas (planilha legada de 12 colunas) — o default conservador.</summary>
     public static readonly CtrCsvColunasOpcionais Nenhuma = new();
 
-    /// <summary>As quatro (o que o NOSSO export escreve).</summary>
+    /// <summary>Todas (o que o NOSSO export escreve).</summary>
     public static readonly CtrCsvColunasOpcionais Todas = new()
     {
         EtapaPlanejamento = true,
         DataAssinaturaContrato = true,
         Criticidade = true,
-        Origem = true
+        Origem = true,
+        Esclarecimento = true
     };
 }
 
@@ -51,6 +59,15 @@ public class CtrCsvLinha
     /// coluna o arquivo nem tem.
     /// </summary>
     public CtrCsvColunasOpcionais ColunasOpcionais { get; set; } = CtrCsvColunasOpcionais.Nenhuma;
+
+    /// <summary>
+    /// A célula "Data de Retorno ao Órgão Comunicante" veio VAZIA (nem data nem "-").
+    /// Essa coluna EXISTE na planilha legada de 12 colunas, então a proteção por
+    /// coluna ausente não a cobre: sem isto, reimportar a planilha da equipe zerava
+    /// o "retorno dispensado" e o processo saía de Concluído. Só data explícita
+    /// desmarca o flag e só "-" o marca; vazio preserva o que está gravado.
+    /// </summary>
+    public bool RetornoOrgaoNaoInformado { get; set; }
 
     /// <summary>Número físico da linha no arquivo (o que o usuário vê no Excel).</summary>
     public int Linha { get; set; }
@@ -88,7 +105,8 @@ public static class CtrCsv
         "Chegada da analise - SGDI", "Chegada da analise- SUBGD", "Chegada da analise- UGTIC",
         "Data de Retorno ao Gab SGDI", "Data de Retorno ao Órgão Comunicante", "Observação",
         "Restituído", "Data da restituição", "Motivo da restituição",
-        "Etapa do planejamento", "Assinatura do contrato", "Criticidade", "Origem"
+        "Etapa do planejamento", "Assinatura do contrato", "Criticidade", "Origem",
+        "Pedido de esclarecimento em", "Esclarecimento solicitado", "Esclarecimento respondido em"
     };
 
     // Posição das 4 colunas opcionais (leitura é por posição, como o resto)
@@ -96,6 +114,9 @@ public static class CtrCsv
     private const int ColunaDataAssinatura = 16;
     private const int ColunaCriticidade = 17;
     private const int ColunaOrigem = 18;
+    private const int ColunaEsclarecimentoSolicitadoEm = 19;
+    private const int ColunaEsclarecimentoDescricao = 20;
+    private const int ColunaEsclarecimentoRespondidoEm = 21;
 
     private static readonly string[] FormatosData = { "dd/MM/yyyy", "d/M/yyyy", "dd/M/yyyy", "d/MM/yyyy" };
 
@@ -157,7 +178,11 @@ public static class CtrCsv
                         EtapaPlanejamento = TemColuna(campos, ColunaEtapaPlanejamento),
                         DataAssinaturaContrato = TemColuna(campos, ColunaDataAssinatura),
                         Criticidade = TemColuna(campos, ColunaCriticidade),
-                        Origem = TemColuna(campos, ColunaOrigem)
+                        Origem = TemColuna(campos, ColunaOrigem),
+                        // Bloco: as três juntas ou nenhuma (o CHECK amarra os campos)
+                        Esclarecimento = TemColuna(campos, ColunaEsclarecimentoSolicitadoEm)
+                            && TemColuna(campos, ColunaEsclarecimentoDescricao)
+                            && TemColuna(campos, ColunaEsclarecimentoRespondidoEm)
                     };
                 }
                 continue; // o título (linha 1) e o próprio cabeçalho não viram dados
@@ -217,9 +242,11 @@ public static class CtrCsv
             return Rejeitar(linha, $"data inválida em Chegada UGTIC: {Campo(8)}");
         if (!TentarData(Campo(9), out var retornoGab, out _))
             return Rejeitar(linha, $"data inválida em Retorno ao Gab SGDI: {Campo(9)}");
-        // "-" aqui passou a significar "não se aplica", como já valia na coluna da UGTIC
+        // "-" aqui passou a significar "não se aplica", como já valia na coluna da UGTIC.
+        // Célula VAZIA é um terceiro estado ("não informado"): ver RetornoOrgaoNaoInformado.
         if (!TentarData(Campo(10), out var retornoOrgao, out var retornoOrgaoNaoSeAplica))
             return Rejeitar(linha, $"data inválida em Retorno ao Órgão Comunicante: {Campo(10)}");
+        linha.RetornoOrgaoNaoInformado = retornoOrgao == null && !retornoOrgaoNaoSeAplica;
 
         var observacao = Texto(11);
 
@@ -239,7 +266,9 @@ public static class CtrCsv
         }
 
         var assinaturaBruta = colunas.DataAssinaturaContrato ? Campo(ColunaDataAssinatura) : string.Empty;
-        if (!TentarData(assinaturaBruta, out var dataAssinatura, out _))
+        // Não existe "não se aplica" para assinatura: o "-" aqui é erro de preenchimento
+        if (!TentarData(assinaturaBruta, out var dataAssinatura, out var assinaturaNaoSeAplica)
+            || assinaturaNaoSeAplica)
             return Rejeitar(linha, $"data inválida em Assinatura do contrato: {assinaturaBruta}");
 
         var criticidadeBruta = colunas.Criticidade ? Campo(ColunaCriticidade) : string.Empty;
@@ -262,6 +291,26 @@ public static class CtrCsv
             origem = achada;
         }
 
+        // ── Colunas 20-22 (bloco do esclarecimento) ───────────────────────────
+        DateOnly? esclarecimentoSolicitadoEm = null;
+        string? esclarecimentoDescricao = null;
+        DateOnly? esclarecimentoRespondidoEm = null;
+        if (colunas.Esclarecimento)
+        {
+            if (!TentarData(Campo(ColunaEsclarecimentoSolicitadoEm), out esclarecimentoSolicitadoEm, out var naoAplicaPedido)
+                || naoAplicaPedido)
+                return Rejeitar(linha,
+                    $"data inválida em Pedido de esclarecimento em: {Campo(ColunaEsclarecimentoSolicitadoEm)}");
+
+            var descricao = Texto(ColunaEsclarecimentoDescricao);
+            esclarecimentoDescricao = string.IsNullOrWhiteSpace(descricao) ? null : descricao;
+
+            if (!TentarData(Campo(ColunaEsclarecimentoRespondidoEm), out esclarecimentoRespondidoEm, out var naoAplicaResposta)
+                || naoAplicaResposta)
+                return Rejeitar(linha,
+                    $"data inválida em Esclarecimento respondido em: {Campo(ColunaEsclarecimentoRespondidoEm)}");
+        }
+
         var dados = new CtrProcessoCreateDTO
         {
             NumeroProcesso = numero,
@@ -281,7 +330,10 @@ public static class CtrCsv
             EtapaPlanejamento = etapaPlanejamento,
             DataAssinaturaContrato = dataAssinatura,
             Criticidade = criticidade,
-            Origem = origem
+            Origem = origem,
+            EsclarecimentoSolicitadoEm = esclarecimentoSolicitadoEm,
+            EsclarecimentoDescricao = esclarecimentoDescricao,
+            EsclarecimentoRespondidoEm = esclarecimentoRespondidoEm
         };
 
         var restituido = Campo(12);
@@ -599,7 +651,10 @@ public static class CtrCsv
                 (p.EtapaPlanejamento ?? string.Empty, false),
                 (Data(p.DataAssinaturaContrato), false),
                 (p.Criticidade ?? string.Empty, false),
-                (p.Origem, false)
+                (p.Origem, false),
+                (Data(p.EsclarecimentoSolicitadoEm), false),
+                (p.EsclarecimentoDescricao ?? string.Empty, true),
+                (Data(p.EsclarecimentoRespondidoEm), false)
             };
 
             sb.Append(string.Join(";", celulas.Select(c => Escapar(c.Valor, c.TextoLivre)))).Append("\r\n");

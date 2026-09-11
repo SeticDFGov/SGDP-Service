@@ -33,6 +33,9 @@ public class CtrPainelResponse
     /// <summary>Corte de dias sem movimento usado nos gargalos.</summary>
     public int LimiteDias { get; set; }
 
+    /// <summary>Ativos com pedido de esclarecimento feito e ainda sem resposta.</summary>
+    public int TotalEsclarecimentoPendente { get; set; }
+
     /// <summary>As 7 situações, mesmo as com zero.</summary>
     public List<CtrContagem> PorSituacao { get; set; } = new();
 

@@ -81,9 +81,37 @@ public class CtrProcessoService : ICtrProcessoService
     public static string CalcularFase(DateOnly? dataAssinaturaContrato) =>
         dataAssinaturaContrato != null ? CtrDominios.Fase.Execucao : CtrDominios.Fase.Planejamento;
 
-    /// <summary>Maior data entre os cinco checkpoints e a restituição; null sem nenhuma.</summary>
+    /// <summary>
+    /// Pedido de esclarecimento feito e ainda sem resposta — DERIVADO, nunca gravado.
+    /// Sinal paralelo ao trâmite: não entra na situação.
+    /// </summary>
+    public static bool CalcularEsclarecimentoPendente(CtrProcesso p) =>
+        CalcularEsclarecimentoPendente(p.EsclarecimentoSolicitadoEm, p.EsclarecimentoRespondidoEm);
+
+    /// <inheritdoc cref="CalcularEsclarecimentoPendente(CtrProcesso)"/>
+    public static bool CalcularEsclarecimentoPendente(DateOnly? solicitadoEm, DateOnly? respondidoEm) =>
+        solicitadoEm != null && respondidoEm == null;
+
+    /// <summary>
+    /// Dias entre o pedido de esclarecimento e hoje; null quando não há pendência.
+    /// Nunca negativo (o pedido não pode ser futuro, mas o piso fica explícito).
+    /// </summary>
+    public static int? CalcularDiasEsclarecimentoPendente(DateOnly? solicitadoEm, DateOnly? respondidoEm,
+        DateOnly hoje)
+    {
+        if (!CalcularEsclarecimentoPendente(solicitadoEm, respondidoEm)) return null;
+
+        var dias = hoje.DayNumber - solicitadoEm!.Value.DayNumber;
+        return dias < 0 ? 0 : dias;
+    }
+
+    /// <summary>
+    /// Maior data entre os cinco checkpoints, a restituição e o esclarecimento;
+    /// null sem nenhuma. Pedir e responder esclarecimento É movimentação do processo.
+    /// </summary>
     public static DateOnly? CalcularUltimaMovimentacao(CtrProcesso p) => CalcularUltimaMovimentacao(
-        p.ChegadaSgdi, p.ChegadaSubgd, p.ChegadaUgtic, p.RetornoGabSgdi, p.RetornoOrgao, p.RestituidoEm);
+        p.ChegadaSgdi, p.ChegadaSubgd, p.ChegadaUgtic, p.RetornoGabSgdi, p.RetornoOrgao, p.RestituidoEm,
+        p.EsclarecimentoSolicitadoEm, p.EsclarecimentoRespondidoEm);
 
     /// <inheritdoc cref="CalcularUltimaMovimentacao(CtrProcesso)"/>
     public static DateOnly? CalcularUltimaMovimentacao(params DateOnly?[] datas)
@@ -150,6 +178,15 @@ public class CtrProcessoService : ICtrProcessoService
         _ => null
     };
 
+    /// <summary>
+    /// Pendência de esclarecimento como predicado sobre as duas colunas (é função
+    /// delas), para o filtro rodar no banco.
+    /// </summary>
+    public static Expression<Func<CtrProcesso, bool>> PredicadoEsclarecimentoPendente(bool pendente) =>
+        pendente
+            ? p => p.EsclarecimentoSolicitadoEm != null && p.EsclarecimentoRespondidoEm == null
+            : p => p.EsclarecimentoSolicitadoEm == null || p.EsclarecimentoRespondidoEm != null;
+
     // ── Validação (criar, editar, checkpoint e importação usam esta função) ────
 
     /// <summary>
@@ -169,6 +206,14 @@ public class CtrProcessoService : ICtrProcessoService
         p.RestituidoMotivo = Limpar(p.RestituidoMotivo);
         p.EtapaPlanejamento = Limpar(p.EtapaPlanejamento);
         p.Criticidade = Limpar(p.Criticidade);
+        p.EsclarecimentoDescricao = Limpar(p.EsclarecimentoDescricao);
+
+        // Limpar a data do pedido ANULA a descrição (normalização, como a restituição:
+        // é gesto explícito do usuário, não erro). A RESPOSTA não entra aqui: ela é
+        // fato datado, e apagá-la em silêncio esconderia perda de dado — na importação
+        // a linha passaria como "Atualizar" sem nada aparecer na prévia. Vira erro,
+        // logo abaixo.
+        if (p.EsclarecimentoSolicitadoEm == null) p.EsclarecimentoDescricao = null;
         // Origem vazia = o caminho normal (o processo veio do órgão comunicante)
         p.Origem = Limpar(p.Origem) ?? CtrDominios.Origem.OrgaoComunicante;
 
@@ -221,6 +266,17 @@ public class CtrProcessoService : ICtrProcessoService
         if (!CtrDominios.Origem.Todos.Contains(p.Origem))
             throw new ApiException(ErrorCode.CtrDominioInvalido, $"Origem inválida: {p.Origem}");
 
+        // Resposta sem pedido é RECUSADA (não normalizada): é o que o contrato chama
+        // de "resposta exige pedido", e a recusa é o que faz a linha aparecer na
+        // prévia da importação em vez de sumir em silêncio
+        if (p.EsclarecimentoSolicitadoEm == null && p.EsclarecimentoRespondidoEm != null)
+            throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                "Informe a data do pedido de esclarecimento antes de registrar a resposta.");
+
+        if (p.EsclarecimentoSolicitadoEm != null && p.EsclarecimentoDescricao == null)
+            throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                "Informe o que foi pedido ao órgão no pedido de esclarecimentos.");
+
         if (p.Restituido && p.RestituidoEm == null)
             throw new ApiException(ErrorCode.CtrProcessoInvalido,
                 "Processo restituído exige a data da restituição.");
@@ -264,6 +320,24 @@ public class CtrProcessoService : ICtrProcessoService
                 $"A data de assinatura do contrato ({p.DataAssinaturaContrato.Value:dd/MM/yyyy}) "
                 + "não pode ser futura.");
 
+        // Esclarecimento é sinal paralelo: não entra na cronologia do trâmite, mas
+        // as duas datas são coerentes entre si e não podem ser futuras
+        if (p.EsclarecimentoSolicitadoEm != null && p.EsclarecimentoSolicitadoEm.Value > hoje)
+            throw new ApiException(ErrorCode.CtrDatasIncoerentes,
+                $"A data do pedido de esclarecimentos ({p.EsclarecimentoSolicitadoEm.Value:dd/MM/yyyy}) "
+                + "não pode ser futura.");
+
+        if (p.EsclarecimentoRespondidoEm != null && p.EsclarecimentoRespondidoEm.Value > hoje)
+            throw new ApiException(ErrorCode.CtrDatasIncoerentes,
+                $"A data da resposta ao esclarecimento ({p.EsclarecimentoRespondidoEm.Value:dd/MM/yyyy}) "
+                + "não pode ser futura.");
+
+        if (p.EsclarecimentoRespondidoEm != null && p.EsclarecimentoSolicitadoEm != null
+            && p.EsclarecimentoRespondidoEm.Value < p.EsclarecimentoSolicitadoEm.Value)
+            throw new ApiException(ErrorCode.CtrDatasIncoerentes,
+                $"A data da resposta ao esclarecimento ({p.EsclarecimentoRespondidoEm.Value:dd/MM/yyyy}) não pode "
+                + $"ser anterior à data do pedido ({p.EsclarecimentoSolicitadoEm.Value:dd/MM/yyyy}).");
+
         // Cada etapa preenchida deve ser >= todas as anteriores preenchidas (lacunas são permitidas)
         for (var atual = 1; atual < etapas.Length; atual++)
         {
@@ -284,6 +358,23 @@ public class CtrProcessoService : ICtrProcessoService
             throw new ApiException(ErrorCode.CtrDatasIncoerentes,
                 $"A data da restituição ({p.RestituidoEm.Value:dd/MM/yyyy}) não pode ser anterior à data de "
                 + $"chegada à SGDI ({p.ChegadaSgdi.Value:dd/MM/yyyy}).");
+    }
+
+    /// <summary>
+    /// Apagar a criticidade de um processo que já tem manifestação do inciso I é
+    /// RECUSADO: o despacho a reporta e sairia com o "[Alta/Média/Baixa]" do papel.
+    /// Simétrica à exigência da criação da manifestação — e protege também o CHECK
+    /// antigo que o Down da migration da rodada anterior recria.
+    /// </summary>
+    public static void ValidarCriticidadeNaoRemovida(string? anterior, string? nova, bool temIncisoI)
+    {
+        if (!temIncisoI) return;
+        if (string.IsNullOrWhiteSpace(anterior)) return;
+        if (!string.IsNullOrWhiteSpace(nova)) return;
+
+        throw new ApiException(ErrorCode.CtrProcessoInvalido,
+            "Não é possível remover a criticidade: o processo já tem manifestação do inciso I, "
+            + "que a reporta ao TCDF.");
     }
 
     private static string? Limpar(string? valor) =>
@@ -394,6 +485,9 @@ public class CtrProcessoService : ICtrProcessoService
                 : query.Where(p => false);
         }
 
+        if (filtro.EsclarecimentoPendente != null)
+            query = query.Where(PredicadoEsclarecimentoPendente(filtro.EsclarecimentoPendente.Value));
+
         return query;
     }
 
@@ -466,7 +560,15 @@ public class CtrProcessoService : ICtrProcessoService
         // entidade rastreada pelo contexto
         var candidato = Clonar(processo);
         AplicarDto(candidato, dto);
+
+        // Origem ausente no corpo PRESERVA a gravada: "vazio = Órgão comunicante"
+        // vale só na criação (o front antigo não manda o campo, e resetar a origem
+        // de um processo do TCDF numa edição qualquer é perda de dado silenciosa)
+        if (string.IsNullOrWhiteSpace(dto.Origem)) candidato.Origem = processo.Origem;
+
         ValidarProcesso(candidato, await _repositorio.NumeroDuplicadoAsync(candidato.NumeroProcesso, processo.Id));
+        ValidarCriticidadeNaoRemovida(processo.Criticidade, candidato.Criticidade,
+            await _repositorio.TemManifestacaoIncisoIAsync(processo.Id));
 
         AplicarDto(processo, DtoDe(candidato));
         processo.AlteradoEm = DateTime.UtcNow;
@@ -578,6 +680,9 @@ public class CtrProcessoService : ICtrProcessoService
         processo.DataAssinaturaContrato = dto.DataAssinaturaContrato;
         processo.Criticidade = dto.Criticidade;
         processo.Origem = dto.Origem ?? CtrDominios.Origem.OrgaoComunicante;
+        processo.EsclarecimentoSolicitadoEm = dto.EsclarecimentoSolicitadoEm;
+        processo.EsclarecimentoDescricao = dto.EsclarecimentoDescricao;
+        processo.EsclarecimentoRespondidoEm = dto.EsclarecimentoRespondidoEm;
         processo.Restituido = dto.Restituido;
         processo.RestituidoEm = dto.RestituidoEm;
         processo.RestituidoMotivo = dto.RestituidoMotivo;
@@ -604,6 +709,9 @@ public class CtrProcessoService : ICtrProcessoService
         DataAssinaturaContrato = p.DataAssinaturaContrato,
         Criticidade = p.Criticidade,
         Origem = p.Origem,
+        EsclarecimentoSolicitadoEm = p.EsclarecimentoSolicitadoEm,
+        EsclarecimentoDescricao = p.EsclarecimentoDescricao,
+        EsclarecimentoRespondidoEm = p.EsclarecimentoRespondidoEm,
         Restituido = p.Restituido,
         RestituidoEm = p.RestituidoEm,
         RestituidoMotivo = p.RestituidoMotivo,
@@ -650,6 +758,8 @@ public class CtrProcessoService : ICtrProcessoService
                 RetornoOrgaoNaoSeAplica = p.RetornoOrgaoNaoSeAplica,
                 DataAssinaturaContrato = p.DataAssinaturaContrato,
                 RestituidoEm = p.RestituidoEm,
+                EsclarecimentoSolicitadoEm = p.EsclarecimentoSolicitadoEm,
+                EsclarecimentoRespondidoEm = p.EsclarecimentoRespondidoEm,
                 CriadoEm = p.CriadoEm
             })
             .ToListAsync();
@@ -661,7 +771,8 @@ public class CtrProcessoService : ICtrProcessoService
                 r.ChegadaUgtic, r.RetornoGabSgdi, r.RetornoOrgao, r.RetornoOrgaoNaoSeAplica),
             Dias = CalcularDiasSemMovimento(
                 CalcularUltimaMovimentacao(r.ChegadaSgdi, r.ChegadaSubgd, r.ChegadaUgtic,
-                    r.RetornoGabSgdi, r.RetornoOrgao, r.RestituidoEm),
+                    r.RetornoGabSgdi, r.RetornoOrgao, r.RestituidoEm,
+                    r.EsclarecimentoSolicitadoEm, r.EsclarecimentoRespondidoEm),
                 r.CriadoEm, hoje)
         }).ToList();
 
@@ -669,6 +780,8 @@ public class CtrProcessoService : ICtrProcessoService
         {
             TotalAtivos = resumos.Count,
             LimiteDias = limiteDias,
+            TotalEsclarecimentoPendente = resumos.Count(r => CalcularEsclarecimentoPendente(
+                r.EsclarecimentoSolicitadoEm, r.EsclarecimentoRespondidoEm)),
             // As 7 situações aparecem sempre, mesmo com zero. Ordem determinística:
             // quantidade desc e, no empate, a ordem do domínio (do trâmite)
             PorSituacao = CtrDominios.Situacao.Todos
@@ -808,6 +921,12 @@ public class CtrProcessoService : ICtrProcessoService
             DataAssinaturaContrato = p.DataAssinaturaContrato,
             Criticidade = p.Criticidade,
             Origem = p.Origem,
+            EsclarecimentoSolicitadoEm = p.EsclarecimentoSolicitadoEm,
+            EsclarecimentoDescricao = p.EsclarecimentoDescricao,
+            EsclarecimentoRespondidoEm = p.EsclarecimentoRespondidoEm,
+            EsclarecimentoPendente = CalcularEsclarecimentoPendente(p),
+            DiasEsclarecimentoPendente = CalcularDiasEsclarecimentoPendente(
+                p.EsclarecimentoSolicitadoEm, p.EsclarecimentoRespondidoEm, hoje),
             Restituido = p.Restituido,
             RestituidoEm = p.RestituidoEm,
             RestituidoMotivo = p.RestituidoMotivo,
@@ -838,6 +957,8 @@ public class CtrProcessoService : ICtrProcessoService
         public bool RetornoOrgaoNaoSeAplica { get; set; }
         public DateOnly? DataAssinaturaContrato { get; set; }
         public DateOnly? RestituidoEm { get; set; }
+        public DateOnly? EsclarecimentoSolicitadoEm { get; set; }
+        public DateOnly? EsclarecimentoRespondidoEm { get; set; }
         public DateTime CriadoEm { get; set; }
     }
 }

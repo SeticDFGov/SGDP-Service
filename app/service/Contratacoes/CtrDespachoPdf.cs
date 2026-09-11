@@ -95,8 +95,9 @@ public static class CtrDespachoPdf
 
                     // A Observacao da manifestação é anotação INTERNA da equipe e não
                     // entra no despacho: o template oficial do TCDF não tem esse campo.
-                    // O StatusTcdf (suspensão/revogação) também fica de fora, pela mesma
-                    // razão — é registro de acompanhamento da tela, não texto do despacho.
+                    // O StatusTcdf (suspensão/revogação) e as PendenciasTcdf também ficam
+                    // de fora, pela mesma razão — são registro de acompanhamento da tela,
+                    // não texto do despacho.
                     //
                     // Fecho num bloco só, com ShowEntire para nunca ser partido entre
                     // páginas (antes ele escorregava sozinho para a página 2) e colado

@@ -29,6 +29,9 @@ public class CtrProcessoFiltro : PagedRequest
     /// <summary>CtrDominios.Origem (Órgão comunicante / TCDF).</summary>
     public string? Origem { get; set; }
 
+    /// <summary>true = só os que aguardam esclarecimento; false = só os sem pendência; null = todos.</summary>
+    public bool? EsclarecimentoPendente { get; set; }
+
     public string? Sigla { get; set; }
 
     /// <summary>true = só restituídos; false = só não restituídos; null = todos.</summary>
@@ -86,9 +89,22 @@ public class CtrProcessoCreateDTO
     [StringLength(10)]
     public string? Criticidade { get; set; }
 
-    /// <summary>CtrDominios.Origem; vazia = "Órgão comunicante".</summary>
+    /// <summary>
+    /// CtrDominios.Origem; vazia = "Órgão comunicante" na CRIAÇÃO. Na edição, vazia
+    /// PRESERVA a origem gravada (o front antigo não manda o campo).
+    /// </summary>
     [StringLength(20)]
     public string? Origem { get; set; }
+
+    /// <summary>Data do pedido de esclarecimentos ao órgão comunicante.</summary>
+    public DateOnly? EsclarecimentoSolicitadoEm { get; set; }
+
+    /// <summary>O que foi pedido. Obrigatória quando há data do pedido.</summary>
+    [StringLength(4000)]
+    public string? EsclarecimentoDescricao { get; set; }
+
+    /// <summary>Data da resposta do órgão; enquanto nula, o processo fica sinalizado.</summary>
+    public DateOnly? EsclarecimentoRespondidoEm { get; set; }
 
     public bool Restituido { get; set; }
 
@@ -156,6 +172,18 @@ public class CtrProcessoResponse
     public string? Criticidade { get; set; }
 
     public string Origem { get; set; } = string.Empty;
+
+    public DateOnly? EsclarecimentoSolicitadoEm { get; set; }
+
+    public string? EsclarecimentoDescricao { get; set; }
+
+    public DateOnly? EsclarecimentoRespondidoEm { get; set; }
+
+    /// <summary>Derivado: pedido feito e ainda sem resposta. Nunca gravado.</summary>
+    public bool EsclarecimentoPendente { get; set; }
+
+    /// <summary>Derivado: dias entre o pedido e hoje; nulo quando não há pendência.</summary>
+    public int? DiasEsclarecimentoPendente { get; set; }
 
     public bool Restituido { get; set; }
 

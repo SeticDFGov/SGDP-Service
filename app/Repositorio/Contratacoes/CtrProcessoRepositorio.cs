@@ -67,6 +67,18 @@ public class CtrProcessoRepositorio : ICtrProcessoRepositorio
             .ToListAsync();
     }
 
+    public async Task<bool> TemManifestacaoIncisoIAsync(long processoId) =>
+        await _context.CtrManifestacoesTcdf.AnyAsync(m =>
+            m.ProcessoId == processoId
+            && m.SituacaoPortfolio == CtrDominios.SituacaoPortfolio.ComunicadaPreviamente);
+
+    public async Task<List<long>> ListarProcessosComIncisoIAsync() =>
+        await _context.CtrManifestacoesTcdf
+            .Where(m => m.SituacaoPortfolio == CtrDominios.SituacaoPortfolio.ComunicadaPreviamente)
+            .Select(m => m.ProcessoId)
+            .Distinct()
+            .ToListAsync();
+
     public void AddManifestacao(CtrManifestacaoTcdf manifestacao) =>
         _context.CtrManifestacoesTcdf.Add(manifestacao);
 
