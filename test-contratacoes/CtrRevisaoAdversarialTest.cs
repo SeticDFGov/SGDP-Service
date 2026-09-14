@@ -67,14 +67,14 @@ public class CtrRevisaoAdversarialTest : CtrTestBase
         var criada = await service.CriarAsync(processo.Id, NovaManifestacaoIncisoI(), ctx);
 
         var invalida = NovaManifestacaoIncisoI();
-        invalida.Criticidade = "Altíssima"; // fora do domínio
+        invalida.ResultadoAnalise = "Tudo certo"; // fora do domínio
         invalida.OficioTcdf = "999/2026-GAB";
 
         await Assert.ThrowsAsync<ApiException>(() => service.AtualizarAsync(criada.Id, invalida, ctx));
 
         // Releitura no MESMO contexto: nada da tentativa recusada ficou na entidade
         var atual = await service.GetAsync(criada.Id);
-        Assert.Equal(CtrDominios.Criticidade.Alta, atual.Criticidade);
+        Assert.Equal(CtrDominios.ResultadoAnalise.Alinhada, atual.ResultadoAnalise);
         Assert.Equal("123/2026-GAB", atual.OficioTcdf);
         Assert.Null(atual.AlteradoEm);
     }

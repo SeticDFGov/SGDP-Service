@@ -108,7 +108,11 @@ public abstract class CtrTestBase : IDisposable
         CategoriaObjeto = categoria
     };
 
-    /// <summary>Insere um processo direto no banco (sem passar pelo service).</summary>
+    /// <summary>
+    /// Insere um processo direto no banco (sem passar pelo service). Já nasce com a
+    /// criticidade definida: desde a rodada da chefia ela é atributo do PROCESSO e o
+    /// inciso I da manifestação a exige.
+    /// </summary>
     protected CtrProcesso SemearProcesso(string numero, Action<CtrProcesso>? ajustar = null)
     {
         var processo = new CtrProcesso
@@ -118,6 +122,8 @@ public abstract class CtrTestBase : IDisposable
             OrgaoSigla = "SEEC",
             Objeto = "Aquisição de switches de acesso",
             CategoriaObjeto = CtrDominios.CategoriaObjeto.InfraestruturaRede,
+            Criticidade = CtrDominios.Criticidade.Alta,
+            Origem = CtrDominios.Origem.OrgaoComunicante,
             Ativo = true,
             CriadoEm = DateTime.UtcNow,
             CriadoPor = "contratacoes@local.teste"
@@ -136,7 +142,7 @@ public abstract class CtrTestBase : IDisposable
         DataOficio = DiasAtras(5),
         SituacaoPortfolio = CtrDominios.SituacaoPortfolio.ComunicadaPreviamente,
         ComunicadaDesde = DiasAtras(60),
-        Criticidade = CtrDominios.Criticidade.Alta,
+        // A criticidade NÃO vem mais no DTO da manifestação: é do processo
         ResultadoAnalise = resultado,
         DesfechoRisco = resultado == CtrDominios.ResultadoAnalise.RiscosSignificativos
             ? CtrDominios.DesfechoRisco.AguardandoResposta

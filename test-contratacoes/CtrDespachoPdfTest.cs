@@ -11,6 +11,7 @@ namespace test.contratacoes;
 /// Despacho ao TCDF: literalidade dos textos-base e geração do PDF nos dois
 /// incisos e em cada desfecho de risco.
 /// </summary>
+[Collection(CtrDespachoPdfCollection.Nome)]
 public class CtrDespachoPdfTest : CtrTestBase
 {
     private readonly CtrProcessoResponse _processo = new()
@@ -21,7 +22,10 @@ public class CtrDespachoPdfTest : CtrTestBase
         OrgaoSigla = "SEEC",
         ComplementoArea = "Secretaria Executiva de Contratos",
         Objeto = "Aquisição de switches de acesso",
-        CategoriaObjeto = CtrDominios.CategoriaObjeto.InfraestruturaRede
+        CategoriaObjeto = CtrDominios.CategoriaObjeto.InfraestruturaRede,
+        // A criticidade do inciso I sai DAQUI (é atributo do processo, art. 11 da IN)
+        Criticidade = CtrDominios.Criticidade.Alta,
+        Origem = CtrDominios.Origem.OrgaoComunicante
     };
 
     private static CtrManifestacaoResponse Manifestacao(string situacao, string? resultado = null,
@@ -35,8 +39,8 @@ public class CtrDespachoPdfTest : CtrTestBase
             SituacaoPortfolio = situacao,
             ComunicadaDesde = situacao == CtrDominios.SituacaoPortfolio.ComunicadaPreviamente
                 ? new DateOnly(2026, 5, 22) : null,
-            Criticidade = situacao == CtrDominios.SituacaoPortfolio.ComunicadaPreviamente
-                ? CtrDominios.Criticidade.Alta : null,
+            // Espelho somente leitura (o PDF usa o do processo, não este)
+            Criticidade = CtrDominios.Criticidade.Alta,
             ResultadoAnalise = resultado,
             DesfechoRisco = desfecho,
             PrazoRegularizacaoDias = situacao == CtrDominios.SituacaoPortfolio.NaoComunicadaPreviamente ? 15 : null

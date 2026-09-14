@@ -71,6 +71,9 @@ public class CtrImportacaoService : ICtrImportacaoService
             .GroupBy(p => p.NumeroProcesso)
             .ToDictionary(g => g.Key, g => g.First());
 
+        // Uma consulta só para a guarda da criticidade (sem N+1 no laço)
+        var comIncisoI = (await _repositorio.ListarProcessosComIncisoIAsync()).ToHashSet();
+
         var resultado = new List<CtrImportacaoLinha>();
 
         foreach (var lida in lidas)
@@ -98,11 +101,31 @@ public class CtrImportacaoService : ICtrImportacaoService
 
             var existente = ativos.TryGetValue(candidato.NumeroProcesso.Trim(), out var achado) ? achado : null;
 
+            // Coluna que o arquivo NÃO tem não pode apagar o que já está no banco.
+            // Aplicado ANTES de validar para que a prévia mostre o resultado real e
+            // a validação enxergue o estado final (ex.: criticidade preservada).
+            if (existente != null)
+            {
+                PreservarColunasAusentes(candidato, existente, lida.ColunasOpcionais);
+
+                // A coluna do retorno ao órgão EXISTE na planilha legada, então a
+                // regra de coluna ausente não a cobre: célula vazia preserva o flag
+                // (só data explícita desmarca e só "-" marca)
+                if (lida.RetornoOrgaoNaoInformado)
+                    candidato.RetornoOrgaoNaoSeAplica = existente.RetornoOrgaoNaoSeAplica;
+            }
+
             try
             {
                 // Número repetido no arquivo já foi barrado pelo parser; o que existe
                 // no banco é justamente o alvo do update, então nunca é "duplicado".
                 CtrProcessoService.ValidarProcesso(candidato, numeroDuplicado: false);
+
+                // Mesma guarda do PUT: a planilha não pode apagar a criticidade de
+                // processo que já tem manifestação do inciso I
+                if (existente != null)
+                    CtrProcessoService.ValidarCriticidadeNaoRemovida(existente.Criticidade,
+                        candidato.Criticidade, comIncisoI.Contains(existente.Id));
             }
             catch (ApiException ex)
             {
@@ -144,5 +167,35 @@ public class CtrImportacaoService : ICtrImportacaoService
         }
 
         return resultado;
+    }
+
+    /// <summary>
+    /// Herda do processo já gravado os campos cujas COLUNAS o arquivo nem traz.
+    ///
+    /// A planilha real da equipe tem 12 colunas e não sabe nada de etapa do
+    /// planejamento, assinatura, criticidade e origem: reimportá-la apagava esses
+    /// campos (inclusive a criticidade que o backfill da migration gravou), e como
+    /// a criticidade passou a ser exigida no inciso I, o fluxo do TCDF quebrava em
+    /// seguida. Coluna PRESENTE e vazia continua limpando o campo — é escolha de
+    /// quem exportou, e é o que mantém o round-trip export→importação fiel.
+    ///
+    /// As 12 colunas originais (datas, observação) e as 3 da restituição seguem
+    /// sendo sempre aplicadas: nelas a planilha é a fonte, como sempre foi.
+    /// </summary>
+    private static void PreservarColunasAusentes(CtrProcesso candidato, CtrProcesso existente,
+        CtrCsvColunasOpcionais colunas)
+    {
+        if (!colunas.EtapaPlanejamento) candidato.EtapaPlanejamento = existente.EtapaPlanejamento;
+        if (!colunas.DataAssinaturaContrato) candidato.DataAssinaturaContrato = existente.DataAssinaturaContrato;
+        if (!colunas.Criticidade) candidato.Criticidade = existente.Criticidade;
+        if (!colunas.Origem) candidato.Origem = existente.Origem;
+
+        // Bloco inteiro: herdar só parte dele produziria estado que o CHECK recusa
+        if (!colunas.Esclarecimento)
+        {
+            candidato.EsclarecimentoSolicitadoEm = existente.EsclarecimentoSolicitadoEm;
+            candidato.EsclarecimentoDescricao = existente.EsclarecimentoDescricao;
+            candidato.EsclarecimentoRespondidoEm = existente.EsclarecimentoRespondidoEm;
+        }
     }
 }

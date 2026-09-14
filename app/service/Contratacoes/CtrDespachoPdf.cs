@@ -58,11 +58,13 @@ public static class CtrDespachoPdf
 
                     col.Item().PaddingTop(4).Text(CtrDespachoTextos.TituloSituacao).SemiBold();
 
-                    // Inciso I — a contratação já era acompanhada
+                    // Inciso I — a contratação já era acompanhada.
+                    // A criticidade (art. 11 da IN) é atributo do PROCESSO: o despacho
+                    // apenas a reporta.
                     col.Item().Text($"I - {CtrDespachoTextos.Caixa(incisoI)} "
                         + CtrDespachoTextos.IncisoIPreenchido(
                             incisoI ? manifestacao.ComunicadaDesde : null,
-                            incisoI ? manifestacao.Criticidade : null)).Justify();
+                            incisoI ? processo.Criticidade : null)).Justify();
 
                     Opcao(col, 1, incisoI && manifestacao.ResultadoAnalise == CtrDominios.ResultadoAnalise.Alinhada,
                         CtrDespachoTextos.ResultadoAlinhada);
@@ -93,6 +95,9 @@ public static class CtrDespachoPdf
 
                     // A Observacao da manifestação é anotação INTERNA da equipe e não
                     // entra no despacho: o template oficial do TCDF não tem esse campo.
+                    // O StatusTcdf (suspensão/revogação) e as PendenciasTcdf também ficam
+                    // de fora, pela mesma razão — são registro de acompanhamento da tela,
+                    // não texto do despacho.
                     //
                     // Fecho num bloco só, com ShowEntire para nunca ser partido entre
                     // páginas (antes ele escorregava sozinho para a página 2) e colado

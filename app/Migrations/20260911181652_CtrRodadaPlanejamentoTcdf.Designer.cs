@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Models;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace demanda_service.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260911181652_CtrRodadaPlanejamentoTcdf")]
+    partial class CtrRodadaPlanejamentoTcdf
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -121,10 +124,6 @@ namespace demanda_service.Migrations
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)")
                         .HasColumnName("oficio_tcdf");
-
-                    b.Property<string>("PendenciasTcdf")
-                        .HasColumnType("text")
-                        .HasColumnName("pendencias_tcdf");
 
                     b.Property<int?>("PrazoRegularizacaoDias")
                         .HasColumnType("integer")
@@ -248,18 +247,6 @@ namespace demanda_service.Migrations
                         .HasColumnType("date")
                         .HasColumnName("data_assinatura_contrato");
 
-                    b.Property<string>("EsclarecimentoDescricao")
-                        .HasColumnType("text")
-                        .HasColumnName("esclarecimento_descricao");
-
-                    b.Property<DateOnly?>("EsclarecimentoRespondidoEm")
-                        .HasColumnType("date")
-                        .HasColumnName("esclarecimento_respondido_em");
-
-                    b.Property<DateOnly?>("EsclarecimentoSolicitadoEm")
-                        .HasColumnType("date")
-                        .HasColumnName("esclarecimento_solicitado_em");
-
                     b.Property<string>("EtapaPlanejamento")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
@@ -353,8 +340,6 @@ namespace demanda_service.Migrations
                             t.HasCheckConstraint("ck_ctr_processo_categoria", "categoria_objeto IN ('Infraestrutura de Rede','Desenvolvimento / Fábrica de Software','Outsourcing de Impressão','Licenciamento de Software','Inteligência Artificial','Segurança Cibernética','Sistemas de Gestão','Certificação Digital','Captação Audiovisual','Telefonia / VoIP','Sem objeto / Indefinido','Outros')");
 
                             t.HasCheckConstraint("ck_ctr_processo_criticidade", "criticidade IS NULL OR criticidade IN ('Alta','Média','Baixa')");
-
-                            t.HasCheckConstraint("ck_ctr_processo_esclarecimento", "(esclarecimento_solicitado_em IS NULL AND esclarecimento_descricao IS NULL AND esclarecimento_respondido_em IS NULL) OR (esclarecimento_solicitado_em IS NOT NULL AND esclarecimento_descricao IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_ctr_processo_etapa_planejamento", "etapa_planejamento IS NULL OR etapa_planejamento IN ('DFD','ETP','TR')");
 
@@ -3090,9 +3075,6 @@ namespace demanda_service.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("CodigoExterno")
-                        .HasColumnType("text");
-
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasColumnType("text");
@@ -3126,6 +3108,10 @@ namespace demanda_service.Migrations
                     b.Property<string>("PapelPgia")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Perfil")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<Guid?>("Unidadeid")
                         .HasColumnType("uuid");
