@@ -356,7 +356,7 @@ public class CtrManifestacaoService : ICtrManifestacaoService
         OficioTcdf = m.OficioTcdf,
         DataOficio = m.DataOficio,
         SituacaoPortfolio = m.SituacaoPortfolio,
-        PendenciasTcdf = m.PendenciasTcdf,
+        EsclarecimentosAdicionais = m.EsclarecimentosAdicionais,
         StatusTcdf = m.StatusTcdf,
         ComunicadaDesde = m.ComunicadaDesde,
         ResultadoAnalise = m.ResultadoAnalise,
@@ -388,7 +388,9 @@ public class CtrManifestacaoService : ICtrManifestacaoService
         m.OficioTcdf = dto.OficioTcdf;
         m.DataOficio = dto.DataOficio;
         m.SituacaoPortfolio = dto.SituacaoPortfolio;
-        m.PendenciasTcdf = string.IsNullOrWhiteSpace(dto.PendenciasTcdf) ? null : dto.PendenciasTcdf.Trim();
+        m.EsclarecimentosAdicionais = string.IsNullOrWhiteSpace(dto.EsclarecimentosAdicionais)
+            ? null
+            : dto.EsclarecimentosAdicionais.Trim();
         m.StatusTcdf = string.IsNullOrWhiteSpace(dto.StatusTcdf) ? null : dto.StatusTcdf.Trim();
         m.ComunicadaDesde = dto.ComunicadaDesde;
         m.ResultadoAnalise = string.IsNullOrWhiteSpace(dto.ResultadoAnalise) ? null : dto.ResultadoAnalise.Trim();
@@ -410,7 +412,7 @@ public class CtrManifestacaoService : ICtrManifestacaoService
         OficioTcdf = m.OficioTcdf,
         DataOficio = m.DataOficio,
         SituacaoPortfolio = m.SituacaoPortfolio,
-        PendenciasTcdf = m.PendenciasTcdf,
+        EsclarecimentosAdicionais = m.EsclarecimentosAdicionais,
         StatusTcdf = m.StatusTcdf,
         ComunicadaDesde = m.ComunicadaDesde,
         // Espelho somente leitura: a criticidade é do processo

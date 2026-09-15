@@ -1,7 +1,9 @@
+using Models.Pgia;
+
 namespace Models.Contratacoes;
 
 /// <summary>
-/// Domínios fechados do módulo Análises de Contratações. Os CHECKs de banco são
+/// Domínios fechados do módulo Supervisão Contínua das Contratações. Os CHECKs de banco são
 /// reproduzidos em <see cref="CtrModelConfiguration"/>; os valores vêm da planilha
 /// legada e do despacho padrão da SGDI ao TCDF (Decreto nº 48.899/2026 + IN SGDI nº 1/2026).
 /// </summary>
@@ -157,6 +159,37 @@ public static class CtrDominios
         public const string EditalRevogado = "Edital revogado";
 
         public static readonly string[] Todos = { SuspensoIrregularidades, EditalRevogado };
+    }
+
+    /// <summary>
+    /// Risco classificado do processo: os MESMOS quatro valores do PGIA
+    /// (<see cref="PgiaDominios.ResultadoRisco"/>, fonte única, reutilizada sem cópia),
+    /// mais o rótulo de ausência usado no filtro e no painel.
+    /// </summary>
+    public static class RiscoClassificado
+    {
+        /// <summary>Processo sem classificação de riscos (checklist nulo).</summary>
+        public const string NaoClassificado = "Não classificado";
+
+        public static readonly string[] Todos = PgiaDominios.ResultadoRisco.Todos;
+    }
+
+    /// <summary>
+    /// Nível de um risco declarado — DERIVADO da célula da matriz da CGDF (5 × 5),
+    /// nunca gravado. Fonte única do cálculo: <c>CtrClassificacaoRisco.CalcularNivel</c>.
+    /// Escala PARALELA ao risco classificado (não se misturam). Ordem crescente.
+    /// </summary>
+    public static class NivelRisco
+    {
+        public const string Baixo = "Baixo";     // verde
+        public const string Medio = "Médio";     // amarelo
+        public const string Alto = "Alto";       // laranja
+        public const string Extremo = "Extremo"; // vermelho
+
+        /// <summary>Rótulo de ausência (filtro e painel): processo sem risco declarado.</summary>
+        public const string SemRiscosDeclarados = "Sem riscos declarados";
+
+        public static readonly string[] Todos = { Baixo, Medio, Alto, Extremo };
     }
 
     /// <summary>

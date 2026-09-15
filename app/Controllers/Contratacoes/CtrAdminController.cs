@@ -8,7 +8,7 @@ using service.Interface;
 namespace Controllers.Contratacoes;
 
 /// <summary>
-/// Administração do módulo Análises de Contratações: atribuição do papel de acesso.
+/// Administração do módulo Supervisão Contínua das Contratações: atribuição do papel de acesso.
 /// Restrito ao perfil admin do SGDP (mesmo padrão do PgiaAdminController).
 /// </summary>
 [ApiController]

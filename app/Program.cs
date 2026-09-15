@@ -101,7 +101,7 @@ builder.Services.AddScoped<IPgiaRelatorioRepositorio, Repositorio.Pgia.PgiaRelat
 builder.Services.AddScoped<IPgiaPublicoRepositorio, Repositorio.Pgia.PgiaPublicoRepositorio>();
 builder.Services.AddScoped<IPgiaDocumentoRepositorio, Repositorio.Pgia.PgiaDocumentoRepositorio>();
 
-// Repositório do módulo Análises de Contratações
+// Repositório do módulo Supervisão Contínua das Contratações
 builder.Services.AddScoped<ICtrProcessoRepositorio, Repositorio.Contratacoes.CtrProcessoRepositorio>();
 
 // Serviços
@@ -126,7 +126,7 @@ builder.Services.AddScoped<IPgiaDocumentoService, service.Pgia.PgiaDocumentoServ
 // só registrar outra implementação de IPgiaArquivoStorage aqui.
 builder.Services.AddScoped<IPgiaArquivoStorage, service.Pgia.PgiaArquivoStorage>();
 
-// Serviços do módulo Análises de Contratações
+// Serviços do módulo Supervisão Contínua das Contratações
 builder.Services.AddScoped<ICtrPermissionService, service.Contratacoes.CtrPermissionService>();
 builder.Services.AddScoped<ICtrAdminService, service.Contratacoes.CtrAdminService>();
 builder.Services.AddScoped<ICtrProcessoService, service.Contratacoes.CtrProcessoService>();

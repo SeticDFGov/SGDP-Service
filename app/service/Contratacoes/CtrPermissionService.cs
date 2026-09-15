@@ -6,7 +6,7 @@ using service.Interface;
 namespace service.Contratacoes;
 
 /// <summary>
-/// Contexto do usuário no módulo Análises de Contratações. O papel efetivo considera
+/// Contexto do usuário no módulo Supervisão Contínua das Contratações. O papel efetivo considera
 /// o perfil admin do SGDP (acesso total) e, fora isso, apenas Users.PapelContratacoes.
 /// </summary>
 public class CtrUserContext
@@ -39,7 +39,7 @@ public static class CtrResources
 }
 
 /// <summary>
-/// Autorização do módulo Análises de Contratações, espelhando o desenho do
+/// Autorização do módulo Supervisão Contínua das Contratações, espelhando o desenho do
 /// PgiaPermissionService (papel + ação + recurso) sem tocar no PermissionService
 /// do SGDP. Sem recorte por órgão: é ferramenta interna da equipe central.
 /// Todo endpoint valida no backend; a checagem do front é só usabilidade.

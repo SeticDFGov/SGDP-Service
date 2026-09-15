@@ -366,37 +366,38 @@ public class CtrEsclarecimentosPendenciasTest : CtrTestBase
         Assert.Null(processo.EsclarecimentoRespondidoEm);
     }
 
-    // ══ A2. Pendências identificadas pelo TCDF ════════════════════════════════
+    // ══ A2. Esclarecimentos Adicionais (antes "Pendências identificadas pelo TCDF") ══
+    // Renomeado de ponta a ponta na rodada da Supervisão Contínua; semântica intacta.
 
     [Fact]
-    public async Task Manifestacao_GravaEDevolveAsPendenciasDoTcdf()
+    public async Task Manifestacao_GravaEDevolveOsEsclarecimentosAdicionais()
     {
         var ctx = await ContextoAnalistaAsync();
         var processo = SemearProcesso("04044-00000340/2026-11", p => p.ChegadaSgdi = DiasAtras(20));
 
         var dto = NovaManifestacaoIncisoI();
-        dto.PendenciasTcdf = "  Ausência de pesquisa de preços e de estudo técnico preliminar.  ";
+        dto.EsclarecimentosAdicionais = "  Ausência de pesquisa de preços e de estudo técnico preliminar.  ";
 
         var criada = await _manifestacoes.CriarAsync(processo.Id, dto, ctx);
 
-        Assert.Equal("Ausência de pesquisa de preços e de estudo técnico preliminar.", criada.PendenciasTcdf);
+        Assert.Equal("Ausência de pesquisa de preços e de estudo técnico preliminar.", criada.EsclarecimentosAdicionais);
 
         // Vale também no inciso II (sem CHECK condicional)
         var dtoII = NovaManifestacaoIncisoII();
-        dtoII.PendenciasTcdf = "Contratação não constava do portfólio.";
+        dtoII.EsclarecimentosAdicionais = "Contratação não constava do portfólio.";
         var incisoII = await _manifestacoes.CriarAsync(processo.Id, dtoII, ctx);
-        Assert.Equal("Contratação não constava do portfólio.", incisoII.PendenciasTcdf);
+        Assert.Equal("Contratação não constava do portfólio.", incisoII.EsclarecimentosAdicionais);
 
         // Texto em branco normaliza para nulo
         var vazio = NovaManifestacaoIncisoI();
         vazio.OficioTcdf = "999/2026-GAB";
-        vazio.PendenciasTcdf = "   ";
-        var semPendencias = await _manifestacoes.CriarAsync(processo.Id, vazio, ctx);
-        Assert.Null(semPendencias.PendenciasTcdf);
+        vazio.EsclarecimentosAdicionais = "   ";
+        var semEsclarecimentos = await _manifestacoes.CriarAsync(processo.Id, vazio, ctx);
+        Assert.Null(semEsclarecimentos.EsclarecimentosAdicionais);
     }
 
     [Fact]
-    public async Task DespachoPdf_NaoImprimeAsPendenciasDoTcdf()
+    public async Task DespachoPdf_NaoImprimeOsEsclarecimentosAdicionais()
     {
         // Mesma decisão da Observação e do status: o template do TCDF não tem o campo
         var ctx = await ContextoAnalistaAsync();
@@ -405,9 +406,9 @@ public class CtrEsclarecimentosPendenciasTest : CtrTestBase
         var criada = await _manifestacoes.CriarAsync(processo.Id, NovaManifestacaoIncisoI(), ctx);
         var pdfSem = await _manifestacoes.GerarDespachoPdfAsync(criada.Id, "Brasília", "Fulano", "Diretor");
 
-        var comPendencias = NovaManifestacaoIncisoI();
-        comPendencias.PendenciasTcdf = "Ausência de pesquisa de preços e de estudo técnico preliminar.";
-        await _manifestacoes.AtualizarAsync(criada.Id, comPendencias, ctx);
+        var comEsclarecimentos = NovaManifestacaoIncisoI();
+        comEsclarecimentos.EsclarecimentosAdicionais = "Ausência de pesquisa de preços e de estudo técnico preliminar.";
+        await _manifestacoes.AtualizarAsync(criada.Id, comEsclarecimentos, ctx);
         var pdfCom = await _manifestacoes.GerarDespachoPdfAsync(criada.Id, "Brasília", "Fulano", "Diretor");
 
         Assert.Equal(pdfSem.Length, pdfCom.Length);

@@ -18,7 +18,7 @@ namespace Controllers;
 /// então este controller nunca opera em produção.
 ///
 /// Além de emitir o token, provisiona o usuário de teste: papel PGIA, papel do
-/// módulo Análises de Contratações, unidade e um Órgão de Teste (com os prazos de
+/// módulo Supervisão Contínua das Contratações, unidade e um Órgão de Teste (com os prazos de
 /// adesão, via o serviço real) — para as personas da tela /auth/local entrarem
 /// direto na visão de cada papel.
 /// Usa o AppDbContext diretamente de propósito: é ferramenta de teste, e criar
@@ -65,7 +65,7 @@ public class AuthLocalController : ControllerBase
         // persona de agente público do art. 13, que precisa pertencer a um órgão).
         public bool VincularAoOrgaoDeTeste { get; set; }
 
-        // Papel do módulo Análises de Contratações (ctr_analise). Mesma semântica
+        // Papel do módulo Supervisão Contínua das Contratações (ctr_analise). Mesma semântica
         // do PapelPgia: ausente/null não mexe no papel já existente.
         public string? PapelContratacoes { get; set; }
     }
@@ -89,7 +89,7 @@ public class AuthLocalController : ControllerBase
             return BadRequest("Papel PGIA inválido (pgia_orgao, pgia_sgdi, pgia_cgtic ou pgia_auditoria).");
 
         if (!PapeisContratacoes.EhValido(request.PapelContratacoes))
-            return BadRequest("Papel de análise de contratações inválido (use ctr_analise ou deixe vazio).");
+            return BadRequest("Papel de supervisão contínua das contratações inválido (use ctr_analise ou deixe vazio).");
 
         await ProvisionarUsuarioDeTesteAsync(request);
 

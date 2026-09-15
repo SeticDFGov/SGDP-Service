@@ -24,9 +24,11 @@ public class CtrManifestacaoTcdf
     // CtrDominios.SituacaoPortfolio — inciso I ou II do despacho
     public string SituacaoPortfolio { get; set; } = string.Empty;
 
-    // O que o Tribunal apontou naquela comunicação. Vale em QUALQUER inciso e com
-    // qualquer resultado (sem CHECK condicional) e NÃO entra no corpo do despacho.
-    public string? PendenciasTcdf { get; set; }
+    // Esclarecimentos adicionais sobre aquela comunicação (antes "Pendências
+    // identificadas pelo TCDF"; coluna renomeada com os dados preservados). Vale em
+    // QUALQUER inciso e com qualquer resultado (sem CHECK condicional) e NÃO entra
+    // no corpo do despacho.
+    public string? EsclarecimentosAdicionais { get; set; }
 
     // CtrDominios.StatusTcdf — fato do Tribunal (suspensão, revogação do edital),
     // válido em QUALQUER inciso. Tem precedência no estágio derivado e NÃO entra

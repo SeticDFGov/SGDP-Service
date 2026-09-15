@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace api.Contratacoes;
 
 /// <summary>
-/// Atribuição do papel do módulo Análises de Contratações a um usuário
+/// Atribuição do papel do módulo Supervisão Contínua das Contratações a um usuário
 /// (PUT api/contratacoes/admin/papel). PapelContratacoes nulo remove o papel.
 /// O Perfil do SGDP nunca é tocado.
 /// </summary>

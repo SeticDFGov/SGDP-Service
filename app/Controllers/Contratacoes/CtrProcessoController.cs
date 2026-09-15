@@ -17,6 +17,12 @@ namespace Controllers.Contratacoes;
 [Route("api/contratacoes/processo")]
 public class CtrProcessoController : ControllerBase
 {
+    /// <summary>
+    /// Nome do arquivo do export — segue o nome exibido do módulo ("Supervisão Contínua
+    /// das Contratações"); rota, API e prefixo técnicos não mudaram.
+    /// </summary>
+    public const string NomeArquivoExportacao = "supervisao-continua-contratacoes.csv";
+
     private readonly ICtrProcessoService _service;
     private readonly ICtrManifestacaoService _manifestacaoService;
     private readonly ICtrPermissionService _permissionService;
@@ -83,7 +89,7 @@ public class CtrProcessoController : ControllerBase
         if (!_permissionService.CanView(ctx, CtrResources.Processo)) return Forbid();
 
         var bytes = await _service.ExportarCsvAsync(consulta);
-        return File(bytes, "text/csv; charset=utf-8", "analises-contratacoes.csv");
+        return File(bytes, "text/csv; charset=utf-8", NomeArquivoExportacao);
     }
 
     /// <summary>

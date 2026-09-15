@@ -49,9 +49,10 @@ namespace Models
         public DbSet<PgiaAuditoriaTecnica> PgiaAuditoriasTecnicas { get; set; }
         public DbSet<PgiaSolicitacaoCidadao> PgiaSolicitacoesCidadao { get; set; }
 
-        // Módulo Análises de Contratações — tabelas com prefixo ctr_
+        // Módulo Supervisão Contínua das Contratações — tabelas com prefixo ctr_
         public DbSet<CtrProcesso> CtrProcessos { get; set; }
         public DbSet<CtrManifestacaoTcdf> CtrManifestacoesTcdf { get; set; }
+        public DbSet<CtrRiscoDeclarado> CtrRiscosDeclarados { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -83,7 +84,7 @@ namespace Models
             // Módulo PGIA: mapeamento isolado em PgiaModelConfiguration
             modelBuilder.ApplyPgiaConfiguration(Database.IsNpgsql());
 
-            // Módulo Análises de Contratações: mapeamento isolado em CtrModelConfiguration
+            // Módulo Supervisão Contínua das Contratações: mapeamento isolado em CtrModelConfiguration
             modelBuilder.ApplyCtrConfiguration(Database.IsNpgsql());
         }
     }

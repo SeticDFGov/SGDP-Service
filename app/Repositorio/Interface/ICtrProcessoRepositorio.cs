@@ -3,8 +3,9 @@ using Models.Contratacoes;
 namespace Repositorio.Interface;
 
 /// <summary>
-/// Acesso a dados do módulo Análises de Contratações (processos e manifestações
-/// ao TCDF — o mesmo agregado, por isso um repositório só).
+/// Acesso a dados do módulo Supervisão Contínua das Contratações (processos,
+/// manifestações ao TCDF e riscos declarados — o mesmo agregado, por isso um
+/// repositório só).
 /// </summary>
 public interface ICtrProcessoRepositorio
 {
@@ -49,6 +50,22 @@ public interface ICtrProcessoRepositorio
     Task<List<long>> ListarProcessosComIncisoIAsync();
 
     void AddManifestacao(CtrManifestacaoTcdf manifestacao);
+
+    /// <summary>Riscos declarados de UM processo (entidades rastreadas), por Id.</summary>
+    Task<List<CtrRiscoDeclarado>> ListarRiscosDeclaradosAsync(long processoId);
+
+    /// <summary>
+    /// Probabilidade e consequência dos riscos dos processos informados, em UMA consulta
+    /// e sem os textos longos (nível máximo da listagem sem N+1).
+    /// </summary>
+    Task<List<CtrEscalaRiscoDeclarado>> ListarEscalasDeRiscoPorProcessosAsync(IReadOnlyCollection<long> processoIds);
+
+    /// <summary>Mesma projeção para todos os processos ATIVOS (painel), em UMA consulta.</summary>
+    Task<List<CtrEscalaRiscoDeclarado>> ListarEscalasDeRiscoDeProcessosAtivosAsync();
+
+    void AddRiscoDeclarado(CtrRiscoDeclarado risco);
+
+    void RemoverRiscosDeclarados(IEnumerable<CtrRiscoDeclarado> riscos);
 
     Task SaveChangesAsync();
 }
