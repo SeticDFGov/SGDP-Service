@@ -71,7 +71,7 @@ public enum ErrorCode
     PgiaSolicitacaoInvalida = 701,
     PgiaSistemaNaoPublicado = 702,
 
-    // Módulo Análises de Contratações (faixa 8xx)
+    // Módulo Supervisão Contínua das Contratações (faixa 8xx)
     CtrProcessoNaoEncontrado = 800,
     CtrProcessoInvalido = 801,
     CtrProcessoDuplicado = 802,
@@ -82,4 +82,6 @@ public enum ErrorCode
     CtrPapelInvalido = 807,
     CtrUsuarioNaoEncontrado = 808,
     CtrDominioInvalido = 809,
+    // Classificação de riscos do processo (completude, riscos declarados, ciclo de vida)
+    CtrClassificacaoRiscoInvalida = 810,
 }

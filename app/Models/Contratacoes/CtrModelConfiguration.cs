@@ -1,9 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Models.Pgia;
 
 namespace Models.Contratacoes;
 
 /// <summary>
-/// Mapeamento EF das tabelas do módulo Análises de Contratações: prefixo ctr_,
+/// Mapeamento EF das tabelas do módulo Supervisão Contínua das Contratações: prefixo ctr_,
 /// colunas snake_case e CHECKs reproduzindo os domínios de <see cref="CtrDominios"/>.
 /// Nomes de constraints e índices levam o prefixo ctr para facilitar a revisão do
 /// script de migration (mesmo padrão do PgiaModelConfiguration).
@@ -48,6 +49,17 @@ public static class CtrModelConfiguration
                     "(esclarecimento_solicitado_em IS NULL AND esclarecimento_descricao IS NULL "
                     + "AND esclarecimento_respondido_em IS NULL) OR "
                     + "(esclarecimento_solicitado_em IS NOT NULL AND esclarecimento_descricao IS NOT NULL)");
+                // Mesmos quatro resultados do PGIA (fonte única: PgiaDominios.ResultadoRisco)
+                t.HasCheckConstraint("ck_ctr_processo_risco_classificado",
+                    "risco_classificado IS NULL OR "
+                    + EmLista("risco_classificado", PgiaDominios.ResultadoRisco.Todos));
+                // Classificação é tudo ou nada: sem checklist não há resultado, pontuação
+                // nem instante; com checklist, os três vêm juntos
+                t.HasCheckConstraint("ck_ctr_processo_classificacao",
+                    "(checklist_risco IS NULL AND risco_classificado IS NULL AND pontuacao_risco IS NULL "
+                    + "AND risco_classificado_em IS NULL) OR "
+                    + "(checklist_risco IS NOT NULL AND risco_classificado IS NOT NULL AND pontuacao_risco IS NOT NULL "
+                    + "AND risco_classificado_em IS NOT NULL)");
             });
 
             entity.HasKey(p => p.Id).HasName("pk_ctr_processo");
@@ -74,6 +86,12 @@ public static class CtrModelConfiguration
             entity.Property(p => p.EsclarecimentoSolicitadoEm).HasColumnName("esclarecimento_solicitado_em");
             entity.Property(p => p.EsclarecimentoDescricao).HasColumnName("esclarecimento_descricao");
             entity.Property(p => p.EsclarecimentoRespondidoEm).HasColumnName("esclarecimento_respondido_em");
+            entity.Property(p => p.ChecklistRisco).HasColumnName("checklist_risco").HasColumnType("jsonb");
+            entity.Property(p => p.RiscoClassificado).HasColumnName("risco_classificado").HasMaxLength(20);
+            entity.Property(p => p.EnquadramentoRisco).HasColumnName("enquadramento_risco").HasMaxLength(20);
+            entity.Property(p => p.PontuacaoRisco).HasColumnName("pontuacao_risco");
+            entity.Property(p => p.RiscoClassificadoEm).HasColumnName("risco_classificado_em");
+            entity.Property(p => p.RiscoClassificadoPor).HasColumnName("risco_classificado_por").HasMaxLength(200);
             entity.Property(p => p.Restituido).HasColumnName("restituido").HasDefaultValue(false);
             entity.Property(p => p.RestituidoEm).HasColumnName("restituido_em");
             entity.Property(p => p.RestituidoMotivo).HasColumnName("restituido_motivo");
@@ -139,7 +157,7 @@ public static class CtrModelConfiguration
             entity.Property(m => m.OficioTcdf).HasColumnName("oficio_tcdf").HasMaxLength(60).IsRequired();
             entity.Property(m => m.DataOficio).HasColumnName("data_oficio");
             entity.Property(m => m.SituacaoPortfolio).HasColumnName("situacao_portfolio").HasMaxLength(30).IsRequired();
-            entity.Property(m => m.PendenciasTcdf).HasColumnName("pendencias_tcdf");
+            entity.Property(m => m.EsclarecimentosAdicionais).HasColumnName("esclarecimentos_adicionais");
             entity.Property(m => m.StatusTcdf).HasColumnName("status_tcdf").HasMaxLength(30);
             entity.Property(m => m.ComunicadaDesde).HasColumnName("comunicada_desde");
             entity.Property(m => m.ResultadoAnalise).HasColumnName("resultado_analise").HasMaxLength(30);
@@ -161,6 +179,41 @@ public static class CtrModelConfiguration
                 .HasForeignKey(m => m.ProcessoId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_ctr_manifestacao_processo");
+        });
+
+        modelBuilder.Entity<CtrRiscoDeclarado>(entity =>
+        {
+            entity.ToTable("ctr_risco_declarado", t =>
+            {
+                // Escala COMPLETA da CGDF — diferente do grupo "Outros" do PGIA, que
+                // aceita só o quadrante baixo (o service valida antes, com mensagem)
+                t.HasCheckConstraint("ck_ctr_risco_declarado_probabilidade",
+                    EmLista("probabilidade", PgiaDominios.EscalaCgdf.Probabilidade.Todos));
+                t.HasCheckConstraint("ck_ctr_risco_declarado_consequencia",
+                    EmLista("consequencia", PgiaDominios.EscalaCgdf.Consequencia.Todos));
+            });
+
+            entity.HasKey(r => r.Id).HasName("pk_ctr_risco_declarado");
+            entity.Property(r => r.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(r => r.ProcessoId).HasColumnName("processo_id");
+            entity.Property(r => r.DescricaoRisco).HasColumnName("descricao_risco").IsRequired();
+            entity.Property(r => r.AcaoMitigacao).HasColumnName("acao_mitigacao").IsRequired();
+            entity.Property(r => r.ResponsavelNome).HasColumnName("responsavel_nome").HasMaxLength(200).IsRequired();
+            entity.Property(r => r.ResponsavelEmail).HasColumnName("responsavel_email").HasMaxLength(200).IsRequired();
+            entity.Property(r => r.Probabilidade).HasColumnName("probabilidade").HasMaxLength(15).IsRequired();
+            entity.Property(r => r.Consequencia).HasColumnName("consequencia").HasMaxLength(15).IsRequired();
+            entity.Property(r => r.CriadoEm).HasColumnName("criado_em").HasDefaultValueSql("NOW()");
+            entity.Property(r => r.CriadoPor).HasColumnName("criado_por").HasMaxLength(200).IsRequired();
+
+            entity.HasIndex(r => r.ProcessoId).HasDatabaseName("ix_ctr_risco_declarado_processo");
+
+            // CASCADE: os riscos declarados são parte da classificação do processo
+            // (como pgia_risco_outro), não peça autônoma
+            entity.HasOne(r => r.Processo)
+                .WithMany(p => p.RiscosDeclarados)
+                .HasForeignKey(r => r.ProcessoId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_ctr_risco_declarado_processo");
         });
     }
 }

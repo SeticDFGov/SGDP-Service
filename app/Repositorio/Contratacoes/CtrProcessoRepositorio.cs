@@ -82,5 +82,33 @@ public class CtrProcessoRepositorio : ICtrProcessoRepositorio
     public void AddManifestacao(CtrManifestacaoTcdf manifestacao) =>
         _context.CtrManifestacoesTcdf.Add(manifestacao);
 
+    public async Task<List<CtrRiscoDeclarado>> ListarRiscosDeclaradosAsync(long processoId) =>
+        await _context.CtrRiscosDeclarados
+            .Where(r => r.ProcessoId == processoId)
+            .OrderBy(r => r.Id)
+            .ToListAsync();
+
+    public async Task<List<CtrEscalaRiscoDeclarado>> ListarEscalasDeRiscoPorProcessosAsync(
+        IReadOnlyCollection<long> processoIds)
+    {
+        if (processoIds.Count == 0) return new List<CtrEscalaRiscoDeclarado>();
+
+        return await _context.CtrRiscosDeclarados
+            .Where(r => processoIds.Contains(r.ProcessoId))
+            .Select(r => new CtrEscalaRiscoDeclarado(r.ProcessoId, r.Probabilidade, r.Consequencia))
+            .ToListAsync();
+    }
+
+    public async Task<List<CtrEscalaRiscoDeclarado>> ListarEscalasDeRiscoDeProcessosAtivosAsync() =>
+        await _context.CtrRiscosDeclarados
+            .Where(r => r.Processo!.Ativo)
+            .Select(r => new CtrEscalaRiscoDeclarado(r.ProcessoId, r.Probabilidade, r.Consequencia))
+            .ToListAsync();
+
+    public void AddRiscoDeclarado(CtrRiscoDeclarado risco) => _context.CtrRiscosDeclarados.Add(risco);
+
+    public void RemoverRiscosDeclarados(IEnumerable<CtrRiscoDeclarado> riscos) =>
+        _context.CtrRiscosDeclarados.RemoveRange(riscos);
+
     public async Task SaveChangesAsync() => await _context.SaveChangesAsync();
 }

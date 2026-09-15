@@ -42,6 +42,18 @@ public class CtrPainelResponse
     /// <summary>As 2 fases (CtrDominios.Fase), mesmo as com zero.</summary>
     public List<CtrContagem> PorFase { get; set; } = new();
 
+    /// <summary>
+    /// Os 4 resultados da classificação + "Não classificado", sempre presentes
+    /// (quantidade desc; empate pela ordem do domínio).
+    /// </summary>
+    public List<CtrContagem> PorRiscoClassificado { get; set; } = new();
+
+    /// <summary>
+    /// Nível MÁXIMO declarado por processo: Baixo, Médio, Alto, Extremo + "Sem riscos
+    /// declarados", sempre presentes (mesma regra de ordem).
+    /// </summary>
+    public List<CtrContagem> PorNivelRiscoDeclarado { get; set; } = new();
+
     public List<CtrContagem> PorCategoria { get; set; } = new();
 
     public List<CtrContagem> PorOrgao { get; set; } = new();

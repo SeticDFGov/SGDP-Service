@@ -1,7 +1,7 @@
 namespace app.Auth;
 
 /// <summary>
-/// Papéis do módulo Análises de Contratações, guardados em Users.PapelContratacoes.
+/// Papéis do módulo Supervisão Contínua das Contratações, guardados em Users.PapelContratacoes.
 /// Não são perfis do SGDP nem roles do Keycloak — espelho de <see cref="PapeisPgia"/>.
 /// </summary>
 public static class PapeisContratacoes

@@ -10,7 +10,7 @@ using service.Contratacoes;
 namespace test.contratacoes;
 
 /// <summary>
-/// Base dos testes do módulo Análises de Contratações: AppDbContext InMemory com
+/// Base dos testes do módulo Supervisão Contínua das Contratações: AppDbContext InMemory com
 /// um usuário por situação de acesso relevante (admin, analista com o papel,
 /// básico sem papel e gestor sem papel) e helpers de fixture.
 ///

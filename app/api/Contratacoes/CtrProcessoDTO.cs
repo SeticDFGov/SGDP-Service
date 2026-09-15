@@ -32,6 +32,18 @@ public class CtrProcessoFiltro : PagedRequest
     /// <summary>true = só os que aguardam esclarecimento; false = só os sem pendência; null = todos.</summary>
     public bool? EsclarecimentoPendente { get; set; }
 
+    /// <summary>
+    /// Um dos quatro resultados (PgiaDominios.ResultadoRisco) ou "Não classificado".
+    /// Fora do domínio, lista vazia.
+    /// </summary>
+    public string? RiscoClassificado { get; set; }
+
+    /// <summary>
+    /// Nível MÁXIMO entre os riscos declarados (Baixo/Médio/Alto/Extremo) ou "Sem riscos
+    /// declarados" — predicado EF sobre os pares da matriz. Fora do domínio, lista vazia.
+    /// </summary>
+    public string? NivelRiscoDeclarado { get; set; }
+
     public string? Sigla { get; set; }
 
     /// <summary>true = só restituídos; false = só não restituídos; null = todos.</summary>
@@ -113,11 +125,114 @@ public class CtrProcessoCreateDTO
     public string? RestituidoMotivo { get; set; }
 
     public string? Observacao { get; set; }
+
+    /// <summary>
+    /// Classificação de riscos (arts. 15 a 17 + riscos declarados). Na CRIAÇÃO, nula =
+    /// processo não classificado. Na EDIÇÃO, nula PRESERVA a gravada (ausência nunca
+    /// apaga); enviada, é validada por inteiro, recalculada e substitui a anterior,
+    /// inclusive a lista de riscos declarados. Importação e checkpoint não a tocam.
+    /// </summary>
+    public CtrClassificacaoRiscoDTO? ClassificacaoRisco { get; set; }
 }
 
-/// <summary>Edição de processo — mesma forma do create.</summary>
+/// <summary>Edição de processo — mesma forma do create, mais o pedido de remoção da classificação.</summary>
 public class CtrProcessoUpdateDTO : CtrProcessoCreateDTO
 {
+    /// <summary>
+    /// true REMOVE a classificação gravada (checklist, resultado, enquadramento, pontuação,
+    /// auditoria e riscos declarados). Enviar junto de ClassificacaoRisco é recusado.
+    /// </summary>
+    public bool LimparClassificacaoRisco { get; set; }
+}
+
+/// <summary>
+/// Classificação de riscos enviada no cadastro/edição do processo (CtrClassificacaoRiscoForm
+/// no front): o questionário do PGIA — cada grupo com incisos marcados XOR "Nenhuma das
+/// alternativas acima" — e os riscos declarados pela matriz completa da CGDF.
+/// </summary>
+public class CtrClassificacaoRiscoDTO
+{
+    /// <summary>Incisos do art. 15 (PgiaDominios.ChecklistIncisos.Art15).</summary>
+    public List<string> Q15 { get; set; } = new();
+
+    /// <summary>Incisos do art. 16.</summary>
+    public List<string> Q16 { get; set; } = new();
+
+    /// <summary>Incisos do art. 17.</summary>
+    public List<string> Q17 { get; set; } = new();
+
+    public bool Q15Nenhuma { get; set; }
+
+    public bool Q16Nenhuma { get; set; }
+
+    public bool Q17Nenhuma { get; set; }
+
+    /// <summary>Obrigatório (ao menos um) quando os três grupos estão em "nenhuma". Até 20.</summary>
+    [MaxLength(20)]
+    public List<CtrRiscoDeclaradoDTO> RiscosDeclarados { get; set; } = new();
+}
+
+/// <summary>Risco declarado da contratação (CtrRiscoDeclaradoForm no front).</summary>
+public class CtrRiscoDeclaradoDTO
+{
+    [StringLength(4000)]
+    public string DescricaoRisco { get; set; } = string.Empty;
+
+    [StringLength(4000)]
+    public string AcaoMitigacao { get; set; } = string.Empty;
+
+    [StringLength(200)]
+    public string ResponsavelNome { get; set; } = string.Empty;
+
+    /// <summary>Validado pela regra do PGIA e gravado com trim e em minúsculas.</summary>
+    [StringLength(200)]
+    public string ResponsavelEmail { get; set; } = string.Empty;
+
+    /// <summary>Escala COMPLETA da CGDF: Improvável, Raro, Possível, Provável, Quase certo.</summary>
+    [StringLength(15)]
+    public string Probabilidade { get; set; } = string.Empty;
+
+    /// <summary>Escala COMPLETA da CGDF: Desprezível, Menor, Moderada, Maior, Catastrófica.</summary>
+    [StringLength(15)]
+    public string Consequencia { get; set; } = string.Empty;
+}
+
+public class CtrRiscoDeclaradoResponse : CtrRiscoDeclaradoDTO
+{
+    public long Id { get; set; }
+
+    /// <summary>Derivado da célula da matriz da CGDF (Baixo/Médio/Alto/Extremo); nunca gravado.</summary>
+    public string Nivel { get; set; } = string.Empty;
+}
+
+/// <summary>Classificação de riscos gravada no processo (só nas leituras de UM processo).</summary>
+public class CtrClassificacaoRiscoResponse
+{
+    public List<string> Q15 { get; set; } = new();
+
+    public List<string> Q16 { get; set; } = new();
+
+    public List<string> Q17 { get; set; } = new();
+
+    public bool Q15Nenhuma { get; set; }
+
+    public bool Q16Nenhuma { get; set; }
+
+    public bool Q17Nenhuma { get; set; }
+
+    /// <summary>PgiaDominios.ResultadoRisco, recalculado no servidor.</summary>
+    public string RiscoClassificado { get; set; } = string.Empty;
+
+    /// <summary>"art. 16, II"; nulo em Baixo Risco.</summary>
+    public string? EnquadramentoRisco { get; set; }
+
+    public int PontuacaoRisco { get; set; }
+
+    public DateTime ClassificadoEm { get; set; }
+
+    public string? ClassificadoPor { get; set; }
+
+    public List<CtrRiscoDeclaradoResponse> RiscosDeclarados { get; set; } = new();
 }
 
 /// <summary>
@@ -208,6 +323,21 @@ public class CtrProcessoResponse
 
     /// <summary>Estágio da manifestação mais recente ao TCDF.</summary>
     public string? UltimoEstagioTcdf { get; set; }
+
+    /// <summary>Resultado da classificação de riscos; nulo = não classificado. Vem em todas as leituras.</summary>
+    public string? RiscoClassificado { get; set; }
+
+    /// <summary>
+    /// Maior nível entre os riscos declarados (derivado da matriz); nulo quando não há
+    /// nenhum. Vem em todas as leituras — na lista, resolvido EM LOTE.
+    /// </summary>
+    public string? NivelMaximoRiscoDeclarado { get; set; }
+
+    /// <summary>
+    /// Classificação completa: SÓ nas leituras e escritas de UM processo (GET {id}, POST,
+    /// PUT e checkpoint); nula na lista, no painel e quando o processo não é classificado.
+    /// </summary>
+    public CtrClassificacaoRiscoResponse? ClassificacaoRisco { get; set; }
 
     public DateTime CriadoEm { get; set; }
 

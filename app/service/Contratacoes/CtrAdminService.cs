@@ -23,7 +23,7 @@ public class CtrAdminService : ICtrAdminService
     {
         if (!PapeisContratacoes.EhValido(dto.PapelContratacoes))
             throw new ApiException(ErrorCode.CtrPapelInvalido,
-                $"Papel inválido para o módulo Análises de Contratações: {dto.PapelContratacoes}");
+                $"Papel inválido para o módulo Supervisão Contínua das Contratações: {dto.PapelContratacoes}");
 
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email)
             ?? throw new ApiException(ErrorCode.CtrUsuarioNaoEncontrado);
