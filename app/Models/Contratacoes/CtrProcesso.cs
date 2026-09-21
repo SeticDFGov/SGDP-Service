@@ -70,31 +70,34 @@ public class CtrProcesso
 
     public DateOnly? EsclarecimentoRespondidoEm { get; set; }
 
-    // ── Classificação de riscos (arts. 15 a 17 do Decreto nº 48.901/2026) ────
-    // Opcional no todo, completa quando presente: checklist NULO = processo não
-    // classificado (importados e os do cadastro rápido do TCDF nascem assim). Estado
-    // atual, sem histórico; resultado, enquadramento e pontuação são recalculados no
-    // servidor a cada envio (CtrClassificacaoRisco). Independente da Criticidade.
+    // ── LEGADO: questionário dos arts. 15 a 17 do Decreto nº 48.901/2026 ─────
+    // Sem uso desde 2026-09-21: a classificação de riscos do processo passou a ser só a
+    // lista de riscos da contratação (RiscosDeclarados). Estas seis colunas continuam no
+    // banco, sem migration (processos classificados antes guardam o questionário do PGIA
+    // aqui), nada as lê e elas são zeradas juntas quando os riscos do processo são
+    // alterados ou limpos. O CHECK ck_ctr_processo_classificacao (tudo ou nada) segue
+    // valendo, por isso RiscoClassificadoEm/Por não servem mais para registrar quem
+    // mexeu nos riscos: isso sai de CtrRiscoDeclarado.CriadoEm/CriadoPor. Remover numa
+    // migration própria.
 
     // jsonb no formato de pgia_classificacao_risco.respostas_checklist
-    // (q15/q16/q17 + q15_nenhuma/q16_nenhuma/q17_nenhuma)
     public string? ChecklistRisco { get; set; }
 
-    // PgiaDominios.ResultadoRisco (Risco Excessivo, Alto Risco, Risco Moderado, Baixo Risco)
+    // PgiaDominios.ResultadoRisco
     public string? RiscoClassificado { get; set; }
 
-    // "art. 16, II" — primeiro inciso marcado na ordem do artigo; nulo em Baixo Risco
     public string? EnquadramentoRisco { get; set; }
 
-    // Soma dos pesos dos incisos marcados (PgiaQuesitos.CalcularPontuacao)
     public int? PontuacaoRisco { get; set; }
 
-    // Instante e autor (e-mail) da última classificação enviada
     public DateTime? RiscoClassificadoEm { get; set; }
 
     public string? RiscoClassificadoPor { get; set; }
 
-    // Riscos declarados pela matriz COMPLETA da CGDF; fazem parte da classificação
+    // ── Riscos da contratação ─────────────────────────────────────────────────
+    // A classificação de riscos do processo: cada risco na matriz COMPLETA da CGDF.
+    // Opcional (importados e os do cadastro rápido do TCDF nascem sem riscos); estado
+    // atual, sem histórico; independente da Criticidade.
     public ICollection<CtrRiscoDeclarado> RiscosDeclarados { get; set; } = new List<CtrRiscoDeclarado>();
 
     // Restituição ao órgão: conceito de primeira classe (hoje vive na Observação)

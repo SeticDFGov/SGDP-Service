@@ -43,14 +43,9 @@ public class CtrPainelResponse
     public List<CtrContagem> PorFase { get; set; } = new();
 
     /// <summary>
-    /// Os 4 resultados da classificação + "Não classificado", sempre presentes
-    /// (quantidade desc; empate pela ordem do domínio).
-    /// </summary>
-    public List<CtrContagem> PorRiscoClassificado { get; set; } = new();
-
-    /// <summary>
-    /// Nível MÁXIMO declarado por processo: Baixo, Médio, Alto, Extremo + "Sem riscos
-    /// declarados", sempre presentes (mesma regra de ordem).
+    /// Nível MÁXIMO dos riscos da contratação por processo: Baixo, Médio, Alto, Extremo +
+    /// "Sem riscos declarados", sempre presentes (quantidade desc; empate pela ordem do
+    /// domínio).
     /// </summary>
     public List<CtrContagem> PorNivelRiscoDeclarado { get; set; } = new();
 

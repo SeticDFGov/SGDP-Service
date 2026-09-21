@@ -1,5 +1,3 @@
-using Models.Pgia;
-
 namespace Models.Contratacoes;
 
 /// <summary>
@@ -162,22 +160,10 @@ public static class CtrDominios
     }
 
     /// <summary>
-    /// Risco classificado do processo: os MESMOS quatro valores do PGIA
-    /// (<see cref="PgiaDominios.ResultadoRisco"/>, fonte única, reutilizada sem cópia),
-    /// mais o rótulo de ausência usado no filtro e no painel.
-    /// </summary>
-    public static class RiscoClassificado
-    {
-        /// <summary>Processo sem classificação de riscos (checklist nulo).</summary>
-        public const string NaoClassificado = "Não classificado";
-
-        public static readonly string[] Todos = PgiaDominios.ResultadoRisco.Todos;
-    }
-
-    /// <summary>
-    /// Nível de um risco declarado — DERIVADO da célula da matriz da CGDF (5 × 5),
+    /// Nível de um risco da contratação: DERIVADO da célula da matriz da CGDF (5 × 5),
     /// nunca gravado. Fonte única do cálculo: <c>CtrClassificacaoRisco.CalcularNivel</c>.
-    /// Escala PARALELA ao risco classificado (não se misturam). Ordem crescente.
+    /// Ordem crescente. (O "risco classificado" pelo questionário do PGIA saiu do módulo
+    /// em 2026-09-21.)
     /// </summary>
     public static class NivelRisco
     {

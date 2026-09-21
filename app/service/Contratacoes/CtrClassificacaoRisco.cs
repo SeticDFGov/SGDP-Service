@@ -1,7 +1,5 @@
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using api.Contratacoes;
 using Models.Contratacoes;
 using Models.Pgia;
@@ -10,24 +8,22 @@ using service.Pgia;
 namespace service.Contratacoes;
 
 /// <summary>
-/// Classificação de riscos do processo — FONTE ÚNICA das regras do módulo: validação
-/// do envio, resultado e enquadramento, pontuação, nível de cada risco declarado pela
-/// matriz 5 × 5 da CGDF e os predicados EF dos filtros.
+/// Riscos da contratação: FONTE ÚNICA das regras da classificação de riscos do processo.
+/// Validação do envio, nível de cada risco pela matriz 5 × 5 da CGDF, nível máximo,
+/// reenvio idêntico e os predicados EF dos filtros.
 ///
-/// Reusa SÓ fontes estáticas de domínio do PGIA (PgiaQuesitos, ChecklistIncisos,
-/// ResultadoRisco, EscalaCgdf e PgiaValidacoes.EmailValido), sem alterar nada dele. A
-/// regra de resultado/enquadramento do PGIA é privada do PgiaSistemaService, por isso
-/// está REPLICADA aqui — a equivalência é provada por teste (CtrClassificacaoRiscoTest).
-/// Diferença deliberada: os riscos declarados aceitam a escala COMPLETA da CGDF (no
-/// PGIA o grupo "Outros" fica no quadrante baixo, porque lá os riscos altos já estão
-/// nos arts. 15 a 17).
+/// Desde 2026-09-21 a classificação é SÓ a lista de riscos da contratação. O questionário
+/// dos arts. 15 a 17 do Decreto nº 48.901/2026 (os riscos padrão do PGIA, feitos para
+/// sistemas de IA) saiu do módulo; as colunas dele em ctr_processo ficaram no banco, sem
+/// uso, e são zeradas quando os riscos do processo são alterados (ver CtrProcesso).
+///
+/// Reusa SÓ fontes estáticas de domínio do PGIA (EscalaCgdf e PgiaValidacoes.EmailValido),
+/// sem alterar nada dele. Os riscos aceitam a escala COMPLETA da CGDF (no PGIA o grupo
+/// "Outros" fica no quadrante baixo).
 /// </summary>
 public static class CtrClassificacaoRisco
 {
     public const int MaximoRiscosDeclarados = 20;
-
-    public const string MensagemTudoNenhuma =
-        "Como nenhuma das situações dos três grupos se aplica, declare ao menos um risco da contratação.";
 
     // ── Matriz da CGDF ────────────────────────────────────────────────────────
 
@@ -63,7 +59,7 @@ public static class CtrClassificacaoRisco
     };
 
     /// <summary>
-    /// Nível do risco declarado pela célula da matriz — FONTE ÚNICA, nunca gravado.
+    /// Nível do risco declarado pela célula da matriz. FONTE ÚNICA, nunca gravado.
     /// Null fora da escala (a validação recusa antes e o CHECK do banco também).
     /// </summary>
     public static string? CalcularNivel(string? probabilidade, string? consequencia)
@@ -99,121 +95,29 @@ public static class CtrClassificacaoRisco
         return pares;
     }
 
-    // ── Resultado, enquadramento e pontuação ──────────────────────────────────
-
-    /// <summary>
-    /// Réplica da regra do PGIA (PgiaSistemaService.AvaliarClassificacao): art. 15 vence o
-    /// 16, que vence o 17; sem inciso marcado, Baixo Risco sem enquadramento. O
-    /// enquadramento aponta o PRIMEIRO inciso na ordem do artigo, não o primeiro digitado.
-    /// </summary>
-    public static (string Resultado, string? Enquadramento) CalcularResultado(
-        IEnumerable<string>? q15, IEnumerable<string>? q16, IEnumerable<string>? q17)
-    {
-        var inciso15 = PrimeiroNaOrdemDoArtigo(q15, PgiaDominios.ChecklistIncisos.Art15);
-        if (inciso15 != null) return (PgiaDominios.ResultadoRisco.Excessivo, $"art. 15, {inciso15}");
-
-        var inciso16 = PrimeiroNaOrdemDoArtigo(q16, PgiaDominios.ChecklistIncisos.Art16);
-        if (inciso16 != null) return (PgiaDominios.ResultadoRisco.Alto, $"art. 16, {inciso16}");
-
-        var inciso17 = PrimeiroNaOrdemDoArtigo(q17, PgiaDominios.ChecklistIncisos.Art17);
-        if (inciso17 != null) return (PgiaDominios.ResultadoRisco.Moderado, $"art. 17, {inciso17}");
-
-        return (PgiaDominios.ResultadoRisco.Baixo, null);
-    }
-
-    private static string? PrimeiroNaOrdemDoArtigo(IEnumerable<string>? marcados, string[] validos)
-    {
-        if (marcados == null) return null;
-        var lista = marcados.ToList();
-        return validos.FirstOrDefault(lista.Contains);
-    }
-
     // ── Validação do envio ────────────────────────────────────────────────────
 
     /// <summary>Risco declarado já normalizado (trim) e validado.</summary>
     public sealed record RiscoAvaliado(string DescricaoRisco, string AcaoMitigacao, string ResponsavelNome,
         string ResponsavelEmail, string Probabilidade, string Consequencia);
 
-    /// <summary>Tudo o que um envio válido grava no processo.</summary>
-    public sealed record Avaliacao(
-        IReadOnlyList<string> Q15, IReadOnlyList<string> Q16, IReadOnlyList<string> Q17,
-        bool Q15Nenhuma, bool Q16Nenhuma, bool Q17Nenhuma,
-        string Resultado, string? Enquadramento, int Pontuacao, string ChecklistJson,
-        IReadOnlyList<RiscoAvaliado> RiscosDeclarados);
-
     /// <summary>
-    /// Valida o envio por inteiro e calcula resultado, enquadramento, pontuação e o jsonb.
-    /// É PURA — não toca entidade nenhuma —, então quem chama só aplica depois de a
-    /// validação inteira passar (a mesma disciplina do candidato do módulo).
-    /// Domínio fora da lista (inciso, probabilidade, consequência) é CtrDominioInvalido;
-    /// o resto (completude, riscos, limite) é CtrClassificacaoRiscoInvalida.
+    /// Valida a lista enviada por inteiro e devolve os riscos normalizados. É PURA (não
+    /// toca entidade nenhuma), então quem chama só aplica depois de a validação inteira
+    /// passar (a mesma disciplina do candidato do módulo). Lista vazia (ou nula) é válida:
+    /// o processo fica sem riscos da contratação, que é como a tela tira o último risco.
+    /// Probabilidade ou consequência fora da escala é CtrDominioInvalido; o resto (risco
+    /// incompleto, e-mail, limite) é CtrClassificacaoRiscoInvalida.
     /// </summary>
-    public static Avaliacao Avaliar(CtrClassificacaoRiscoDTO dto)
+    public static IReadOnlyList<RiscoAvaliado> Avaliar(CtrClassificacaoRiscoDTO dto)
     {
-        var q15 = NormalizarIncisos(dto.Q15, PgiaDominios.ChecklistIncisos.Art15, 15);
-        var q16 = NormalizarIncisos(dto.Q16, PgiaDominios.ChecklistIncisos.Art16, 16);
-        var q17 = NormalizarIncisos(dto.Q17, PgiaDominios.ChecklistIncisos.Art17, 17);
-
-        // Completude: cada grupo respondido com incisos XOR "nenhuma das alternativas"
-        ValidarCompletudeDoGrupo(15, q15, dto.Q15Nenhuma);
-        ValidarCompletudeDoGrupo(16, q16, dto.Q16Nenhuma);
-        ValidarCompletudeDoGrupo(17, q17, dto.Q17Nenhuma);
-
         var itens = dto.RiscosDeclarados ?? new List<CtrRiscoDeclaradoDTO>();
-
-        // Contratação sem risco algum não existe (regra do PGIA, transferida intacta)
-        if (dto.Q15Nenhuma && dto.Q16Nenhuma && dto.Q17Nenhuma && itens.Count == 0)
-            throw new ApiException(ErrorCode.CtrClassificacaoRiscoInvalida, MensagemTudoNenhuma);
 
         if (itens.Count > MaximoRiscosDeclarados)
             throw new ApiException(ErrorCode.CtrClassificacaoRiscoInvalida,
                 $"Declare no máximo {MaximoRiscosDeclarados} riscos da contratação.");
 
-        var riscos = itens.Select(ValidarRisco).ToList();
-
-        var (resultado, enquadramento) = CalcularResultado(q15, q16, q17);
-
-        // Os "nenhuma" e os riscos declarados não pontuam
-        var pontuacao = PgiaQuesitos.CalcularPontuacao(q15, q16, q17);
-
-        var json = JsonSerializer.Serialize(new ChecklistPersistido
-        {
-            Q15 = q15,
-            Q16 = q16,
-            Q17 = q17,
-            Q15Nenhuma = dto.Q15Nenhuma,
-            Q16Nenhuma = dto.Q16Nenhuma,
-            Q17Nenhuma = dto.Q17Nenhuma
-        });
-
-        return new Avaliacao(q15, q16, q17, dto.Q15Nenhuma, dto.Q16Nenhuma, dto.Q17Nenhuma,
-            resultado, enquadramento, pontuacao, json, riscos);
-    }
-
-    /// <summary>Descarta repetições e devolve os incisos na ordem do artigo.</summary>
-    private static List<string> NormalizarIncisos(List<string>? marcados, string[] validos, int artigo)
-    {
-        if (marcados == null || marcados.Count == 0) return new List<string>();
-
-        foreach (var inciso in marcados)
-        {
-            if (!validos.Contains(inciso))
-                throw new ApiException(ErrorCode.CtrDominioInvalido,
-                    $"Inciso inválido no grupo do art. {artigo}: {inciso}");
-        }
-
-        return validos.Where(marcados.Contains).ToList();
-    }
-
-    private static void ValidarCompletudeDoGrupo(int artigo, List<string> incisos, bool nenhuma)
-    {
-        if (incisos.Count > 0 && nenhuma)
-            throw new ApiException(ErrorCode.CtrClassificacaoRiscoInvalida,
-                $"No grupo do art. {artigo}, marque os incisos aplicáveis ou \"Nenhuma das alternativas acima\", não os dois.");
-
-        if (incisos.Count == 0 && !nenhuma)
-            throw new ApiException(ErrorCode.CtrClassificacaoRiscoInvalida,
-                $"Responda o grupo do art. {artigo}: marque os incisos aplicáveis ou \"Nenhuma das alternativas acima\".");
+        return itens.Select(ValidarRisco).ToList();
     }
 
     private static RiscoAvaliado ValidarRisco(CtrRiscoDeclaradoDTO? item)
@@ -257,49 +161,21 @@ public static class CtrClassificacaoRisco
         return new RiscoAvaliado(descricao, mitigacao, nome, email, probabilidade, consequencia);
     }
 
-    // ── Idempotência do reenvio ───────────────────────────────────────────────
+    // ── Reenvio idêntico ──────────────────────────────────────────────────────
 
     /// <summary>
-    /// A classificação enviada é IDÊNTICA à gravada? Compara o conteúdo normalizado:
-    /// incisos de cada grupo como conjuntos ordenados (ordem do artigo), os três
-    /// "nenhuma" e os riscos declarados como MULTICONJUNTO de tuplas normalizadas
-    /// (descrição, ação e nome com trim; e-mail com trim e em minúsculas — forma em que
-    /// ele é gravado; probabilidade e consequência), sem considerar a ordem da lista. Idêntica é reenvio, não
-    /// reclassificação: quem chama não regrava quem/quando nem substitui os riscos (os
-    /// Ids mudariam à toa e a auditoria passaria a refletir o último salvamento).
+    /// A lista enviada é IDÊNTICA à gravada? Compara os riscos como MULTICONJUNTO de tuplas
+    /// normalizadas (descrição, ação e nome com trim; e-mail com trim e em minúsculas, forma
+    /// em que ele é gravado; probabilidade e consequência), sem considerar a ordem da lista.
+    /// Idêntica é reenvio, não alteração: quem chama não substitui os riscos (os Ids mudariam
+    /// à toa e o registro de quem/quando passaria a refletir o último salvamento).
     /// </summary>
-    public static bool MesmaClassificacao(CtrProcesso processo, IEnumerable<CtrRiscoDeclarado> riscosGravados,
-        Avaliacao enviada)
-    {
-        if (processo.ChecklistRisco == null) return false;
-
-        var gravado = JsonSerializer.Deserialize<ChecklistPersistido>(processo.ChecklistRisco);
-        if (gravado == null) return false;
-
-        if (gravado.Q15Nenhuma != enviada.Q15Nenhuma
-            || gravado.Q16Nenhuma != enviada.Q16Nenhuma
-            || gravado.Q17Nenhuma != enviada.Q17Nenhuma)
-            return false;
-
-        if (!MesmosIncisos(gravado.Q15, enviada.Q15, PgiaDominios.ChecklistIncisos.Art15)
-            || !MesmosIncisos(gravado.Q16, enviada.Q16, PgiaDominios.ChecklistIncisos.Art16)
-            || !MesmosIncisos(gravado.Q17, enviada.Q17, PgiaDominios.ChecklistIncisos.Art17))
-            return false;
-
-        return MesmoMulticonjunto(
-            riscosGravados.Select(r => ChaveDoRisco(r.DescricaoRisco, r.AcaoMitigacao, r.ResponsavelNome,
+    public static bool MesmosRiscos(IEnumerable<CtrRiscoDeclarado> gravados, IEnumerable<RiscoAvaliado> enviados) =>
+        MesmoMulticonjunto(
+            gravados.Select(r => ChaveDoRisco(r.DescricaoRisco, r.AcaoMitigacao, r.ResponsavelNome,
                 r.ResponsavelEmail, r.Probabilidade, r.Consequencia)),
-            enviada.RiscosDeclarados.Select(r => ChaveDoRisco(r.DescricaoRisco, r.AcaoMitigacao, r.ResponsavelNome,
+            enviados.Select(r => ChaveDoRisco(r.DescricaoRisco, r.AcaoMitigacao, r.ResponsavelNome,
                 r.ResponsavelEmail, r.Probabilidade, r.Consequencia)));
-    }
-
-    private static bool MesmosIncisos(IEnumerable<string>? gravados, IEnumerable<string>? enviados, string[] ordemDoArtigo)
-    {
-        var conjuntoGravado = new HashSet<string>(gravados ?? Enumerable.Empty<string>());
-        var conjuntoEnviado = new HashSet<string>(enviados ?? Enumerable.Empty<string>());
-        return ordemDoArtigo.Where(conjuntoGravado.Contains)
-            .SequenceEqual(ordemDoArtigo.Where(conjuntoEnviado.Contains));
-    }
 
     private static (string, string, string, string, string, string) ChaveDoRisco(string? descricao, string? acao,
         string? nome, string? email, string? probabilidade, string? consequencia) =>
@@ -335,32 +211,22 @@ public static class CtrClassificacaoRisco
     // ── Leitura ───────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Classificação gravada, para as leituras de UM processo; null quando o processo
-    /// não é classificado (checklist nulo).
+    /// Riscos gravados, para as leituras de UM processo; null quando o processo não tem
+    /// nenhum. Quem registrou e quando saem do risco mais recente: a lista é substituída
+    /// inteira a cada alteração, então os riscos de um salvamento têm o mesmo registro.
     /// </summary>
-    public static CtrClassificacaoRiscoResponse? MapearClassificacao(CtrProcesso processo,
-        IEnumerable<CtrRiscoDeclarado> riscos)
+    public static CtrClassificacaoRiscoResponse? MapearClassificacao(IEnumerable<CtrRiscoDeclarado> riscos)
     {
-        if (processo.ChecklistRisco == null) return null;
+        var ordenados = riscos.OrderBy(r => r.Id).ToList();
+        if (ordenados.Count == 0) return null;
 
-        var checklist = JsonSerializer.Deserialize<ChecklistPersistido>(processo.ChecklistRisco)
-                        ?? new ChecklistPersistido();
+        var maisRecente = ordenados.OrderByDescending(r => r.CriadoEm).ThenByDescending(r => r.Id).First();
 
         return new CtrClassificacaoRiscoResponse
         {
-            Q15 = checklist.Q15 ?? new List<string>(),
-            Q16 = checklist.Q16 ?? new List<string>(),
-            Q17 = checklist.Q17 ?? new List<string>(),
-            Q15Nenhuma = checklist.Q15Nenhuma,
-            Q16Nenhuma = checklist.Q16Nenhuma,
-            Q17Nenhuma = checklist.Q17Nenhuma,
-            RiscoClassificado = processo.RiscoClassificado ?? string.Empty,
-            EnquadramentoRisco = processo.EnquadramentoRisco,
-            PontuacaoRisco = processo.PontuacaoRisco ?? 0,
-            ClassificadoEm = processo.RiscoClassificadoEm ?? default,
-            ClassificadoPor = processo.RiscoClassificadoPor,
-            RiscosDeclarados = riscos
-                .OrderBy(r => r.Id)
+            ClassificadoEm = maisRecente.CriadoEm,
+            ClassificadoPor = maisRecente.CriadoPor,
+            RiscosDeclarados = ordenados
                 .Select(r => new CtrRiscoDeclaradoResponse
                 {
                     Id = r.Id,
@@ -376,36 +242,11 @@ public static class CtrClassificacaoRisco
         };
     }
 
-    /// <summary>
-    /// Mesma forma e mapeamento do jsonb de pgia_classificacao_risco.respostas_checklist
-    /// (o ChecklistPersistido do PGIA é privado, por isso a réplica).
-    /// </summary>
-    private sealed class ChecklistPersistido
-    {
-        [JsonPropertyName("q15")] public List<string> Q15 { get; set; } = new();
-        [JsonPropertyName("q16")] public List<string> Q16 { get; set; } = new();
-        [JsonPropertyName("q17")] public List<string> Q17 { get; set; } = new();
-        [JsonPropertyName("q15_nenhuma")] public bool Q15Nenhuma { get; set; }
-        [JsonPropertyName("q16_nenhuma")] public bool Q16Nenhuma { get; set; }
-        [JsonPropertyName("q17_nenhuma")] public bool Q17Nenhuma { get; set; }
-    }
-
     // ── Predicados dos filtros (rodam no banco) ───────────────────────────────
 
     /// <summary>
-    /// Filtro pelo risco classificado: um dos quatro resultados ou "Não classificado".
-    /// Null quando o valor não é do domínio (quem chama devolve lista vazia).
-    /// </summary>
-    public static Expression<Func<CtrProcesso, bool>>? PredicadoRiscoClassificado(string? valor)
-    {
-        if (valor == CtrDominios.RiscoClassificado.NaoClassificado) return p => p.RiscoClassificado == null;
-        if (valor == null || !CtrDominios.RiscoClassificado.Todos.Contains(valor)) return null;
-        return p => p.RiscoClassificado == valor;
-    }
-
-    /// <summary>
     /// Filtro pelo nível MÁXIMO declarado: o nível vira a lista de pares probabilidade ×
-    /// consequência daquela cor — tem ao menos um risco nesses pares e nenhum nos pares
+    /// consequência daquela cor. Tem ao menos um risco nesses pares e nenhum nos pares
     /// dos níveis acima. "Sem riscos declarados" = nenhum risco. Null fora do domínio.
     /// </summary>
     public static Expression<Func<CtrProcesso, bool>>? PredicadoNivelRiscoDeclarado(string? nivel)
