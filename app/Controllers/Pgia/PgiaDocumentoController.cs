@@ -17,7 +17,7 @@ namespace Controllers.Pgia;
 /// <c>POST api/pgia/sistema/{id}/documentos</c>, que não mudou.
 /// </summary>
 [ApiController]
-[Authorize(Roles = "admin,pgia")]
+[Authorize(Policy = ModulosSgdp.PoliticaPgia)]
 [Route("api/pgia/documento")]
 public class PgiaDocumentoController : ControllerBase
 {

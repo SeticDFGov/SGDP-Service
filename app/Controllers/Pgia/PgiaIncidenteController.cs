@@ -13,7 +13,7 @@ namespace Controllers.Pgia;
 /// comunicação formal à SGDI e apuração (arts. 8º, IX e 30).
 /// </summary>
 [ApiController]
-[Authorize(Roles = "admin,pgia")]
+[Authorize(Policy = ModulosSgdp.PoliticaPgia)]
 [Route("api/pgia/incidente")]
 public class PgiaIncidenteController : ControllerBase
 {

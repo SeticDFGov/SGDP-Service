@@ -1,3 +1,4 @@
+using app.Auth;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,7 +13,7 @@ namespace Controllers.Contratacoes;
 /// "arquivo"): prévia sem gravar e importação idempotente (upsert por nº do processo).
 /// </summary>
 [ApiController]
-[Authorize]
+[Authorize(Policy = ModulosSgdp.PoliticaContratacoes)]
 [Route("api/contratacoes/importacao")]
 public class CtrImportacaoController : ControllerBase
 {

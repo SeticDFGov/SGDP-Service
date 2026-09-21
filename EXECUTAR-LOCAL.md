@@ -7,22 +7,28 @@
 | Ferramenta | Onde está |
 | --- | --- |
 | Docker Desktop | instalado (`docker --version`) |
-| .NET 8 SDK | instalado em `%USERPROFILE%\.dotnet` (adicione ao PATH da sessão: `$env:PATH = "$env:USERPROFILE\.dotnet;$env:USERPROFILE\.dotnet\tools;$env:PATH"`) |
+| .NET 8 SDK | no host (`%USERPROFILE%\.dotnet`, PATH: `$env:PATH = "$env:USERPROFILE\.dotnet;$env:USERPROFILE\.dotnet\tools;$env:PATH"`) **ou** pela imagem oficial `mcr.microsoft.com/dotnet/sdk:8.0` (a mesma do `Dockerfile`) — é o caminho usado desde 2026-09-21, quando o host ficou sem SDK |
 | Node 24 + npm | instalados |
 
 ## 1. Banco (PostgreSQL em contêiner)
 
 ```bash
-docker run -d --name pgia-local-pg -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -p 5432:5432 postgres:16
+docker run -d --name sgdp-local-pg -e POSTGRES_USER=sgdp_user -e POSTGRES_PASSWORD=sgdp_password_dev -p 5432:5432 postgres:16-alpine
 ```
 
-Usuário/senha/banco casam com `app/appsettings.Development.json` (`Host=localhost;Database=postgres;Username=user;Password=password`). Alternativa: `docker compose up -d postgres` na raiz do `SGDP-Service-main` (exige `.env` copiado do `.env.example` com `POSTGRES_USER=user` e `POSTGRES_PASSWORD=password`).
+Usuário/senha/banco casam com `app/appsettings.Development.json` (`Host=localhost;Port=5432;Database=postgres;Username=sgdp_user;Password=sgdp_password_dev`). Alternativa: `docker compose up -d postgres` na raiz do `SGDP-Service-main` (exige `.env` copiado do `.env.example` com `POSTGRES_USER=user` e `POSTGRES_PASSWORD=password`).
 
 ## 2. Migrations (cria as tabelas do SGDP, as 24 `pgia_*` com seeds e as 2 `ctr_*`)
 
 ```bash
 cd SGDP-Service-main/app
 dotnet ef database update
+```
+
+Sem SDK no host, pelo contêiner (Git Bash; o banco é alcançado em `host.docker.internal`):
+
+```bash
+MSYS_NO_PATHCONV=1 docker run --rm -v "E:/Trabalho/projetos/sgdp/SGDP-Service:/src" -v sgdp-nuget:/root/.nuget/packages -v sgdp-dotnet-tools:/tools -w /src/app -e ASPNETCORE_ENVIRONMENT=Development -e "ConnectionStrings__PostgreSql=Host=host.docker.internal;Port=5432;Database=postgres;Username=sgdp_user;Password=sgdp_password_dev" mcr.microsoft.com/dotnet/sdk:8.0 bash -c "([ -x /tools/dotnet-ef ] || dotnet tool install --tool-path /tools dotnet-ef --version 8.0.13) && /tools/dotnet-ef database update"
 ```
 
 Com `ASPNETCORE_ENVIRONMENT=Development` (padrão fora de produção). **Nunca** rode este comando apontando para o banco de produção — lá quem aplica é o CI, no merge para a main.
@@ -36,7 +42,13 @@ cd SGDP-Service-main/app
 $env:Auth__ModoLocal = "true"; dotnet run
 ```
 
-Sobe em `http://localhost:5148` — Swagger em `http://localhost:5148/swagger`. O CORS de desenvolvimento já libera `http://localhost:4200`.
+Sem SDK no host, pelo contêiner (a configuração `sgdp-api` do `../.claude/launch.json` faz exatamente isto):
+
+```bash
+MSYS_NO_PATHCONV=1 docker run --rm --name sgdp-api -p 5148:5148 -v "E:/Trabalho/projetos/sgdp/SGDP-Service:/src" -v sgdp-nuget:/root/.nuget/packages -w /src/app -e ASPNETCORE_ENVIRONMENT=Development -e ASPNETCORE_URLS=http://+:5148 -e Auth__ModoLocal=true -e "ConnectionStrings__PostgreSql=Host=host.docker.internal;Port=5432;Database=postgres;Username=sgdp_user;Password=sgdp_password_dev" mcr.microsoft.com/dotnet/sdk:8.0 dotnet run --no-launch-profile
+```
+
+Sobe em `http://localhost:5148` (Swagger em `http://localhost:5148/swagger`). Parar o processo do `docker run` pelo painel de preview não para o contêiner: antes de subir de novo, `docker stop sgdp-api`. O CORS de desenvolvimento já libera `http://localhost:4200`. **A chave dos tokens do modo local muda a cada reinício da API**: depois de reiniciar, entre de novo pelo `/auth/local`.
 
 O modo local troca só a validação de token: em vez do Keycloak, a API aceita tokens que ela mesma emite em `POST /api/authlocal/token` (e-mail + nome + perfil). Todo o resto — criação de usuário no `/me`, perfis, papéis PGIA, guards — é o código real de produção. Salvaguardas: a flag é opt-in, o endpoint devolve 404 com ela desligada, a chave de assinatura muda a cada reinício da API e **a aplicação se recusa a subir com a flag fora de `Development`**.
 
@@ -52,12 +64,14 @@ Abre em `http://localhost:4200` (o `environment.ts` já aponta para `http://loca
 
 ## 5. Entrar com usuários de teste
 
-Abra `http://localhost:4200/auth/local` (há um link "entrar no modo local" na tela de login quando o build não é de produção). A tela tem três blocos:
+Abra `http://localhost:4200/auth/local` (há um link "entrar no modo local" na tela de login quando o build não é de produção). **Desde o isolamento entre módulos (2026-09-21), toda persona entra pela tela inicial `/inicio`**, com os cards dos quatro módulos: os liberados ficam ativos e os demais em cinza. A tela tem estes blocos:
 
-- **Papéis do PGIA** — uma persona por papel do decreto, que entra **direto na tela do papel**: Otávio (`pgia_orgao` → área do órgão), Sofia (`pgia_sgdi` → governança central), Caio (`pgia_cgtic` → comitê), Alice (agente pública **sem** papel → registrar uso/incidentes do art. 13), Aurélio (`pgia_auditoria` → auditorias designadas) e o botão **Cidadão** (página pública, sem login). O backend provisiona tudo sozinho no primeiro clique: papel, unidade e um "Órgão de Teste do PGIA" (sigla TESTE) já com os 6 prazos de adesão.
+- **Isolamento entre módulos**: Bruna Básico (sem acesso algum: os três módulos em cinza, sem o card da Administração, e o botão "Pedir acesso"), Débora Demandas (só Demandas, em consulta, por concessão do sistema) e Marina Multimódulo (gestor + papel de órgão no PGIA + Supervisão Contínua: três módulos).
+
+- **Papéis do PGIA** — uma persona por papel do decreto; pelo card do PGIA cada uma abre a **trilha numerada do seu papel**: Otávio (`pgia_orgao` → área do órgão), Sofia (`pgia_sgdi` → governança central), Caio (`pgia_cgtic` → comitê), Alice (agente pública **sem** papel → registrar uso/incidentes do art. 13), Aurélio (`pgia_auditoria` → auditorias designadas) e o botão **Cidadão** (página pública, sem login). O backend provisiona tudo sozinho no primeiro clique: papel, unidade e um "Órgão de Teste do PGIA" (sigla TESTE) já com os 6 prazos de adesão.
 - **Supervisão Contínua das Contratações** — persona **Clara das Contratações** (`contratacoes@local.teste`, perfil `basico` + papel `ctr_analise`), que entra direto em `/analises`: processos de contratações de TIC, painel, manifestações ao TCDF e importação da planilha. O backend provisiona o papel e a unidade central de teste no primeiro clique.
-- **Perfis do SGDP** — as cinco personas originais (admin, gestor, centralit, parceiro, básico), para a regressão do sistema existente.
-- **Formulário livre** — nome + e-mail + perfil + papel PGIA opcional + papel de supervisão contínua das contratações opcional.
+- **Perfis do SGDP**: Ana Admin (todos os módulos, inclusive Administração, com Pedidos de acesso e Gestão de acessos) e Gabriel Gestor (só Demandas, criando e editando).
+- **Formulário livre** — nome + e-mail + perfil + papel PGIA opcional + papel de supervisão contínua opcional + concessões do sistema (Demandas e/ou PGIA de agente).
 
 Para trocar de usuário: Sair → `/auth/local` de novo. Papéis também podem ser trocados a qualquer momento pela tela de admin, como em produção (relogar com uma persona **não** apaga papel atribuído manualmente — o campo só é aplicado quando vem preenchido).
 
@@ -70,7 +84,7 @@ Para trocar de usuário: Sair → `/auth/local` de novo. Papéis também podem s
 5. **Papel `pgia_auditoria`**: "Auditorias designadas" → entregar parecer.
 6. **Usuário sem papel** (perfil `gestor` com unidade do órgão): sidebar "Registrar uso de IA" e aviso de incidente — nada além.
 7. **Sem login**: `http://localhost:4200/transparencia-ia` — Registro Público, pedido do cidadão (guarde o protocolo) e acompanhamento pelo protocolo. Responda pelo papel de órgão e consulte de novo.
-8. **Regressão dos perfis atuais**: `admin`/`gestor` (dashboard e demandas), `centralit` → `/centralit`, `parceiro` → `/parceiro`, `basico` sem papel → `/pending-approval` — tudo como antes.
+8. **Regressão dos perfis atuais**: `admin` vê os quatro módulos (só quem é admin vê o card da Administração); `gestor` só Demandas (painel e demandas, com criação); `basico` sem papel nem concessão vê os três módulos em cinza (a antiga tela `/pending-approval` redireciona para `/inicio`).
 
 ## 7. Roteiro de fumaça do módulo Supervisão Contínua das Contratações
 
@@ -90,10 +104,22 @@ Para trocar de usuário: Sair → `/auth/local` de novo. Papéis também podem s
    - **Manifestações ao TCDF**: registre uma do **inciso I** (comunicada previamente, resultado) e uma do **inciso II** (prazo em dias); numa de "Riscos significativos" marque as duas ações e evolua o desfecho de "Aguardando resposta" para "Risco resolvido" (é edição da mesma manifestação). O inciso I é **bloqueado** enquanto o processo não tiver criticidade ("Defina a criticidade no cadastro do processo..."). Marque o **Status no TCDF** ("Suspenso por irregularidades" / "Edital revogado"): ele passa a mandar no estágio (badge e filtro) e **não** aparece no despacho. Filtre a lista por estágio e gere o **despacho em PDF** (modal Local/Nome/Cargo): as opções marcadas saem com `( X )` e as demais com `(   )`, e a criticidade impressa é a do processo.
 3. **Regressão do acesso**: um `basico` **sem** o papel não vê o grupo "Supervisão Contínua das Contratações" na sidebar e é barrado ao digitar `/analises`; o módulo PGIA e os cinco perfis continuam exatamente como antes.
 
+## 8. Roteiro de fumaça do isolamento entre módulos e da trilha do PGIA
+
+1. **Bruna Básico** → `/inicio`: três cards em cinza (a Administração nem aparece para quem não é admin) e a faixa "Seu usuário ainda não tem acesso a nenhum módulo". Digitar `/demandas`, `/pgia` ou `/analises` na barra volta para o início com o toast. A API responde 403 em tudo (política `modulo:*`), menos nos pedidos de acesso.
+2. **Pedido de acesso**: ainda como Bruna, "Pedir acesso" em Demandas abre a janela; escreva a justificativa (opcional) e envie. O card passa a "Pedido enviado em dd/mm, aguardando".
+3. **Ana Admin**: o card da Administração avisa "1 pedido de acesso aguardando você" e a aba **Pedidos de acesso** tem o contador. Recuse com um motivo (obrigatório). A Bruna vê no card "Pedido recusado em dd/mm", o motivo e o botão "Pedir de novo". Em "Todos", a fila mostra o histórico (quem decidiu, quando, papel e motivo).
+4. **SGDI decide o PGIA**: a Bruna pede o PGIA. **Sofia da SGDI** vê no card do PGIA "1 pedido de acesso aguardando você"; na trilha, o próximo passo recomendado vira o 1.2 ("1 pedido de acesso aguardando"). Em Pessoas e acessos, o bloco "Pedidos de acesso ao PGIA": aprove escolhendo o papel (sem papel = agente público). A Bruna vê o PGIA ativo sem novo login.
+5. **Gestão de acessos** (Ana Admin): o filtro "Sem acesso a nenhum módulo" lista quem ainda não tem nada. Liberar um módulo por lá também encerra o pedido pendente da pessoa, como aprovado.
+6. **Gabriel Gestor**: só Demandas (abas Painel e Demandas, sem barra lateral), com "Adicionar Demanda". O botão "Voltar ao início" fica no cabeçalho de todas as telas.
+7. **Otávio do Órgão** → PGIA → visão geral com as 7 etapas numeradas, a situação de cada passo e o próximo passo recomendado (na base de teste, 1.2 "Designe o Responsável de IA", com prazo vencido em 02/08/2026). Em cada tela, a trilha fica no topo e "Próximo passo" leva adiante (1.2 → 1.3 → 2.1…). `/pgia/sistemas/lista?passo=3.1` abre a mesma lista na etapa 3 (AIA).
+8. **Sofia da SGDI**: 6 etapas, a fila de homologação como passo 3.1 e, em 1.2 "Pessoas e acessos", a fila de pedidos do PGIA e a coluna "Entra no PGIA?" com o botão "Liberar como agente".
+9. **Ana Admin** no PGIA: "Ver a trilha de" alterna entre as trilhas de órgão, SGDI, CGTIC, auditoria e agente.
+
 ## Limpeza
 
 ```bash
-docker rm -f pgia-local-pg
+docker rm -f sgdp-local-pg sgdp-api
 ```
 
 ## Avisos

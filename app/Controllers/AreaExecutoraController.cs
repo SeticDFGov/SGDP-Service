@@ -1,3 +1,4 @@
+using app.Auth;
 using api.AreaExecutora;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -6,7 +7,7 @@ using Models;
 namespace Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Policy = ModulosSgdp.PoliticaDemandas)]
 [Route("api/area-executora")]
 public class AreaExecutoraController : ControllerBase
 {

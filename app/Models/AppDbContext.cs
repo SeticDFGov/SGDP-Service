@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using app.Models;
 using Models.Pgia;
 using Models.Contratacoes;
+using Models.Acesso;
 
 namespace Models
 {
@@ -54,6 +55,12 @@ namespace Models
         public DbSet<CtrManifestacaoTcdf> CtrManifestacoesTcdf { get; set; }
         public DbSet<CtrRiscoDeclarado> CtrRiscosDeclarados { get; set; }
 
+        // Gestão de acessos por módulo (isolamento entre módulos) — tabela acesso_modulo
+        public DbSet<AcessoModulo> AcessosModulo { get; set; }
+
+        // Pedidos de acesso feitos no card da tela inicial: tabela pedido_acesso
+        public DbSet<PedidoAcesso> PedidosAcesso { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -86,6 +93,9 @@ namespace Models
 
             // Módulo Supervisão Contínua das Contratações: mapeamento isolado em CtrModelConfiguration
             modelBuilder.ApplyCtrConfiguration(Database.IsNpgsql());
+
+            // Gestão de acessos por módulo: mapeamento isolado em AcessoModelConfiguration
+            modelBuilder.ApplyAcessoConfiguration();
         }
     }
 

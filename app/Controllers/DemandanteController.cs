@@ -1,3 +1,4 @@
+using app.Auth;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -6,7 +7,7 @@ using Repositorio.Interface;
 
 namespace Controllers;
 [ApiController]
-[Authorize]
+[Authorize(Policy = ModulosSgdp.PoliticaDemandas)]
 [Route("api/[controller]")]
 public class DemandanteController : ControllerBase
 {

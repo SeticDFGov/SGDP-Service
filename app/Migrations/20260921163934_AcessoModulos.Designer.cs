@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Models;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace demanda_service.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260921163934_AcessoModulos")]
+    partial class AcessoModulos
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -71,81 +74,6 @@ namespace demanda_service.Migrations
                             t.HasCheckConstraint("ck_acesso_modulo_modulo", "modulo IN ('demandas','pgia','contratacoes','administracao')");
 
                             t.HasCheckConstraint("ck_acesso_modulo_origem", "origem IN ('sistema','keycloak')");
-                        });
-                });
-
-            modelBuilder.Entity("Models.Acesso.PedidoAcesso", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CriadoEm")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("criado_em")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<DateTime?>("DecididoEm")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("decidido_em");
-
-                    b.Property<string>("DecididoPor")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("decidido_por");
-
-                    b.Property<string>("Justificativa")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("justificativa");
-
-                    b.Property<string>("Modulo")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("modulo");
-
-                    b.Property<string>("MotivoRecusa")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("motivo_recusa");
-
-                    b.Property<string>("PapelPgia")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("papel_pgia");
-
-                    b.Property<string>("Situacao")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("situacao");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_pedido_acesso");
-
-                    b.HasIndex("Situacao", "CriadoEm")
-                        .HasDatabaseName("ix_pedido_acesso_situacao");
-
-                    b.HasIndex("UserId", "Modulo")
-                        .IsUnique()
-                        .HasDatabaseName("ux_pedido_acesso_pendente")
-                        .HasFilter("situacao = 'pendente'");
-
-                    b.ToTable("pedido_acesso", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_pedido_acesso_modulo", "modulo IN ('demandas','pgia','contratacoes')");
-
-                            t.HasCheckConstraint("ck_pedido_acesso_situacao", "situacao IN ('pendente','aprovado','recusado')");
                         });
                 });
 
@@ -3376,18 +3304,6 @@ namespace demanda_service.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_acesso_modulo_user");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("Models.Acesso.PedidoAcesso", b =>
-                {
-                    b.HasOne("app.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_pedido_acesso_user");
 
                     b.Navigation("User");
                 });

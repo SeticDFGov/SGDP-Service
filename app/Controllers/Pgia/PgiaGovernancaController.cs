@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using api.Acesso;
 using api.Pgia;
 using app.Auth;
 using demanda_service.Helpers;
@@ -17,7 +18,7 @@ namespace Controllers.Pgia;
 /// (arts. 18, § 2º e 21). Toda ação valida papel no PgiaPermissionService.
 /// </summary>
 [ApiController]
-[Authorize(Roles = "admin,pgia")]
+[Authorize(Policy = ModulosSgdp.PoliticaPgia)]
 [Route("api/pgia/governanca")]
 public class PgiaGovernancaController : ControllerBase
 {
@@ -26,19 +27,22 @@ public class PgiaGovernancaController : ControllerBase
     private readonly IPgiaRelatorioService _relatorioService;
     private readonly IPgiaAdminService _adminService;
     private readonly IPgiaPermissionService _permissionService;
+    private readonly IAcessoModuloService _acessoModuloService;
 
     public PgiaGovernancaController(
         IPgiaGovernancaService service,
         IPgiaSistemaService sistemaService,
         IPgiaRelatorioService relatorioService,
         IPgiaAdminService adminService,
-        IPgiaPermissionService permissionService)
+        IPgiaPermissionService permissionService,
+        IAcessoModuloService acessoModuloService)
     {
         _service = service;
         _sistemaService = sistemaService;
         _relatorioService = relatorioService;
         _adminService = adminService;
         _permissionService = permissionService;
+        _acessoModuloService = acessoModuloService;
     }
 
     private string? GetUserEmail() => User.FindFirst(ClaimTypes.Email)?.Value;
@@ -155,7 +159,9 @@ public class PgiaGovernancaController : ControllerBase
         // Quem administra o vínculo é quem enxerga a lista: só SGDI e admin
         if (!_permissionService.CanEdit(ctx, PgiaResources.PessoaVinculo)) return Forbid();
 
-        return Ok(await _service.ListarPessoasAcessoAsync(filtro, orgaoId));
+        var pessoas = await _service.ListarPessoasAcessoAsync(filtro, orgaoId);
+        await PreencherAcessoModuloAsync(pessoas);
+        return Ok(pessoas);
     }
 
     /// <summary>
@@ -172,7 +178,10 @@ public class PgiaGovernancaController : ControllerBase
         if (ctx == null) return Unauthorized();
         if (!_permissionService.CanEdit(ctx, PgiaResources.PessoaVinculo)) return Forbid();
 
-        return Ok(await _service.CriarOuVincularPessoaAsync(dto));
+        var pessoa = await _service.CriarOuVincularPessoaAsync(dto);
+        await EncerrarPedidoPgiaAtendidoAsync(pessoa, ctx.Email);
+        await PreencherAcessoModuloAsync(new[] { pessoa });
+        return Ok(pessoa);
     }
 
     /// <summary>
@@ -186,7 +195,59 @@ public class PgiaGovernancaController : ControllerBase
         if (ctx == null) return Unauthorized();
         if (!_permissionService.CanEdit(ctx, PgiaResources.PessoaVinculo)) return Forbid();
 
-        return Ok(await _service.AtualizarVinculoPessoaAsync(userId, dto));
+        var pessoa = await _service.AtualizarVinculoPessoaAsync(userId, dto);
+        await EncerrarPedidoPgiaAtendidoAsync(pessoa, ctx.Email);
+        await PreencherAcessoModuloAsync(new[] { pessoa });
+        return Ok(pessoa);
+    }
+
+    /// <summary>
+    /// Liga ou desliga o acesso da pessoa ao MÓDULO PGIA (isolamento entre módulos).
+    /// Sem papel PGIA, quem tem o acesso atua como agente público do art. 13:
+    /// registra uso de IA e avisa incidentes. Papel PGIA já dá acesso por si; a role
+    /// "pgia" do grupo no Keycloak também (e não é desligada por aqui).
+    /// </summary>
+    [HttpPut("pessoa/{userId:guid}/acesso-modulo")]
+    public async Task<IActionResult> DefinirAcessoModuloPessoa(Guid userId, [FromBody] AcessoModuloToggleDTO dto)
+    {
+        var ctx = await GetContextAsync();
+        if (ctx == null) return Unauthorized();
+        if (!_permissionService.CanEdit(ctx, PgiaResources.PessoaVinculo)) return Forbid();
+
+        try
+        {
+            await _acessoModuloService.DefinirConcessaoAsync(userId, ModulosSgdp.Pgia, dto.Ativo, ctx.Email);
+        }
+        catch (ApiException ex) when (ex.Error.Code == (int)ErrorCode.AcessoUsuarioNaoEncontrado)
+        {
+            return NotFound(new { ex.Error.Code, ex.Error.Message });
+        }
+
+        var resumo = await _acessoModuloService.ResumoDoModuloAsync(ModulosSgdp.Pgia, new[] { userId });
+        return Ok(new { AcessoModulo = resumo[userId].Concedido, AcessoModuloKeycloak = resumo[userId].Keycloak });
+    }
+
+    /// <summary>
+    /// Papel PGIA dado pela SGDI já é acesso ao módulo: o pedido de acesso ao PGIA
+    /// que a pessoa tinha na fila sai dela, como aprovado por quem deu o papel.
+    /// </summary>
+    private async Task EncerrarPedidoPgiaAtendidoAsync(PgiaPessoaAcesso pessoa, string autorEmail)
+    {
+        if (!PapeisPgia.Todos.Contains(pessoa.PapelPgia)) return;
+        await _acessoModuloService.EncerrarPedidosAtendidosAsync(
+            pessoa.UserId, new[] { ModulosSgdp.Pgia }, autorEmail, pessoa.PapelPgia);
+    }
+
+    /// <summary>Acesso ao módulo PGIA de cada pessoa, em lote (uma consulta).</summary>
+    private async Task PreencherAcessoModuloAsync(IReadOnlyCollection<PgiaPessoaAcesso> pessoas)
+    {
+        if (pessoas.Count == 0) return;
+        var resumo = await _acessoModuloService.ResumoDoModuloAsync(ModulosSgdp.Pgia, pessoas.Select(p => p.UserId));
+        foreach (var pessoa in pessoas)
+        {
+            pessoa.AcessoModulo = resumo[pessoa.UserId].Concedido;
+            pessoa.AcessoModuloKeycloak = resumo[pessoa.UserId].Keycloak;
+        }
     }
 
     // ── Deliberações do CGTIC (art. 7º) ───────────────────────────────────────

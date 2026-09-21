@@ -59,6 +59,15 @@ public class PgiaPessoaAcesso
     // No GET pessoas e no PUT vínculo é sempre false. Mantido no mesmo tipo para não
     // quebrar o front, que já tipa a resposta do POST como PgiaPessoaAcesso.
     public bool JaExistia { get; set; }
+
+    // Acesso ao MÓDULO PGIA concedido no sistema (isolamento entre módulos). Com ele
+    // e sem papel, a pessoa entra como agente público do art. 13 (registra uso de IA
+    // e avisa incidentes). Preenchido pelo controller a partir de acesso_modulo.
+    public bool AcessoModulo { get; set; }
+
+    // A pessoa entra no PGIA pela role "pgia" do grupo no Keycloak (retrato do último
+    // login) — gerido no Keycloak, só leitura aqui.
+    public bool AcessoModuloKeycloak { get; set; }
 }
 
 /// <summary>

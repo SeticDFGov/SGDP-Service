@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Models.Pgia;
 using Repositorio;
 using Repositorio.Pgia;
+using service.Acesso;
 using service;
 using service.Pgia;
 using Xunit;
@@ -54,7 +55,8 @@ public class PgiaGestaoPessoasTest : PgiaTestBase
                 new PgiaOrgaoRepositorio(Context),
                 new PgiaPrazoRepositorio(Context),
                 Context),
-            _permissionService);
+            _permissionService,
+            new AcessoModuloService(Context));
     }
 
     // ── Apoio ─────────────────────────────────────────────────────────────────

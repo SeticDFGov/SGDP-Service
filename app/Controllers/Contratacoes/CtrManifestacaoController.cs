@@ -1,3 +1,4 @@
+using app.Auth;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
 using api.Contratacoes;
@@ -14,7 +15,7 @@ namespace Controllers.Contratacoes;
 /// A criação é pela rota do processo (POST api/contratacoes/processo/{id}/manifestacao).
 /// </summary>
 [ApiController]
-[Authorize]
+[Authorize(Policy = ModulosSgdp.PoliticaContratacoes)]
 [Route("api/contratacoes/manifestacao")]
 public class CtrManifestacaoController : ControllerBase
 {
