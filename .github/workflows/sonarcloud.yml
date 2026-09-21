@@ -27,8 +27,11 @@ jobs:
     - name: Verificar versão do .NET
       run: dotnet --version
 
-    - name: Verificar Java (exigido pelo scanner)
-      run: java -version
+    - name: Instalar Java (exigido pelo scanner)
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
 
     - name: Instalar dotnet-sonarscanner
       run: |
