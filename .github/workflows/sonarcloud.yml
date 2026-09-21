@@ -1,0 +1,60 @@
+name: SonarCloud Analysis
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+    types: [ opened, synchronize, reopened ]
+
+jobs:
+  sonarcloud:
+    runs-on: self-hosted
+
+    steps:
+    - name: Checkout do código
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Adicionar .NET ao PATH
+      run: |
+        echo "/usr/share/dotnet" >> $GITHUB_PATH
+        echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+        echo "DOTNET_ROOT=/usr/share/dotnet" >> $GITHUB_ENV
+
+    - name: Verificar versão do .NET
+      run: dotnet --version
+
+    - name: Verificar Java (exigido pelo scanner)
+      run: java -version
+
+    - name: Instalar dotnet-sonarscanner
+      run: |
+        export PATH="$PATH:$HOME/.dotnet/tools"
+        dotnet tool install --global dotnet-sonarscanner || dotnet tool update --global dotnet-sonarscanner
+
+    - name: Iniciar análise do SonarCloud
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      run: |
+        export PATH="$PATH:$HOME/.dotnet/tools"
+        dotnet-sonarscanner begin \
+          /k:"SeticDFGov_SGDP-Service" \
+          /o:"seticdfgov" \
+          /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
+          /d:sonar.host.url="https://sonarcloud.io" \
+          /d:sonar.exclusions="**/Migrations/**,**/bin/**,**/obj/**"
+
+    - name: Restore dependencies
+      run: dotnet restore app/demanda_service.sln
+
+    - name: Build
+      run: dotnet build app/demanda_service.sln --no-restore --configuration Release
+
+    - name: Finalizar análise do SonarCloud
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      run: |
+        export PATH="$PATH:$HOME/.dotnet/tools"
+        dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
