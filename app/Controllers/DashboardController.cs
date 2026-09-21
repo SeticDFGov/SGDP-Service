@@ -9,7 +9,7 @@ using service.Interface;
 namespace Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Policy = ModulosSgdp.PoliticaDemandas)]
 [Route("api/dashboard")]
 public class DashboardController : ControllerBase
 {

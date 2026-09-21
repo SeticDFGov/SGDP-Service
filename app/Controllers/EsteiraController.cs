@@ -1,3 +1,4 @@
+using app.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Models;
@@ -8,7 +9,7 @@ using System.Threading.Tasks;
 namespace Controllers
 {
     [ApiController]
-    [Authorize]
+    [Authorize(Policy = ModulosSgdp.PoliticaDemandas)]
     [Route("api/[controller]")]
     public class EsteiraController : ControllerBase
     {

@@ -84,4 +84,13 @@ public enum ErrorCode
     CtrDominioInvalido = 809,
     // Classificação de riscos do processo (completude, riscos declarados, ciclo de vida)
     CtrClassificacaoRiscoInvalida = 810,
+
+    // Gestão de acessos por módulo (isolamento entre módulos) — faixa 9xx
+    AcessoUsuarioNaoEncontrado = 900,
+    AcessoInvalido = 901,
+    // Pedidos de acesso (card da tela inicial e fila de quem decide)
+    PedidoAcessoNaoEncontrado = 902,
+    PedidoAcessoInvalido = 903,
+    PedidoAcessoJaDecidido = 904,
+    PedidoAcessoForaDoEscopo = 905,
 }

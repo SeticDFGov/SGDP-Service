@@ -14,7 +14,7 @@ namespace Controllers.Pgia;
 /// trilhas ProCapIA/DF (arts. 28 e 29) e registro de uso de IA (art. 13, IV e V).
 /// </summary>
 [ApiController]
-[Authorize(Roles = "admin,pgia")]
+[Authorize(Policy = ModulosSgdp.PoliticaPgia)]
 [Route("api/pgia/conformidade")]
 public class PgiaConformidadeController : ControllerBase
 {

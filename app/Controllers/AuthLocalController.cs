@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Models;
+using Models.Acesso;
 using service.Interface;
 
 namespace Controllers;
@@ -68,6 +69,10 @@ public class AuthLocalController : ControllerBase
         // Papel do módulo Supervisão Contínua das Contratações (ctr_analise). Mesma semântica
         // do PapelPgia: ausente/null não mexe no papel já existente.
         public string? PapelContratacoes { get; set; }
+
+        // Módulos concedidos no sistema (ModulosSgdp.Concedidos: demandas, pgia), como a
+        // tela de gestão de acessos faria. Ausente/null não mexe nas concessões atuais.
+        public List<string>? ConcederModulos { get; set; }
     }
 
     /// <summary>
@@ -90,6 +95,9 @@ public class AuthLocalController : ControllerBase
 
         if (!PapeisContratacoes.EhValido(request.PapelContratacoes))
             return BadRequest("Papel de supervisão contínua das contratações inválido (use ctr_analise ou deixe vazio).");
+
+        if (request.ConcederModulos != null && request.ConcederModulos.Any(m => !ModulosSgdp.Concedidos.Contains(m)))
+            return BadRequest("Módulo concedível inválido (use demandas ou pgia).");
 
         await ProvisionarUsuarioDeTesteAsync(request);
 
@@ -154,6 +162,29 @@ public class AuthLocalController : ControllerBase
         if (unidade != null) user.Unidade = unidade;
 
         await _context.SaveChangesAsync();
+
+        // Concessões do sistema pedidas pela persona (a mesma linha que a tela de
+        // gestão de acessos grava)
+        if (request.ConcederModulos != null)
+        {
+            var existentes = await _context.AcessosModulo
+                .Where(a => a.UserId == user.Id && a.Origem == OrigemAcesso.Sistema)
+                .Select(a => a.Modulo)
+                .ToListAsync();
+
+            foreach (var modulo in request.ConcederModulos.Distinct().Where(m => !existentes.Contains(m)))
+            {
+                _context.AcessosModulo.Add(new AcessoModulo
+                {
+                    UserId = user.Id,
+                    Modulo = modulo,
+                    Origem = OrigemAcesso.Sistema,
+                    ConcedidoEm = DateTime.UtcNow,
+                    ConcedidoPor = "modo-local"
+                });
+            }
+            await _context.SaveChangesAsync();
+        }
     }
 
     private async Task<Unidade> GarantirUnidadeAsync(string nome, string? codigoExterno = null)

@@ -11,7 +11,7 @@ using service.Interface;
 namespace Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Policy = ModulosSgdp.PoliticaDemandas)]
 [Route("api/demanda")]
 public class DemandaController : ControllerBase
 {

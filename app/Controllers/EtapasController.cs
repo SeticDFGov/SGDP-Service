@@ -9,7 +9,7 @@ using service.Interface;
 namespace Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Policy = ModulosSgdp.PoliticaDemandas)]
 [Route("api/entregavel")]
 public class EntregaveisController : ControllerBase
 {

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -110,6 +111,12 @@ builder.Services.AddScoped<IDemandaService, DemandaService>();
 builder.Services.AddScoped<IEtapaService, EtapaService>();
 builder.Services.AddScoped<IEsteiraService, EsteiraService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
+
+// Isolamento entre módulos: regra única do acesso (Keycloak + concessões do sistema)
+// e a transformação que põe os módulos liberados nas claims de cada requisição
+builder.Services.AddScoped<IAcessoModuloService, service.Acesso.AcessoModuloService>();
+builder.Services.AddScoped<IPedidoAcessoService, service.Acesso.PedidoAcessoService>();
+builder.Services.AddScoped<IClaimsTransformation, ModuloAcessoClaimsTransformation>();
 
 // Serviços do módulo PGIA
 builder.Services.AddScoped<IPgiaPermissionService, service.Pgia.PgiaPermissionService>();
@@ -244,18 +251,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                             .Cast<string>()
                             .ToList();
 
-                        foreach (var r in rolesDoToken)
+                        // O perfil do SGDP entra PRIMEIRO (admin > gestor > basico), depois as
+                        // demais roles do token (ex. "pgia", que abre o módulo PGIA) — ver
+                        // ModulosSgdp.RolesComPerfilPrimeiro. O acesso a cada módulo não
+                        // depende do perfil: é a política "modulo:*" que decide.
+                        foreach (var r in ModulosSgdp.RolesComPerfilPrimeiro(rolesDoToken))
                             identity.AddClaim(new Claim(ClaimTypes.Role, r));
-
-                        // A role "pgia" é o portão de entrada do módulo PGIA (checado via
-                        // [Authorize(Roles = "pgia")] nos controllers PGIA) e também empresta
-                        // o perfil "basico" para reaproveitar o confinamento de tela do SGDP —
-                        // mas só quando o usuário não tem perfil próprio (admin/gestor): um
-                        // gestor que também está num grupo PGIA continua gestor no resto do
-                        // sistema, "basico" é só o fallback de quem não tem perfil nenhum.
-                        var temPerfilProprio = rolesDoToken.Contains(Perfis.Admin) || rolesDoToken.Contains(Perfis.Gestor);
-                        if (rolesDoToken.Contains("pgia") && !temPerfilProprio)
-                            identity.AddClaim(new Claim(ClaimTypes.Role, Perfis.Basico));
                     }
 
                     JsonElement groups = default;
@@ -287,7 +288,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization();
+// Uma política por módulo: exige a claim sgdp_modulo que a claims transformation
+// acrescenta a partir das roles do token e das concessões gravadas no sistema
+builder.Services.AddAuthorization(ModulosSgdp.AdicionarPoliticas);
 
 // Política usada SÓ pela superfície anônima do PGIA ([EnableRateLimiting] no
 // PgiaPublicoController); nenhum endpoint existente passa pelo limitador.

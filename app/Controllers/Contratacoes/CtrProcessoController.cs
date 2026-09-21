@@ -1,3 +1,4 @@
+using app.Auth;
 using System.Security.Claims;
 using api.Contratacoes;
 using Microsoft.AspNetCore.Authorization;
@@ -13,7 +14,7 @@ namespace Controllers.Contratacoes;
 /// CtrPermissionService (o front é só usabilidade).
 /// </summary>
 [ApiController]
-[Authorize]
+[Authorize(Policy = ModulosSgdp.PoliticaContratacoes)]
 [Route("api/contratacoes/processo")]
 public class CtrProcessoController : ControllerBase
 {

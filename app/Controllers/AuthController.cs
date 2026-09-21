@@ -1,10 +1,12 @@
 using System.Security.Claims;
 using System.Text.Json;
 using api.Auth;
+using app.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Repositorio;
+using service.Interface;
 
 namespace Controllers;
 
@@ -16,12 +18,15 @@ public class AuthController : ControllerBase
     private readonly IAuthRepositorio _authRepositorio;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly AuthSettings _authSettings;
+    private readonly IAcessoModuloService _acessoModuloService;
 
-    public AuthController(IAuthRepositorio authRepositorio, IHttpClientFactory httpClientFactory, IOptions<AuthSettings> authSettings)
+    public AuthController(IAuthRepositorio authRepositorio, IHttpClientFactory httpClientFactory,
+        IOptions<AuthSettings> authSettings, IAcessoModuloService acessoModuloService)
     {
         _authRepositorio = authRepositorio;
         _httpClientFactory = httpClientFactory;
         _authSettings = authSettings.Value;
+        _acessoModuloService = acessoModuloService;
     }
 
     private string KeycloakTokenUrl => $"{_authSettings.Authority}/protocol/openid-connect/token";
@@ -83,19 +88,43 @@ public class AuthController : ControllerBase
         var email = User.FindFirst(ClaimTypes.Email)?.Value ?? User.FindFirst("email")?.Value;
         var nome = User.FindFirst(ClaimTypes.Name)?.Value ?? User.FindFirst("name")?.Value
             ?? User.FindFirst("preferred_username")?.Value ?? "";
+        // O perfil do SGDP é sempre a primeira role (o Program.cs põe admin > gestor >
+        // basico na frente das demais roles do token)
         var perfil = User.FindFirst(ClaimTypes.Role)?.Value ?? "basico";
         var unidadeCodigo = User.FindFirst("unidade_codigo")?.Value;
-        // Acesso ao módulo PGIA = role "pgia" do Keycloak (portão de entrada,
-        // checado via [Authorize(Roles = "admin,pgia")] nos controllers PGIA).
-        var acessoPgia = User.IsInRole("admin") || User.IsInRole("pgia");
 
         if (string.IsNullOrEmpty(keycloakId))
             return Unauthorized();
 
         var user = await _authRepositorio.GetOrCreateUserAsync(keycloakId, nome, email ?? "", unidadeCodigo);
-        // PapelPgia, AcessoPgia e PapelContratacoes são campos adicionais na
-        // resposta; o front atual ignora campos extras
-        return Ok(new { user.Id, user.Nome, user.Email, Perfil = perfil, user.PapelPgia, AcessoPgia = acessoPgia, user.PapelContratacoes, user.Unidade });
+
+        // Retrato das roles do Keycloak para a tela de gestão de acessos (informativo)
+        await _acessoModuloService.SincronizarRetratoKeycloakAsync(user.Id, User);
+
+        // Módulos que o usuário enxerga (ModulosSgdp): roles do token + concessões e
+        // papéis gravados no sistema. Lista vazia = não enxerga nada. Recalculado aqui
+        // com o usuário já cadastrado (no 1º login a claims transformation ainda não
+        // o encontrava no banco).
+        var modulos = await _acessoModuloService.ModulosDoUsuarioAsync(User, user);
+
+        // Pedido de acesso pendente de um módulo que a pessoa já tem (chegou pelo
+        // Keycloak, por exemplo) sai da fila de quem decide
+        await _acessoModuloService.EncerrarPedidosAtendidosAsync(user.Id, modulos, null, user.PapelPgia);
+
+        // PapelPgia, AcessoPgia, PapelContratacoes e Modulos são campos adicionais na
+        // resposta; AcessoPgia passou a ser o acesso efetivo ao módulo PGIA
+        return Ok(new
+        {
+            user.Id,
+            user.Nome,
+            user.Email,
+            Perfil = perfil,
+            user.PapelPgia,
+            AcessoPgia = modulos.Contains(ModulosSgdp.Pgia),
+            user.PapelContratacoes,
+            user.Unidade,
+            Modulos = modulos
+        });
     }
 
     [HttpPost("unidade")]
