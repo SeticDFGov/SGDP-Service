@@ -10,7 +10,10 @@ on:
 
 jobs:
   sonarcloud:
-    runs-on: self-hosted
+    # Runner hospedado pelo GitHub: ambiente isolado e recriado do zero a cada
+    # execução (nada compartilhado com a máquina do self-hosted, que faltava
+    # Java e travava o scanner com SIGABRT).
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout do código
@@ -18,14 +21,10 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Adicionar .NET ao PATH
-      run: |
-        echo "/usr/share/dotnet" >> $GITHUB_PATH
-        echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
-        echo "DOTNET_ROOT=/usr/share/dotnet" >> $GITHUB_ENV
-
-    - name: Verificar versão do .NET
-      run: dotnet --version
+    - name: Instalar .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
 
     - name: Instalar Java (exigido pelo scanner)
       uses: actions/setup-java@v4
@@ -34,15 +33,12 @@ jobs:
         java-version: '17'
 
     - name: Instalar dotnet-sonarscanner
-      run: |
-        export PATH="$PATH:$HOME/.dotnet/tools"
-        dotnet tool install --global dotnet-sonarscanner || dotnet tool update --global dotnet-sonarscanner
+      run: dotnet tool install --global dotnet-sonarscanner
 
     - name: Iniciar análise do SonarCloud
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       run: |
-        export PATH="$PATH:$HOME/.dotnet/tools"
         dotnet-sonarscanner begin \
           /k:"SeticDFGov_SGDP-Service" \
           /o:"seticdfgov" \
@@ -59,6 +55,4 @@ jobs:
     - name: Finalizar análise do SonarCloud
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      run: |
-        export PATH="$PATH:$HOME/.dotnet/tools"
-        dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+      run: dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
