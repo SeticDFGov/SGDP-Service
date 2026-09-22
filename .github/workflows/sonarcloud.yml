@@ -44,13 +44,31 @@ jobs:
           /o:"seticdfgov" \
           /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
           /d:sonar.host.url="https://sonarcloud.io" \
-          /d:sonar.exclusions="**/Migrations/**,**/bin/**,**/obj/**"
+          /d:sonar.exclusions="**/Migrations/**,**/bin/**,**/obj/**" \
+          /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
 
     - name: Restore dependencies
       run: dotnet restore app/demanda_service.sln
 
     - name: Build
       run: dotnet build app/demanda_service.sln --no-restore --configuration Release
+
+    # Cobertura dos dois projetos de teste (test/ é o legado que não compila, fora
+    # do escopo). O relatório é o que dotnet-sonarscanner end lê para publicar a
+    # cobertura no dashboard do SonarCloud.
+    - name: Testes com cobertura (test-pgia)
+      run: >
+        dotnet test test-pgia/test-pgia.csproj
+        --collect:"XPlat Code Coverage"
+        --results-directory test-pgia/TestResults
+        -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+
+    - name: Testes com cobertura (test-contratacoes)
+      run: >
+        dotnet test test-contratacoes/test-contratacoes.csproj
+        --collect:"XPlat Code Coverage"
+        --results-directory test-contratacoes/TestResults
+        -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
 
     - name: Finalizar análise do SonarCloud
       env:
