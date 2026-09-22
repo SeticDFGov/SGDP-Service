@@ -49,6 +49,8 @@ public static class CtrModelConfiguration
                     "(esclarecimento_solicitado_em IS NULL AND esclarecimento_descricao IS NULL "
                     + "AND esclarecimento_respondido_em IS NULL) OR "
                     + "(esclarecimento_solicitado_em IS NOT NULL AND esclarecimento_descricao IS NOT NULL)");
+                // Os dois CHECKs abaixo são das colunas LEGADAS do questionário do PGIA (sem
+                // uso desde 2026-09-21, ver CtrProcesso); ficam até a migration que as remover.
                 // Mesmos quatro resultados do PGIA (fonte única: PgiaDominios.ResultadoRisco)
                 t.HasCheckConstraint("ck_ctr_processo_risco_classificado",
                     "risco_classificado IS NULL OR "

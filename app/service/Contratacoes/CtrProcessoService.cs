@@ -488,16 +488,10 @@ public class CtrProcessoService : ICtrProcessoService
         if (filtro.EsclarecimentoPendente != null)
             query = query.Where(PredicadoEsclarecimentoPendente(filtro.EsclarecimentoPendente.Value));
 
-        if (!string.IsNullOrWhiteSpace(filtro.RiscoClassificado))
-        {
-            // Mesma regra dos demais filtros de domínio: fora dele, lista vazia
-            var predicado = CtrClassificacaoRisco.PredicadoRiscoClassificado(filtro.RiscoClassificado.Trim());
-            query = predicado != null ? query.Where(predicado) : query.Where(p => false);
-        }
-
         if (!string.IsNullOrWhiteSpace(filtro.NivelRiscoDeclarado))
         {
-            // Nível MÁXIMO como predicado EF sobre os pares da matriz (nada materializado)
+            // Nível MÁXIMO como predicado EF sobre os pares da matriz (nada materializado);
+            // mesma regra dos demais filtros de domínio: fora dele, lista vazia
             var predicado = CtrClassificacaoRisco.PredicadoNivelRiscoDeclarado(filtro.NivelRiscoDeclarado.Trim());
             query = predicado != null ? query.Where(predicado) : query.Where(p => false);
         }
@@ -560,13 +554,9 @@ public class CtrProcessoService : ICtrProcessoService
 
         ValidarProcesso(processo, await _repositorio.NumeroDuplicadoAsync(processo.NumeroProcesso, null));
 
-        // Nula = processo NÃO classificado; enviada, precisa estar completa
-        var classificacao = dto.ClassificacaoRisco != null
-            ? CtrClassificacaoRisco.Avaliar(dto.ClassificacaoRisco)
-            : null;
-
-        var riscos = classificacao != null
-            ? AplicarClassificacao(processo, classificacao, ctx.Email, agora)
+        // Nula ou vazia = processo sem riscos da contratação; enviada, cada risco é validado
+        var riscos = dto.ClassificacaoRisco != null
+            ? NovosRiscos(processo, CtrClassificacaoRisco.Avaliar(dto.ClassificacaoRisco), ctx.Email, agora)
             : new List<CtrRiscoDeclarado>();
 
         _repositorio.Add(processo);
@@ -581,10 +571,10 @@ public class CtrProcessoService : ICtrProcessoService
         var processo = await GetEntidadeAsync(id)
             ?? throw new ApiException(ErrorCode.CtrProcessoNaoEncontrado);
 
-        // Substituir e remover a classificação no mesmo pedido é ambíguo: recusado
+        // Substituir e remover os riscos no mesmo pedido é ambíguo: recusado
         if (dto.ClassificacaoRisco != null && dto.LimparClassificacaoRisco)
             throw new ApiException(ErrorCode.CtrClassificacaoRiscoInvalida,
-                "Envie a classificação de riscos ou o pedido para removê-la, não os dois.");
+                "Envie os riscos da contratação ou o pedido para removê-los, não os dois.");
 
         // Valida num candidato solto: edição recusada não pode deixar rastro na
         // entidade rastreada pelo contexto
@@ -600,42 +590,37 @@ public class CtrProcessoService : ICtrProcessoService
         ValidarCriticidadeNaoRemovida(processo.Criticidade, candidato.Criticidade,
             await _repositorio.TemManifestacaoIncisoIAsync(processo.Id));
 
-        // A classificação também é validada por inteiro ANTES de qualquer escrita
-        // (Avaliar é pura). Nula e sem pedido de remoção, a gravada e seus riscos
+        // Os riscos também são validados por inteiro ANTES de qualquer escrita (Avaliar é
+        // pura). Limpar equivale a mandar a lista vazia. Sem nenhum dos dois, os gravados
         // ficam intactos: ausência de dado nunca apaga dado gravado.
-        var classificacao = dto.ClassificacaoRisco != null
+        var mexeNosRiscos = dto.ClassificacaoRisco != null || dto.LimparClassificacaoRisco;
+        var riscosEnviados = dto.ClassificacaoRisco != null
             ? CtrClassificacaoRisco.Avaliar(dto.ClassificacaoRisco)
-            : null;
-        var riscosAnteriores = classificacao != null || dto.LimparClassificacaoRisco
+            : new List<CtrClassificacaoRisco.RiscoAvaliado>();
+        var riscosAnteriores = mexeNosRiscos
             ? await _repositorio.ListarRiscosDeclaradosAsync(processo.Id)
             : new List<CtrRiscoDeclarado>();
 
-        // Reenvio IDÊNTICO à gravada (conteúdo normalizado, riscos sem ordem) não é
-        // reclassificação: nem a auditoria (quem/quando) nem os Ids dos riscos mudam
-        if (classificacao != null
-            && CtrClassificacaoRisco.MesmaClassificacao(processo, riscosAnteriores, classificacao))
-            classificacao = null;
-
-        var mexeNaClassificacao = classificacao != null || dto.LimparClassificacaoRisco;
+        // Reenvio IDÊNTICO ao gravado (conteúdo normalizado, sem ordem) não substitui
+        // nada: nem os Ids dos riscos nem o registro de quem/quando mudam
+        var substituiRiscos = mexeNosRiscos
+            && !CtrClassificacaoRisco.MesmosRiscos(riscosAnteriores, riscosEnviados);
 
         var agora = DateTime.UtcNow;
         AplicarDto(processo, DtoDe(candidato));
         processo.AlteradoEm = agora;
         processo.AlteradoPor = ctx.Email;
 
-        if (mexeNaClassificacao)
+        if (mexeNosRiscos)
         {
-            // Enviada, SUBSTITUI a lista de riscos declarados; limpar apaga todos
-            _repositorio.RemoverRiscosDeclarados(riscosAnteriores);
+            // O questionário antigo do PGIA sai de vez quando os riscos são mexidos
+            DescartarQuestionarioLegado(processo);
 
-            if (classificacao != null)
+            if (substituiRiscos)
             {
-                foreach (var risco in AplicarClassificacao(processo, classificacao, ctx.Email, agora))
+                _repositorio.RemoverRiscosDeclarados(riscosAnteriores);
+                foreach (var risco in NovosRiscos(processo, riscosEnviados, ctx.Email, agora))
                     _repositorio.AddRiscoDeclarado(risco);
-            }
-            else
-            {
-                LimparClassificacao(processo);
             }
         }
 
@@ -830,7 +815,6 @@ public class CtrProcessoService : ICtrProcessoService
                 RestituidoEm = p.RestituidoEm,
                 EsclarecimentoSolicitadoEm = p.EsclarecimentoSolicitadoEm,
                 EsclarecimentoRespondidoEm = p.EsclarecimentoRespondidoEm,
-                RiscoClassificado = p.RiscoClassificado,
                 CriadoEm = p.CriadoEm
             })
             .ToListAsync();
@@ -884,11 +868,8 @@ public class CtrProcessoService : ICtrProcessoService
                 .OrderByDescending(c => c.Contagem.Quantidade).ThenBy(c => c.Ordem)
                 .Select(c => c.Contagem)
                 .ToList(),
-            // Os 4 resultados + "Não classificado", sempre presentes, com o mesmo desempate
-            PorRiscoClassificado = ContarNoDominio(
-                CtrDominios.RiscoClassificado.Todos.Append(CtrDominios.RiscoClassificado.NaoClassificado),
-                resumos.Select(r => r.RiscoClassificado ?? CtrDominios.RiscoClassificado.NaoClassificado).ToList()),
-            // Nível MÁXIMO declarado por processo: Baixo..Extremo + "Sem riscos declarados", idem
+            // Nível MÁXIMO dos riscos por processo: Baixo..Extremo + "Sem riscos declarados",
+            // sempre presentes, com o mesmo desempate
             PorNivelRiscoDeclarado = ContarNoDominio(
                 CtrDominios.NivelRisco.Todos.Append(CtrDominios.NivelRisco.SemRiscosDeclarados),
                 resumos.Select(r => nivelMaximoPorProcesso.GetValueOrDefault(r.Id)
@@ -1006,14 +987,14 @@ public class CtrProcessoService : ICtrProcessoService
     }
 
     /// <summary>
-    /// Leitura de UM processo (GET {id}, PUT e checkpoint): os campos planos, mais a
-    /// classificação aninhada com os riscos declarados.
+    /// Leitura de UM processo (GET {id}, PUT e checkpoint): os campos planos, mais os
+    /// riscos da contratação aninhados.
     /// </summary>
     private async Task<CtrProcessoResponse> MapearDetalheAsync(CtrProcesso processo)
     {
         var resposta = (await MapearComManifestacoesAsync(new List<CtrProcesso> { processo })).Single();
         var riscos = await _repositorio.ListarRiscosDeclaradosAsync(processo.Id);
-        resposta.ClassificacaoRisco = CtrClassificacaoRisco.MapearClassificacao(processo, riscos);
+        resposta.ClassificacaoRisco = CtrClassificacaoRisco.MapearClassificacao(riscos);
         return resposta;
     }
 
@@ -1024,26 +1005,18 @@ public class CtrProcessoService : ICtrProcessoService
         var resposta = MapProcesso(processo, hoje);
         resposta.NivelMaximoRiscoDeclarado = CtrClassificacaoRisco.CalcularNivelMaximo(
             riscos.Select(r => (r.Probabilidade, r.Consequencia)));
-        resposta.ClassificacaoRisco = CtrClassificacaoRisco.MapearClassificacao(processo, riscos);
+        resposta.ClassificacaoRisco = CtrClassificacaoRisco.MapearClassificacao(riscos);
         return resposta;
     }
 
     /// <summary>
-    /// Grava na entidade uma classificação JÁ VALIDADA: colunas recalculadas e a
-    /// auditoria (quem/quando). Devolve os riscos declarados novos para quem chama
+    /// Entidades dos riscos JÁ VALIDADOS, com quem registrou e quando, para quem chama
     /// incluir no contexto (a lista anterior é removida por quem chama, na edição).
     /// </summary>
-    private static List<CtrRiscoDeclarado> AplicarClassificacao(CtrProcesso processo,
-        CtrClassificacaoRisco.Avaliacao avaliacao, string email, DateTime agora)
+    private static List<CtrRiscoDeclarado> NovosRiscos(CtrProcesso processo,
+        IEnumerable<CtrClassificacaoRisco.RiscoAvaliado> riscos, string email, DateTime agora)
     {
-        processo.ChecklistRisco = avaliacao.ChecklistJson;
-        processo.RiscoClassificado = avaliacao.Resultado;
-        processo.EnquadramentoRisco = avaliacao.Enquadramento;
-        processo.PontuacaoRisco = avaliacao.Pontuacao;
-        processo.RiscoClassificadoEm = agora;
-        processo.RiscoClassificadoPor = email;
-
-        return avaliacao.RiscosDeclarados
+        return riscos
             .Select(r => new CtrRiscoDeclarado
             {
                 Processo = processo,
@@ -1060,8 +1033,11 @@ public class CtrProcessoService : ICtrProcessoService
             .ToList();
     }
 
-    /// <summary>Remoção deliberada (LimparClassificacaoRisco): o processo volta a "Não classificado".</summary>
-    private static void LimparClassificacao(CtrProcesso processo)
+    /// <summary>
+    /// Zera as colunas LEGADAS do questionário dos arts. 15 a 17 do PGIA (sem uso desde
+    /// 2026-09-21, ver CtrProcesso). Todas nulas juntas é o que o CHECK tudo-ou-nada aceita.
+    /// </summary>
+    private static void DescartarQuestionarioLegado(CtrProcesso processo)
     {
         processo.ChecklistRisco = null;
         processo.RiscoClassificado = null;
@@ -1109,8 +1085,7 @@ public class CtrProcessoService : ICtrProcessoService
             Fase = CalcularFase(p),
             UltimaMovimentacao = ultimaMovimentacao,
             DiasSemMovimento = CalcularDiasSemMovimento(ultimaMovimentacao, p.CriadoEm, hoje),
-            // Plano, em todas as leituras; o nível máximo e o aninhado dependem dos riscos
-            RiscoClassificado = p.RiscoClassificado,
+            // O nível máximo e os riscos aninhados dependem dos riscos: quem chama resolve
             CriadoEm = p.CriadoEm,
             CriadoPor = p.CriadoPor,
             AlteradoEm = p.AlteradoEm,
@@ -1135,7 +1110,6 @@ public class CtrProcessoService : ICtrProcessoService
         public DateOnly? RestituidoEm { get; set; }
         public DateOnly? EsclarecimentoSolicitadoEm { get; set; }
         public DateOnly? EsclarecimentoRespondidoEm { get; set; }
-        public string? RiscoClassificado { get; set; }
         public DateTime CriadoEm { get; set; }
     }
 }
