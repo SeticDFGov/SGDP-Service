@@ -5,7 +5,7 @@ using Xunit;
 namespace test.contratacoes;
 
 /// <summary>
-/// Painel: contagens (as 7 situações sempre presentes), médias com amostra
+/// Painel: contagens (as 8 situações sempre presentes), médias com amostra
 /// conhecida e lista de gargalos.
 /// </summary>
 public class CtrPainelTest : CtrTestBase
@@ -80,17 +80,17 @@ public class CtrPainelTest : CtrTestBase
     }
 
     [Fact]
-    public async Task Painel_ContaSoOsAtivosECobreAsSeteSituacoes()
+    public async Task Painel_ContaSoOsAtivosECobreAsOitoSituacoes()
     {
         var painel = await _service.MontarPainelAsync(15);
 
         Assert.Equal(5, painel.TotalAtivos);
         Assert.Equal(15, painel.LimiteDias);
-        Assert.Equal(7, painel.PorSituacao.Count);
+        Assert.Equal(8, painel.PorSituacao.Count);
         Assert.Equal(CtrDominios.Situacao.Todos.OrderBy(s => s),
             painel.PorSituacao.Select(c => c.Chave).OrderBy(s => s));
 
-        Assert.Equal(2, painel.PorSituacao.Single(c => c.Chave == CtrDominios.Situacao.Concluido).Quantidade);
+        Assert.Equal(2, painel.PorSituacao.Single(c => c.Chave == CtrDominios.Situacao.AnaliseConcluida).Quantidade);
         Assert.Equal(1, painel.PorSituacao.Single(c => c.Chave == CtrDominios.Situacao.EmAnaliseSubgd).Quantidade);
         Assert.Equal(1, painel.PorSituacao.Single(c => c.Chave == CtrDominios.Situacao.EmAnaliseSgdi).Quantidade);
         Assert.Equal(1, painel.PorSituacao.Single(c => c.Chave == CtrDominios.Situacao.Restituido).Quantidade);

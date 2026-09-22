@@ -23,6 +23,9 @@ public class CtrProcessoService : ICtrProcessoService
     /// <summary>Máximo de processos parados listados no painel.</summary>
     public const int LimiteGargalos = 50;
 
+    /// <summary>Máximo de concluídos na relação do painel (os de assinatura mais recente).</summary>
+    public const int LimiteConcluidos = 50;
+
     private const int PageSizeMaximo = 100;
 
     // Formato SEI: 00000-00000000/AAAA-DD
@@ -30,8 +33,18 @@ public class CtrProcessoService : ICtrProcessoService
 
     private static readonly string[] OrdenacoesValidas =
     {
-        "NumeroProcesso", "OrgaoSigla", "ChegadaSgdi", "CategoriaObjeto", "CriadoEm"
+        "NumeroProcesso", "OrgaoSigla", "ChegadaSgdi", "CategoriaObjeto", "CriadoEm", "Criticidade"
     };
+
+    /// <summary>
+    /// Ordem da criticidade na lista: Alta, Média, Baixa e por fim os sem criticidade.
+    /// Expressão (não método) para o EF traduzir em CASE no banco.
+    /// </summary>
+    private static readonly Expression<Func<CtrProcesso, int>> OrdemCriticidade = p =>
+        p.Criticidade == CtrDominios.Criticidade.Alta ? 0
+        : p.Criticidade == CtrDominios.Criticidade.Media ? 1
+        : p.Criticidade == CtrDominios.Criticidade.Baixa ? 2
+        : 3;
 
     private readonly ICtrProcessoRepositorio _repositorio;
 
@@ -47,22 +60,25 @@ public class CtrProcessoService : ICtrProcessoService
     /// datas e da restituição, na ordem do desenho.
     /// </summary>
     public static string CalcularSituacao(CtrProcesso p) => CalcularSituacao(
-        p.Restituido, p.ChegadaSgdi, p.ChegadaSubgd, p.ChegadaUgtic, p.RetornoGabSgdi, p.RetornoOrgao,
-        p.RetornoOrgaoNaoSeAplica);
+        p.DataAssinaturaContrato, p.Restituido, p.ChegadaSgdi, p.ChegadaSubgd, p.ChegadaUgtic, p.RetornoGabSgdi,
+        p.RetornoOrgao, p.RetornoOrgaoNaoSeAplica);
 
     /// <inheritdoc cref="CalcularSituacao(CtrProcesso)"/>
-    // Sem valor default de propósito: um chamador que esquecesse o flag receberia a
+    // Sem valor default de propósito: um chamador que esquecesse um dos flags receberia a
     // situação ANTIGA em silêncio (o processo com devolução dispensada não concluiria)
-    public static string CalcularSituacao(bool restituido, DateOnly? chegadaSgdi, DateOnly? chegadaSubgd,
-        DateOnly? chegadaUgtic, DateOnly? retornoGabSgdi, DateOnly? retornoOrgao,
+    public static string CalcularSituacao(DateOnly? dataAssinaturaContrato, bool restituido, DateOnly? chegadaSgdi,
+        DateOnly? chegadaSubgd, DateOnly? chegadaUgtic, DateOnly? retornoGabSgdi, DateOnly? retornoOrgao,
         bool retornoOrgaoNaoSeAplica)
     {
+        // Contrato assinado = processo Concluído, seja qual for o resto do trâmite: é a
+        // data FINAL (o processo sai da lista e vai para a relação de concluídos do painel)
+        if (dataAssinaturaContrato != null) return CtrDominios.Situacao.Concluido;
         if (restituido) return CtrDominios.Situacao.Restituido;
-        // Concluído pela devolução ao órgão OU pela devolução dispensada — mas só com
-        // o retorno ao Gab SGDI: marcar "não se aplica" sozinho não conclui nada,
+        // Análise concluída pela devolução ao órgão OU pela devolução dispensada — mas só
+        // com o retorno ao Gab SGDI: marcar "não se aplica" sozinho não conclui nada,
         // o processo segue na etapa em que está.
         if (retornoOrgao != null || (retornoOrgaoNaoSeAplica && retornoGabSgdi != null))
-            return CtrDominios.Situacao.Concluido;
+            return CtrDominios.Situacao.AnaliseConcluida;
         if (retornoGabSgdi != null) return CtrDominios.Situacao.RetornadoGabSgdi;
         if (chegadaUgtic != null) return CtrDominios.Situacao.EmAnaliseUgtic;
         // Vale também quando a UGTIC "não se aplica" (a etapa foi pulada de propósito)
@@ -70,16 +86,6 @@ public class CtrProcessoService : ICtrProcessoService
         if (chegadaSgdi != null) return CtrDominios.Situacao.EmAnaliseSgdi;
         return CtrDominios.Situacao.SemMovimentacao;
     }
-
-    /// <summary>
-    /// Fase da contratação — FONTE ÚNICA, nunca gravada: assinado o contrato, a
-    /// contratação está em execução; antes disso, em planejamento.
-    /// </summary>
-    public static string CalcularFase(CtrProcesso p) => CalcularFase(p.DataAssinaturaContrato);
-
-    /// <inheritdoc cref="CalcularFase(CtrProcesso)"/>
-    public static string CalcularFase(DateOnly? dataAssinaturaContrato) =>
-        dataAssinaturaContrato != null ? CtrDominios.Fase.Execucao : CtrDominios.Fase.Planejamento;
 
     /// <summary>
     /// Pedido de esclarecimento feito e ainda sem resposta — DERIVADO, nunca gravado.
@@ -145,36 +151,32 @@ public class CtrProcessoService : ICtrProcessoService
     /// </summary>
     public static Expression<Func<CtrProcesso, bool>>? PredicadoSituacao(string? situacao) => situacao switch
     {
-        CtrDominios.Situacao.Restituido => p => p.Restituido,
-        // Concluído inclui a devolução dispensada com o retorno ao Gab SGDI feito
-        CtrDominios.Situacao.Concluido => p =>
-            !p.Restituido && (p.RetornoOrgao != null || (p.RetornoOrgaoNaoSeAplica && p.RetornoGabSgdi != null)),
+        // A assinatura tem precedência sobre tudo: as demais situações a exigem nula
+        CtrDominios.Situacao.Concluido => p => p.DataAssinaturaContrato != null,
+        CtrDominios.Situacao.Restituido => p => p.DataAssinaturaContrato == null && p.Restituido,
+        // Análise concluída inclui a devolução dispensada com o retorno ao Gab SGDI feito
+        CtrDominios.Situacao.AnaliseConcluida => p =>
+            p.DataAssinaturaContrato == null && !p.Restituido
+            && (p.RetornoOrgao != null || (p.RetornoOrgaoNaoSeAplica && p.RetornoGabSgdi != null)),
         CtrDominios.Situacao.RetornadoGabSgdi => p =>
-            !p.Restituido && p.RetornoOrgao == null && !p.RetornoOrgaoNaoSeAplica && p.RetornoGabSgdi != null,
+            p.DataAssinaturaContrato == null && !p.Restituido && p.RetornoOrgao == null
+            && !p.RetornoOrgaoNaoSeAplica && p.RetornoGabSgdi != null,
         // Sem retorno ao Gab SGDI o "não se aplica" não muda nada: as demais
         // situações já exigem RetornoGabSgdi == null
         CtrDominios.Situacao.EmAnaliseUgtic => p =>
-            !p.Restituido && p.RetornoOrgao == null && p.RetornoGabSgdi == null && p.ChegadaUgtic != null,
+            p.DataAssinaturaContrato == null && !p.Restituido && p.RetornoOrgao == null
+            && p.RetornoGabSgdi == null && p.ChegadaUgtic != null,
         CtrDominios.Situacao.EmAnaliseSubgd => p =>
-            !p.Restituido && p.RetornoOrgao == null && p.RetornoGabSgdi == null && p.ChegadaUgtic == null
-            && p.ChegadaSubgd != null,
+            p.DataAssinaturaContrato == null && !p.Restituido && p.RetornoOrgao == null
+            && p.RetornoGabSgdi == null && p.ChegadaUgtic == null && p.ChegadaSubgd != null,
         CtrDominios.Situacao.EmAnaliseSgdi => p =>
-            !p.Restituido && p.RetornoOrgao == null && p.RetornoGabSgdi == null && p.ChegadaUgtic == null
-            && p.ChegadaSubgd == null && p.ChegadaSgdi != null,
+            p.DataAssinaturaContrato == null && !p.Restituido && p.RetornoOrgao == null
+            && p.RetornoGabSgdi == null && p.ChegadaUgtic == null && p.ChegadaSubgd == null
+            && p.ChegadaSgdi != null,
         CtrDominios.Situacao.SemMovimentacao => p =>
-            !p.Restituido && p.RetornoOrgao == null && p.RetornoGabSgdi == null && p.ChegadaUgtic == null
-            && p.ChegadaSubgd == null && p.ChegadaSgdi == null,
-        _ => null
-    };
-
-    /// <summary>
-    /// Traduz a fase derivada em predicado sobre a data de assinatura, como as
-    /// situações. Null quando o valor não é do domínio.
-    /// </summary>
-    public static Expression<Func<CtrProcesso, bool>>? PredicadoFase(string? fase) => fase switch
-    {
-        CtrDominios.Fase.Execucao => p => p.DataAssinaturaContrato != null,
-        CtrDominios.Fase.Planejamento => p => p.DataAssinaturaContrato == null,
+            p.DataAssinaturaContrato == null && !p.Restituido && p.RetornoOrgao == null
+            && p.RetornoGabSgdi == null && p.ChegadaUgtic == null && p.ChegadaSubgd == null
+            && p.ChegadaSgdi == null,
         _ => null
     };
 
@@ -207,6 +209,17 @@ public class CtrProcessoService : ICtrProcessoService
         p.EtapaPlanejamento = Limpar(p.EtapaPlanejamento);
         p.Criticidade = Limpar(p.Criticidade);
         p.EsclarecimentoDescricao = Limpar(p.EsclarecimentoDescricao);
+
+        // Com as respostas aos critérios, a criticidade é DERIVADA delas (fonte única
+        // CtrCriticidade): o valor que veio no corpo é descartado. Sem respostas vale o
+        // que veio (planilha antiga, processo classificado antes da regra automática).
+        var criterios = CtrCriticidade.Desserializar(p.CriteriosCriticidade);
+        if (criterios != null)
+        {
+            var normalizados = CtrCriticidade.Normalizar(criterios);
+            p.CriteriosCriticidade = CtrCriticidade.Serializar(normalizados);
+            p.Criticidade = CtrCriticidade.Calcular(normalizados);
+        }
 
         // Limpar a data do pedido ANULA a descrição (normalização, como a restituição:
         // é gesto explícito do usuário, não erro). A RESPOSTA não entra aqui: ela é
@@ -454,12 +467,10 @@ public class CtrProcessoService : ICtrProcessoService
             query = predicado != null ? query.Where(predicado) : query.Where(p => false);
         }
 
-        if (!string.IsNullOrWhiteSpace(filtro.Fase))
-        {
-            // Mesma regra da situação: fora do domínio, lista vazia
-            var predicado = PredicadoFase(filtro.Fase);
-            query = predicado != null ? query.Where(predicado) : query.Where(p => false);
-        }
+        // Concluídos (contrato assinado) ficam FORA da lista e do export por padrão: entram
+        // só quando pedidos (IncluirConcluidos) ou quando a situação filtrada é a deles
+        if (!filtro.IncluirConcluidos && string.IsNullOrWhiteSpace(filtro.Situacao))
+            query = query.Where(p => p.DataAssinaturaContrato == null);
 
         if (!string.IsNullOrWhiteSpace(filtro.EtapaPlanejamento))
         {
@@ -518,11 +529,19 @@ public class CtrProcessoService : ICtrProcessoService
             "CriadoEm" => asc
                 ? query.OrderBy(p => p.CriadoEm).ThenByDescending(p => p.Id)
                 : query.OrderByDescending(p => p.CriadoEm).ThenByDescending(p => p.Id),
-            // ChegadaSgdi (e o padrão): nulos SEMPRE por último
+            // ChegadaSgdi: nulos SEMPRE por último
             "ChegadaSgdi" when asc => query
                 .OrderBy(p => p.ChegadaSgdi == null).ThenBy(p => p.ChegadaSgdi).ThenByDescending(p => p.Id),
+            "ChegadaSgdi" => query
+                .OrderBy(p => p.ChegadaSgdi == null).ThenByDescending(p => p.ChegadaSgdi).ThenByDescending(p => p.Id),
+            // Criticidade (e o padrão): da mais alta para a mais baixa, os sem criticidade no
+            // fim e, dentro de cada uma, a chegada mais recente primeiro (nulos por último)
+            "Criticidade" when !asc => query
+                .OrderByDescending(OrdemCriticidade)
+                .ThenBy(p => p.ChegadaSgdi == null).ThenByDescending(p => p.ChegadaSgdi).ThenByDescending(p => p.Id),
             _ => query
-                .OrderBy(p => p.ChegadaSgdi == null).ThenByDescending(p => p.ChegadaSgdi).ThenByDescending(p => p.Id)
+                .OrderBy(OrdemCriticidade)
+                .ThenBy(p => p.ChegadaSgdi == null).ThenByDescending(p => p.ChegadaSgdi).ThenByDescending(p => p.Id)
         };
     }
 
@@ -585,6 +604,11 @@ public class CtrProcessoService : ICtrProcessoService
         // vale só na criação (o front antigo não manda o campo, e resetar a origem
         // de um processo do TCDF numa edição qualquer é perda de dado silenciosa)
         if (string.IsNullOrWhiteSpace(dto.Origem)) candidato.Origem = processo.Origem;
+
+        // Respostas aos critérios ausentes no corpo PRESERVAM as gravadas (o front só as
+        // manda quando o usuário as avaliou); com elas gravadas a criticidade é recalculada
+        // na validação, e o Criticidade do corpo só vale para processo ainda sem respostas
+        if (dto.CriteriosCriticidade == null) candidato.CriteriosCriticidade = processo.CriteriosCriticidade;
 
         ValidarProcesso(candidato, await _repositorio.NumeroDuplicadoAsync(candidato.NumeroProcesso, processo.Id));
         ValidarCriticidadeNaoRemovida(processo.Criticidade, candidato.Criticidade,
@@ -698,6 +722,10 @@ public class CtrProcessoService : ICtrProcessoService
                     candidato.RetornoOrgao = dto.Data;
                 }
                 break;
+            case CtrDominios.Etapa.AssinaturaContrato:
+                // A data final: com ela o processo fica Concluído (limpar reabre)
+                candidato.DataAssinaturaContrato = dto.Data;
+                break;
         }
 
         ValidarProcesso(candidato, await _repositorio.NumeroDuplicadoAsync(candidato.NumeroProcesso, processo.Id));
@@ -734,6 +762,9 @@ public class CtrProcessoService : ICtrProcessoService
         processo.EtapaPlanejamento = dto.EtapaPlanejamento;
         processo.DataAssinaturaContrato = dto.DataAssinaturaContrato;
         processo.Criticidade = dto.Criticidade;
+        processo.CriteriosCriticidade = dto.CriteriosCriticidade == null
+            ? null
+            : CtrCriticidade.Serializar(dto.CriteriosCriticidade);
         processo.Origem = dto.Origem ?? CtrDominios.Origem.OrgaoComunicante;
         processo.EsclarecimentoSolicitadoEm = dto.EsclarecimentoSolicitadoEm;
         processo.EsclarecimentoDescricao = dto.EsclarecimentoDescricao;
@@ -763,6 +794,7 @@ public class CtrProcessoService : ICtrProcessoService
         EtapaPlanejamento = p.EtapaPlanejamento,
         DataAssinaturaContrato = p.DataAssinaturaContrato,
         Criticidade = p.Criticidade,
+        CriteriosCriticidade = CtrCriticidade.Desserializar(p.CriteriosCriticidade),
         Origem = p.Origem,
         EsclarecimentoSolicitadoEm = p.EsclarecimentoSolicitadoEm,
         EsclarecimentoDescricao = p.EsclarecimentoDescricao,
@@ -828,7 +860,7 @@ public class CtrProcessoService : ICtrProcessoService
         var comSituacao = resumos.Select(r => new
         {
             Resumo = r,
-            Situacao = CalcularSituacao(r.Restituido, r.ChegadaSgdi, r.ChegadaSubgd,
+            Situacao = CalcularSituacao(r.DataAssinaturaContrato, r.Restituido, r.ChegadaSgdi, r.ChegadaSubgd,
                 r.ChegadaUgtic, r.RetornoGabSgdi, r.RetornoOrgao, r.RetornoOrgaoNaoSeAplica),
             Dias = CalcularDiasSemMovimento(
                 CalcularUltimaMovimentacao(r.ChegadaSgdi, r.ChegadaSubgd, r.ChegadaUgtic,
@@ -843,7 +875,7 @@ public class CtrProcessoService : ICtrProcessoService
             LimiteDias = limiteDias,
             TotalEsclarecimentoPendente = resumos.Count(r => CalcularEsclarecimentoPendente(
                 r.EsclarecimentoSolicitadoEm, r.EsclarecimentoRespondidoEm)),
-            // As 7 situações aparecem sempre, mesmo com zero. Ordem determinística:
+            // As 8 situações aparecem sempre, mesmo com zero. Ordem determinística:
             // quantidade desc e, no empate, a ordem do domínio (do trâmite)
             PorSituacao = CtrDominios.Situacao.Todos
                 .Select((s, ordem) => new
@@ -854,20 +886,7 @@ public class CtrProcessoService : ICtrProcessoService
                 .OrderByDescending(c => c.Contagem.Quantidade).ThenBy(c => c.Ordem)
                 .Select(c => c.Contagem)
                 .ToList(),
-            // As 2 fases aparecem sempre, com o mesmo desempate das situações
-            PorFase = CtrDominios.Fase.Todos
-                .Select((f, ordem) => new
-                {
-                    Contagem = new CtrContagem
-                    {
-                        Chave = f,
-                        Quantidade = resumos.Count(r => CalcularFase(r.DataAssinaturaContrato) == f)
-                    },
-                    Ordem = ordem
-                })
-                .OrderByDescending(c => c.Contagem.Quantidade).ThenBy(c => c.Ordem)
-                .Select(c => c.Contagem)
-                .ToList(),
+            TotalConcluidos = resumos.Count(r => r.DataAssinaturaContrato != null),
             // Nível MÁXIMO dos riscos por processo: Baixo..Extremo + "Sem riscos declarados",
             // sempre presentes, com o mesmo desempate
             PorNivelRiscoDeclarado = ContarNoDominio(
@@ -890,12 +909,15 @@ public class CtrProcessoService : ICtrProcessoService
                 SubgdParaUgtic = Media(resumos, r => r.ChegadaSubgd, r => r.ChegadaUgtic),
                 UgticParaRetornoGab = Media(resumos, r => r.ChegadaUgtic, r => r.RetornoGabSgdi),
                 RetornoGabParaOrgao = Media(resumos, r => r.RetornoGabSgdi, r => r.RetornoOrgao),
-                ChegadaParaConclusao = Media(resumos, r => r.ChegadaSgdi, r => r.RetornoOrgao)
+                ChegadaParaConclusao = Media(resumos, r => r.ChegadaSgdi, r => r.RetornoOrgao),
+                ChegadaParaAssinatura = Media(resumos, r => r.ChegadaSgdi, r => r.DataAssinaturaContrato)
             }
         };
 
+        // Parados: nem os concluídos, nem os de análise concluída, nem os restituídos
         var gargalos = comSituacao
             .Where(x => x.Situacao != CtrDominios.Situacao.Concluido
+                        && x.Situacao != CtrDominios.Situacao.AnaliseConcluida
                         && x.Situacao != CtrDominios.Situacao.Restituido
                         && x.Dias >= limiteDias)
             .OrderByDescending(x => x.Dias)
@@ -913,6 +935,26 @@ public class CtrProcessoService : ICtrProcessoService
             painel.Gargalos = gargalos
                 .Where(x => mapeados.ContainsKey(x.Resumo.Id))
                 .Select(x => mapeados[x.Resumo.Id])
+                .ToList();
+        }
+
+        // Relação de concluídos: os de assinatura mais recente, com os mesmos dados da lista
+        var idsConcluidos = resumos
+            .Where(r => r.DataAssinaturaContrato != null)
+            .OrderByDescending(r => r.DataAssinaturaContrato)
+            .ThenByDescending(r => r.Id)
+            .Take(LimiteConcluidos)
+            .Select(r => r.Id)
+            .ToList();
+
+        if (idsConcluidos.Count > 0)
+        {
+            var processos = await _repositorio.QueryAtivos().Where(p => idsConcluidos.Contains(p.Id)).ToListAsync();
+            var mapeados = (await MapearComManifestacoesAsync(processos)).ToDictionary(p => p.Id);
+
+            painel.Concluidos = idsConcluidos
+                .Where(mapeados.ContainsKey)
+                .Select(id => mapeados[id])
                 .ToList();
         }
 
@@ -1050,6 +1092,7 @@ public class CtrProcessoService : ICtrProcessoService
     public static CtrProcessoResponse MapProcesso(CtrProcesso p, DateOnly hoje)
     {
         var ultimaMovimentacao = CalcularUltimaMovimentacao(p);
+        var criterios = CtrCriticidade.Desserializar(p.CriteriosCriticidade);
 
         return new CtrProcessoResponse
         {
@@ -1070,6 +1113,8 @@ public class CtrProcessoService : ICtrProcessoService
             EtapaPlanejamento = p.EtapaPlanejamento,
             DataAssinaturaContrato = p.DataAssinaturaContrato,
             Criticidade = p.Criticidade,
+            CriteriosCriticidade = criterios,
+            PontosCriticidade = criterios == null ? null : CtrCriticidade.PontosTotais(criterios),
             Origem = p.Origem,
             EsclarecimentoSolicitadoEm = p.EsclarecimentoSolicitadoEm,
             EsclarecimentoDescricao = p.EsclarecimentoDescricao,
@@ -1082,7 +1127,6 @@ public class CtrProcessoService : ICtrProcessoService
             RestituidoMotivo = p.RestituidoMotivo,
             Observacao = p.Observacao,
             Situacao = CalcularSituacao(p),
-            Fase = CalcularFase(p),
             UltimaMovimentacao = ultimaMovimentacao,
             DiasSemMovimento = CalcularDiasSemMovimento(ultimaMovimentacao, p.CriadoEm, hoje),
             // O nível máximo e os riscos aninhados dependem dos riscos: quem chama resolve

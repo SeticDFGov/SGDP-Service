@@ -45,17 +45,25 @@ public class CtrProcesso
     // Só conclui o processo junto do retorno ao Gab SGDI (CalcularSituacao).
     public bool RetornoOrgaoNaoSeAplica { get; set; }
 
-    // ── Fase da contratação (planejamento -> execução) ────────────────────────
-    // CtrDominios.EtapaPlanejamento — onde o planejamento está (ou parou)
+    // CtrDominios.EtapaPlanejamento — onde o planejamento está (ou parou). Continua
+    // registrada depois da assinatura do contrato.
     public string? EtapaPlanejamento { get; set; }
 
-    // Assinado = a contratação saiu do planejamento e está em execução.
-    // A Fase é DERIVADA daqui (CtrProcessoService.CalcularFase) e nunca gravada.
+    // Sexta e última data do trâmite (desde 2026-09-22): assinado o contrato, o processo
+    // está Concluído (CalcularSituacao), sai da lista e vai para a relação de concluídos
+    // do painel. Fora da cronologia dos outros checkpoints: o TCDF também analisa
+    // contrato já assinado. Só não pode ser futura.
     public DateOnly? DataAssinaturaContrato { get; set; }
 
     // CtrDominios.Criticidade (art. 11 da IN SGDI nº 1/2026): atributo da
-    // CONTRATAÇÃO, não da resposta ao TCDF — o despacho apenas a reporta.
+    // CONTRATAÇÃO, não da resposta ao TCDF — o despacho apenas a reporta. Com as
+    // respostas aos critérios (abaixo) é DERIVADA delas (CtrCriticidade.Calcular) e
+    // regravada a cada validação; sem respostas, é a registrada antes da regra automática.
     public string? Criticidade { get; set; }
+
+    // Respostas aos critérios do art. 11, § 3º, da IN (CtrDominios.CriterioCriticidade),
+    // em jsonb {"I":"Sim","II":"Alto",...}. Nulo = critérios ainda não avaliados.
+    public string? CriteriosCriticidade { get; set; }
 
     // CtrDominios.Origem: nem toda contratação chega pelo órgão comunicante —
     // há as que nascem de análise do próprio TCDF sobre o contrato.

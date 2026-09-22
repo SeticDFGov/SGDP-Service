@@ -36,12 +36,16 @@ public static class CtrDominios
 
     /// <summary>
     /// Situação derivada do processo — NUNCA gravada. Fonte única do cálculo:
-    /// <c>CtrProcessoService.CalcularSituacao</c>.
+    /// <c>CtrProcessoService.CalcularSituacao</c>. Desde 2026-09-22 a assinatura do
+    /// contrato é a data FINAL do trâmite: com ela o processo está Concluído (sai da
+    /// lista e vai para a relação de concluídos do painel). A devolução ao órgão, que
+    /// até então se chamava "Concluído", passou a "Análise concluída".
     /// </summary>
     public static class Situacao
     {
-        public const string Restituido = "Restituído";
         public const string Concluido = "Concluído";
+        public const string Restituido = "Restituído";
+        public const string AnaliseConcluida = "Análise concluída";
         public const string RetornadoGabSgdi = "Retornado ao Gab SGDI";
         public const string EmAnaliseUgtic = "Em análise na UGTIC";
         public const string EmAnaliseSubgd = "Em análise na SUBGD";
@@ -50,12 +54,16 @@ public static class CtrDominios
 
         public static readonly string[] Todos =
         {
-            Restituido, Concluido, RetornadoGabSgdi, EmAnaliseUgtic,
+            Concluido, Restituido, AnaliseConcluida, RetornadoGabSgdi, EmAnaliseUgtic,
             EmAnaliseSubgd, EmAnaliseSgdi, SemMovimentacao
         };
     }
 
-    /// <summary>Checkpoints do trâmite, na ordem cronológica esperada.</summary>
+    /// <summary>
+    /// Checkpoints do trâmite, na ordem cronológica esperada. A assinatura do contrato é a
+    /// sexta e última data: fora da cronologia dos outros cinco (o TCDF também analisa
+    /// contrato já assinado), mas conclui o processo.
+    /// </summary>
     public static class Etapa
     {
         public const string ChegadaSgdi = "ChegadaSgdi";
@@ -63,10 +71,11 @@ public static class CtrDominios
         public const string ChegadaUgtic = "ChegadaUgtic";
         public const string RetornoGabSgdi = "RetornoGabSgdi";
         public const string RetornoOrgao = "RetornoOrgao";
+        public const string AssinaturaContrato = "AssinaturaContrato";
 
         public static readonly string[] Todos =
         {
-            ChegadaSgdi, ChegadaSubgd, ChegadaUgtic, RetornoGabSgdi, RetornoOrgao
+            ChegadaSgdi, ChegadaSubgd, ChegadaUgtic, RetornoGabSgdi, RetornoOrgao, AssinaturaContrato
         };
     }
 
@@ -82,18 +91,6 @@ public static class CtrDominios
         public const string Tr = "TR";
 
         public static readonly string[] Todos = { Dfd, Etp, Tr };
-    }
-
-    /// <summary>
-    /// Fase da contratação — DERIVADA, nunca gravada. Fonte única do cálculo:
-    /// <c>CtrProcessoService.CalcularFase</c> (assinatura do contrato = execução).
-    /// </summary>
-    public static class Fase
-    {
-        public const string Planejamento = "Planejamento";
-        public const string Execucao = "Execução";
-
-        public static readonly string[] Todos = { Planejamento, Execucao };
     }
 
     /// <summary>
@@ -117,14 +114,76 @@ public static class CtrDominios
         public static readonly string[] Todos = { ComunicadaPreviamente, NaoComunicadaPreviamente };
     }
 
-    /// <summary>Criticidade da contratação (art. 11 da IN SGDI nº 1/2026).</summary>
+    /// <summary>
+    /// Criticidade da contratação (art. 11, § 1º, da IN SGDI nº 1/2026). Desde 2026-09-22 é
+    /// DERIVADA das respostas aos critérios (<see cref="CriterioCriticidade"/>; fonte única
+    /// do cálculo: <c>CtrCriticidade.Calcular</c>) e gravada na coluna, para filtro e ordem.
+    /// Processo sem respostas guarda a criticidade registrada antes da regra automática.
+    /// </summary>
     public static class Criticidade
     {
         public const string Alta = "Alta";
         public const string Media = "Média";
         public const string Baixa = "Baixa";
 
+        /// <summary>Da mais alta para a mais baixa: é a ordem padrão da lista.</summary>
         public static readonly string[] Todos = { Alta, Media, Baixa };
+    }
+
+    /// <summary>
+    /// Critérios de priorização do art. 11, § 3º, da IN SGDI nº 1/2026, respondidos no
+    /// cadastro do processo. I, III, V e VII são Sim/Não; II, IV e VI são graduados
+    /// (Nenhum, Baixo, Médio, Alto). A resposta padrão de cada um é a primeira da lista.
+    /// </summary>
+    public static class CriterioCriticidade
+    {
+        /// <summary>I: alinhamento às diretrizes da EGD/DF.</summary>
+        public const string AlinhamentoEgd = "I";
+
+        /// <summary>II: impacto sobre a prestação de serviços públicos digitais.</summary>
+        public const string ImpactoServicos = "II";
+
+        /// <summary>III: potencial de compartilhamento ou utilização corporativa da solução.</summary>
+        public const string Compartilhamento = "III";
+
+        /// <summary>IV: impacto sobre a arquitetura corporativa, a interoperabilidade ou a governança de dados.</summary>
+        public const string ImpactoArquitetura = "IV";
+
+        /// <summary>V: tecnologias emergentes, computação em nuvem ou soluções baseadas em IA.</summary>
+        public const string TecnologiasEmergentes = "V";
+
+        /// <summary>VI: riscos de segurança da informação, proteção de dados pessoais ou continuidade dos serviços.</summary>
+        public const string RiscosSeguranca = "VI";
+
+        /// <summary>VII: valor estimado igual ou superior ao limite das alíneas a, b ou c.</summary>
+        public const string ValorEstimado = "VII";
+
+        public static readonly string[] Todos =
+        {
+            AlinhamentoEgd, ImpactoServicos, Compartilhamento, ImpactoArquitetura,
+            TecnologiasEmergentes, RiscosSeguranca, ValorEstimado
+        };
+
+        public const string Nao = "Não";
+        public const string Sim = "Sim";
+
+        public static readonly string[] RespostasSimNao = { Nao, Sim };
+
+        public const string Nenhum = "Nenhum";
+        public const string Baixo = "Baixo";
+        public const string Medio = "Médio";
+        public const string Alto = "Alto";
+
+        public static readonly string[] RespostasGrau = { Nenhum, Baixo, Medio, Alto };
+
+        /// <summary>Os três critérios graduados (os demais são Sim/Não).</summary>
+        public static readonly string[] Graduados = { ImpactoServicos, ImpactoArquitetura, RiscosSeguranca };
+
+        public static string[] RespostasDe(string codigo) =>
+            Graduados.Contains(codigo) ? RespostasGrau : RespostasSimNao;
+
+        /// <summary>Resposta assumida quando o critério não é respondido (Não ou Nenhum).</summary>
+        public static string RespostaPadrao(string codigo) => RespostasDe(codigo)[0];
     }
 
     /// <summary>Resultado da análise e providência adotada (inciso I do despacho).</summary>

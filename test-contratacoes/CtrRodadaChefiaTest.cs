@@ -38,7 +38,7 @@ public class CtrRodadaChefiaTest : CtrTestBase
             RetornoOrgaoNaoSeAplica = true
         };
 
-        Assert.Equal(CtrDominios.Situacao.Concluido, CtrProcessoService.CalcularSituacao(processo));
+        Assert.Equal(CtrDominios.Situacao.AnaliseConcluida, CtrProcessoService.CalcularSituacao(processo));
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public class CtrRodadaChefiaTest : CtrTestBase
         });
 
         var concluidos = await _processos.ListarAsync(
-            new CtrProcessoFiltro { Situacao = CtrDominios.Situacao.Concluido });
+            new CtrProcessoFiltro { Situacao = CtrDominios.Situacao.AnaliseConcluida });
         Assert.Equal(2, concluidos.TotalItems);
 
         var naGab = await _processos.ListarAsync(
@@ -133,7 +133,7 @@ public class CtrRodadaChefiaTest : CtrTestBase
 
         Assert.True(resposta.RetornoOrgaoNaoSeAplica);
         Assert.Null(resposta.RetornoOrgao);
-        Assert.Equal(CtrDominios.Situacao.Concluido, resposta.Situacao);
+        Assert.Equal(CtrDominios.Situacao.AnaliseConcluida, resposta.Situacao);
     }
 
     [Fact]
@@ -156,7 +156,7 @@ public class CtrRodadaChefiaTest : CtrTestBase
 
         Assert.False(resposta.RetornoOrgaoNaoSeAplica);
         Assert.Equal(DiasAtras(2), resposta.RetornoOrgao);
-        Assert.Equal(CtrDominios.Situacao.Concluido, resposta.Situacao);
+        Assert.Equal(CtrDominios.Situacao.AnaliseConcluida, resposta.Situacao);
     }
 
     [Fact]
@@ -214,16 +214,36 @@ public class CtrRodadaChefiaTest : CtrTestBase
         Assert.Equal(DiasAtras(3), resposta.RetornoOrgao);
     }
 
-    // ══ 2.1 Fase da contratação ═══════════════════════════════════════════════
+    // ══ 2.1 Assinatura do contrato: a data FINAL do trâmite ═══════════════════
+    // (Desde 2026-09-22 substitui a "fase" derivada: assinado = Concluído.)
 
     [Fact]
-    public void CalcularFase_SaiDaAssinaturaDoContrato()
+    public void CalcularSituacao_AssinaturaDoContrato_ConcluiOProcesso()
     {
-        Assert.Equal(CtrDominios.Fase.Planejamento,
-            CtrProcessoService.CalcularFase(new CtrProcesso()));
+        Assert.Equal(CtrDominios.Situacao.SemMovimentacao,
+            CtrProcessoService.CalcularSituacao(new CtrProcesso()));
 
-        Assert.Equal(CtrDominios.Fase.Execucao,
-            CtrProcessoService.CalcularFase(new CtrProcesso { DataAssinaturaContrato = DiasAtras(1) }));
+        Assert.Equal(CtrDominios.Situacao.Concluido,
+            CtrProcessoService.CalcularSituacao(new CtrProcesso { DataAssinaturaContrato = DiasAtras(1) }));
+
+        // Vence tudo: trâmite no meio, restituição e devolução ao órgão
+        var noMeio = new CtrProcesso
+        {
+            ChegadaSgdi = DiasAtras(30),
+            ChegadaSubgd = DiasAtras(20),
+            DataAssinaturaContrato = DiasAtras(1)
+        };
+        Assert.Equal(CtrDominios.Situacao.Concluido, CtrProcessoService.CalcularSituacao(noMeio));
+
+        var restituido = new CtrProcesso
+        {
+            ChegadaSgdi = DiasAtras(30),
+            Restituido = true,
+            RestituidoEm = DiasAtras(10),
+            RestituidoMotivo = "Devolvido por falta de documentos",
+            DataAssinaturaContrato = DiasAtras(1)
+        };
+        Assert.Equal(CtrDominios.Situacao.Concluido, CtrProcessoService.CalcularSituacao(restituido));
 
         // A etapa do planejamento NÃO é anulada pela assinatura: é onde ele parou
         var assinado = new CtrProcesso
@@ -231,27 +251,28 @@ public class CtrRodadaChefiaTest : CtrTestBase
             EtapaPlanejamento = CtrDominios.EtapaPlanejamento.Tr,
             DataAssinaturaContrato = DiasAtras(1)
         };
-        Assert.Equal(CtrDominios.Fase.Execucao, CtrProcessoService.CalcularFase(assinado));
+        Assert.Equal(CtrDominios.Situacao.Concluido, CtrProcessoService.CalcularSituacao(assinado));
         Assert.Equal(CtrDominios.EtapaPlanejamento.Tr, assinado.EtapaPlanejamento);
     }
 
     [Fact]
-    public async Task Criar_ComEtapaEAssinatura_DevolveAFaseDerivada()
+    public async Task Criar_ComEtapaEAssinatura_DevolveConcluido()
     {
         var ctx = await ContextoAnalistaAsync();
         var dto = NovoProcessoDto("04044-00000120/2026-11");
         dto.ChegadaSgdi = DiasAtras(20);
         dto.EtapaPlanejamento = CtrDominios.EtapaPlanejamento.Etp;
 
-        var emPlanejamento = await _processos.CriarAsync(dto, ctx);
-        Assert.Equal(CtrDominios.Fase.Planejamento, emPlanejamento.Fase);
-        Assert.Equal(CtrDominios.EtapaPlanejamento.Etp, emPlanejamento.EtapaPlanejamento);
+        var emAnalise = await _processos.CriarAsync(dto, ctx);
+        Assert.Equal(CtrDominios.Situacao.EmAnaliseSgdi, emAnalise.Situacao);
+        Assert.Equal(CtrDominios.EtapaPlanejamento.Etp, emAnalise.EtapaPlanejamento);
 
         dto.NumeroProcesso = "04044-00000121/2026-12";
         dto.DataAssinaturaContrato = DiasAtras(2);
-        var emExecucao = await _processos.CriarAsync(dto, ctx);
-        Assert.Equal(CtrDominios.Fase.Execucao, emExecucao.Fase);
-        Assert.Equal(DiasAtras(2), emExecucao.DataAssinaturaContrato);
+        var concluido = await _processos.CriarAsync(dto, ctx);
+        Assert.Equal(CtrDominios.Situacao.Concluido, concluido.Situacao);
+        Assert.Equal(DiasAtras(2), concluido.DataAssinaturaContrato);
+        Assert.Equal(CtrDominios.EtapaPlanejamento.Etp, concluido.EtapaPlanejamento);
     }
 
     [Fact]
@@ -266,7 +287,7 @@ public class CtrRodadaChefiaTest : CtrTestBase
 
         var resposta = await _processos.CriarAsync(dto, ctx);
 
-        Assert.Equal(CtrDominios.Fase.Execucao, resposta.Fase);
+        Assert.Equal(CtrDominios.Situacao.Concluido, resposta.Situacao);
         Assert.Equal(DiasAtras(200), resposta.DataAssinaturaContrato);
     }
 
@@ -289,7 +310,7 @@ public class CtrRodadaChefiaTest : CtrTestBase
     }
 
     [Fact]
-    public async Task Filtro_FaseEEtapa_ForaDoDominioDevolveVazio()
+    public async Task Filtro_Etapa_ForaDoDominioDevolveVazio_EConcluidoSoEntraQuandoPedido()
     {
         SemearProcesso("04044-00000130/2026-11", p => p.EtapaPlanejamento = CtrDominios.EtapaPlanejamento.Dfd);
         SemearProcesso("04044-00000131/2026-12", p =>
@@ -298,27 +319,26 @@ public class CtrRodadaChefiaTest : CtrTestBase
             p.DataAssinaturaContrato = DiasAtras(5);
         });
 
-        var planejamento = await _processos.ListarAsync(
-            new CtrProcessoFiltro { Fase = CtrDominios.Fase.Planejamento });
-        Assert.Equal("04044-00000130/2026-11", Assert.Single(planejamento.Items).NumeroProcesso);
-
-        var execucao = await _processos.ListarAsync(new CtrProcessoFiltro { Fase = CtrDominios.Fase.Execucao });
-        Assert.Equal("04044-00000131/2026-12", Assert.Single(execucao.Items).NumeroProcesso);
-
         var porEtapa = await _processos.ListarAsync(
             new CtrProcessoFiltro { EtapaPlanejamento = CtrDominios.EtapaPlanejamento.Dfd });
         Assert.Equal("04044-00000130/2026-11", Assert.Single(porEtapa.Items).NumeroProcesso);
 
-        // Regra B5: o que o servidor não entende vira lista vazia, nunca "todos"
-        var faseInvalida = await _processos.ListarAsync(new CtrProcessoFiltro { Fase = "Homologação" });
-        Assert.Equal(0, faseInvalida.TotalItems);
+        // O assinado está Concluído: fora da lista por padrão, dentro quando pedido
+        var porEtapaTr = await _processos.ListarAsync(
+            new CtrProcessoFiltro { EtapaPlanejamento = CtrDominios.EtapaPlanejamento.Tr });
+        Assert.Equal(0, porEtapaTr.TotalItems);
 
+        var comConcluidos = await _processos.ListarAsync(new CtrProcessoFiltro
+        { EtapaPlanejamento = CtrDominios.EtapaPlanejamento.Tr, IncluirConcluidos = true });
+        Assert.Equal("04044-00000131/2026-12", Assert.Single(comConcluidos.Items).NumeroProcesso);
+
+        // Regra B5: o que o servidor não entende vira lista vazia, nunca "todos"
         var etapaInvalida = await _processos.ListarAsync(new CtrProcessoFiltro { EtapaPlanejamento = "EDITAL" });
         Assert.Equal(0, etapaInvalida.TotalItems);
     }
 
     [Fact]
-    public async Task Painel_PorFase_TrazAsDuasFasesSempre()
+    public async Task Painel_Concluidos_TrazTotalERelacaoDoMaisRecentePrimeiro()
     {
         SemearProcesso("04044-00000140/2026-11");
         SemearProcesso("04044-00000141/2026-12", p => p.DataAssinaturaContrato = DiasAtras(3));
@@ -326,21 +346,27 @@ public class CtrRodadaChefiaTest : CtrTestBase
 
         var painel = await _processos.MontarPainelAsync(15);
 
-        Assert.Equal(2, painel.PorFase.Count);
-        // Quantidade desc; no empate, a ordem do domínio
-        Assert.Equal(CtrDominios.Fase.Execucao, painel.PorFase[0].Chave);
-        Assert.Equal(2, painel.PorFase[0].Quantidade);
-        Assert.Equal(CtrDominios.Fase.Planejamento, painel.PorFase[1].Chave);
-        Assert.Equal(1, painel.PorFase[1].Quantidade);
+        Assert.Equal(3, painel.TotalAtivos);
+        Assert.Equal(2, painel.TotalConcluidos);
+        Assert.Equal(new[] { "04044-00000141/2026-12", "04044-00000142/2026-13" },
+            painel.Concluidos.Select(c => c.NumeroProcesso).ToArray());
+        Assert.All(painel.Concluidos, c => Assert.Equal(CtrDominios.Situacao.Concluido, c.Situacao));
+        Assert.Equal(2, painel.PorSituacao.Single(c => c.Chave == CtrDominios.Situacao.Concluido).Quantidade);
+        // Concluído não é gargalo, por mais parado que esteja
+        Assert.DoesNotContain(painel.Gargalos, g => g.DataAssinaturaContrato != null);
     }
 
     [Fact]
-    public async Task Painel_PorFase_ComBaseVazia_TrazAsDuasFasesZeradas()
+    public async Task Painel_SemConcluidos_TrazTotalZeroERelacaoVazia()
     {
+        SemearProcesso("04044-00000143/2026-14");
+
         var painel = await _processos.MontarPainelAsync(15);
 
-        Assert.Equal(CtrDominios.Fase.Todos, painel.PorFase.Select(c => c.Chave).ToArray());
-        Assert.All(painel.PorFase, c => Assert.Equal(0, c.Quantidade));
+        Assert.Equal(0, painel.TotalConcluidos);
+        Assert.Empty(painel.Concluidos);
+        Assert.Null(painel.TemposMedios.ChegadaParaAssinatura);
+        Assert.Equal(0, painel.PorSituacao.Single(c => c.Chave == CtrDominios.Situacao.Concluido).Quantidade);
     }
 
     // ══ 2.2 Criticidade no processo ═══════════════════════════════════════════
@@ -580,8 +606,8 @@ public class CtrRodadaChefiaTest : CtrTestBase
         var resposta = await _processos.CriarAsync(dto, ctx);
 
         Assert.Equal(CtrDominios.Origem.Tcdf, resposta.Origem);
-        Assert.Equal(CtrDominios.Situacao.SemMovimentacao, resposta.Situacao);
-        Assert.Equal(CtrDominios.Fase.Execucao, resposta.Fase);
+        // Já assinado = já Concluído (só aparece na lista quando pedido); nasce sem trâmite
+        Assert.Equal(CtrDominios.Situacao.Concluido, resposta.Situacao);
         Assert.Null(resposta.ChegadaSgdi);
     }
 
@@ -751,7 +777,8 @@ public class CtrRodadaChefiaTest : CtrTestBase
             p.Criticidade = CtrDominios.Criticidade.Baixa;
         });
 
-        var bytes = await _processos.ExportarCsvAsync(new CtrProcessoFiltro { PageSize = 50 });
+        // O assinado está Concluído: o export só o traz quando pedido, como a lista
+        var bytes = await _processos.ExportarCsvAsync(new CtrProcessoFiltro { PageSize = 50, IncluirConcluidos = true });
         var previa = await NovoImportacaoService().PreviaAsync(bytes);
 
         Assert.Equal(2, previa.TotalLinhas);

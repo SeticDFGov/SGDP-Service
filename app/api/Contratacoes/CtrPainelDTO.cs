@@ -22,7 +22,11 @@ public class CtrTemposMedios
 
     public double? RetornoGabParaOrgao { get; set; }
 
+    /// <summary>Chegada à SGDI até o retorno ao órgão (análise concluída).</summary>
     public double? ChegadaParaConclusao { get; set; }
+
+    /// <summary>Chegada à SGDI até a assinatura do contrato (processo concluído).</summary>
+    public double? ChegadaParaAssinatura { get; set; }
 }
 
 /// <summary>Indicadores agregados dos processos ativos (GET api/contratacoes/painel).</summary>
@@ -36,11 +40,17 @@ public class CtrPainelResponse
     /// <summary>Ativos com pedido de esclarecimento feito e ainda sem resposta.</summary>
     public int TotalEsclarecimentoPendente { get; set; }
 
-    /// <summary>As 7 situações, mesmo as com zero.</summary>
+    /// <summary>As 8 situações, mesmo as com zero.</summary>
     public List<CtrContagem> PorSituacao { get; set; } = new();
 
-    /// <summary>As 2 fases (CtrDominios.Fase), mesmo as com zero.</summary>
-    public List<CtrContagem> PorFase { get; set; } = new();
+    /// <summary>Ativos com contrato assinado (situação Concluído).</summary>
+    public int TotalConcluidos { get; set; }
+
+    /// <summary>
+    /// Relação de concluídos: os de assinatura mais recente primeiro, no máximo 50, com os
+    /// mesmos dados da lista.
+    /// </summary>
+    public List<CtrProcessoResponse> Concluidos { get; set; } = new();
 
     /// <summary>
     /// Nível MÁXIMO dos riscos da contratação por processo: Baixo, Médio, Alto, Extremo +
@@ -56,7 +66,7 @@ public class CtrPainelResponse
     public CtrTemposMedios TemposMedios { get; set; } = new();
 
     /// <summary>
-    /// Ativos fora de Concluído/Restituído com DiasSemMovimento >= LimiteDias,
+    /// Ativos fora de Concluído/Análise concluída/Restituído com DiasSemMovimento >= LimiteDias,
     /// do mais parado para o menos, no máximo 50.
     /// </summary>
     public List<CtrProcessoResponse> Gargalos { get; set; } = new();
