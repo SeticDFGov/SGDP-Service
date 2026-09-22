@@ -284,12 +284,14 @@ public class CtrEsclarecimentosPendenciasTest : CtrTestBase
     // ── CSV do esclarecimento ─────────────────────────────────────────────────
 
     [Fact]
-    public void Csv_Cabecalho_TerminaComAsTresColunasDeEsclarecimento()
+    public void Csv_Cabecalho_TemAsTresColunasDeEsclarecimentoDepoisDaOrigem()
     {
-        Assert.Equal(22, CtrCsv.Cabecalho.Length);
+        // 22 colunas até a rodada dos esclarecimentos; as 7 dos critérios de criticidade
+        // vieram depois delas (CtrCriticidadeConclusaoTest)
+        Assert.Equal(29, CtrCsv.Cabecalho.Length);
         Assert.Equal(
             new[] { "Pedido de esclarecimento em", "Esclarecimento solicitado", "Esclarecimento respondido em" },
-            CtrCsv.Cabecalho[^3..]);
+            CtrCsv.Cabecalho[19..22]);
     }
 
     [Fact]
@@ -435,12 +437,12 @@ public class CtrEsclarecimentosPendenciasTest : CtrTestBase
 
         processo.RetornoOrgaoNaoSeAplica = true;
         Context.SaveChanges();
-        Assert.Equal(CtrDominios.Situacao.Concluido, CtrProcessoService.CalcularSituacao(processo));
+        Assert.Equal(CtrDominios.Situacao.AnaliseConcluida, CtrProcessoService.CalcularSituacao(processo));
 
         await NovoImportacaoService().ImportarAsync(PlanilhaReal(), ctx);
 
         Assert.True(processo.RetornoOrgaoNaoSeAplica);
-        Assert.Equal(CtrDominios.Situacao.Concluido, CtrProcessoService.CalcularSituacao(processo));
+        Assert.Equal(CtrDominios.Situacao.AnaliseConcluida, CtrProcessoService.CalcularSituacao(processo));
     }
 
     [Fact]
@@ -750,7 +752,7 @@ public class CtrEsclarecimentosPendenciasTest : CtrTestBase
 
         Assert.True(resposta.RetornoOrgaoNaoSeAplica);
         Assert.Null(resposta.RetornoOrgao);
-        Assert.Equal(CtrDominios.Situacao.Concluido, resposta.Situacao);
+        Assert.Equal(CtrDominios.Situacao.AnaliseConcluida, resposta.Situacao);
     }
 
     // ── Assimetria CalcularEstagio × PredicadoEstagio ────────────────────────

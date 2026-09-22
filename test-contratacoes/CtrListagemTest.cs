@@ -110,7 +110,7 @@ public class CtrListagemTest : CtrTestBase
     [InlineData(CtrDominios.Situacao.EmAnaliseSubgd, 1)]
     [InlineData(CtrDominios.Situacao.EmAnaliseUgtic, 1)]
     [InlineData(CtrDominios.Situacao.RetornadoGabSgdi, 1)]
-    [InlineData(CtrDominios.Situacao.Concluido, 1)]
+    [InlineData(CtrDominios.Situacao.AnaliseConcluida, 1)]
     [InlineData(CtrDominios.Situacao.Restituido, 1)]
     public async Task Listar_FiltraPorSituacaoDerivada(string situacao, int esperado)
     {

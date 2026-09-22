@@ -189,6 +189,9 @@ public class CtrImportacaoService : ICtrImportacaoService
         if (!colunas.DataAssinaturaContrato) candidato.DataAssinaturaContrato = existente.DataAssinaturaContrato;
         if (!colunas.Criticidade) candidato.Criticidade = existente.Criticidade;
         if (!colunas.Origem) candidato.Origem = existente.Origem;
+        // Bloco dos sete critérios: ausente, as respostas gravadas (e a criticidade calculada
+        // delas) ficam; presente e todo vazio, limpa as respostas e a coluna Criticidade decide
+        if (!colunas.CriteriosCriticidade) candidato.CriteriosCriticidade = existente.CriteriosCriticidade;
 
         // Bloco inteiro: herdar só parte dele produziria estado que o CHECK recusa
         if (!colunas.Esclarecimento)

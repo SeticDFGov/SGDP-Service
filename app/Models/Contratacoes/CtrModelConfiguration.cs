@@ -83,6 +83,7 @@ public static class CtrModelConfiguration
             entity.Property(p => p.EtapaPlanejamento).HasColumnName("etapa_planejamento").HasMaxLength(10);
             entity.Property(p => p.DataAssinaturaContrato).HasColumnName("data_assinatura_contrato");
             entity.Property(p => p.Criticidade).HasColumnName("criticidade").HasMaxLength(10);
+            entity.Property(p => p.CriteriosCriticidade).HasColumnName("criticidade_criterios").HasColumnType("jsonb");
             entity.Property(p => p.Origem).HasColumnName("origem").HasMaxLength(20).IsRequired()
                 .HasDefaultValue(CtrDominios.Origem.OrgaoComunicante);
             entity.Property(p => p.EsclarecimentoSolicitadoEm).HasColumnName("esclarecimento_solicitado_em");

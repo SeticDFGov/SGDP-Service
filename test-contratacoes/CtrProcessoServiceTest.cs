@@ -248,7 +248,7 @@ public class CtrProcessoServiceTest : CtrTestBase
             CtrProcessoService.CalcularSituacao(new CtrProcesso
             { ChegadaSgdi = d, ChegadaSubgd = d, ChegadaUgtic = d, RetornoGabSgdi = d }));
 
-        Assert.Equal(CtrDominios.Situacao.Concluido,
+        Assert.Equal(CtrDominios.Situacao.AnaliseConcluida,
             CtrProcessoService.CalcularSituacao(new CtrProcesso
             { ChegadaSgdi = d, ChegadaSubgd = d, ChegadaUgtic = d, RetornoGabSgdi = d, RetornoOrgao = d }));
 

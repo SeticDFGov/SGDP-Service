@@ -17,9 +17,6 @@ public class CtrProcessoFiltro : PagedRequest
     /// <summary>Situação DERIVADA (CtrDominios.Situacao), traduzida em predicado EF.</summary>
     public string? Situacao { get; set; }
 
-    /// <summary>Fase DERIVADA (CtrDominios.Fase), traduzida em predicado sobre a assinatura.</summary>
-    public string? Fase { get; set; }
-
     /// <summary>CtrDominios.EtapaPlanejamento (DFD/ETP/TR).</summary>
     public string? EtapaPlanejamento { get; set; }
 
@@ -42,6 +39,12 @@ public class CtrProcessoFiltro : PagedRequest
 
     /// <summary>true = só restituídos; false = só não restituídos; null = todos.</summary>
     public bool? Restituidos { get; set; }
+
+    /// <summary>
+    /// true traz também os Concluídos (contrato assinado), que por padrão ficam fora da lista
+    /// e do export. O filtro Situacao = "Concluído" também os traz.
+    /// </summary>
+    public bool IncluirConcluidos { get; set; }
 
     /// <summary>Janela sobre ChegadaSgdi.</summary>
     public DateOnly? De { get; set; }
@@ -88,12 +91,27 @@ public class CtrProcessoCreateDTO
     [StringLength(10)]
     public string? EtapaPlanejamento { get; set; }
 
-    /// <summary>Assinatura do contrato: leva a contratação para a fase de execução.</summary>
+    /// <summary>
+    /// Assinatura do contrato: a data final do trâmite. Preenchida, o processo fica Concluído
+    /// (sai da lista e vai para a relação de concluídos do painel). Não pode ser futura.
+    /// </summary>
     public DateOnly? DataAssinaturaContrato { get; set; }
 
-    /// <summary>CtrDominios.Criticidade (art. 11 da IN).</summary>
+    /// <summary>
+    /// CtrDominios.Criticidade (art. 11 da IN). Com <see cref="CriteriosCriticidade"/> no
+    /// corpo é DERIVADA das respostas e o valor enviado é ignorado. Sem respostas vale o
+    /// que vier (planilha antiga, processo classificado antes da regra automática).
+    /// </summary>
     [StringLength(10)]
     public string? Criticidade { get; set; }
+
+    /// <summary>
+    /// Respostas aos critérios do art. 11, § 3º, da IN: chave = código do critério
+    /// (CtrDominios.CriterioCriticidade.Todos), valor = resposta (Sim/Não ou Nenhum/Baixo/
+    /// Médio/Alto). Critério ausente recebe a resposta padrão. Na EDIÇÃO, nula PRESERVA as
+    /// respostas gravadas (e a criticidade calculada delas).
+    /// </summary>
+    public Dictionary<string, string>? CriteriosCriticidade { get; set; }
 
     /// <summary>
     /// CtrDominios.Origem; vazia = "Órgão comunicante" na CRIAÇÃO. Na edição, vazia
@@ -251,6 +269,12 @@ public class CtrProcessoResponse
 
     public string? Criticidade { get; set; }
 
+    /// <summary>Respostas aos critérios do art. 11, § 3º, da IN; nulas quando ainda não avaliados.</summary>
+    public Dictionary<string, string>? CriteriosCriticidade { get; set; }
+
+    /// <summary>Derivado: soma dos pontos das respostas (CtrCriticidade); nulo sem respostas.</summary>
+    public int? PontosCriticidade { get; set; }
+
     public string Origem { get; set; } = string.Empty;
 
     public DateOnly? EsclarecimentoSolicitadoEm { get; set; }
@@ -273,11 +297,11 @@ public class CtrProcessoResponse
 
     public string? Observacao { get; set; }
 
-    /// <summary>Derivada das datas (CtrProcessoService.CalcularSituacao); nunca gravada.</summary>
+    /// <summary>
+    /// Derivada das datas (CtrProcessoService.CalcularSituacao); nunca gravada. Concluído =
+    /// contrato assinado.
+    /// </summary>
     public string Situacao { get; set; } = string.Empty;
-
-    /// <summary>Derivada da assinatura (CtrProcessoService.CalcularFase); nunca gravada.</summary>
-    public string Fase { get; set; } = string.Empty;
 
     /// <summary>Maior data entre os cinco checkpoints e a restituição.</summary>
     public DateOnly? UltimaMovimentacao { get; set; }

@@ -33,6 +33,12 @@ public class CtrCsvColunasOpcionais
     /// </summary>
     public bool Esclarecimento { get; init; }
 
+    /// <summary>
+    /// As SETE colunas dos critérios de criticidade (art. 11, § 3º, da IN), também como
+    /// bloco: presente só quando as sete estão no cabeçalho.
+    /// </summary>
+    public bool CriteriosCriticidade { get; init; }
+
     /// <summary>Nenhuma delas (planilha legada de 12 colunas) — o default conservador.</summary>
     public static readonly CtrCsvColunasOpcionais Nenhuma = new();
 
@@ -43,7 +49,8 @@ public class CtrCsvColunasOpcionais
         DataAssinaturaContrato = true,
         Criticidade = true,
         Origem = true,
-        Esclarecimento = true
+        Esclarecimento = true,
+        CriteriosCriticidade = true
     };
 }
 
@@ -97,7 +104,8 @@ public static class CtrCsv
     /// <summary>
     /// Cabeçalho do export: os 12 nomes originais da planilha, os 3 da restituição e,
     /// AO FINAL (a ordem já existente é preservada), os 4 da rodada de planejamento e
-    /// status no TCDF. Na importação as 4 últimas são opcionais.
+    /// status no TCDF, os 3 do esclarecimento e os 7 dos critérios de criticidade. Na
+    /// importação, da 16ª em diante são opcionais.
     /// </summary>
     public static readonly string[] Cabecalho =
     {
@@ -106,8 +114,17 @@ public static class CtrCsv
         "Data de Retorno ao Gab SGDI", "Data de Retorno ao Órgão Comunicante", "Observação",
         "Restituído", "Data da restituição", "Motivo da restituição",
         "Etapa do planejamento", "Assinatura do contrato", "Criticidade", "Origem",
-        "Pedido de esclarecimento em", "Esclarecimento solicitado", "Esclarecimento respondido em"
+        "Pedido de esclarecimento em", "Esclarecimento solicitado", "Esclarecimento respondido em",
+        "Critério I - Alinhamento à EGD/DF", "Critério II - Impacto nos serviços públicos digitais",
+        "Critério III - Compartilhamento ou uso corporativo",
+        "Critério IV - Impacto na arquitetura, interoperabilidade ou dados",
+        "Critério V - Tecnologias emergentes, nuvem ou IA",
+        "Critério VI - Riscos de segurança, dados pessoais ou continuidade",
+        "Critério VII - Valor estimado no limite do inciso VII"
     };
+
+    /// <summary>As sete colunas dos critérios, na ordem de CtrDominios.CriterioCriticidade.Todos.</summary>
+    public static readonly string[] ColunasCriterios = Cabecalho[ColunaCriterioInicial..];
 
     // Posição das 4 colunas opcionais (leitura é por posição, como o resto)
     private const int ColunaEtapaPlanejamento = 15;
@@ -117,6 +134,9 @@ public static class CtrCsv
     private const int ColunaEsclarecimentoSolicitadoEm = 19;
     private const int ColunaEsclarecimentoDescricao = 20;
     private const int ColunaEsclarecimentoRespondidoEm = 21;
+
+    // As sete colunas dos critérios de criticidade, na ordem dos incisos (bloco: as sete ou nenhuma)
+    private const int ColunaCriterioInicial = 22;
 
     private static readonly string[] FormatosData = { "dd/MM/yyyy", "d/M/yyyy", "dd/M/yyyy", "d/MM/yyyy" };
 
@@ -182,7 +202,11 @@ public static class CtrCsv
                         // Bloco: as três juntas ou nenhuma (o CHECK amarra os campos)
                         Esclarecimento = TemColuna(campos, ColunaEsclarecimentoSolicitadoEm)
                             && TemColuna(campos, ColunaEsclarecimentoDescricao)
-                            && TemColuna(campos, ColunaEsclarecimentoRespondidoEm)
+                            && TemColuna(campos, ColunaEsclarecimentoRespondidoEm),
+                        // Também bloco: uma resposta solta não classifica nada
+                        CriteriosCriticidade = CtrDominios.CriterioCriticidade.Todos
+                            .Select((_, i) => TemColuna(campos, ColunaCriterioInicial + i))
+                            .All(tem => tem)
                     };
                 }
                 continue; // o título (linha 1) e o próprio cabeçalho não viram dados
@@ -311,6 +335,41 @@ public static class CtrCsv
                     $"data inválida em Esclarecimento respondido em: {Campo(ColunaEsclarecimentoRespondidoEm)}");
         }
 
+        // ── Colunas 23-29 (bloco dos critérios de criticidade) ────────────────
+        // As sete células vazias = critérios não avaliados (a coluna Criticidade decide,
+        // como antes). Qualquer resposta preenchida avalia o bloco: as ausentes recebem a
+        // resposta padrão e a criticidade passa a ser DERIVADA das respostas.
+        Dictionary<string, string>? criterios = null;
+        if (colunas.CriteriosCriticidade)
+        {
+            var respostas = new Dictionary<string, string>();
+            for (var i = 0; i < CtrDominios.CriterioCriticidade.Todos.Length; i++)
+            {
+                var codigo = CtrDominios.CriterioCriticidade.Todos[i];
+                var bruta = Campo(ColunaCriterioInicial + i);
+                if (string.IsNullOrWhiteSpace(bruta)) continue;
+
+                var resposta = CtrDominios.CriterioCriticidade.RespostasDe(codigo)
+                    .FirstOrDefault(r => Normalizar(r) == Normalizar(bruta));
+                if (resposta == null)
+                    return Rejeitar(linha, $"resposta inválida em {Cabecalho[ColunaCriterioInicial + i]}: {bruta}");
+                respostas[codigo] = resposta;
+            }
+
+            if (respostas.Count > 0) criterios = CtrCriticidade.Normalizar(respostas);
+        }
+
+        // Criticidade digitada que não confere com os critérios é RECUSADA, não corrigida em
+        // silêncio: com respostas a coluna é derivada, e a divergência só nasce de edição à
+        // mão da planilha
+        if (criterios != null && criticidade != null)
+        {
+            var calculada = CtrCriticidade.Calcular(criterios);
+            if (calculada != criticidade)
+                return Rejeitar(linha, $"criticidade {criticidade} não confere com os critérios (pelas respostas seria "
+                    + $"{calculada}); ajuste as colunas dos critérios ou deixe a Criticidade vazia");
+        }
+
         var dados = new CtrProcessoCreateDTO
         {
             NumeroProcesso = numero,
@@ -330,6 +389,7 @@ public static class CtrCsv
             EtapaPlanejamento = etapaPlanejamento,
             DataAssinaturaContrato = dataAssinatura,
             Criticidade = criticidade,
+            CriteriosCriticidade = criterios,
             Origem = origem,
             EsclarecimentoSolicitadoEm = esclarecimentoSolicitadoEm,
             EsclarecimentoDescricao = esclarecimentoDescricao,
@@ -654,7 +714,15 @@ public static class CtrCsv
                 (p.Origem, false),
                 (Data(p.EsclarecimentoSolicitadoEm), false),
                 (p.EsclarecimentoDescricao ?? string.Empty, true),
-                (Data(p.EsclarecimentoRespondidoEm), false)
+                (Data(p.EsclarecimentoRespondidoEm), false),
+                // Os sete critérios: vazios quando o processo ainda não os tem avaliados
+                (Criterio(p, CtrDominios.CriterioCriticidade.AlinhamentoEgd), false),
+                (Criterio(p, CtrDominios.CriterioCriticidade.ImpactoServicos), false),
+                (Criterio(p, CtrDominios.CriterioCriticidade.Compartilhamento), false),
+                (Criterio(p, CtrDominios.CriterioCriticidade.ImpactoArquitetura), false),
+                (Criterio(p, CtrDominios.CriterioCriticidade.TecnologiasEmergentes), false),
+                (Criterio(p, CtrDominios.CriterioCriticidade.RiscosSeguranca), false),
+                (Criterio(p, CtrDominios.CriterioCriticidade.ValorEstimado), false)
             };
 
             sb.Append(string.Join(";", celulas.Select(c => Escapar(c.Valor, c.TextoLivre)))).Append("\r\n");
@@ -665,6 +733,11 @@ public static class CtrCsv
     }
 
     private static string Data(DateOnly? data) => data?.ToString("dd/MM/yyyy") ?? string.Empty;
+
+    private static string Criterio(CtrProcessoResponse p, string codigo) =>
+        p.CriteriosCriticidade != null && p.CriteriosCriticidade.TryGetValue(codigo, out var resposta)
+            ? resposta
+            : string.Empty;
 
     private static string Escapar(string valor, bool textoLivre = false)
     {
