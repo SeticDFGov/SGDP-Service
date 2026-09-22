@@ -69,6 +69,19 @@ public class CtrProcesso
     // há as que nascem de análise do próprio TCDF sobre o contrato.
     public string Origem { get; set; } = CtrDominios.Origem.OrgaoComunicante;
 
+    // ── Dados da contratação (pedido de 2026-09-22) ───────────────────────────
+    // Vêm do formulário do processo, que manda os três sempre (no PUT, nulo limpa). O
+    // checkpoint não os toca; a importação só quando o arquivo traz a coluna.
+
+    // Em reais: numeric(18,2), nunca negativo (CtrProcessoService.ValidarProcesso)
+    public decimal? ValorEstimado { get; set; }
+
+    // CtrDominios.HospedagemCetic; nulo = não informado
+    public string? HospedagemCetic { get; set; }
+
+    // Usa a rede GDFNet; nulo = não informado
+    public bool? UsaGdfnet { get; set; }
+
     // ── Pedido de esclarecimentos ao órgão comunicante ────────────────────────
     // Sinal PARALELO ao trâmite: não é etapa e NÃO muda a situação derivada — só
     // marca que o processo está aguardando retorno do órgão.

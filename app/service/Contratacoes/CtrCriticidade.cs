@@ -15,6 +15,8 @@ namespace service.Contratacoes;
 ///  - I (alinhamento à EGD/DF): estar alinhado é BOM e baixa a criticidade: Sim tira 1 ponto;
 ///  - III (compartilhamento): Sim vale 1 ponto;
 ///  - II, IV e VI (impactos e riscos): Nenhum 0, Baixo 1, Médio 2, Alto 3;
+///  - IV aceita ainda "Não foi possível avaliar com as informações apresentadas", que vale 0
+///    (como Nenhum; decisão do usuário, 2026-09-22);
 ///  - V (tecnologias emergentes, nuvem ou IA): Sim vale 3, é crítico por si;
 ///  - VII (valor estimado no limite das alíneas a, b ou c): Sim é Alta, seja qual for o resto.
 ///
@@ -28,6 +30,9 @@ public static class CtrCriticidade
     public const int PontosAlinhamentoEgd = -1;
 
     public const int PontosTecnologiasEmergentes = 3;
+
+    /// <summary>Critério IV sem avaliação possível: não pesa na criticidade, como "Nenhum".</summary>
+    public const int PontosNaoFoiPossivelAvaliar = 0;
 
     public const int PontosMinimosMedia = 3;
 
@@ -50,6 +55,9 @@ public static class CtrCriticidade
                 return resposta == CtrDominios.CriterioCriticidade.Sim ? PontosSim : 0;
             case CtrDominios.CriterioCriticidade.TecnologiasEmergentes:
                 return resposta == CtrDominios.CriterioCriticidade.Sim ? PontosTecnologiasEmergentes : 0;
+            case CtrDominios.CriterioCriticidade.ImpactoArquitetura
+                when resposta == CtrDominios.CriterioCriticidade.NaoFoiPossivelAvaliar:
+                return PontosNaoFoiPossivelAvaliar;
             case CtrDominios.CriterioCriticidade.ImpactoServicos:
             case CtrDominios.CriterioCriticidade.ImpactoArquitetura:
             case CtrDominios.CriterioCriticidade.RiscosSeguranca:
@@ -104,8 +112,7 @@ public static class CtrCriticidade
             // Resposta vazia = não respondido (vale o padrão), como célula vazia na planilha
             if (string.IsNullOrWhiteSpace(valor)) continue;
 
-            var resposta = CtrDominios.CriterioCriticidade.RespostasDe(codigo)
-                .FirstOrDefault(r => CtrCsv.Normalizar(r) == CtrCsv.Normalizar(valor))
+            var resposta = ResolverResposta(codigo, valor)
                 ?? throw new ApiException(ErrorCode.CtrDominioInvalido,
                     $"Resposta inválida no critério {codigo} da criticidade: {valor}");
 
@@ -116,6 +123,25 @@ public static class CtrCriticidade
             canonico.TryAdd(codigo, CtrDominios.CriterioCriticidade.RespostaPadrao(codigo));
 
         return canonico;
+    }
+
+    /// <summary>
+    /// Resposta de UM critério na grafia do domínio (comparação sem acento nem caixa), ou null
+    /// quando não é resposta daquele critério. No IV aceita também o atalho "Não foi possível
+    /// avaliar", que vira sempre a frase completa. Fonte única da API e da planilha.
+    /// </summary>
+    public static string? ResolverResposta(string codigo, string valor)
+    {
+        var alvo = CtrCsv.Normalizar(valor);
+
+        var resposta = CtrDominios.CriterioCriticidade.RespostasDe(codigo)
+            .FirstOrDefault(r => CtrCsv.Normalizar(r) == alvo);
+        if (resposta != null) return resposta;
+
+        return codigo == CtrDominios.CriterioCriticidade.ImpactoArquitetura
+               && alvo == CtrCsv.Normalizar(CtrDominios.CriterioCriticidade.NaoFoiPossivelAvaliarAtalho)
+            ? CtrDominios.CriterioCriticidade.NaoFoiPossivelAvaliar
+            : null;
     }
 
     /// <summary>Jsonb da coluna, sempre na ordem dos critérios (comparável byte a byte).</summary>

@@ -328,17 +328,19 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
     // ══ 5. CSV: as sete colunas dos critérios ════════════════════════════════
 
     [Fact]
-    public void Csv_Cabecalho_TerminaComAsSeteColunasDosCriterios()
+    public void Csv_Cabecalho_TrazAsSeteColunasDosCriteriosDepoisDoEsclarecimento()
     {
-        Assert.Equal(29, CtrCsv.Cabecalho.Length);
+        // Eram as últimas até chegarem os 3 dados da contratação, que vêm depois delas
+        // (CtrValorHospedagemGdfnetTest)
+        Assert.Equal(32, CtrCsv.Cabecalho.Length);
         Assert.Equal(7, CtrCsv.ColunasCriterios.Length);
-        Assert.Equal(CtrCsv.ColunasCriterios, CtrCsv.Cabecalho[^7..]);
+        Assert.Equal(CtrCsv.ColunasCriterios, CtrCsv.Cabecalho[22..29]);
         Assert.StartsWith("Critério I - ", CtrCsv.ColunasCriterios[0]);
         Assert.StartsWith("Critério VII - ", CtrCsv.ColunasCriterios[6]);
     }
 
-    /// <summary>Uma linha com as 29 colunas do nosso export, das quais só as informadas são preenchidas.</summary>
-    private static string Linha29(string numero, string criticidade, params (int Coluna, string Valor)[] celulas)
+    /// <summary>Uma linha com todas as colunas do nosso export, das quais só as informadas são preenchidas.</summary>
+    private static string LinhaDoExport(string numero, string criticidade, params (int Coluna, string Valor)[] celulas)
     {
         var linha = new string[CtrCsv.Cabecalho.Length];
         Array.Fill(linha, string.Empty);
@@ -359,7 +361,7 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
     {
         // Colunas 22..28 = critérios I..VII; V=Sim (3) e II=alto (3) dão Alta
         var csv = string.Join(";", CtrCsv.Cabecalho) + "\r\n"
-            + Linha29("04044-00000540/2026-11", "", (26, "Sim"), (23, "alto")) + "\r\n";
+            + LinhaDoExport("04044-00000540/2026-11", "", (26, "Sim"), (23, "alto")) + "\r\n";
 
         var linha = Assert.Single(CtrCsv.Ler(BytesUtf8ComBom(csv)));
 
@@ -382,7 +384,7 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
     public void Csv_Ler_CriticidadeQueNaoConfereComOsCriterios_RejeitaALinha()
     {
         var csv = string.Join(";", CtrCsv.Cabecalho) + "\r\n"
-            + Linha29("04044-00000541/2026-12", "Baixa", (26, "Sim"), (23, "Alto")) + "\r\n";
+            + LinhaDoExport("04044-00000541/2026-12", "Baixa", (26, "Sim"), (23, "Alto")) + "\r\n";
 
         var linha = Assert.Single(CtrCsv.Ler(BytesUtf8ComBom(csv)));
 
@@ -395,7 +397,7 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
     public void Csv_Ler_CriticidadeQueConfereComOsCriterios_EhAceita()
     {
         var csv = string.Join(";", CtrCsv.Cabecalho) + "\r\n"
-            + Linha29("04044-00000542/2026-13", "Alta", (28, "Sim")) + "\r\n";
+            + LinhaDoExport("04044-00000542/2026-13", "Alta", (28, "Sim")) + "\r\n";
 
         var linha = Assert.Single(CtrCsv.Ler(BytesUtf8ComBom(csv)));
 
@@ -408,7 +410,7 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
     public void Csv_Ler_RespostaForaDoDominio_RejeitaALinhaNomeandoAColuna()
     {
         var csv = string.Join(";", CtrCsv.Cabecalho) + "\r\n"
-            + Linha29("04044-00000543/2026-14", "", (22, "Talvez")) + "\r\n";
+            + LinhaDoExport("04044-00000543/2026-14", "", (22, "Talvez")) + "\r\n";
 
         var linha = Assert.Single(CtrCsv.Ler(BytesUtf8ComBom(csv)));
 
@@ -421,7 +423,7 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
     public void Csv_Ler_BlocoTodoVazio_DeixaOsCriteriosNulosEACriticidadeDaColuna()
     {
         var csv = string.Join(";", CtrCsv.Cabecalho) + "\r\n"
-            + Linha29("04044-00000544/2026-15", "Média") + "\r\n";
+            + LinhaDoExport("04044-00000544/2026-15", "Média") + "\r\n";
 
         var linha = Assert.Single(CtrCsv.Ler(BytesUtf8ComBom(csv)));
 
@@ -445,9 +447,11 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
         var bytes = await _processos.ExportarCsvAsync(new CtrProcessoFiltro());
         var texto = System.Text.Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
         var celulas = texto.Split("\r\n", StringSplitOptions.RemoveEmptyEntries)[1].Split(';');
-        Assert.Equal(29, celulas.Length);
+        Assert.Equal(32, celulas.Length);
         Assert.Equal("Alta", celulas[17]);
-        Assert.Equal(new[] { "Não", "Nenhum", "Sim", "Médio", "Não", "Alto", "Não" }, celulas[22..]);
+        Assert.Equal(new[] { "Não", "Nenhum", "Sim", "Médio", "Não", "Alto", "Não" }, celulas[22..29]);
+        // Os dados da contratação, não informados neste processo, saem vazios
+        Assert.Equal(new[] { "", "", "" }, celulas[29..]);
 
         var previa = await NovoImportacaoService().PreviaAsync(bytes);
         var linha = Assert.Single(previa.Linhas);
