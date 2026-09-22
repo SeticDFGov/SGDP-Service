@@ -7,7 +7,7 @@ using Models.Contratacoes;
 namespace service.Contratacoes;
 
 /// <summary>
-/// Quais das colunas OPCIONAIS (as 4 acrescentadas na rodada da chefia) o arquivo
+/// Quais das colunas OPCIONAIS (as acrescentadas da rodada da chefia em diante) o arquivo
 /// trazia no CABEÇALHO.
 ///
 /// Coluna AUSENTE não é o mesmo que coluna presente e VAZIA: a planilha real da
@@ -39,6 +39,13 @@ public class CtrCsvColunasOpcionais
     /// </summary>
     public bool CriteriosCriticidade { get; init; }
 
+    // As três dos dados da contratação (pedido de 2026-09-22): cada uma por si, sem bloco
+    public bool ValorEstimado { get; init; }
+
+    public bool HospedagemCetic { get; init; }
+
+    public bool UsaGdfnet { get; init; }
+
     /// <summary>Nenhuma delas (planilha legada de 12 colunas) — o default conservador.</summary>
     public static readonly CtrCsvColunasOpcionais Nenhuma = new();
 
@@ -50,7 +57,10 @@ public class CtrCsvColunasOpcionais
         Criticidade = true,
         Origem = true,
         Esclarecimento = true,
-        CriteriosCriticidade = true
+        CriteriosCriticidade = true,
+        ValorEstimado = true,
+        HospedagemCetic = true,
+        UsaGdfnet = true
     };
 }
 
@@ -102,9 +112,10 @@ public class CtrCsvLinha
 public static class CtrCsv
 {
     /// <summary>
-    /// Cabeçalho do export: os 12 nomes originais da planilha, os 3 da restituição e,
-    /// AO FINAL (a ordem já existente é preservada), os 4 da rodada de planejamento e
-    /// status no TCDF, os 3 do esclarecimento e os 7 dos critérios de criticidade. Na
+    /// Cabeçalho do export (32 colunas): os 12 nomes originais da planilha, os 3 da
+    /// restituição e, AO FINAL (a ordem já existente é preservada), os 4 da rodada de
+    /// planejamento e status no TCDF, os 3 do esclarecimento, os 7 dos critérios de
+    /// criticidade e os 3 dos dados da contratação (valor, hospedagem e GDFNet). Na
     /// importação, da 16ª em diante são opcionais.
     /// </summary>
     public static readonly string[] Cabecalho =
@@ -120,13 +131,18 @@ public static class CtrCsv
         "Critério IV - Impacto na arquitetura, interoperabilidade ou dados",
         "Critério V - Tecnologias emergentes, nuvem ou IA",
         "Critério VI - Riscos de segurança, dados pessoais ou continuidade",
-        "Critério VII - Valor estimado no limite do inciso VII"
+        "Critério VII - Valor estimado no limite do inciso VII",
+        "Valor estimado (R$)", "Hospedagem no CeTIC-DF", "Usa a rede GDFNet"
     };
 
-    /// <summary>As sete colunas dos critérios, na ordem de CtrDominios.CriterioCriticidade.Todos.</summary>
-    public static readonly string[] ColunasCriterios = Cabecalho[ColunaCriterioInicial..];
+    // As sete colunas dos critérios de criticidade, na ordem dos incisos (bloco: as sete ou nenhuma)
+    private const int ColunaCriterioInicial = 22;
 
-    // Posição das 4 colunas opcionais (leitura é por posição, como o resto)
+    /// <summary>As sete colunas dos critérios, na ordem de CtrDominios.CriterioCriticidade.Todos.</summary>
+    public static readonly string[] ColunasCriterios =
+        Cabecalho[ColunaCriterioInicial..(ColunaCriterioInicial + CtrDominios.CriterioCriticidade.Todos.Length)];
+
+    // Posição das colunas opcionais (leitura é por posição, como o resto)
     private const int ColunaEtapaPlanejamento = 15;
     private const int ColunaDataAssinatura = 16;
     private const int ColunaCriticidade = 17;
@@ -135,8 +151,10 @@ public static class CtrCsv
     private const int ColunaEsclarecimentoDescricao = 20;
     private const int ColunaEsclarecimentoRespondidoEm = 21;
 
-    // As sete colunas dos critérios de criticidade, na ordem dos incisos (bloco: as sete ou nenhuma)
-    private const int ColunaCriterioInicial = 22;
+    // Os dados da contratação, logo depois dos sete critérios (cada coluna independente)
+    private const int ColunaValorEstimado = 29;
+    private const int ColunaHospedagemCetic = 30;
+    private const int ColunaUsaGdfnet = 31;
 
     private static readonly string[] FormatosData = { "dd/MM/yyyy", "d/M/yyyy", "dd/M/yyyy", "d/MM/yyyy" };
 
@@ -161,6 +179,19 @@ public static class CtrCsv
 
     // Caracteres que fazem uma célula virar fórmula no Excel/Sheets (CSV injection)
     private static readonly char[] IniciamFormula = { '=', '+', '-', '@', '\t', '\r' };
+
+    // Valor estimado: "1.234.567" é milhar brasileiro (grupos de três depois do primeiro);
+    // "1234.5", com um ponto só e fora desse desenho, é ponto decimal
+    private static readonly Regex MilharComPonto = new(@"^[0-9]{1,3}(\.[0-9]{3})+$", RegexOptions.Compiled);
+    private static readonly Regex DecimalComPonto = new(@"^[0-9]+\.[0-9]+$", RegexOptions.Compiled);
+
+    // Vírgula decimal e nenhum separador de milhar ("1234567,89"), sem depender dos dados de
+    // cultura instalados no servidor
+    private static readonly NumberFormatInfo FormatoValor = new()
+    {
+        NumberDecimalSeparator = ",",
+        NumberGroupSeparator = string.Empty
+    };
 
     static CtrCsv()
     {
@@ -206,7 +237,11 @@ public static class CtrCsv
                         // Também bloco: uma resposta solta não classifica nada
                         CriteriosCriticidade = CtrDominios.CriterioCriticidade.Todos
                             .Select((_, i) => TemColuna(campos, ColunaCriterioInicial + i))
-                            .All(tem => tem)
+                            .All(tem => tem),
+                        // Cada uma por si: nenhum CHECK amarra as três
+                        ValorEstimado = TemColuna(campos, ColunaValorEstimado),
+                        HospedagemCetic = TemColuna(campos, ColunaHospedagemCetic),
+                        UsaGdfnet = TemColuna(campos, ColunaUsaGdfnet)
                     };
                 }
                 continue; // o título (linha 1) e o próprio cabeçalho não viram dados
@@ -349,8 +384,8 @@ public static class CtrCsv
                 var bruta = Campo(ColunaCriterioInicial + i);
                 if (string.IsNullOrWhiteSpace(bruta)) continue;
 
-                var resposta = CtrDominios.CriterioCriticidade.RespostasDe(codigo)
-                    .FirstOrDefault(r => Normalizar(r) == Normalizar(bruta));
+                // O mesmo resolvedor da API (inclui o atalho da resposta longa do critério IV)
+                var resposta = CtrCriticidade.ResolverResposta(codigo, bruta);
                 if (resposta == null)
                     return Rejeitar(linha, $"resposta inválida em {Cabecalho[ColunaCriterioInicial + i]}: {bruta}");
                 respostas[codigo] = resposta;
@@ -369,6 +404,30 @@ public static class CtrCsv
                 return Rejeitar(linha, $"criticidade {criticidade} não confere com os critérios (pelas respostas seria "
                     + $"{calculada}); ajuste as colunas dos critérios ou deixe a Criticidade vazia");
         }
+
+        // ── Colunas 30-32 (dados da contratação, cada uma independente) ───────
+        // Mesma regra das opcionais: ausente nem é lida (quem decide é a importação),
+        // presente e vazia limpa, valor que não se entende rejeita nomeando a coluna.
+        // Não são texto livre: não passam pela proteção contra fórmula.
+        var valorBruto = colunas.ValorEstimado ? Campo(ColunaValorEstimado) : string.Empty;
+        if (!TentarValor(valorBruto, out var valorEstimado))
+            return Rejeitar(linha, $"valor inválido em {Cabecalho[ColunaValorEstimado]}: {valorBruto}");
+        // O limite do numeric(18,2) e o arredondamento ficam com o ValidarProcesso (fonte única)
+        if (valorEstimado < 0)
+            return Rejeitar(linha, $"valor negativo em {Cabecalho[ColunaValorEstimado]}: {valorBruto}");
+
+        var hospedagemBruta = colunas.HospedagemCetic ? Campo(ColunaHospedagemCetic) : string.Empty;
+        string? hospedagemCetic = null;
+        if (!string.IsNullOrWhiteSpace(hospedagemBruta))
+        {
+            hospedagemCetic = ResolverHospedagemCetic(hospedagemBruta);
+            if (hospedagemCetic == null)
+                return Rejeitar(linha, $"valor inválido em {Cabecalho[ColunaHospedagemCetic]}: {hospedagemBruta}");
+        }
+
+        var gdfnetBruto = colunas.UsaGdfnet ? Campo(ColunaUsaGdfnet) : string.Empty;
+        if (!TentarSimNao(gdfnetBruto, out var usaGdfnet))
+            return Rejeitar(linha, $"valor inválido em {Cabecalho[ColunaUsaGdfnet]}: {gdfnetBruto}");
 
         var dados = new CtrProcessoCreateDTO
         {
@@ -391,6 +450,9 @@ public static class CtrCsv
             Criticidade = criticidade,
             CriteriosCriticidade = criterios,
             Origem = origem,
+            ValorEstimado = valorEstimado,
+            HospedagemCetic = hospedagemCetic,
+            UsaGdfnet = usaGdfnet,
             EsclarecimentoSolicitadoEm = esclarecimentoSolicitadoEm,
             EsclarecimentoDescricao = esclarecimentoDescricao,
             EsclarecimentoRespondidoEm = esclarecimentoRespondidoEm
@@ -400,11 +462,10 @@ public static class CtrCsv
         if (!string.IsNullOrWhiteSpace(restituido))
         {
             // Colunas 13-15 (o que o NOSSO export escreve): a informação é explícita
-            var marcado = Normalizar(restituido);
-            if (marcado is not ("sim" or "nao"))
+            if (!TentarSimNao(restituido, out var marcado))
                 return Rejeitar(linha, $"valor inválido em Restituído: {restituido}");
 
-            if (marcado == "sim")
+            if (marcado == true)
             {
                 if (!TentarData(Campo(13), out var restituidoEm, out _) || restituidoEm == null)
                     return Rejeitar(linha, "restituição sem data");
@@ -584,6 +645,88 @@ public static class CtrCsv
     }
 
     /// <summary>
+    /// Valor em reais da célula: vazia -> null. Aceita "R$", espaços, o formato brasileiro
+    /// ("1.234.567,89", "1234567,89"), inteiro ("1500000") e ponto decimal quando não há
+    /// vírgula e o ponto não é separador de milhar ("1234.5"). O sinal de menos é lido (quem
+    /// chama recusa o negativo com mensagem própria). Retorna false quando não é valor nenhum.
+    /// </summary>
+    private static bool TentarValor(string valor, out decimal? lido)
+    {
+        lido = null;
+        if (string.IsNullOrWhiteSpace(valor)) return true;
+
+        // Sem espaço algum, inclusive o espaço fixo que o Excel põe depois do "R$"
+        var texto = string.Concat(valor.Where(c => !char.IsWhiteSpace(c)));
+
+        // O sinal pode vir antes ou depois do símbolo da moeda: "-R$ 10,00" ou "R$ -10,00"
+        var negativo = texto.StartsWith('-');
+        if (negativo) texto = texto[1..];
+        if (texto.StartsWith("R$", StringComparison.OrdinalIgnoreCase)) texto = texto[2..];
+        if (!negativo && texto.StartsWith('-'))
+        {
+            negativo = true;
+            texto = texto[1..];
+        }
+
+        string invariante;
+        var virgula = texto.IndexOf(',');
+        if (virgula >= 0)
+        {
+            // Formato brasileiro: a vírgula é o decimal e os pontos, se houver, o milhar
+            var inteiro = texto[..virgula];
+            var decimais = texto[(virgula + 1)..];
+            if (!SoDigitos(decimais) || !(SoDigitos(inteiro) || MilharComPonto.IsMatch(inteiro))) return false;
+            invariante = inteiro.Replace(".", string.Empty) + "." + decimais;
+        }
+        else if (MilharComPonto.IsMatch(texto))
+        {
+            // "1.500.000": ponto de milhar, valor inteiro
+            invariante = texto.Replace(".", string.Empty);
+        }
+        else if (SoDigitos(texto) || DecimalComPonto.IsMatch(texto))
+        {
+            // Inteiro ("1500000") ou ponto decimal ("1234.5")
+            invariante = texto;
+        }
+        else
+        {
+            return false;
+        }
+
+        // Mais dígitos do que o decimal comporta também não é valor
+        if (!decimal.TryParse(invariante, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture,
+                out var numero))
+            return false;
+
+        lido = negativo ? -numero : numero;
+        return true;
+    }
+
+    private static bool SoDigitos(string texto) => texto.Length > 0 && texto.All(char.IsAsciiDigit);
+
+    /// <summary>
+    /// Sim/Não da célula, com a mesma leitura da coluna "Restituído" (sem caixa nem acento):
+    /// vazia -> null; false quando não é nenhum dos dois.
+    /// </summary>
+    private static bool TentarSimNao(string valor, out bool? marcado)
+    {
+        marcado = null;
+        if (string.IsNullOrWhiteSpace(valor)) return true;
+
+        switch (Normalizar(valor))
+        {
+            case "sim":
+                marcado = true;
+                return true;
+            case "nao":
+                marcado = false;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
     /// Primeira menção de restituição que NÃO esteja negada ("não restituído",
     /// "não foi restituída"); null quando só há menções negadas ou nenhuma.
     /// </summary>
@@ -660,6 +803,17 @@ public static class CtrCsv
         return CtrDominios.CategoriaObjeto.Todos.FirstOrDefault(c => Normalizar(c) == alvo);
     }
 
+    /// <summary>
+    /// Hospedagem no CeTIC-DF na grafia do domínio, pela mesma normalização da categoria
+    /// ("nao aplicavel (saas)" vira "Não aplicável (SaaS)"); fora do domínio devolve null.
+    /// Fonte única da API (ValidarProcesso) e da planilha.
+    /// </summary>
+    public static string? ResolverHospedagemCetic(string valor)
+    {
+        var alvo = Normalizar(valor);
+        return CtrDominios.HospedagemCetic.Todos.FirstOrDefault(h => Normalizar(h) == alvo);
+    }
+
     /// <summary>Trim + minúsculas + sem acentos + espaços colapsados.</summary>
     public static string Normalizar(string valor)
     {
@@ -722,7 +876,11 @@ public static class CtrCsv
                 (Criterio(p, CtrDominios.CriterioCriticidade.ImpactoArquitetura), false),
                 (Criterio(p, CtrDominios.CriterioCriticidade.TecnologiasEmergentes), false),
                 (Criterio(p, CtrDominios.CriterioCriticidade.RiscosSeguranca), false),
-                (Criterio(p, CtrDominios.CriterioCriticidade.ValorEstimado), false)
+                (Criterio(p, CtrDominios.CriterioCriticidade.ValorEstimado), false),
+                // Os dados da contratação: vazios quando não informados
+                (Valor(p.ValorEstimado), false),
+                (p.HospedagemCetic ?? string.Empty, false),
+                (SimNao(p.UsaGdfnet), false)
             };
 
             sb.Append(string.Join(";", celulas.Select(c => Escapar(c.Valor, c.TextoLivre)))).Append("\r\n");
@@ -733,6 +891,16 @@ public static class CtrCsv
     }
 
     private static string Data(DateOnly? data) => data?.ToString("dd/MM/yyyy") ?? string.Empty;
+
+    /// <summary>Sempre com os centavos e sem separador de milhar: "1234567,89", "1500000,00".</summary>
+    private static string Valor(decimal? valor) => valor?.ToString("0.00", FormatoValor) ?? string.Empty;
+
+    private static string SimNao(bool? valor) => valor switch
+    {
+        true => "Sim",
+        false => "Não",
+        null => string.Empty
+    };
 
     private static string Criterio(CtrProcessoResponse p, string codigo) =>
         p.CriteriosCriticidade != null && p.CriteriosCriticidade.TryGetValue(codigo, out var resposta)

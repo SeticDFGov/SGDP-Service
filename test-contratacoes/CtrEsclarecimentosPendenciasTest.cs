@@ -287,8 +287,9 @@ public class CtrEsclarecimentosPendenciasTest : CtrTestBase
     public void Csv_Cabecalho_TemAsTresColunasDeEsclarecimentoDepoisDaOrigem()
     {
         // 22 colunas até a rodada dos esclarecimentos; as 7 dos critérios de criticidade
-        // vieram depois delas (CtrCriticidadeConclusaoTest)
-        Assert.Equal(29, CtrCsv.Cabecalho.Length);
+        // vieram depois delas (CtrCriticidadeConclusaoTest) e, no fim, as 3 dos dados da
+        // contratação (CtrValorHospedagemGdfnetTest)
+        Assert.Equal(32, CtrCsv.Cabecalho.Length);
         Assert.Equal(
             new[] { "Pedido de esclarecimento em", "Esclarecimento solicitado", "Esclarecimento respondido em" },
             CtrCsv.Cabecalho[19..22]);

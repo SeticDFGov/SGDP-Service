@@ -173,11 +173,12 @@ public class CtrImportacaoService : ICtrImportacaoService
     /// Herda do processo já gravado os campos cujas COLUNAS o arquivo nem traz.
     ///
     /// A planilha real da equipe tem 12 colunas e não sabe nada de etapa do
-    /// planejamento, assinatura, criticidade e origem: reimportá-la apagava esses
-    /// campos (inclusive a criticidade que o backfill da migration gravou), e como
-    /// a criticidade passou a ser exigida no inciso I, o fluxo do TCDF quebrava em
-    /// seguida. Coluna PRESENTE e vazia continua limpando o campo — é escolha de
-    /// quem exportou, e é o que mantém o round-trip export→importação fiel.
+    /// planejamento, assinatura, criticidade e origem (nem, depois, dos critérios e dos
+    /// dados da contratação): reimportá-la apagava esses campos (inclusive a criticidade
+    /// que o backfill da migration gravou), e como a criticidade passou a ser exigida no
+    /// inciso I, o fluxo do TCDF quebrava em seguida. Coluna PRESENTE e vazia continua
+    /// limpando o campo: é escolha de quem exportou, e é o que mantém o round-trip
+    /// export→importação fiel.
     ///
     /// As 12 colunas originais (datas, observação) e as 3 da restituição seguem
     /// sendo sempre aplicadas: nelas a planilha é a fonte, como sempre foi.
@@ -192,6 +193,11 @@ public class CtrImportacaoService : ICtrImportacaoService
         // Bloco dos sete critérios: ausente, as respostas gravadas (e a criticidade calculada
         // delas) ficam; presente e todo vazio, limpa as respostas e a coluna Criticidade decide
         if (!colunas.CriteriosCriticidade) candidato.CriteriosCriticidade = existente.CriteriosCriticidade;
+        // Os dados da contratação, cada um pela sua coluna (arquivo de 29 colunas ou a planilha
+        // legada não os conhecem e não podem apagá-los)
+        if (!colunas.ValorEstimado) candidato.ValorEstimado = existente.ValorEstimado;
+        if (!colunas.HospedagemCetic) candidato.HospedagemCetic = existente.HospedagemCetic;
+        if (!colunas.UsaGdfnet) candidato.UsaGdfnet = existente.UsaGdfnet;
 
         // Bloco inteiro: herdar só parte dele produziria estado que o CHECK recusa
         if (!colunas.Esclarecimento)

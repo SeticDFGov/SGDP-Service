@@ -109,6 +109,21 @@ public static class CtrDominios
         public static readonly string[] Todos = { OrgaoComunicante, Tcdf };
     }
 
+    /// <summary>
+    /// Se a solução contratada fica hospedada no CeTIC-DF. "Não aplicável (SaaS)" é o
+    /// software contratado como serviço, que roda na infraestrutura do fornecedor. Nulo no
+    /// processo = não informado.
+    /// </summary>
+    public static class HospedagemCetic
+    {
+        public const string Sim = "Sim";
+        public const string Nao = "Não";
+        public const string Parcialmente = "Parcialmente";
+        public const string NaoAplicavelSaas = "Não aplicável (SaaS)";
+
+        public static readonly string[] Todos = { Sim, Nao, Parcialmente, NaoAplicavelSaas };
+    }
+
     /// <summary>Situação no Portfólio Estratégico de Contratações de TIC (incisos I e II do despacho).</summary>
     public static class SituacaoPortfolio
     {
@@ -137,7 +152,8 @@ public static class CtrDominios
     /// <summary>
     /// Critérios de priorização do art. 11, § 3º, da IN SGDI nº 1/2026, respondidos no
     /// cadastro do processo. I, III, V e VII são Sim/Não; II, IV e VI são graduados
-    /// (Nenhum, Baixo, Médio, Alto). A resposta padrão de cada um é a primeira da lista.
+    /// (Nenhum, Baixo, Médio, Alto), e o IV aceita ainda "Não foi possível avaliar com as
+    /// informações apresentadas". A resposta padrão de cada um é a primeira da lista.
     /// </summary>
     public static class CriterioCriticidade
     {
@@ -180,11 +196,28 @@ public static class CtrDominios
 
         public static readonly string[] RespostasGrau = { Nenhum, Baixo, Medio, Alto };
 
+        /// <summary>
+        /// Só no critério IV: as informações apresentadas não permitiram avaliar o impacto.
+        /// Vale 0 ponto, como "Nenhum" (decisão do usuário, 2026-09-22).
+        /// </summary>
+        public const string NaoFoiPossivelAvaliar = "Não foi possível avaliar com as informações apresentadas";
+
+        /// <summary>
+        /// Atalho aceito na entrada (tela e planilha) para <see cref="NaoFoiPossivelAvaliar"/>;
+        /// nunca é gravado: vira sempre a frase completa.
+        /// </summary>
+        public const string NaoFoiPossivelAvaliarAtalho = "Não foi possível avaliar";
+
+        /// <summary>As respostas do critério IV: a graduação e, por último, a que não avalia.</summary>
+        public static readonly string[] RespostasImpactoArquitetura = { Nenhum, Baixo, Medio, Alto, NaoFoiPossivelAvaliar };
+
         /// <summary>Os três critérios graduados (os demais são Sim/Não).</summary>
         public static readonly string[] Graduados = { ImpactoServicos, ImpactoArquitetura, RiscosSeguranca };
 
         public static string[] RespostasDe(string codigo) =>
-            Graduados.Contains(codigo) ? RespostasGrau : RespostasSimNao;
+            codigo == ImpactoArquitetura ? RespostasImpactoArquitetura
+            : Graduados.Contains(codigo) ? RespostasGrau
+            : RespostasSimNao;
 
         /// <summary>Resposta assumida quando o critério não é respondido (Não ou Nenhum).</summary>
         public static string RespostaPadrao(string codigo) => RespostasDe(codigo)[0];

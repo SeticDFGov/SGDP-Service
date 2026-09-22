@@ -120,6 +120,24 @@ public class CtrProcessoCreateDTO
     [StringLength(20)]
     public string? Origem { get; set; }
 
+    /// <summary>
+    /// Valor estimado da contratação, em reais: não pode ser negativo, é arredondado para
+    /// centavos e vai até 9999999999999999,99 (o numeric(18,2) do banco). Nulo = não
+    /// informado; na EDIÇÃO, nulo LIMPA (o formulário manda sempre o processo inteiro).
+    /// </summary>
+    public decimal? ValorEstimado { get; set; }
+
+    /// <summary>
+    /// CtrDominios.HospedagemCetic (Sim, Não, Parcialmente, Não aplicável (SaaS)), comparada
+    /// sem caixa nem acento e gravada na grafia do domínio. Vazia = não informada; na
+    /// EDIÇÃO, nula ou vazia LIMPA.
+    /// </summary>
+    [StringLength(30)]
+    public string? HospedagemCetic { get; set; }
+
+    /// <summary>Usa a rede GDFNet. Nulo = não informado; na EDIÇÃO, nulo LIMPA.</summary>
+    public bool? UsaGdfnet { get; set; }
+
     /// <summary>Data do pedido de esclarecimentos ao órgão comunicante.</summary>
     public DateOnly? EsclarecimentoSolicitadoEm { get; set; }
 
@@ -276,6 +294,15 @@ public class CtrProcessoResponse
     public int? PontosCriticidade { get; set; }
 
     public string Origem { get; set; } = string.Empty;
+
+    /// <summary>Valor estimado da contratação, em reais (centavos); nulo = não informado.</summary>
+    public decimal? ValorEstimado { get; set; }
+
+    /// <summary>CtrDominios.HospedagemCetic; nula = não informada.</summary>
+    public string? HospedagemCetic { get; set; }
+
+    /// <summary>Usa a rede GDFNet; nulo = não informado.</summary>
+    public bool? UsaGdfnet { get; set; }
 
     public DateOnly? EsclarecimentoSolicitadoEm { get; set; }
 

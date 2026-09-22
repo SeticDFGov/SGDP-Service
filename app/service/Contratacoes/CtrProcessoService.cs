@@ -26,6 +26,9 @@ public class CtrProcessoService : ICtrProcessoService
     /// <summary>Máximo de concluídos na relação do painel (os de assinatura mais recente).</summary>
     public const int LimiteConcluidos = 50;
 
+    /// <summary>Maior valor estimado que cabe na coluna numeric(18,2): 16 dígitos inteiros e os centavos.</summary>
+    public const decimal ValorEstimadoMaximo = 9_999_999_999_999_999.99m;
+
     private const int PageSizeMaximo = 100;
 
     // Formato SEI: 00000-00000000/AAAA-DD
@@ -192,9 +195,10 @@ public class CtrProcessoService : ICtrProcessoService
     // ── Validação (criar, editar, checkpoint e importação usam esta função) ────
 
     /// <summary>
-    /// Normaliza (trim, sigla em caixa alta, restituição limpa quando desmarcada) e
-    /// valida o processo. <paramref name="numeroDuplicado"/> vem de quem chama
-    /// (consulta ao banco no CRUD, dicionário em memória na importação).
+    /// Normaliza (trim, sigla em caixa alta, restituição limpa quando desmarcada, hospedagem
+    /// na grafia do domínio, valor estimado em centavos) e valida o processo.
+    /// <paramref name="numeroDuplicado"/> vem de quem chama (consulta ao banco no CRUD,
+    /// dicionário em memória na importação).
     /// </summary>
     public static void ValidarProcesso(CtrProcesso p, bool numeroDuplicado)
     {
@@ -209,6 +213,17 @@ public class CtrProcessoService : ICtrProcessoService
         p.EtapaPlanejamento = Limpar(p.EtapaPlanejamento);
         p.Criticidade = Limpar(p.Criticidade);
         p.EsclarecimentoDescricao = Limpar(p.EsclarecimentoDescricao);
+
+        // Hospedagem comparada sem caixa nem acento (o normalizador da categoria e dos
+        // critérios) e gravada na grafia do domínio; o que não casar é recusado abaixo
+        p.HospedagemCetic = Limpar(p.HospedagemCetic);
+        if (p.HospedagemCetic != null)
+            p.HospedagemCetic = CtrCsv.ResolverHospedagemCetic(p.HospedagemCetic) ?? p.HospedagemCetic;
+
+        // Valor em centavos, como a coluna numeric(18,2) guarda (a resposta sai igual ao
+        // gravado). Negativo não é arredondado: é recusado abaixo como veio
+        if (p.ValorEstimado is { } valor && valor >= 0)
+            p.ValorEstimado = Math.Round(valor, 2, MidpointRounding.AwayFromZero);
 
         // Com as respostas aos critérios, a criticidade é DERIVADA delas (fonte única
         // CtrCriticidade): o valor que veio no corpo é descartado. Sem respostas vale o
@@ -278,6 +293,18 @@ public class CtrProcessoService : ICtrProcessoService
 
         if (!CtrDominios.Origem.Todos.Contains(p.Origem))
             throw new ApiException(ErrorCode.CtrDominioInvalido, $"Origem inválida: {p.Origem}");
+
+        if (p.HospedagemCetic != null && !CtrDominios.HospedagemCetic.Todos.Contains(p.HospedagemCetic))
+            throw new ApiException(ErrorCode.CtrDominioInvalido,
+                $"Hospedagem no CeTIC-DF inválida: {p.HospedagemCetic}");
+
+        if (p.ValorEstimado < 0)
+            throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                "O valor estimado da contratação não pode ser negativo.");
+
+        if (p.ValorEstimado > ValorEstimadoMaximo)
+            throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                "O valor estimado da contratação não pode passar de R$ 9.999.999.999.999.999,99.");
 
         // Resposta sem pedido é RECUSADA (não normalizada): é o que o contrato chama
         // de "resposta exige pedido", e a recusa é o que faz a linha aparecer na
@@ -766,6 +793,11 @@ public class CtrProcessoService : ICtrProcessoService
             ? null
             : CtrCriticidade.Serializar(dto.CriteriosCriticidade);
         processo.Origem = dto.Origem ?? CtrDominios.Origem.OrgaoComunicante;
+        // Os três seguem o corpo (nulo limpa): o formulário os manda sempre. O checkpoint
+        // passa por aqui com o DtoDe do próprio processo, então nunca os altera
+        processo.ValorEstimado = dto.ValorEstimado;
+        processo.HospedagemCetic = dto.HospedagemCetic;
+        processo.UsaGdfnet = dto.UsaGdfnet;
         processo.EsclarecimentoSolicitadoEm = dto.EsclarecimentoSolicitadoEm;
         processo.EsclarecimentoDescricao = dto.EsclarecimentoDescricao;
         processo.EsclarecimentoRespondidoEm = dto.EsclarecimentoRespondidoEm;
@@ -796,6 +828,9 @@ public class CtrProcessoService : ICtrProcessoService
         Criticidade = p.Criticidade,
         CriteriosCriticidade = CtrCriticidade.Desserializar(p.CriteriosCriticidade),
         Origem = p.Origem,
+        ValorEstimado = p.ValorEstimado,
+        HospedagemCetic = p.HospedagemCetic,
+        UsaGdfnet = p.UsaGdfnet,
         EsclarecimentoSolicitadoEm = p.EsclarecimentoSolicitadoEm,
         EsclarecimentoDescricao = p.EsclarecimentoDescricao,
         EsclarecimentoRespondidoEm = p.EsclarecimentoRespondidoEm,
@@ -1116,6 +1151,9 @@ public class CtrProcessoService : ICtrProcessoService
             CriteriosCriticidade = criterios,
             PontosCriticidade = criterios == null ? null : CtrCriticidade.PontosTotais(criterios),
             Origem = p.Origem,
+            ValorEstimado = p.ValorEstimado,
+            HospedagemCetic = p.HospedagemCetic,
+            UsaGdfnet = p.UsaGdfnet,
             EsclarecimentoSolicitadoEm = p.EsclarecimentoSolicitadoEm,
             EsclarecimentoDescricao = p.EsclarecimentoDescricao,
             EsclarecimentoRespondidoEm = p.EsclarecimentoRespondidoEm,

@@ -44,6 +44,8 @@ public static class CtrModelConfiguration
                     "criticidade IS NULL OR " + EmLista("criticidade", CtrDominios.Criticidade.Todos));
                 t.HasCheckConstraint("ck_ctr_processo_origem",
                     EmLista("origem", CtrDominios.Origem.Todos));
+                t.HasCheckConstraint("ck_ctr_processo_hospedagem_cetic",
+                    "hospedagem_cetic IS NULL OR " + EmLista("hospedagem_cetic", CtrDominios.HospedagemCetic.Todos));
                 // Resposta sem pedido não existe; pedido exige o que foi pedido
                 t.HasCheckConstraint("ck_ctr_processo_esclarecimento",
                     "(esclarecimento_solicitado_em IS NULL AND esclarecimento_descricao IS NULL "
@@ -86,6 +88,9 @@ public static class CtrModelConfiguration
             entity.Property(p => p.CriteriosCriticidade).HasColumnName("criticidade_criterios").HasColumnType("jsonb");
             entity.Property(p => p.Origem).HasColumnName("origem").HasMaxLength(20).IsRequired()
                 .HasDefaultValue(CtrDominios.Origem.OrgaoComunicante);
+            entity.Property(p => p.ValorEstimado).HasColumnName("valor_estimado").HasPrecision(18, 2);
+            entity.Property(p => p.HospedagemCetic).HasColumnName("hospedagem_cetic").HasMaxLength(30);
+            entity.Property(p => p.UsaGdfnet).HasColumnName("usa_gdfnet");
             entity.Property(p => p.EsclarecimentoSolicitadoEm).HasColumnName("esclarecimento_solicitado_em");
             entity.Property(p => p.EsclarecimentoDescricao).HasColumnName("esclarecimento_descricao");
             entity.Property(p => p.EsclarecimentoRespondidoEm).HasColumnName("esclarecimento_respondido_em");
