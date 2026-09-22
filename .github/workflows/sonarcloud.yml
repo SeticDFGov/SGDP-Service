@@ -48,10 +48,20 @@ jobs:
           /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
 
     - name: Restore dependencies
-      run: dotnet restore app/demanda_service.sln
+      run: |
+        dotnet restore app/demanda_service.sln
+        dotnet restore test-pgia/test-pgia.csproj
+        dotnet restore test-contratacoes/test-contratacoes.csproj
 
+    # Build dos projetos de teste (além do app) é o que faz o MSBuild integration
+    # do scanner reconhecer demanda_service como projeto MAIN corretamente — sem
+    # isso o scanner só via ProjectInfo de TEST e descartava a cobertura inteira
+    # ("detected only TEST files and no MAIN files").
     - name: Build
-      run: dotnet build app/demanda_service.sln --no-restore --configuration Release
+      run: |
+        dotnet build app/demanda_service.sln --no-restore --configuration Release
+        dotnet build test-pgia/test-pgia.csproj --no-restore --configuration Release
+        dotnet build test-contratacoes/test-contratacoes.csproj --no-restore --configuration Release
 
     # Cobertura dos dois projetos de teste (test/ é o legado que não compila, fora
     # do escopo). O relatório é o que dotnet-sonarscanner end lê para publicar a
@@ -59,6 +69,7 @@ jobs:
     - name: Testes com cobertura (test-pgia)
       run: >
         dotnet test test-pgia/test-pgia.csproj
+        --no-build --no-restore --configuration Release
         --collect:"XPlat Code Coverage"
         --results-directory test-pgia/TestResults
         -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
@@ -66,6 +77,7 @@ jobs:
     - name: Testes com cobertura (test-contratacoes)
       run: >
         dotnet test test-contratacoes/test-contratacoes.csproj
+        --no-build --no-restore --configuration Release
         --collect:"XPlat Code Coverage"
         --results-directory test-contratacoes/TestResults
         -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
