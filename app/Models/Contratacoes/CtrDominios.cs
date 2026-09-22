@@ -7,7 +7,10 @@ namespace Models.Contratacoes;
 /// </summary>
 public static class CtrDominios
 {
-    /// <summary>Categoria do objeto contratado (os 12 valores observados na planilha).</summary>
+    /// <summary>
+    /// Categoria do objeto contratado: os 12 valores observados na planilha mais
+    /// "Serviços de TIC" (pedido de 2026-09-22).
+    /// </summary>
     public static class CategoriaObjeto
     {
         public const string InfraestruturaRede = "Infraestrutura de Rede";
@@ -20,6 +23,7 @@ public static class CtrDominios
         public const string CertificacaoDigital = "Certificação Digital";
         public const string CaptacaoAudiovisual = "Captação Audiovisual";
         public const string TelefoniaVoip = "Telefonia / VoIP";
+        public const string ServicosTic = "Serviços de TIC";
 
         /// <summary>Default da importação quando a célula "Categoria do Objeto" vem vazia.</summary>
         public const string SemObjeto = "Sem objeto / Indefinido";
@@ -30,7 +34,7 @@ public static class CtrDominios
         {
             InfraestruturaRede, DesenvolvimentoSoftware, OutsourcingImpressao, LicenciamentoSoftware,
             InteligenciaArtificial, SegurancaCibernetica, SistemasGestao, CertificacaoDigital,
-            CaptacaoAudiovisual, TelefoniaVoip, SemObjeto, Outros
+            CaptacaoAudiovisual, TelefoniaVoip, ServicosTic, SemObjeto, Outros
         };
     }
 
