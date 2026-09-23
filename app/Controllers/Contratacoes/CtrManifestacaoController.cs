@@ -11,8 +11,9 @@ namespace Controllers.Contratacoes;
 
 /// <summary>
 /// Manifestações da SGDI ao TCDF (despacho padrão da supervisão contínua):
-/// lista geral com filtro por estágio, edição e geração do despacho em PDF.
-/// A criação é pela rota do processo (POST api/contratacoes/processo/{id}/manifestacao).
+/// lista geral com filtro por estágio, registro da comunicação do TCDF, edição e
+/// geração do despacho em PDF. A rota do processo (POST
+/// api/contratacoes/processo/{id}/manifestacao) continua criando no processo informado.
 /// </summary>
 [ApiController]
 [Authorize(Policy = ModulosSgdp.PoliticaContratacoes)]
@@ -71,6 +72,24 @@ public class CtrManifestacaoController : ControllerBase
     }
 
     /// <summary>
+    /// Registra a comunicação do TCDF: a manifestação no processo já cadastrado
+    /// (ProcessoId) ou com a contratação nova, que vira processo de origem TCDF
+    /// (Contratacao)
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> Criar([FromBody] CtrComunicacaoTcdfCreateDTO dto)
+    {
+        var ctx = await GetContextAsync();
+        if (ctx == null) return Unauthorized();
+        if (!_permissionService.CanEdit(ctx, CtrResources.Manifestacao)) return Forbid();
+
+        if (dto.ProcessoId is { } processoId && !await _service.ProcessoAtivoExisteAsync(processoId))
+            return NotFound();
+
+        return Ok(await _service.CriarComunicacaoAsync(dto, ctx));
+    }
+
+    /// <summary>
     /// Edita a manifestação (a evolução do desfecho é atualização da mesma peça)
     /// </summary>
     [HttpPut("{id:long}")]
@@ -104,7 +123,10 @@ public class CtrManifestacaoController : ControllerBase
         if (manifestacao == null) return NotFound();
 
         var bytes = await _service.GerarDespachoPdfAsync(id, local, nome, cargo);
-        var numero = Regex.Replace(manifestacao.Processo?.NumeroProcesso ?? "processo", @"[^0-9A-Za-z]", "-");
+        // O mesmo número do cabeçalho do despacho
+        var numero = Regex.Replace(
+            manifestacao.ProcessoComunicacaoTcdf ?? manifestacao.Processo?.NumeroProcesso ?? "processo",
+            @"[^0-9A-Za-z]", "-");
 
         return File(bytes, "application/pdf", $"despacho-tcdf-{numero}-{id}.pdf");
     }

@@ -143,6 +143,15 @@ public static class CtrModelConfiguration
                     "desfecho_risco IS NULL OR " + EmLista("desfecho_risco", CtrDominios.DesfechoRisco.Todos));
                 t.HasCheckConstraint("ck_ctr_manifestacao_prazo",
                     "prazo_regularizacao_dias IS NULL OR prazo_regularizacao_dias > 0");
+                t.HasCheckConstraint("ck_ctr_manifestacao_ato_tcdf",
+                    "ato_tcdf IS NULL OR " + EmLista("ato_tcdf", CtrDominios.AtoTcdf.Todos));
+                // Os dados da comunicação do TCDF são tudo ou nada: a manifestação nova
+                // traz os quatro e a registrada antes deles fica com os quatro nulos
+                t.HasCheckConstraint("ck_ctr_manifestacao_comunicacao",
+                    "(processo_comunicacao_tcdf IS NULL AND data_recebimento IS NULL "
+                    + "AND ato_tcdf IS NULL AND numero_ato_tcdf IS NULL) OR "
+                    + "(processo_comunicacao_tcdf IS NOT NULL AND data_recebimento IS NOT NULL "
+                    + "AND ato_tcdf IS NOT NULL AND numero_ato_tcdf IS NOT NULL)");
                 // Coerência dos incisos I e II do despacho (o provider InMemory ignora
                 // CHECKs, por isso o service valida exatamente o mesmo)
                 // A criticidade saiu daqui: passou a ser do PROCESSO (o despacho só a reporta)
@@ -164,6 +173,10 @@ public static class CtrModelConfiguration
             entity.Property(m => m.ProcessoId).HasColumnName("processo_id");
             entity.Property(m => m.OficioTcdf).HasColumnName("oficio_tcdf").HasMaxLength(60).IsRequired();
             entity.Property(m => m.DataOficio).HasColumnName("data_oficio");
+            entity.Property(m => m.ProcessoComunicacaoTcdf).HasColumnName("processo_comunicacao_tcdf").HasMaxLength(25);
+            entity.Property(m => m.DataRecebimento).HasColumnName("data_recebimento");
+            entity.Property(m => m.AtoTcdf).HasColumnName("ato_tcdf").HasMaxLength(20);
+            entity.Property(m => m.NumeroAtoTcdf).HasColumnName("numero_ato_tcdf").HasMaxLength(60);
             entity.Property(m => m.SituacaoPortfolio).HasColumnName("situacao_portfolio").HasMaxLength(30).IsRequired();
             entity.Property(m => m.EsclarecimentosAdicionais).HasColumnName("esclarecimentos_adicionais");
             entity.Property(m => m.StatusTcdf).HasColumnName("status_tcdf").HasMaxLength(30);

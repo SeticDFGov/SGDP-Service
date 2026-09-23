@@ -32,7 +32,8 @@ public class CtrProcessoService : ICtrProcessoService
     private const int PageSizeMaximo = 100;
 
     // Formato SEI: 00000-00000000/AAAA-DD
-    private static readonly Regex FormatoSei = new(@"^\d{5}-\d{8}/\d{4}-\d{2}$", RegexOptions.Compiled);
+    // Também valida o processo de comunicação do TCDF na manifestação
+    internal static readonly Regex FormatoSei = new(@"^\d{5}-\d{8}/\d{4}-\d{2}$", RegexOptions.Compiled);
 
     private static readonly string[] OrdenacoesValidas =
     {
@@ -264,7 +265,8 @@ public class CtrProcessoService : ICtrProcessoService
                 $"Já existe processo ativo com o número {p.NumeroProcesso}.");
 
         if (string.IsNullOrWhiteSpace(p.OrgaoNome))
-            throw new ApiException(ErrorCode.CtrProcessoInvalido, "Informe o órgão comunicante.");
+            // Neutra: vale para o órgão comunicante e para o órgão auditado da comunicação do TCDF
+            throw new ApiException(ErrorCode.CtrProcessoInvalido, "Informe o nome do órgão.");
 
         if (string.IsNullOrWhiteSpace(p.OrgaoSigla))
             throw new ApiException(ErrorCode.CtrProcessoInvalido, "Informe a sigla do órgão.");

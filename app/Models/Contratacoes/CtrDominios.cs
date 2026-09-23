@@ -244,6 +244,18 @@ public static class CtrDominios
     }
 
     /// <summary>
+    /// Ato do TCDF que originou a comunicação à SGDI (pedido de 2026-09-23): o despacho
+    /// singular do relator ou a decisão do Tribunal. Gravado junto com o número do ato.
+    /// </summary>
+    public static class AtoTcdf
+    {
+        public const string DespachoSingular = "Despacho Singular";
+        public const string Decisao = "Decisão";
+
+        public static readonly string[] Todos = { DespachoSingular, Decisao };
+    }
+
+    /// <summary>
     /// Status do processo no TCDF: fato do Tribunal, não desfecho da análise da SGDI —
     /// vale em qualquer inciso e com qualquer resultado. Nulo = sem status especial.
     /// </summary>

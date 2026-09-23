@@ -22,6 +22,16 @@ public interface ICtrManifestacaoService
 
     Task<CtrManifestacaoResponse> CriarAsync(long processoId, CtrManifestacaoCreateDTO dto, CtrUserContext ctx);
 
+    /// <summary>
+    /// Comunicação nova do TCDF: a manifestação no processo já cadastrado ou, para a
+    /// contratação que o módulo ainda não tem, junto com o processo de origem TCDF
+    /// criado dos dados dela (uma gravação só).
+    /// </summary>
+    Task<CtrManifestacaoResponse> CriarComunicacaoAsync(CtrComunicacaoTcdfCreateDTO dto, CtrUserContext ctx);
+
+    /// <summary>O processo existe e não foi excluído? (404 do controller)</summary>
+    Task<bool> ProcessoAtivoExisteAsync(long processoId);
+
     Task<CtrManifestacaoResponse> AtualizarAsync(long id, CtrManifestacaoUpdateDTO dto, CtrUserContext ctx);
 
     /// <summary>Despacho padrão da SGDI ao TCDF, preenchido, em PDF. Nada persiste.</summary>
