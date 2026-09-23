@@ -100,7 +100,12 @@ public class CtrManifestacaoService : ICtrManifestacaoService
     /// Criticidade gravada no PROCESSO (art. 11 da IN). O inciso I a exige: o dado
     /// nasce no cadastro do processo, a manifestação só o reporta.
     /// </param>
-    public static void ValidarManifestacao(CtrManifestacaoTcdf m, string? criticidadeProcesso)
+    /// <param name="exigirComunicacao">
+    /// Os quatro dados da comunicação do TCDF são obrigatórios? Sim na criação e na
+    /// edição de manifestação que já os tem; na edição de uma registrada antes deles,
+    /// vêm os quatro ou nenhum (ver <see cref="TemComunicacao"/>).
+    /// </param>
+    public static void ValidarManifestacao(CtrManifestacaoTcdf m, string? criticidadeProcesso, bool exigirComunicacao)
     {
         m.OficioTcdf = (m.OficioTcdf ?? string.Empty).Trim();
         m.Observacao = string.IsNullOrWhiteSpace(m.Observacao) ? null : m.Observacao.Trim();
@@ -122,6 +127,10 @@ public class CtrManifestacaoService : ICtrManifestacaoService
             throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
                 $"A data do ofício ({m.DataOficio:dd/MM/yyyy}) não pode ser futura.");
 
+        // Tudo ou nada: preencher um dos quatro numa manifestação antiga pede os demais
+        if (exigirComunicacao || TemComunicacao(m))
+            ValidarComunicacao(m);
+
         if (!CtrDominios.SituacaoPortfolio.Todos.Contains(m.SituacaoPortfolio))
             throw new ApiException(ErrorCode.CtrDominioInvalido,
                 $"Situação no portfólio inválida: {m.SituacaoPortfolio}");
@@ -130,6 +139,54 @@ public class CtrManifestacaoService : ICtrManifestacaoService
             ValidarIncisoI(m, criticidadeProcesso);
         else
             ValidarIncisoII(m);
+    }
+
+    /// <summary>
+    /// A manifestação traz algum dos dados da comunicação do TCDF? As registradas antes
+    /// deles (2026-09-23) têm os quatro nulos.
+    /// </summary>
+    public static bool TemComunicacao(CtrManifestacaoTcdf m) =>
+        m.ProcessoComunicacaoTcdf != null || m.DataRecebimento != null
+        || m.AtoTcdf != null || m.NumeroAtoTcdf != null;
+
+    /// <summary>Os quatro dados da comunicação do TCDF, todos obrigatórios.</summary>
+    private static void ValidarComunicacao(CtrManifestacaoTcdf m)
+    {
+        if (m.ProcessoComunicacaoTcdf == null)
+            throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
+                "Informe o número do processo de comunicação do TCDF.");
+
+        if (!CtrProcessoService.FormatoSei.IsMatch(m.ProcessoComunicacaoTcdf))
+            throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
+                "Número do processo de comunicação do TCDF fora do formato SEI (00000-00000000/AAAA-DD): "
+                + m.ProcessoComunicacaoTcdf);
+
+        if (m.DataRecebimento == null)
+            throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
+                "Informe a data de recebimento do processo na SGDI.");
+
+        if (m.DataRecebimento.Value > CtrProcessoService.HojeBrasilia())
+            throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
+                $"A data de recebimento ({m.DataRecebimento.Value:dd/MM/yyyy}) não pode ser futura.");
+
+        // O processo chega à SGDI depois de o TCDF expedir o ofício
+        if (m.DataRecebimento.Value < m.DataOficio)
+            throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
+                $"A data de recebimento ({m.DataRecebimento.Value:dd/MM/yyyy}) não pode ser anterior "
+                + $"à data do ofício do TCDF ({m.DataOficio:dd/MM/yyyy}).");
+
+        if (m.AtoTcdf == null)
+            throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
+                "Informe se o ato do TCDF é Despacho Singular ou Decisão.");
+
+        if (!CtrDominios.AtoTcdf.Todos.Contains(m.AtoTcdf))
+            throw new ApiException(ErrorCode.CtrDominioInvalido, $"Ato do TCDF inválido: {m.AtoTcdf}");
+
+        if (m.NumeroAtoTcdf == null)
+            throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
+                m.AtoTcdf == CtrDominios.AtoTcdf.Decisao
+                    ? "Informe o número da Decisão do TCDF."
+                    : "Informe o número do Despacho Singular do TCDF.");
     }
 
     private static void ValidarIncisoI(CtrManifestacaoTcdf m, string? criticidadeProcesso)
@@ -238,8 +295,10 @@ public class CtrManifestacaoService : ICtrManifestacaoService
         if (!string.IsNullOrWhiteSpace(filtro.Filtro))
         {
             var termo = filtro.Filtro.Trim().ToLower();
+            // O teste de nulo antes do ToLower vale para o InMemory, que avalia em C#
             query = query.Where(m =>
                 m.Processo!.NumeroProcesso.ToLower().Contains(termo) ||
+                (m.ProcessoComunicacaoTcdf != null && m.ProcessoComunicacaoTcdf.ToLower().Contains(termo)) ||
                 m.Processo!.OrgaoSigla.ToLower().Contains(termo) ||
                 m.OficioTcdf.ToLower().Contains(termo));
         }
@@ -304,8 +363,71 @@ public class CtrManifestacaoService : ICtrManifestacaoService
             CriadoPor = ctx.Email
         };
         AplicarDto(manifestacao, dto);
-        ValidarManifestacao(manifestacao, processo.Criticidade);
+        ValidarManifestacao(manifestacao, processo.Criticidade, exigirComunicacao: true);
 
+        _repositorio.AddManifestacao(manifestacao);
+        await _repositorio.SaveChangesAsync();
+
+        return Map(manifestacao);
+    }
+
+    public async Task<bool> ProcessoAtivoExisteAsync(long processoId) =>
+        await _repositorio.GetByIdAsync(processoId) is { Ativo: true };
+
+    public async Task<CtrManifestacaoResponse> CriarComunicacaoAsync(CtrComunicacaoTcdfCreateDTO dto,
+        CtrUserContext ctx)
+    {
+        if ((dto.ProcessoId == null) == (dto.Contratacao == null))
+            throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
+                "Informe o processo já cadastrado da contratação ou os dados de uma contratação nova, "
+                + "um dos dois.");
+
+        if (dto.ProcessoId is { } processoId)
+            return await CriarAsync(processoId, dto, ctx);
+
+        var agora = DateTime.UtcNow;
+        var manifestacao = new CtrManifestacaoTcdf { CriadoEm = agora, CriadoPor = ctx.Email };
+        AplicarDto(manifestacao, dto);
+
+        // O inciso I reporta a criticidade e a data de entrada no monitoramento, que são
+        // do processo da contratação já acompanhada: ela está no módulo e é a ele que a
+        // comunicação se liga (a mensagem do inciso I sozinha mandaria definir a
+        // criticidade num processo que nem existe)
+        if (manifestacao.SituacaoPortfolio?.Trim() == CtrDominios.SituacaoPortfolio.ComunicadaPreviamente)
+            throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
+                "Contratação comunicada previamente (inciso I) já é acompanhada pela SGDI: registre a "
+                + "comunicação no processo dela, que tem a criticidade.");
+
+        ValidarManifestacao(manifestacao, criticidadeProcesso: null, exigirComunicacao: true);
+
+        // A contratação que o módulo ainda não tem vira processo de origem TCDF. O único
+        // processo SEI que a SGDI tem dela é o da comunicação, e é o número dele que o
+        // processo recebe (sem trâmite, riscos nem critérios de criticidade)
+        var contratacao = dto.Contratacao!;
+        var processo = new CtrProcesso
+        {
+            NumeroProcesso = manifestacao.ProcessoComunicacaoTcdf!,
+            OrgaoNome = contratacao.OrgaoNome,
+            OrgaoSigla = contratacao.OrgaoSigla,
+            Objeto = contratacao.Objeto,
+            CategoriaObjeto = contratacao.CategoriaObjeto,
+            ValorEstimado = contratacao.ValorEstimado,
+            Origem = CtrDominios.Origem.Tcdf,
+            Ativo = true,
+            CriadoEm = agora,
+            CriadoPor = ctx.Email
+        };
+
+        // Ofício novo sobre processo que já está no módulo: é nele que a comunicação entra
+        if (await _repositorio.NumeroDuplicadoAsync(processo.NumeroProcesso, null))
+            throw new ApiException(ErrorCode.CtrProcessoDuplicado,
+                $"Já existe processo cadastrado com o número {processo.NumeroProcesso}: registre a "
+                + "comunicação nele em vez de cadastrar a contratação de novo.");
+
+        CtrProcessoService.ValidarProcesso(processo, numeroDuplicado: false);
+
+        manifestacao.Processo = processo;
+        _repositorio.Add(processo);
         _repositorio.AddManifestacao(manifestacao);
         await _repositorio.SaveChangesAsync();
 
@@ -322,7 +444,9 @@ public class CtrManifestacaoService : ICtrManifestacaoService
         // a entidade rastreada com o estado inválido (mesma disciplina do processo)
         var candidato = Clonar(manifestacao);
         AplicarDto(candidato, dto);
-        ValidarManifestacao(candidato, manifestacao.Processo?.Criticidade);
+        // Registrada antes dos dados da comunicação do TCDF, pode seguir sem eles
+        ValidarManifestacao(candidato, manifestacao.Processo?.Criticidade,
+            exigirComunicacao: TemComunicacao(manifestacao));
 
         AplicarDto(manifestacao, DtoDe(candidato));
         manifestacao.AlteradoEm = DateTime.UtcNow;
@@ -355,6 +479,10 @@ public class CtrManifestacaoService : ICtrManifestacaoService
     {
         OficioTcdf = m.OficioTcdf,
         DataOficio = m.DataOficio,
+        ProcessoComunicacaoTcdf = m.ProcessoComunicacaoTcdf,
+        DataRecebimento = m.DataRecebimento,
+        AtoTcdf = m.AtoTcdf,
+        NumeroAtoTcdf = m.NumeroAtoTcdf,
         SituacaoPortfolio = m.SituacaoPortfolio,
         EsclarecimentosAdicionais = m.EsclarecimentosAdicionais,
         StatusTcdf = m.StatusTcdf,
@@ -387,6 +515,12 @@ public class CtrManifestacaoService : ICtrManifestacaoService
     {
         m.OficioTcdf = dto.OficioTcdf;
         m.DataOficio = dto.DataOficio;
+        m.ProcessoComunicacaoTcdf = string.IsNullOrWhiteSpace(dto.ProcessoComunicacaoTcdf)
+            ? null
+            : dto.ProcessoComunicacaoTcdf.Trim();
+        m.DataRecebimento = dto.DataRecebimento;
+        m.AtoTcdf = string.IsNullOrWhiteSpace(dto.AtoTcdf) ? null : dto.AtoTcdf.Trim();
+        m.NumeroAtoTcdf = string.IsNullOrWhiteSpace(dto.NumeroAtoTcdf) ? null : dto.NumeroAtoTcdf.Trim();
         m.SituacaoPortfolio = dto.SituacaoPortfolio;
         m.EsclarecimentosAdicionais = string.IsNullOrWhiteSpace(dto.EsclarecimentosAdicionais)
             ? null
@@ -409,8 +543,15 @@ public class CtrManifestacaoService : ICtrManifestacaoService
         OrgaoSigla = m.Processo?.OrgaoSigla ?? string.Empty,
         OrgaoNome = m.Processo?.OrgaoNome ?? string.Empty,
         Objeto = m.Processo?.Objeto ?? string.Empty,
+        CategoriaObjeto = m.Processo?.CategoriaObjeto ?? string.Empty,
+        ValorEstimado = m.Processo?.ValorEstimado,
+        Origem = m.Processo?.Origem ?? string.Empty,
         OficioTcdf = m.OficioTcdf,
         DataOficio = m.DataOficio,
+        ProcessoComunicacaoTcdf = m.ProcessoComunicacaoTcdf,
+        DataRecebimento = m.DataRecebimento,
+        AtoTcdf = m.AtoTcdf,
+        NumeroAtoTcdf = m.NumeroAtoTcdf,
         SituacaoPortfolio = m.SituacaoPortfolio,
         EsclarecimentosAdicionais = m.EsclarecimentosAdicionais,
         StatusTcdf = m.StatusTcdf,

@@ -134,12 +134,23 @@ public abstract class CtrTestBase : IDisposable
         return processo;
     }
 
-    /// <summary>Manifestação válida do inciso I (comunicada previamente).</summary>
+    /// <summary>Processo de comunicação do TCDF dos helpers de manifestação.</summary>
+    protected const string ProcessoComunicacaoPadrao = "00600-00000123/2026-11";
+
+    /// <summary>
+    /// Manifestação válida do inciso I (comunicada previamente). Os dados da comunicação
+    /// do TCDF (obrigatórios na criação desde 2026-09-23) recebem hoje como data de
+    /// recebimento, que vale para qualquer data de ofício que um teste escolha.
+    /// </summary>
     protected static CtrManifestacaoUpdateDTO NovaManifestacaoIncisoI(
         string resultado = CtrDominios.ResultadoAnalise.Alinhada) => new()
     {
         OficioTcdf = "123/2026-GAB",
         DataOficio = DiasAtras(5),
+        ProcessoComunicacaoTcdf = ProcessoComunicacaoPadrao,
+        DataRecebimento = Hoje,
+        AtoTcdf = CtrDominios.AtoTcdf.Decisao,
+        NumeroAtoTcdf = "1234/2026",
         SituacaoPortfolio = CtrDominios.SituacaoPortfolio.ComunicadaPreviamente,
         ComunicadaDesde = DiasAtras(60),
         // A criticidade NÃO vem mais no DTO da manifestação: é do processo
@@ -154,6 +165,10 @@ public abstract class CtrTestBase : IDisposable
     {
         OficioTcdf = "456/2026-GAB",
         DataOficio = DiasAtras(3),
+        ProcessoComunicacaoTcdf = ProcessoComunicacaoPadrao,
+        DataRecebimento = Hoje,
+        AtoTcdf = CtrDominios.AtoTcdf.DespachoSingular,
+        NumeroAtoTcdf = "45/2026",
         SituacaoPortfolio = CtrDominios.SituacaoPortfolio.NaoComunicadaPreviamente,
         PrazoRegularizacaoDias = 30
     };

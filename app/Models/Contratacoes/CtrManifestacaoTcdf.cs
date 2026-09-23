@@ -21,6 +21,22 @@ public class CtrManifestacaoTcdf
 
     public DateOnly DataOficio { get; set; }
 
+    // ── Comunicação do TCDF (pedido de 2026-09-23) ────────────────────────────
+    // Os quatro andam juntos (ck_ctr_manifestacao_comunicacao): obrigatórios na
+    // manifestação nova e todos nulos nas registradas antes deles.
+
+    // Processo SEI em que o TCDF comunicou a SGDI; é nele que o despacho é juntado,
+    // por isso o PDF o traz como "Processo SEI nº" (sem ele, o número do processo)
+    public string? ProcessoComunicacaoTcdf { get; set; }
+
+    // Dia em que esse processo chegou à SGDI (a data do ofício continua: o despacho a cita)
+    public DateOnly? DataRecebimento { get; set; }
+
+    // CtrDominios.AtoTcdf (Despacho Singular ou Decisão) e o número do ato
+    public string? AtoTcdf { get; set; }
+
+    public string? NumeroAtoTcdf { get; set; }
+
     // CtrDominios.SituacaoPortfolio — inciso I ou II do despacho
     public string SituacaoPortfolio { get; set; } = string.Empty;
 

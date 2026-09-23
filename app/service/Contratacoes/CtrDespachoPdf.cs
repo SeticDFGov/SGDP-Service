@@ -48,7 +48,7 @@ public static class CtrDespachoPdf
                     // segunda página e o fecho ficava órfão lá.
                     col.Spacing(4);
 
-                    col.Item().Text($"Processo SEI nº: {processo.NumeroProcesso}");
+                    col.Item().Text($"Processo SEI nº: {NumeroDoProcessoSei(processo, manifestacao)}");
                     col.Item().Text("Referência: Ofício/Comunicação TCDF nº "
                         + $"{manifestacao.OficioTcdf}, de {manifestacao.DataOficio:dd/MM/yyyy}");
                     col.Item().Text($"Contratação: {Contratacao(processo)}");
@@ -121,6 +121,16 @@ public static class CtrDespachoPdf
             });
         }).GeneratePdf();
     }
+
+    /// <summary>
+    /// "Processo SEI nº" do cabeçalho: o processo de comunicação do TCDF, em que o
+    /// despacho é juntado. A manifestação registrada antes desse campo mostra o número
+    /// do processo da contratação, como sempre mostrou.
+    /// </summary>
+    public static string NumeroDoProcessoSei(CtrProcessoResponse processo, CtrManifestacaoResponse manifestacao) =>
+        string.IsNullOrWhiteSpace(manifestacao.ProcessoComunicacaoTcdf)
+            ? processo.NumeroProcesso
+            : manifestacao.ProcessoComunicacaoTcdf;
 
     /// <summary>"objeto — Órgão (SIGLA), complemento" do cabeçalho do despacho.</summary>
     private static string Contratacao(CtrProcessoResponse p)
