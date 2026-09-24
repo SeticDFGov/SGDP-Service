@@ -154,4 +154,9 @@ public enum ErrorCode
     PeDocConfigInvalida = 1075,         // 400: config do bloco não serve para o tipo
     PeDocVersaoNaoEncontrada = 1076,    // 404: versão gerada inexistente
     PeDocGeracaoFalhou = 1077,          // 409: o PDF não pôde ser montado (conteúdo que não cabe na página)
+    // Fluxos (E6): faixa 1090 a 1099
+    PeFluxoNaoEncontrado = 1090,        // 404: chave de fluxo que não existe
+    PeFluxoInvalido = 1091,             // 400: a definição não passa na validação; o corpo traz Erros [texto]
+    PeCronogramaPreenchido = 1092,      // 409: a seção do cronograma já tem linhas (a sugestão só entra nela vazia)
+    PeCronogramaSemTarefas = 1093,      // 409: os fluxos da elaboração não têm tarefa para sugerir
 }

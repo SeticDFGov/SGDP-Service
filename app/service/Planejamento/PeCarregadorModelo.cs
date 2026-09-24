@@ -118,7 +118,7 @@ public sealed class PeSeedOpcao
 public sealed record PeCarregamentoResultado(
     int VersaoAnterior, int Versao, bool Executou,
     int Niveis, int Etapas, int Passos, int Secoes, int Campos, int Opcoes, int Configuracoes, int Registros = 0,
-    int Documentos = 0, int Capitulos = 0, int Blocos = 0);
+    int Documentos = 0, int Capitulos = 0, int Blocos = 0, int Fluxos = 0);
 
 /// <summary>
 /// Carregador do modelo inicial do módulo Governança Estratégica: a trilha da seção 7 do
@@ -129,7 +129,8 @@ public sealed record PeCarregamentoResultado(
 /// diretrizes do ciclo) e do PETIC-DF, e os 11 princípios do art. 4º do Decreto nº
 /// 48.900/2026 como registros do sistema; desde a versão 3 (E5), o campo do logotipo no
 /// dicionário de nomes e o modelo do documento do PDTIC (capítulos, textos padrão e blocos de
-/// dados, em documento-inicial.json). O conteúdo fica em JSON embutido na aplicação.
+/// dados, em documento-inicial.json); desde a versão 4 (E6), os fluxos do guia como modelo
+/// (figuras 4 a 22, em fluxos-inicial.json). O conteúdo fica em JSON embutido na aplicação.
 /// <list type="bullet">
 /// <item>Idempotente: se a versão gravada em pe_configuracao (seed_modelo_versao) já é a do
 /// JSON, não faz nada; senão insere só o que falta, achando cada item pela chave (nível
@@ -154,6 +155,9 @@ public sealed class PeCarregadorModelo
 
     /// <summary>Versão do modelo inicial que trouxe o modelo do documento do PDTIC e o logotipo (E5).</summary>
     public const int VersaoDoDocumento = 3;
+
+    /// <summary>Versão do modelo inicial que trouxe os fluxos do guia (E6).</summary>
+    public const int VersaoDosFluxos = 4;
 
     // Trava do carregador no PostgreSQL: segura até o fim da transação
     private const string SqlTrava = "SELECT pg_advisory_xact_lock(4890020260924)";
@@ -353,7 +357,12 @@ public sealed class PeCarregadorModelo
         CarregarAsync(seed, null, ct);
 
     /// <summary>A carga com o modelo do documento dado (nulo = o embutido na aplicação).</summary>
-    public async Task<PeCarregamentoResultado> CarregarAsync(PeSeedModelo seed, PeSeedDocumentos? documentos, CancellationToken ct = default)
+    public Task<PeCarregamentoResultado> CarregarAsync(PeSeedModelo seed, PeSeedDocumentos? documentos, CancellationToken ct = default) =>
+        CarregarAsync(seed, documentos, null, ct);
+
+    /// <summary>A carga com o modelo do documento e os fluxos dados (nulo = os embutidos na aplicação).</summary>
+    public async Task<PeCarregamentoResultado> CarregarAsync(PeSeedModelo seed, PeSeedDocumentos? documentos, PeSeedFluxos? fluxos,
+        CancellationToken ct = default)
     {
         ValidarSeed(seed);
 
@@ -664,6 +673,12 @@ public sealed class PeCarregadorModelo
             ? await CarregarDocumentosAsync(documentos ?? PeDocSeed.Ler(), passos, secoes, campos, opcoes, agora, ct)
             : (0, 0, 0);
 
+        // Fluxos do guia (versão 4, E6): os que faltam, achados pela chave; o que já existe
+        // (inclusive o que o administrador mudou) não é tocado
+        var nFluxos = seed.Versao >= VersaoDosFluxos
+            ? await CarregarFluxosAsync(fluxos ?? PeFluxoSeed.Ler(), agora, ct)
+            : 0;
+
         // A versão carregada
         if (registroVersao == null)
         {
@@ -686,7 +701,34 @@ public sealed class PeCarregadorModelo
         if (transacao != null) await transacao.CommitAsync(ct);
 
         return new PeCarregamentoResultado(versaoAnterior, seed.Versao, true, nNiveis, nEtapas, nPassos, nSecoes, nCampos, nOpcoes, nConfig,
-            nRegistros, nDocumentos, nCapitulos, nBlocos);
+            nRegistros, nDocumentos, nCapitulos, nBlocos, nFluxos);
+    }
+
+    /// <summary>
+    /// Acrescenta os fluxos do guia que faltam (pela chave), com a definição conferida pela
+    /// validação da API e numerada. Erro no JSON = modelo inicial inválido e nada é gravado.
+    /// </summary>
+    private async Task<int> CarregarFluxosAsync(PeSeedFluxos fluxos, DateTime agora, CancellationToken ct)
+    {
+        var validos = PeFluxoSeed.Validar(fluxos);
+        var existentes = await _context.PeFluxosModelo.Select(f => f.Chave).ToListAsync(ct);
+        var novos = 0;
+        foreach (var ((seed, definicao), i) in validos.Select((v, i) => (v, i)))
+        {
+            if (existentes.Contains(seed.Chave)) continue;
+            _context.PeFluxosModelo.Add(new PeFluxoModelo
+            {
+                Chave = seed.Chave,
+                Nome = seed.Nome.Trim(),
+                FiguraGuia = string.IsNullOrWhiteSpace(seed.FiguraGuia) ? null : seed.FiguraGuia.Trim(),
+                Ordem = i + 1,
+                Definicao = PeFluxoDefinicaoLeitor.ParaJson(definicao),
+                CriadoEm = agora,
+                CriadoPor = Autor
+            });
+            novos++;
+        }
+        return novos;
     }
 
     /// <summary>

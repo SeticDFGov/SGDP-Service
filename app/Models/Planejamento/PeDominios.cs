@@ -408,9 +408,11 @@ public static class PeDominios
         // Modelo do documento (E5): capítulo e bloco
         public const string DocCapitulo = "doc_capitulo";
         public const string DocBloco = "doc_bloco";
+        // Fluxo do guia (modelo, E6)
+        public const string FluxoModelo = "fluxo_modelo";
 
         public static readonly string[] Todas =
-            { Nivel, Etapa, Passo, Secao, Campo, Opcao, OrgaoNivel, OrgaoAjuste, DocCapitulo, DocBloco };
+            { Nivel, Etapa, Passo, Secao, Campo, Opcao, OrgaoNivel, OrgaoAjuste, DocCapitulo, DocBloco, FluxoModelo };
     }
 
     /// <summary>O que aconteceu com o item (pe_modelo_historico.acao).</summary>
@@ -519,6 +521,63 @@ public static class PeDominios
         public const string UnidadeTic = "unidade_tic";
         public const string SiglaOrgao = "sigla_orgao";
         public const string Logotipo = "logotipo";
+    }
+
+    // ── Fluxos (E6) ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Tipo de um elemento de fluxo (a definição em jsonb de pe_fluxo_modelo e pe_fluxo): início
+    /// e fim, ligação com outro fluxo (evento de enlace do BPMN), tarefa, subprocesso, decisão
+    /// (gateway exclusivo, com "X") e paralelo (gateway paralelo, com "+"). Tarefa e subprocesso
+    /// recebem o número automático (prefixo do fluxo e a ordem no desenho).
+    /// </summary>
+    public static class TipoElementoFluxo
+    {
+        public const string Inicio = "inicio";
+        public const string Fim = "fim";
+        public const string Ligacao = "ligacao";
+        public const string Tarefa = "tarefa";
+        public const string Subprocesso = "subprocesso";
+        public const string Decisao = "decisao";
+        public const string Paralelo = "paralelo";
+
+        public static readonly string[] Todos = { Inicio, Fim, Ligacao, Tarefa, Subprocesso, Decisao, Paralelo };
+
+        /// <summary>Recebe número automático e artefatos.</summary>
+        public static bool EhAtividade(string? tipo) => tipo is Tarefa or Subprocesso;
+
+        /// <summary>Losango (decisão ou paralelo).</summary>
+        public static bool EhPorta(string? tipo) => tipo is Decisao or Paralelo;
+
+        /// <summary>Círculo (início, fim ou ligação com outro fluxo).</summary>
+        public static bool EhEvento(string? tipo) => tipo is Inicio or Fim or Ligacao;
+    }
+
+    /// <summary>
+    /// Os fluxos do guia que o carregador semeia (figuras 4 a 22) e os que viram o cronograma
+    /// sugerido do plano de trabalho (preparação, diagnóstico e planejamento, na ordem).
+    /// </summary>
+    public static class FluxoGuia
+    {
+        public const string Macroprocesso = "macroprocesso";
+        public const string Elaboracao = "elaboracao";
+        public const string Preparacao = "preparacao";
+        public const string Diagnostico = "diagnostico";
+        public const string Planejamento = "planejamento";
+        public const string Acompanhamento = "acompanhamento";
+        public const string PlanejamentoAcompanhamento = "planejamento_acompanhamento";
+        public const string Monitoramento = "monitoramento";
+        public const string AvaliacaoIntermediaria = "avaliacao_intermediaria";
+        public const string AvaliacaoFinal = "avaliacao_final";
+
+        // As tarefas destes fluxos viram as linhas sugeridas do cronograma (passo do plano de trabalho)
+        public static readonly string[] DoCronograma = { Preparacao, Diagnostico, Planejamento };
+
+        // A seção do cronograma do plano de trabalho e os campos que a sugestão preenche
+        public const string SecaoCronograma = "cronograma_elaboracao";
+        public const string CampoAtividade = "atividade";
+        public const string CampoResponsavel = "responsavel";
+        public const string CampoPredecessoras = "predecessoras";
     }
 
     /// <summary>As quatro seções da análise SWOT (passo 2.5) e o campo do texto de cada item.</summary>

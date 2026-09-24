@@ -99,6 +99,9 @@ namespace Models
         public DbSet<PeDocOrgao> PeDocOrgaos { get; set; }
         public DbSet<PeDocOrgaoBloco> PeDocOrgaoBlocos { get; set; }
         public DbSet<PeDocVersao> PeDocVersoes { get; set; }
+        // Fluxos (E6): os fluxos do guia como modelo e a cópia que o órgão adaptou
+        public DbSet<PeFluxoModelo> PeFluxosModelo { get; set; }
+        public DbSet<PeFluxo> PeFluxos { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

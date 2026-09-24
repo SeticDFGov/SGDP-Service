@@ -163,6 +163,9 @@ builder.Services.AddScoped<IPeComentarioService, service.Planejamento.PeComentar
 // modelo do documento do administrador
 builder.Services.AddScoped<IPeDocumentoService, service.Planejamento.PeDocumentoService>();
 builder.Services.AddScoped<IPeDocModeloService, service.Planejamento.PeDocModeloService>();
+// Fluxos (E6): os fluxos do guia como modelo, a cópia do órgão, o desenho em SVG e o
+// cronograma sugerido do plano de trabalho
+builder.Services.AddScoped<IPeFluxoService, service.Planejamento.PeFluxoService>();
 // Modelo inicial (trilha e campos do PDTIC, e os referenciais do DF e do PETIC-DF, com os
 // princípios do art. 4º): carregado ao subir, fora das requisições.
 // Sem as tabelas (intervalo entre o PR e a migration do merge) só registra no log e

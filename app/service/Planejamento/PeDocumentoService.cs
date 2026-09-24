@@ -42,7 +42,10 @@ public class PeDocumentoService : IPeDocumentoService
 
     private const string PassoDosSistemasDeIa = "diagnostico.sistemas-ia";
 
-    /// <summary>Os fluxos do guia pela chave (o nome que o bloco mostra até a E6 trazer os fluxos).</summary>
+    /// <summary>
+    /// Os fluxos do guia pela chave: o nome que o bloco mostra quando o fluxo não está em
+    /// pe_fluxo_modelo (antes de a E6 carregar os fluxos, ou chave que não existe).
+    /// </summary>
     public static readonly IReadOnlyDictionary<string, string> NomesDosFluxos = new Dictionary<string, string>
     {
         ["macroprocesso"] = "Macroprocesso do PDTIC (figura 4 do guia)",
@@ -554,7 +557,7 @@ public class PeDocumentoService : IPeDocumentoService
     {
         var base_ = await BaseAsync(pdtic);
         var trilha = base_.Trilha;
-        var (dicionario, logotipo) = await DicionarioAsync(pdtic, trilha);
+        var (dicionario, logotipo) = await DicionarioAsync(_registros, pdtic, trilha);
         var marcadores = Marcadores(pdtic, base_.Orgao, dicionario);
 
         bool Resolve(PeDocBloco bloco) =>
@@ -591,12 +594,16 @@ public class PeDocumentoService : IPeDocumentoService
             .Where(Resolve)
             .ToList();
         var chaves = new HashSet<string>();
+        var chavesDosFluxos = new HashSet<string>();
         var comPgia = false;
         foreach (var bloco in aResolver)
         {
             var config = PeDocConfig.Ler(bloco.Config);
             switch (bloco.Tipo)
             {
+                case PeDominios.TipoBloco.Fluxo when PeDocConfig.Fluxo(config) is string fluxo:
+                    chavesDosFluxos.Add(fluxo);
+                    break;
                 case PeDominios.TipoBloco.TabelaSecao when PeDocConfig.Secao(config) is string secao:
                     if (secao == PeDocConfig.SecaoPgia) comPgia = true;
                     else chaves.Add(secao);
@@ -620,6 +627,7 @@ public class PeDocumentoService : IPeDocumentoService
                 .OrderBy(s => s.Denominacao).ThenBy(s => s.Id)
                 .ToListAsync()
             : new List<PgiaSistemaIa>();
+        var fluxos = await FluxosAsync(pdtic, chavesDosFluxos, marcadores, trilha);
 
         var resposta = new PeDocumentoResponse
         {
@@ -659,7 +667,7 @@ public class PeDocumentoService : IPeDocumentoService
             {
                 foreach (var bloco in base_.Blocos.Where(b => b.CapituloId == capitulo.Id && Resolve(b)))
                 {
-                    var resolvidoDoBloco = Bloco(bloco, base_, marcadores, dados, sistemasIa);
+                    var resolvidoDoBloco = Bloco(bloco, base_, marcadores, dados, sistemasIa, fluxos);
                     if (resolvidoDoBloco == null) continue;
                     item.Blocos.Add(resolvidoDoBloco);
                     resolvido.Blocos[bloco.Id] = resolvidoDoBloco;
@@ -673,9 +681,11 @@ public class PeDocumentoService : IPeDocumentoService
 
     /// <summary>
     /// Os valores do dicionário de nomes (campos de texto visíveis do registro do passo 1.2) pela
-    /// chave do marcador ("nomes.comite"), e o id do logotipo (campo de arquivo visível).
+    /// chave do marcador ("nomes.comite"), e o id do logotipo (campo de arquivo visível). Os
+    /// fluxos (E6) usam os mesmos valores nas raias e nos passos.
     /// </summary>
-    private async Task<(Dictionary<string, string?> Valores, long? Logotipo)> DicionarioAsync(PePdtic pdtic, PeTrilhaOrgao trilha)
+    internal static async Task<(Dictionary<string, string?> Valores, long? Logotipo)> DicionarioAsync(IPeRegistroService registros,
+        PePdtic pdtic, PeTrilhaOrgao trilha)
     {
         var valores = new Dictionary<string, string?>();
         var secao = trilha.Dados.SecaoPorChave(PeDominios.DicionarioNomes.Secao);
@@ -685,7 +695,7 @@ public class PeDocumentoService : IPeDocumentoService
 
         var visivel = trilha.Secao(PeDominios.DicionarioNomes.Secao);
         if (visivel == null) return (valores, null);
-        var exportada = (await _registros.ExportarAsync(PeDono.DoPdtic(pdtic.Id), new[] { trilha.Montar(visivel.Value.Secao) }))[0];
+        var exportada = (await registros.ExportarAsync(PeDono.DoPdtic(pdtic.Id), new[] { trilha.Montar(visivel.Value.Secao) }))[0];
         var registro = exportada.Registros.FirstOrDefault();
         if (registro == null) return (valores, null);
 
@@ -719,10 +729,35 @@ public class PeDocumentoService : IPeDocumentoService
         return valores;
     }
 
+    /// <summary>
+    /// Os desenhos dos fluxos que o documento mostra (E6). Sem as tabelas dos fluxos (o intervalo
+    /// entre o PR e a migration), o documento sai sem os desenhos, em vez de falhar inteiro.
+    /// </summary>
+    private async Task<Dictionary<string, PeFluxoService.ParaDocumento>> FluxosAsync(PePdtic pdtic, IReadOnlyCollection<string> chaves,
+        IReadOnlyDictionary<string, string?> marcadores, PeTrilhaOrgao trilha)
+    {
+        if (chaves.Count == 0) return new Dictionary<string, PeFluxoService.ParaDocumento>();
+        try
+        {
+            return await PeFluxoService.ParaDocumentoAsync(_context, pdtic.Id, chaves, marcadores, PeFluxoService.CamposDoDicionario(trilha.Dados));
+        }
+        catch (Exception ex) when (PeBanco.TabelaAusente(ex))
+        {
+            return new Dictionary<string, PeFluxoService.ParaDocumento>();
+        }
+    }
+
+    /// <summary>
+    /// Largura (em unidades do desenho) acima da qual o fluxo vai para uma página deitada no PDF:
+    /// em pé, ele sairia pequeno demais para ler.
+    /// </summary>
+    public const double LarguraDoFluxoEmPe = 760;
+
     // ── Blocos ──────────────────────────────────────────────────────────────
 
     private static PeDocBlocoResponse? Bloco(PeDocBloco bloco, Base base_, IReadOnlyDictionary<string, string?> marcadores,
-        IReadOnlyDictionary<string, PeSecaoExportada> dados, IReadOnlyList<PgiaSistemaIa> sistemasIa)
+        IReadOnlyDictionary<string, PeSecaoExportada> dados, IReadOnlyList<PgiaSistemaIa> sistemasIa,
+        IReadOnlyDictionary<string, PeFluxoService.ParaDocumento> fluxos)
     {
         var config = PeDocConfig.Ler(bloco.Config);
         var resposta = new PeDocBlocoResponse
@@ -755,7 +790,23 @@ public class PeDocumentoService : IPeDocumentoService
             case PeDominios.TipoBloco.Fluxo:
             {
                 var chave = PeDocConfig.Fluxo(config) ?? string.Empty;
-                resposta.Fluxo = new PeDocFluxoResponse { Chave = chave, Nome = NomesDosFluxos.GetValueOrDefault(chave) ?? chave, Svg = null };
+                if (fluxos.TryGetValue(chave, out var desenho))
+                {
+                    resposta.Fluxo = new PeDocFluxoResponse
+                    {
+                        Chave = chave,
+                        Nome = desenho.Nome,
+                        Svg = desenho.Svg,
+                        Personalizado = desenho.Personalizado,
+                        Descricao = desenho.Descricao
+                    };
+                    // Fluxo largo vai para a página deitada, mesmo sem a marca do bloco
+                    if (desenho.Largura > LarguraDoFluxoEmPe) resposta.PaginaDeitada = true;
+                }
+                else
+                {
+                    resposta.Fluxo = new PeDocFluxoResponse { Chave = chave, Nome = NomesDosFluxos.GetValueOrDefault(chave) ?? chave, Svg = null };
+                }
                 break;
             }
         }

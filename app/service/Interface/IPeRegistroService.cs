@@ -29,6 +29,13 @@ public interface IPeRegistroService
     Task<PeRegistrosResponse> OrdenarAsync(PeDono dono, string secaoChave, PeOrdemDTO dto, PeUserContext ctx);
 
     /// <summary>
+    /// Linhas sugeridas pelo sistema numa tabela vazia (o cronograma que vem dos fluxos, E6), só
+    /// com os textos e as ligações dados; os obrigatórios que faltam o órgão completa depois.
+    /// Tabela com linhas: 409 PeCronogramaPreenchido.
+    /// </summary>
+    Task<List<PeRegistroResponse>> CriarSugeridosAsync(PeDono dono, string secaoChave, IReadOnlyList<PeRegistroSugerido> linhas, PeUserContext ctx);
+
+    /// <summary>
     /// Itens de um catálogo (petic_objetivo e petic_eixo da vigente; principio do DF;
     /// pgia_sistema, os sistemas de IA do inventário do PGIA do órgão do PDTIC pdticId).
     /// </summary>

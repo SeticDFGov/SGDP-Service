@@ -74,6 +74,7 @@ public static class PeModelConfiguration
         modelBuilder.ApplyPeReferenciaisConfiguration();
         modelBuilder.ApplyPePdticConfiguration();
         modelBuilder.ApplyPeDocumentoConfiguration();
+        modelBuilder.ApplyPeFluxoConfiguration();
     }
 
     // ── Modelo configurável e níveis de maturidade (E2) ──────────────────────
@@ -1005,6 +1006,60 @@ public static class PeModelConfiguration
                 .HasForeignKey(v => v.ArquivoId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_pe_doc_versao_arquivo");
+        });
+    }
+
+    // ── Fluxos (E6) ───────────────────────────────────────────────────────────
+
+    private static void ApplyPeFluxoConfiguration(this ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PeFluxoModelo>(entity =>
+        {
+            entity.ToTable("pe_fluxo_modelo", t =>
+                t.HasCheckConstraint("ck_pe_fluxo_modelo_chave", $"chave ~ '{ChaveComSublinhado}'"));
+
+            entity.HasKey(m => m.Id).HasName("pk_pe_fluxo_modelo");
+            entity.Property(m => m.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(m => m.Chave).HasColumnName("chave").HasMaxLength(60).IsRequired();
+            entity.Property(m => m.Nome).HasColumnName("nome").HasMaxLength(200).IsRequired();
+            entity.Property(m => m.FiguraGuia).HasColumnName("figura_guia").HasMaxLength(40);
+            entity.Property(m => m.Ordem).HasColumnName("ordem");
+            entity.Property(m => m.Definicao).HasColumnName("definicao").HasColumnType("jsonb").IsRequired();
+            Auditoria(entity);
+
+            // A chave é o endereço do fluxo (a API e o bloco de fluxo do documento usam)
+            entity.HasIndex(m => m.Chave).IsUnique().HasDatabaseName("ux_pe_fluxo_modelo_chave");
+        });
+
+        modelBuilder.Entity<PeFluxo>(entity =>
+        {
+            entity.ToTable("pe_fluxo");
+
+            entity.HasKey(f => f.Id).HasName("pk_pe_fluxo");
+            entity.Property(f => f.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(f => f.PdticId).HasColumnName("pdtic_id");
+            entity.Property(f => f.ModeloId).HasColumnName("modelo_id");
+            entity.Property(f => f.Nome).HasColumnName("nome").HasMaxLength(200).IsRequired();
+            entity.Property(f => f.Definicao).HasColumnName("definicao").HasColumnType("jsonb").IsRequired();
+            entity.Property(f => f.ModeloHash).HasColumnName("modelo_hash").HasMaxLength(64).IsRequired();
+            Auditoria(entity);
+
+            // Uma cópia por PDTIC e modelo: duas gravações ao mesmo tempo não viram duas cópias
+            entity.HasIndex(f => new { f.PdticId, f.ModeloId }).IsUnique().HasDatabaseName("ux_pe_fluxo_pdtic_modelo");
+            entity.HasIndex(f => f.ModeloId).HasDatabaseName("ix_pe_fluxo_modelo");
+
+            entity.HasOne(f => f.Pdtic)
+                .WithMany()
+                .HasForeignKey(f => f.PdticId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_fluxo_pdtic");
+
+            // O modelo não é apagado (não há exclusão de fluxo do guia)
+            entity.HasOne(f => f.Modelo)
+                .WithMany()
+                .HasForeignKey(f => f.ModeloId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_fluxo_modelo");
         });
     }
 }

@@ -388,7 +388,9 @@ public class PeDocumentoResolucaoTest : PeDocumentoTestBase
         var fluxo = Cap(documento, "metodologia").Blocos.Single(b => b.Tipo == "fluxo").Fluxo!;
         Assert.Equal("elaboracao", fluxo.Chave);
         Assert.Equal("Processo de elaboração do PDTIC (figura 5 do guia)", fluxo.Nome);
-        Assert.Null(fluxo.Svg);
+        // Desde a E6, o desenho do fluxo do guia (o modelo, sem cópia do órgão)
+        Assert.StartsWith("<svg", fluxo.Svg);
+        Assert.False(fluxo.Personalizado);
     }
 
     [Fact]

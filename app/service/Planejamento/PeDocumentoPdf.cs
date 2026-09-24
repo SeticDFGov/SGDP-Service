@@ -544,7 +544,7 @@ public static partial class PeDocumentoPdf
                 Swot(container, bloco.Swot);
                 break;
             case PeDominios.TipoBloco.Fluxo when bloco.Fluxo?.Svg != null:
-                Fluxo(container, bloco.Fluxo);
+                Fluxo(container, bloco);
                 break;
         }
     }
@@ -783,8 +783,26 @@ public static partial class PeDocumentoPdf
         });
     }
 
-    private static void Fluxo(IContainer container, PeDocFluxoResponse fluxo)
+    // Área do fluxo na página (pontos): a largura útil e uma altura que deixa a legenda e o rodapé
+    private const float FluxoLarguraEmPe = 465f;
+    private const float FluxoAlturaEmPe = 600f;
+    private const float FluxoLarguraDeitada = 735f;
+    private const float FluxoAlturaDeitada = 420f;
+
+    // O desenho não cresce além deste tamanho (texto de 10,5 do desenho sai com cerca de 9 pontos)
+    private const float FluxoEscalaMaxima = 0.85f;
+
+    // A altura da legenda (até duas linhas) e do espaço até o desenho
+    private const float FluxoFolgaDaLegenda = 30f;
+
+    /// <summary>
+    /// O fluxo em SVG (E6): o texto do desenho já vem em contornos, então sai igual ao da prévia.
+    /// A escala cabe na largura e na altura da página (deitada, quando o fluxo é largo) sem
+    /// passar da escala máxima.
+    /// </summary>
+    private static void Fluxo(IContainer container, PeDocBlocoResponse bloco)
     {
+        var fluxo = bloco.Fluxo!;
         SvgImage? svg;
         try
         {
@@ -794,19 +812,28 @@ public static partial class PeDocumentoPdf
         {
             return;
         }
-        var proporcao = ProporcaoDoSvg(fluxo.Svg!);
-        container.EnsureSpace(200).Column(col =>
+        var largura = FluxoEscalaMaxima * 600f;
+        var altura = 200f;
+        if (TamanhoDoSvg(fluxo.Svg!) is (float l, float a))
+        {
+            var escala = Math.Min(FluxoEscalaMaxima, Math.Min(
+                (bloco.PaginaDeitada ? FluxoLarguraDeitada : FluxoLarguraEmPe) / l,
+                (bloco.PaginaDeitada ? FluxoAlturaDeitada : FluxoAlturaEmPe) / a));
+            largura = l * escala;
+            altura = a * escala;
+        }
+        // A legenda e o desenho juntos: pela escala, o bloco inteiro cabe numa página, então,
+        // quando não cabe no resto desta, vai todo para a seguinte (a legenda não fica sozinha)
+        container.EnsureSpace(altura + FluxoFolgaDaLegenda).Column(col =>
         {
             col.Spacing(4);
             Legenda(col, fluxo.Nome);
-            var item = col.Item().AlignCenter();
-            if (proporcao is float p) item = item.MaxWidth(Math.Max(40f, 420f * p));
-            item.Svg(svg).FitWidth();
+            col.Item().AlignCenter().Width(largura).Svg(svg).FitWidth();
         });
     }
 
-    /// <summary>Largura sobre altura do SVG, pelo viewBox (ou nulo).</summary>
-    private static float? ProporcaoDoSvg(string svg)
+    /// <summary>Largura e altura do SVG, pelo viewBox (ou nulo).</summary>
+    public static (float Largura, float Altura)? TamanhoDoSvg(string svg)
     {
         var m = ViewBox().Match(svg);
         if (!m.Success) return null;
@@ -815,7 +842,7 @@ public static partial class PeDocumentoPdf
                && float.TryParse(partes[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var largura)
                && float.TryParse(partes[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var altura)
                && largura > 0 && altura > 0
-            ? largura / altura
+            ? (largura, altura)
             : null;
     }
 

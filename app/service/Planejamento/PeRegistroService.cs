@@ -36,6 +36,18 @@ public sealed class PeSecaoAnalisada
     public bool Completa => !FaltaRegistro && Incompletos.Count == 0;
 }
 
+/// <summary>
+/// Uma linha sugerida pelo sistema (o cronograma que vem dos fluxos): os textos pela chave do
+/// campo e, por campo de ligação com a própria seção, as posições (na lista da sugestão) das
+/// linhas anteriores ligadas.
+/// </summary>
+public sealed class PeRegistroSugerido
+{
+    public Dictionary<string, string> Textos { get; init; } = new();
+
+    public Dictionary<string, List<int>> Ligacoes { get; init; } = new();
+}
+
 /// <summary>A análise de um dono: as seções e as ligações que saem dos registros delas.</summary>
 public sealed class PeAnaliseDono
 {
@@ -374,6 +386,76 @@ public class PeRegistroService : IPeRegistroService
         Tocar(aberto, ctx, DateTime.UtcNow);
         CopiarVigencia(aberto, secao, null);
         await _context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Linhas sugeridas pelo sistema numa tabela vazia (o cronograma que vem dos fluxos, E6): só
+    /// os textos dados (nos campos de texto visíveis) e as ligações com linhas anteriores da
+    /// mesma sugestão (nos campos de ligação visíveis com a própria seção). Os obrigatórios que
+    /// ficam vazios (as datas) o órgão completa depois; até lá o passo fica pendente. Tabela com
+    /// linhas: 409 PeCronogramaPreenchido. Tudo numa gravação só.
+    /// </summary>
+    public async Task<List<PeRegistroResponse>> CriarSugeridosAsync(PeDono dono, string secaoChave, IReadOnlyList<PeRegistroSugerido> linhas,
+        PeUserContext ctx)
+    {
+        var aberto = await AbrirAsync(dono, ctx, escrita: true);
+        var secao = await SecaoAsync(aberto, secaoChave);
+        if (secao.EhFormulario)
+            throw new ApiException(ErrorCode.PeDadosInvalidos, "A sugestão só entra numa tabela.");
+        var doDono = RegistrosDo(dono).Where(r => r.SecaoId == secao.Secao.Id);
+        if (await doDono.AnyAsync())
+            throw new ApiException(ErrorCode.PeCronogramaPreenchido,
+                "O cronograma já tem linhas. A sugestão só entra no cronograma vazio: apague as linhas para sugerir de novo.");
+
+        var visiveis = secao.Visiveis.ToDictionary(v => v.Campo.Chave, v => v.Campo);
+        var agora = DateTime.UtcNow;
+        var sequencia = await SequenciaAsync(secao.Secao.Id, dono);
+        var criados = new List<PeRegistro>();
+        foreach (var linha in linhas)
+        {
+            var dados = new JsonObject();
+            foreach (var (chave, texto) in linha.Textos)
+            {
+                if (!visiveis.TryGetValue(chave, out var campo) || campo.Tipo is not (PeDominios.TipoCampo.TextoCurto or PeDominios.TipoCampo.TextoLongo))
+                    continue;
+                var maximo = PeValores.Inteiro(campo.Config, "max") ?? (campo.Tipo == PeDominios.TipoCampo.TextoCurto ? 1000 : 50000);
+                var valor = (texto ?? string.Empty).Trim();
+                if (valor.Length > maximo) valor = valor[..maximo].TrimEnd();
+                if (valor.Length > 0) dados[chave] = valor;
+            }
+            sequencia.Ultimo++;
+            var registro = new PeRegistro
+            {
+                SecaoId = secao.Secao.Id,
+                PeticId = dono.PeticId,
+                PdticId = dono.PdticId,
+                Codigo = CodigoDe(secao, sequencia.Ultimo),
+                Ordem = criados.Count + 1,
+                Dados = dados.ToJsonString(PeModeloService.JsonHistorico),
+                Sistema = false,
+                CriadoEm = agora,
+                CriadoPor = ctx.Email
+            };
+            _context.PeRegistros.Add(registro);
+
+            // Ligações com as linhas anteriores da sugestão (a própria seção, sem ligar a si mesma)
+            foreach (var (chave, indices) in linha.Ligacoes)
+            {
+                if (!visiveis.TryGetValue(chave, out var campo) || campo.Tipo != PeDominios.TipoCampo.LigacaoSecao
+                    || PeConfigCampo.SecaoDaLigacao(campo.Config) != secao.Secao.Chave)
+                    continue;
+                var multipla = PeValores.Booleano(campo.Config, "multipla") == true;
+                foreach (var i in indices.Where(i => i >= 0 && i < criados.Count).Distinct().Take(multipla ? int.MaxValue : 1))
+                    _context.PeVinculos.Add(new PeVinculo { RegistroOrigem = registro, CampoId = campo.Id, RegistroDestino = criados[i] });
+            }
+            criados.Add(registro);
+        }
+        Tocar(aberto, ctx, agora);
+        await _context.SaveChangesAsync();
+
+        var ids = criados.Select(r => r.Id).ToList();
+        var gravados = await _context.PeRegistros.AsNoTracking().Where(r => ids.Contains(r.Id)).OrderBy(r => r.Ordem).ToListAsync();
+        return await ResponderAsync(secao, gravados);
     }
 
     public async Task<PeRegistrosResponse> OrdenarAsync(PeDono dono, string secaoChave, PeOrdemDTO dto, PeUserContext ctx)

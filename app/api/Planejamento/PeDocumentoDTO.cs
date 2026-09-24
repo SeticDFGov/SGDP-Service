@@ -186,10 +186,18 @@ public class PeDocFluxoResponse
 {
     public string Chave { get; set; } = string.Empty;
 
+    // O nome do fluxo com a figura do guia ("Preparação (figura 6 do guia)")
     public string Nome { get; set; } = string.Empty;
 
-    // O desenho em SVG (a E6 preenche); nulo até lá
+    // O desenho em SVG (desde a E6: a cópia do órgão ou o modelo, com os nomes do dicionário);
+    // nulo quando o fluxo não existe (ou antes de a migration da E6 rodar)
     public string? Svg { get; set; }
+
+    // A mais que o contrato (E6): o órgão adaptou o fluxo
+    public bool Personalizado { get; set; }
+
+    // A mais que o contrato (E6): o texto alternativo do desenho (as raias e os passos em lista numerada)
+    public List<string> Descricao { get; set; } = new();
 }
 
 /// <summary>Uma versão gerada do documento (a lista de GET .../versoes e a resposta do POST .../pdf).</summary>

@@ -468,6 +468,7 @@ public class AcessoModuloTest : PgiaTestBase
             [typeof(PeArquivosController)] = ModulosSgdp.PoliticaPlanejamento,
             [typeof(PePdticController)] = ModulosSgdp.PoliticaPlanejamento,
             [typeof(PeDocumentoController)] = ModulosSgdp.PoliticaPlanejamento,
+            [typeof(PeFluxosController)] = ModulosSgdp.PoliticaPlanejamento,
             [typeof(PgiaAdminController)] = "role:admin",
             [typeof(CtrAdminController)] = "role:admin",
             [typeof(AcessoController)] = "role:admin",
@@ -859,6 +860,8 @@ public class AcessoModuloTest : PgiaTestBase
         await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PeComentarios.AnyAsync());
         await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PeDocModelos.AnyAsync());
         await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PeDocVersoes.AnyAsync());
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PeFluxosModelo.AnyAsync());
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PeFluxos.AnyAsync());
 
         var sgdi = new User { KeycloakId = "kc-sgdi", Nome = "Sofia da SGDI", Email = "sofia@sgdi.df.gov.br", PapelPgia = PapeisPgia.Sgdi };
         var comum = new User { KeycloakId = "kc-comum", Nome = "Carlos Comum", Email = "carlos@df.gov.br" };

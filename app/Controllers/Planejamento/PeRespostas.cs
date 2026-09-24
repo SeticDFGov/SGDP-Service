@@ -57,7 +57,7 @@ internal static class PeRespostas
                 or ErrorCode.PePeticNaoEncontrado or ErrorCode.PeDeliberacaoNaoEncontrada or ErrorCode.PeArquivoNaoEncontrado
                 or ErrorCode.PeCatalogoNaoEncontrado or ErrorCode.PePdticNaoEncontrado or ErrorCode.PePassoIndisponivel
                 or ErrorCode.PeComentarioNaoEncontrado or ErrorCode.PeDocCapituloNaoEncontrado or ErrorCode.PeDocBlocoNaoEncontrado
-                or ErrorCode.PeDocVersaoNaoEncontrada => StatusCodes.Status404NotFound,
+                or ErrorCode.PeDocVersaoNaoEncontrada or ErrorCode.PeFluxoNaoEncontrado => StatusCodes.Status404NotFound,
             ErrorCode.PeSemPermissao => StatusCodes.Status403Forbidden,
             ErrorCode.PeAutoRebaixamento or ErrorCode.PeItemTravado or ErrorCode.PeItemDoSistema or ErrorCode.PeChaveDuplicada
                 or ErrorCode.PeNivelInativo or ErrorCode.PeUltimoNivelAtivo or ErrorCode.PeItemExcluido or ErrorCode.PeItemEmUso
@@ -66,12 +66,16 @@ internal static class PeRespostas
                 or ErrorCode.PeVersaoEmAndamento or ErrorCode.PeDeliberacaoJaDecidida
                 or ErrorCode.PeVersaoJaEnviada or ErrorCode.PePdticJaExiste or ErrorCode.PePdticFechado
                 or ErrorCode.PeNaoSeAplicaRecusado or ErrorCode.PeComentarioResolvido
-                or ErrorCode.PeDocCapituloObrigatorio or ErrorCode.PeDocGeracaoFalhou => StatusCodes.Status409Conflict,
+                or ErrorCode.PeDocCapituloObrigatorio or ErrorCode.PeDocGeracaoFalhou
+                or ErrorCode.PeCronogramaPreenchido or ErrorCode.PeCronogramaSemTarefas => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
         // Validação de registro: a mensagem de cada campo, pela chave
         if (ex is PeValidacaoException validacao)
             return new ObjectResult(new { ex.Error.Code, ex.Error.Message, validacao.Campos }) { StatusCode = status };
+        // Validação do fluxo: os erros em linguagem simples, em lista
+        if (ex is PeFluxoInvalidoException fluxo)
+            return new ObjectResult(new { ex.Error.Code, ex.Error.Message, fluxo.Erros }) { StatusCode = status };
         return new ObjectResult(new { ex.Error.Code, ex.Error.Message }) { StatusCode = status };
     }
 
