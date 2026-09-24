@@ -610,7 +610,7 @@ public sealed class PeCarregadorModelo
         var comRegistros = seed.SecoesForaDoPdtic.Where(s => s.Registros.Count > 0).ToList();
         if (comRegistros.Count > 0)
         {
-            var existentes = await _context.PeRegistros.Where(r => r.PeticId == null)
+            var existentes = await _context.PeRegistros.Where(r => r.PeticId == null && r.PdticId == null)
                 .Select(r => new { r.SecaoId, r.Codigo, r.Ordem })
                 .ToListAsync(ct);
             var sequencias = await _context.PeRegistroSequencias.Where(s => s.Dono == PeDono.Df.Chave).ToListAsync(ct);

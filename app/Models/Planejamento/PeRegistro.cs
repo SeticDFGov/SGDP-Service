@@ -4,11 +4,12 @@ namespace Models.Planejamento;
 /// Um registro de uma seção: a linha de uma tabela ou o único registro de um formulário.
 /// Os valores ficam em jsonb (chave do campo para valor), validados pelo modelo a cada
 /// gravação (service.Planejamento.PeRegistroService); as ligações ficam em pe_vinculo.
-/// Dono: a versão do PETIC-DF (petic_id) ou nenhum (catálogo do DF, escopo df); a E4
-/// acrescenta o PDTIC. O código (N01, OE03) sai do prefixo da seção e da sequência dentro
-/// do dono (pe_registro_sequencia) e nunca é reaproveitado; formulário e tabela sem
-/// prefixo não têm código. Registro do sistema (os princípios do art. 4º) não se edita
-/// nem se apaga. Tabela pe_registro; mapeamento em PeModelConfiguration.
+/// Dono: a versão do PETIC-DF (petic_id), o PDTIC de um órgão (pdtic_id, desde a E4) ou
+/// nenhum (catálogo do DF, escopo df); nunca os dois (ck_pe_registro_dono). O código (N01,
+/// OE03) sai do prefixo da seção e da sequência dentro do dono (pe_registro_sequencia) e
+/// nunca é reaproveitado; formulário e tabela sem prefixo não têm código. Registro do
+/// sistema (os princípios do art. 4º) não se edita nem se apaga. Tabela pe_registro;
+/// mapeamento em PeModelConfiguration.
 /// </summary>
 public class PeRegistro : IPeAuditavel
 {
@@ -18,10 +19,15 @@ public class PeRegistro : IPeAuditavel
 
     public PeSecao? Secao { get; set; }
 
-    // Nulo no catálogo do DF
+    // Nulo no catálogo do DF e no PDTIC
     public long? PeticId { get; set; }
 
     public PePetic? Petic { get; set; }
+
+    // Nulo no catálogo do DF e no PETIC-DF
+    public long? PdticId { get; set; }
+
+    public PePdtic? Pdtic { get; set; }
 
     // Prefixo da seção + sequência ("OE01"); nulo no formulário e na tabela sem prefixo
     public string? Codigo { get; set; }
@@ -65,8 +71,8 @@ public class PeVinculo
 }
 
 /// <summary>
-/// O último número de código dado numa seção para um dono ("df", "petic:12"; a E4 usa
-/// "pdtic:ID"). É o que impede reaproveitar o código de um registro apagado, e o token de
+/// O último número de código dado numa seção para um dono ("df", "petic:12", "pdtic:7").
+/// É o que impede reaproveitar o código de um registro apagado, e o token de
 /// concorrência em Ultimo faz duas inclusões ao mesmo tempo não darem o mesmo código (a
 /// segunda recebe 409 e tenta de novo). Formulário também passa por aqui: a primeira
 /// gravação cria a linha, e duas primeiras gravações simultâneas não viram dois registros.
@@ -88,7 +94,8 @@ public class PeRegistroSequencia
 /// próprio banco, como os anexos do PGIA. Os metadados ficam nesta classe; o binário, em
 /// <see cref="PeArquivoConteudo"/>, que divide a mesma tabela (table splitting): consultar
 /// os metadados nunca traz o binário junto. O dono é o registro cujo campo aponta para o
-/// arquivo; sem dono, só quem enviou vê. Tabela pe_arquivo.
+/// arquivo (campo de arquivo ou, desde a E4, imagem de um texto rico); sem dono, só quem
+/// enviou vê. Tabela pe_arquivo.
 /// </summary>
 public class PeArquivo : IPeAuditavel
 {

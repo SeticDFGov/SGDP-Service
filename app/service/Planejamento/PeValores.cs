@@ -40,7 +40,8 @@ public static class PeFormato
 /// Valores dos registros: a validação de cada tipo de campo (com mensagens em linguagem
 /// simples), o texto pronto para exibir e os cálculos. Formato guardado no jsonb:
 /// <list type="bullet">
-/// <item>texto curto e longo: texto (sem espaço nas pontas); texto rico: objeto JSON (E4);</item>
+/// <item>texto curto e longo: texto (sem espaço nas pontas); texto rico: o JSON do TipTap,
+/// conferido e limpo por <see cref="PeTextoRico"/> (E4);</item>
 /// <item>número, moeda (duas casas, não negativa) e percentual (0 a 100): número;</item>
 /// <item>data: "aaaa-mm-dd"; sim ou não: verdadeiro ou falso;</item>
 /// <item>lista: o valor da opção; lista múltipla: lista de valores, na ordem das opções;</item>
@@ -59,8 +60,12 @@ public static class PeValores
     private const decimal MaximoNumero = 1_000_000_000_000_000m;
     private const decimal MaximoMoeda = 10_000_000_000_000m;
 
-    /// <summary>Resultado da validação de um valor: o valor a guardar (nulo = vazio) ou o erro.</summary>
-    public readonly record struct Resultado(JsonNode? Valor, string? Erro, long? ArquivoId = null)
+    /// <summary>
+    /// Resultado da validação de um valor: o valor a guardar (nulo = vazio) ou o erro. No
+    /// campo de arquivo, o id do arquivo; no texto rico, os ids das imagens (quem chama
+    /// confere os arquivos no banco).
+    /// </summary>
+    public readonly record struct Resultado(JsonNode? Valor, string? Erro, long? ArquivoId = null, IReadOnlyList<long>? Imagens = null)
     {
         public static Resultado Vazio => new(null, null);
 
@@ -95,12 +100,13 @@ public static class PeValores
             }
             case PeDominios.TipoCampo.TextoRico:
             {
+                // JSON do TipTap conferido contra a lista fechada de nós e marcas (E4)
                 if (entrada.ValueKind != JsonValueKind.Object)
                     return Resultado.Falha("O texto formatado veio num formato que não serve. Atualize a tela e tente de novo.");
-                var bruto = entrada.GetRawText();
-                if (bruto.Length > MaximoTextoRico) return Resultado.Falha("O texto formatado passou do tamanho máximo.");
-                var objeto = JsonNode.Parse(bruto) as JsonObject;
-                return objeto == null || objeto.Count == 0 ? Resultado.Vazio : Resultado.Com(objeto);
+                if (entrada.GetRawText().Length > MaximoTextoRico) return Resultado.Falha("O texto formatado passou do tamanho máximo.");
+                var rico = PeTextoRico.Validar(entrada);
+                if (rico.Erro != null) return Resultado.Falha(rico.Erro);
+                return rico.Documento == null ? Resultado.Vazio : new Resultado(rico.Documento, null, null, rico.Imagens);
             }
             case PeDominios.TipoCampo.Numero:
             {

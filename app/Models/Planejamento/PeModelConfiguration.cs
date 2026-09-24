@@ -72,6 +72,7 @@ public static class PeModelConfiguration
 
         modelBuilder.ApplyPeModeloConfiguration();
         modelBuilder.ApplyPeReferenciaisConfiguration();
+        modelBuilder.ApplyPePdticConfiguration();
     }
 
     // ── Modelo configurável e níveis de maturidade (E2) ──────────────────────
@@ -542,12 +543,17 @@ public static class PeModelConfiguration
         modelBuilder.Entity<PeRegistro>(entity =>
         {
             entity.ToTable("pe_registro", t =>
-                t.HasCheckConstraint("ck_pe_registro_codigo", $"codigo IS NULL OR codigo ~ '{CodigoRegistro}'"));
+            {
+                t.HasCheckConstraint("ck_pe_registro_codigo", $"codigo IS NULL OR codigo ~ '{CodigoRegistro}'");
+                // Um dono só (E4): a versão do PETIC-DF, o PDTIC de um órgão ou nenhum (catálogo do DF)
+                t.HasCheckConstraint("ck_pe_registro_dono", "petic_id IS NULL OR pdtic_id IS NULL");
+            });
 
             entity.HasKey(r => r.Id).HasName("pk_pe_registro");
             entity.Property(r => r.Id).HasColumnName("id").UseIdentityByDefaultColumn();
             entity.Property(r => r.SecaoId).HasColumnName("secao_id");
             entity.Property(r => r.PeticId).HasColumnName("petic_id");
+            entity.Property(r => r.PdticId).HasColumnName("pdtic_id");
             entity.Property(r => r.Codigo).HasColumnName("codigo").HasMaxLength(20);
             entity.Property(r => r.Ordem).HasColumnName("ordem");
             entity.Property(r => r.Dados).HasColumnName("dados").HasColumnType("jsonb").IsRequired();
@@ -561,6 +567,9 @@ public static class PeModelConfiguration
             // sequência (pe_registro_sequencia)
             entity.HasIndex(r => new { r.PeticId, r.SecaoId, r.Codigo }).IsUnique()
                 .HasDatabaseName("ux_pe_registro_petic_codigo");
+            // O mesmo no PDTIC de cada órgão (E4); serve também de índice por PDTIC e seção
+            entity.HasIndex(r => new { r.PdticId, r.SecaoId, r.Codigo }).IsUnique()
+                .HasDatabaseName("ux_pe_registro_pdtic_codigo");
 
             // Seção não é apagada de verdade (exclusão lógica)
             entity.HasOne(r => r.Secao)
@@ -575,6 +584,13 @@ public static class PeModelConfiguration
                 .HasForeignKey(r => r.PeticId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("fk_pe_registro_petic");
+
+            // PDTIC do órgão (E4): se um dia um PDTIC for apagado, os registros vão junto
+            entity.HasOne(r => r.Pdtic)
+                .WithMany()
+                .HasForeignKey(r => r.PdticId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_registro_pdtic");
         });
 
         modelBuilder.Entity<PeVinculo>(entity =>
@@ -678,4 +694,131 @@ public static class PeModelConfiguration
                 .HasForeignKey<PeArquivoConteudo>(c => c.Id);
         });
     }
+
+    // ── PDTIC dos órgãos (E4) ─────────────────────────────────────────────────
+
+    private static void ApplyPePdticConfiguration(this ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PePdtic>(entity =>
+        {
+            entity.ToTable("pe_pdtic", t =>
+            {
+                t.HasCheckConstraint("ck_pe_pdtic_situacao", EmLista("situacao", PeDominios.SituacaoPdtic.Todas));
+                t.HasCheckConstraint("ck_pe_pdtic_versao", "versao ~ '^[0-9]+\\.[0-9]+$'");
+                t.HasCheckConstraint("ck_pe_pdtic_vigencia",
+                    "vigencia_inicio IS NULL OR vigencia_fim IS NULL OR vigencia_fim >= vigencia_inicio");
+            });
+
+            entity.HasKey(p => p.Id).HasName("pk_pe_pdtic");
+            entity.Property(p => p.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(p => p.OrgaoId).HasColumnName("orgao_id");
+            entity.Property(p => p.Versao).HasColumnName("versao").HasMaxLength(10).IsRequired();
+            // Token de concorrência: gravar um registro, enviar e decidir ao mesmo tempo não passam juntos
+            entity.Property(p => p.Situacao).HasColumnName("situacao").HasMaxLength(20).IsRequired().IsConcurrencyToken();
+            entity.Property(p => p.VigenciaInicio).HasColumnName("vigencia_inicio");
+            entity.Property(p => p.VigenciaFim).HasColumnName("vigencia_fim");
+            entity.Property(p => p.RegistradoExternamente).HasColumnName("registrado_externamente");
+            entity.Property(p => p.AnteriorId).HasColumnName("anterior_id");
+            Auditoria(entity);
+
+            entity.HasIndex(p => new { p.OrgaoId, p.Versao }).IsUnique().HasDatabaseName("ux_pe_pdtic_orgao_versao");
+            // Um PDTIC atual (nem encerrado nem substituído) por órgão: dois cliques em "abrir" não viram dois
+            entity.HasIndex(p => p.OrgaoId).IsUnique()
+                .HasFilter(ForaDaLista("situacao", PeDominios.SituacaoPdtic.Encerradas))
+                .HasDatabaseName("ux_pe_pdtic_atual");
+            entity.HasIndex(p => p.AnteriorId).HasDatabaseName("ix_pe_pdtic_anterior");
+
+            // Órgão do PGIA não é apagado (só desativado): a FK só impede apagar por engano
+            entity.HasOne(p => p.Orgao)
+                .WithMany()
+                .HasForeignKey(p => p.OrgaoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_pdtic_orgao");
+
+            entity.HasOne(p => p.Anterior)
+                .WithMany()
+                .HasForeignKey(p => p.AnteriorId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_pdtic_anterior");
+        });
+
+        modelBuilder.Entity<PePdticPasso>(entity =>
+        {
+            // Marcado tem justificativa; desfeito, não
+            entity.ToTable("pe_pdtic_passo", t =>
+                t.HasCheckConstraint("ck_pe_pdtic_passo_justificativa", "nao_se_aplica = (justificativa IS NOT NULL)"));
+
+            entity.HasKey(p => new { p.PdticId, p.PassoId }).HasName("pk_pe_pdtic_passo");
+            entity.Property(p => p.PdticId).HasColumnName("pdtic_id");
+            entity.Property(p => p.PassoId).HasColumnName("passo_id");
+            entity.Property(p => p.NaoSeAplica).HasColumnName("nao_se_aplica");
+            entity.Property(p => p.Justificativa).HasColumnName("justificativa").HasMaxLength(1000);
+            entity.Property(p => p.MarcadoEm).HasColumnName("marcado_em");
+            entity.Property(p => p.MarcadoPor).HasColumnName("marcado_por").HasMaxLength(200).IsRequired();
+
+            entity.HasIndex(p => p.PassoId).HasDatabaseName("ix_pe_pdtic_passo_passo");
+
+            entity.HasOne(p => p.Pdtic)
+                .WithMany()
+                .HasForeignKey(p => p.PdticId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_pdtic_passo_pdtic");
+
+            // Passo não é apagado de verdade (exclusão lógica)
+            entity.HasOne(p => p.Passo)
+                .WithMany()
+                .HasForeignKey(p => p.PassoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_pdtic_passo_passo");
+        });
+
+        modelBuilder.Entity<PeComentario>(entity =>
+        {
+            entity.ToTable("pe_comentario", t =>
+            {
+                t.HasCheckConstraint("ck_pe_comentario_resolvido", "(resolvido_em IS NULL) = (resolvido_por IS NULL)");
+                // Só o comentário principal é resolvido; a resposta acompanha o dele
+                t.HasCheckConstraint("ck_pe_comentario_resposta", "pai_id IS NULL OR resolvido_em IS NULL");
+            });
+
+            entity.HasKey(c => c.Id).HasName("pk_pe_comentario");
+            entity.Property(c => c.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(c => c.PdticId).HasColumnName("pdtic_id");
+            entity.Property(c => c.PassoId).HasColumnName("passo_id");
+            entity.Property(c => c.PaiId).HasColumnName("pai_id");
+            entity.Property(c => c.Texto).HasColumnName("texto").HasMaxLength(2000).IsRequired();
+            entity.Property(c => c.AutorEmail).HasColumnName("autor_email").HasMaxLength(200).IsRequired();
+            entity.Property(c => c.AutorNome).HasColumnName("autor_nome").HasMaxLength(200).IsRequired();
+            entity.Property(c => c.CriadoEm).HasColumnName("criado_em").HasDefaultValueSql("NOW()");
+            entity.Property(c => c.ResolvidoEm).HasColumnName("resolvido_em");
+            entity.Property(c => c.ResolvidoPor).HasColumnName("resolvido_por").HasMaxLength(200);
+
+            // Comentários de um PDTIC por passo (a situação conta os abertos de cada passo)
+            entity.HasIndex(c => new { c.PdticId, c.PassoId }).HasDatabaseName("ix_pe_comentario_pdtic");
+            entity.HasIndex(c => c.PassoId).HasDatabaseName("ix_pe_comentario_passo");
+            entity.HasIndex(c => c.PaiId).HasDatabaseName("ix_pe_comentario_pai");
+
+            entity.HasOne(c => c.Pdtic)
+                .WithMany()
+                .HasForeignKey(c => c.PdticId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_comentario_pdtic");
+
+            entity.HasOne(c => c.Passo)
+                .WithMany()
+                .HasForeignKey(c => c.PassoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_comentario_passo");
+
+            // A resposta vai junto com o comentário respondido
+            entity.HasOne(c => c.Pai)
+                .WithMany()
+                .HasForeignKey(c => c.PaiId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_comentario_pai");
+        });
+    }
+
+    private static string ForaDaLista(string coluna, IEnumerable<string> valores) =>
+        $"{coluna} NOT IN ({string.Join(",", valores.Select(v => $"'{v.Replace("'", "''")}'"))})";
 }

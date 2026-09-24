@@ -51,36 +51,23 @@ public class PeModeloService : IPeModeloService
     public async Task<PeModeloResponse> ObterModeloAsync(bool incluirExcluidos) =>
         (await PeModeloDados.CarregarAsync(_context)).Modelo(incluirExcluidos);
 
+    /// <summary>
+    /// A trilha resolvida do órgão (nível e ajustes). Desde a E4, sem PETIC-DF vigente a
+    /// ligação com os catálogos dele vem com Obrigatorio falso (o motor já dispensava).
+    /// </summary>
     public async Task<PeTrilhaResponse> TrilhaAsync(long orgaoId)
     {
-        var orgao = await _context.PgiaOrgaos.AsNoTracking().FirstOrDefaultAsync(o => o.Id == orgaoId && o.Ativo)
-            ?? throw new ApiException(ErrorCode.PeOrgaoNaoEncontrado, "Órgão não encontrado ou desativado.");
-
-        var dados = await PeModeloDados.CarregarAsync(_context);
-        var escolhido = await _context.PeOrgaosConfig.AsNoTracking()
-            .Where(c => c.OrgaoId == orgaoId)
-            .Select(c => (long?)c.NivelId)
-            .FirstOrDefaultAsync();
-        var nivel = (escolhido != null ? dados.Niveis.FirstOrDefault(n => n.Id == escolhido) : null)
-            ?? dados.NivelPadrao()
-            ?? throw ModeloIndisponivel();
-
-        var ajustes = await _context.PeOrgaosAjuste.AsNoTracking()
-            .Where(a => a.OrgaoId == orgaoId)
-            .Select(a => new { a.AlvoTipo, a.AlvoId, a.Situacao })
-            .ToListAsync();
-
+        var trilha = await PeTrilhaOrgao.CarregarAsync(_context, orgaoId);
         return new PeTrilhaResponse
         {
-            OrgaoId = orgao.Id,
-            OrgaoSigla = orgao.Sigla,
-            OrgaoNome = orgao.Nome,
-            NivelId = nivel.Id,
-            NivelNome = nivel.Nome,
-            NivelPadrao = escolhido != nivel.Id,
-            NivelAtivo = nivel.Ativo,
-            Etapas = PeTrilhaResolver.Resolver(dados, nivel.Id,
-                ajustes.ToDictionary(a => (a.AlvoTipo, a.AlvoId), a => a.Situacao))
+            OrgaoId = trilha.Orgao.Id,
+            OrgaoSigla = trilha.Orgao.Sigla,
+            OrgaoNome = trilha.Orgao.Nome,
+            NivelId = trilha.Nivel.Id,
+            NivelNome = trilha.Nivel.Nome,
+            NivelPadrao = trilha.NivelPadrao,
+            NivelAtivo = trilha.Nivel.Ativo,
+            Etapas = trilha.Etapas
         };
     }
 
@@ -683,9 +670,10 @@ public class PeModeloService : IPeModeloService
             var opcoes = await _context.PeOpcoes.AsNoTracking().Where(o => o.CampoId == id).Select(o => o.Valor).ToListAsync();
             var novoConfig = PeConfigCampo.Normalizar(novoTipo, config, await ContextoConfigAsync(secao, campo.Chave, irmaos, opcoes));
 
-            // Ligação com ligações gravadas não troca a seção nem o catálogo que liga (E3)
+            // Ligação com ligações gravadas não troca a seção nem o catálogo que liga (E3; a do
+            // PGIA, desde a E4, guarda os ids no jsonb do registro)
             if (!mudaTipo && alvoAntes != null && AlvoDaLigacao(novoTipo, novoConfig) != alvoAntes
-                && await _context.PeVinculos.AnyAsync(v => v.CampoId == id))
+                && await RegistrosComValorAsync(campo) > 0)
                 throw EmUso("Este campo já tem ligações gravadas: a seção ou o catálogo que ele liga não muda mais. "
                             + "Se precisar, crie outro campo.");
             campo.Config = novoConfig;
@@ -955,11 +943,11 @@ public class PeModeloService : IPeModeloService
 
     /// <summary>
     /// Em quantos registros (de qualquer dono) o campo tem valor: no jsonb, ou, no campo de
-    /// ligação, nas ligações gravadas.
+    /// ligação, nas ligações gravadas (a ligação com o PGIA fica no jsonb).
     /// </summary>
     private async Task<int> RegistrosComValorAsync(PeCampo campo)
     {
-        if (PeRegistroDados.EhLigacao(campo))
+        if (PeRegistroDados.EhLigacaoPorVinculo(campo))
             return await _context.PeVinculos.Where(v => v.CampoId == campo.Id)
                 .Select(v => v.RegistroOrigemId).Distinct().CountAsync();
 

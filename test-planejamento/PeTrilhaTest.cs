@@ -218,7 +218,9 @@ public class PeTrilhaTest : PeModeloTestBase
 
         await DefinirNivelDoOrgaoAsync(OrgaoSes, "intermediario");
         var intermediario = NaTrilha(await TrilhaAsync(OrgaoSes), "diagnostico.necessidades-tic")!.Secoes.Single();
-        Assert.True(intermediario.Campos.Single(c => c.Chave == "objetivo_petic").Obrigatorio);
+        // Sem PETIC-DF vigente, a ligação com ele fica opcional também na trilha (E4); com a
+        // vigente, volta a ser obrigatória (PeTrilhaPeticTest)
+        Assert.False(intermediario.Campos.Single(c => c.Chave == "objetivo_petic").Obrigatorio);
         Assert.True(intermediario.Campos.Single(c => c.Chave == "gravidade").Obrigatorio);
         Assert.DoesNotContain(intermediario.Campos, c => c.Chave == "prioridade_simples");
     }

@@ -18,9 +18,10 @@ namespace service.Planejamento;
 /// <item>o tipo servido sai da extensão, nunca do que o navegador mandou; o nome é saneado
 /// (sem caminho) e só serve para exibir.</item>
 /// </list>
-/// O arquivo nasce sem dono; ganha dono quando um registro o usa num campo de arquivo. Baixa
-/// quem pode ver o dono do registro (PETIC-DF e catálogo do DF: qualquer papel do módulo);
-/// sem dono (ou com o registro apagado), só quem enviou.
+/// O arquivo nasce sem dono; ganha dono quando um registro o usa num campo de arquivo (ou,
+/// desde a E4, como imagem de um texto rico). Baixa quem pode ver o dono do registro
+/// (PETIC-DF e catálogo do DF: qualquer papel do módulo; PDTIC: quem vê o órgão); sem dono
+/// (ou com o registro apagado), só quem enviou.
 /// </summary>
 public class PeArquivoService : IPeArquivoService
 {
@@ -117,14 +118,22 @@ public class PeArquivoService : IPeArquivoService
 
         var registro = await _context.PeRegistros.AsNoTracking()
             .Where(r => r.Id == arquivo.DonoId)
-            .Select(r => new { r.PeticId })
+            .Select(r => new { r.PeticId, r.PdticId })
             .FirstOrDefaultAsync();
         if (registro == null) return enviou;
         if (enviou) return true;
 
         // PETIC-DF e catálogo do DF: qualquer papel do módulo lê, mas o papel de órgão só vê as
-        // versões aprovadas do PETIC-DF (a E4 acrescenta o órgão do PDTIC)
+        // versões aprovadas do PETIC-DF. PDTIC (E4): quem vê o órgão dele
         if (!_permissoes.PodeLerReferenciais(ctx)) return false;
+        if (registro.PdticId != null)
+        {
+            var orgaoId = await _context.PePdtics.AsNoTracking()
+                .Where(p => p.Id == registro.PdticId)
+                .Select(p => (long?)p.OrgaoId)
+                .FirstOrDefaultAsync();
+            return orgaoId != null && _permissoes.PodeVerOrgao(ctx, orgaoId.Value);
+        }
         if (registro.PeticId == null) return true;
         var situacao = await _context.PePetics.AsNoTracking()
             .Where(p => p.Id == registro.PeticId)

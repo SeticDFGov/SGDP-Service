@@ -136,4 +136,13 @@ public enum ErrorCode
     PeCatalogoNaoEncontrado = 1045,     // 404: catálogo fora da lista
     PePlanilhaInvalida = 1046,          // 400: formato fora de csv e xlsx (a completa só sai em xlsx)
     PeVersaoJaEnviada = 1047,           // 409: versão que já foi ao CGTIC não é apagada
+    // PDTIC dos órgãos, situação dos passos, comentários e planilhas (E4): faixa 1050 a 1069
+    PePdticNaoEncontrado = 1050,        // 404: PDTIC inexistente
+    PePdticJaExiste = 1051,             // 409: o órgão já tem um PDTIC atual (nem encerrado nem substituído)
+    PePdticFechado = 1052,              // 409: PDTIC fora de em_elaboracao e devolvido não é editado
+    PePassoIndisponivel = 1053,         // 404: passo que não está na trilha do órgão (apagado ou desligado)
+    PeNaoSeAplicaRecusado = 1054,       // 409: passo obrigatório, travado ou que não aceita "não se aplica"
+    PeComentarioNaoEncontrado = 1055,   // 404
+    PeComentarioInvalido = 1056,        // 400: texto vazio ou longo, resposta a uma resposta, passo diferente do comentário
+    PeComentarioResolvido = 1057,       // 409: comentário resolvido não recebe resposta
 }

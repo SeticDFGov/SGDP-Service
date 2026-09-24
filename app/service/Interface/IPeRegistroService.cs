@@ -5,12 +5,13 @@ namespace service.Interface;
 
 /// <summary>
 /// Motor de registros do módulo Governança Estratégica (E3): grava os dados descritos pelo
-/// modelo (seções e campos) para um dono (o catálogo do DF ou uma versão do PETIC-DF; a E4
-/// acrescenta o PDTIC). Valida pelo modelo (só campos visíveis, obrigatórios, tipos, opções
-/// ativas, ligações do mesmo dono ou do catálogo), guarda o valor de campo desligado sem
-/// exigir (decisão 13), gera o código pela sequência do dono, calcula os campos calculados
-/// e devolve os rótulos prontos. A autorização fica aqui (quem lê, quem edita e se a versão
-/// está em rascunho), pelo IPePermissionService. Erros como ApiException (1030 a 1049).
+/// modelo (seções e campos) para um dono (o catálogo do DF, uma versão do PETIC-DF ou, desde
+/// a E4, o PDTIC de um órgão, pela trilha do órgão). Valida pelo modelo (só campos visíveis,
+/// obrigatórios, tipos, opções ativas, texto rico pela lista fechada, ligações do mesmo dono
+/// ou do catálogo), guarda o valor de campo desligado sem exigir (decisão 13), gera o código
+/// pela sequência do dono, calcula os campos calculados e devolve os rótulos prontos. A
+/// autorização fica aqui (quem lê, quem edita e se a versão ou o PDTIC está aberto), pelo
+/// IPePermissionService. Erros como ApiException (1030 a 1049 e 1050 a 1069).
 /// </summary>
 public interface IPeRegistroService
 {
@@ -27,8 +28,11 @@ public interface IPeRegistroService
     /// <summary>Nova ordem ({ Ids }, todos os registros da seção); devolve a lista.</summary>
     Task<PeRegistrosResponse> OrdenarAsync(PeDono dono, string secaoChave, PeOrdemDTO dto, PeUserContext ctx);
 
-    /// <summary>Itens de um catálogo (petic_objetivo e petic_eixo da vigente; principio do DF).</summary>
-    Task<List<PeCatalogoItemResponse>> CatalogoAsync(string catalogo, PeUserContext ctx);
+    /// <summary>
+    /// Itens de um catálogo (petic_objetivo e petic_eixo da vigente; principio do DF;
+    /// pgia_sistema, os sistemas de IA do inventário do PGIA do órgão do PDTIC pdticId).
+    /// </summary>
+    Task<List<PeCatalogoItemResponse>> CatalogoAsync(string catalogo, PeUserContext ctx, long? pdticId = null);
 
     /// <summary>
     /// O que falta para o dono ir ao CGTIC: seção obrigatória sem registro e registro com
@@ -36,11 +40,24 @@ public interface IPeRegistroService
     /// </summary>
     Task<List<string>> PendenciasAsync(PeDono dono);
 
+    /// <summary>
+    /// Os registros das seções dadas e o que falta em cada um, mais as ligações que saem deles
+    /// (situação dos passos e avisos do PDTIC). Não confere quem chama: quem chama já conferiu.
+    /// </summary>
+    Task<PeAnaliseDono> AnalisarAsync(PeDono dono, IReadOnlyList<PeSecaoDoDono> secoes);
+
     /// <summary>Uma seção para a planilha: as colunas (visíveis e marcadas "na planilha") e os registros.</summary>
     Task<PeSecaoExportada> ExportarSecaoAsync(PeDono dono, string secaoChave, PeUserContext ctx);
 
     /// <summary>Todas as seções do dono que vão para a planilha, na ordem.</summary>
     Task<List<PeSecaoExportada>> ExportarSecoesAsync(PeDono dono, PeUserContext ctx);
+
+    /// <summary>
+    /// Os registros de uma seção em vários PDTICs de uma vez (o consolidado), cada um com a
+    /// seção como o órgão dele a vê; poucas consultas para todos os órgãos. Não confere quem
+    /// chama: quem chama já conferiu.
+    /// </summary>
+    Task<Dictionary<long, List<PeRegistroResponse>>> ExportarDosPdticsAsync(long secaoId, IReadOnlyList<(long PdticId, PeSecaoDoDono Secao)> pdtics);
 }
 
 /// <summary>
@@ -56,9 +73,10 @@ public interface IPeArquivoService
 }
 
 /// <summary>
-/// Planilhas do PETIC-DF e do catálogo do DF: CSV (UTF-8 com BOM, ponto e vírgula, proteção
-/// contra fórmula) e XLSX (cabeçalho destacado e fixo, filtro, datas e valores como
-/// números, listas com validação e a aba Leia-me).
+/// Planilhas do PETIC-DF, do catálogo do DF e, desde a E4, do PDTIC de cada órgão (por seção
+/// e completa) e do consolidado de todos os PDTICs atuais (papéis globais e admin geral): CSV
+/// (UTF-8 com BOM, ponto e vírgula, proteção contra fórmula) e XLSX (cabeçalho destacado e
+/// fixo, filtro, datas e valores como números, listas com validação e a aba Leia-me).
 /// </summary>
 public interface IPePlanilhaService
 {
@@ -67,4 +85,20 @@ public interface IPePlanilhaService
     Task<PePlanilhaArquivo> PeticCompletaAsync(long peticId, string? formato, PeUserContext ctx);
 
     Task<PePlanilhaArquivo> DfSecaoAsync(string secaoChave, string? formato, PeUserContext ctx);
+
+    /// <summary>Uma seção do PDTIC, com as colunas do nível do órgão (PDTIC_SIGLA_secao_data).</summary>
+    Task<PePlanilhaArquivo> PdticSecaoAsync(long pdticId, string secaoChave, string? formato, PeUserContext ctx);
+
+    /// <summary>O PDTIC inteiro, uma aba por seção visível (só xlsx).</summary>
+    Task<PePlanilhaArquivo> PdticCompletaAsync(long pdticId, string? formato, PeUserContext ctx);
+
+    /// <summary>
+    /// Uma seção de todos os PDTICs atuais: as colunas do órgão (órgão, sigla, nível, versão e
+    /// situação) antes dos campos, e os campos visíveis em qualquer nível ou órgão (célula vazia
+    /// quando o campo não aparece para o órgão).
+    /// </summary>
+    Task<PePlanilhaArquivo> ConsolidadoSecaoAsync(string secaoChave, string? formato, PeUserContext ctx);
+
+    /// <summary>O consolidado com todas as seções, uma aba por seção (só xlsx).</summary>
+    Task<PePlanilhaArquivo> ConsolidadoCompletoAsync(string? formato, PeUserContext ctx);
 }

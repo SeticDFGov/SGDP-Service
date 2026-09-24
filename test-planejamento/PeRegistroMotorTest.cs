@@ -443,7 +443,8 @@ public class PeRegistroMotorTest : PeReferenciaisTestBase
         Assert.Equal("PR01", principios[0].Codigo);
         Assert.Equal(PeReferenciaisCargaTest.Art4[0], principios[0].Rotulo);
         Assert.Empty(await Registros.CatalogoAsync("petic_eixo", ctx));
-        Assert.Equal(Codigo(ErrorCode.PeCatalogoNaoEncontrado), await ErroAsync(() => Registros.CatalogoAsync("pgia_sistema", ctx)));
+        // Desde a E4 o catálogo do PGIA existe, mas pede o PDTIC (os sistemas são do órgão dele)
+        Assert.Equal(Codigo(ErrorCode.PeDadosInvalidos), await ErroAsync(() => Registros.CatalogoAsync("pgia_sistema", ctx)));
         Assert.Equal(Codigo(ErrorCode.PeCatalogoNaoEncontrado), await ErroAsync(() => Registros.CatalogoAsync("outro", ctx)));
         Assert.Equal(Codigo(ErrorCode.PeSemPermissao),
             await ErroAsync(async () => await Registros.CatalogoAsync("principio", await ContextoDe(UserSemPapel))));

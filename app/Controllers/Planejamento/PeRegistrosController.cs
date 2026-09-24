@@ -11,12 +11,13 @@ using service.Planejamento;
 namespace Controllers.Planejamento;
 
 /// <summary>
-/// Registros das seções (E3): o mesmo contrato para o PETIC-DF (uma versão) e para o
-/// catálogo do DF (princípios e diretrizes do ciclo); a E4 acrescenta o PDTIC. Mais os
-/// catálogos para os campos de ligação e as planilhas do DF. Ler: qualquer papel do módulo.
-/// Editar: pe_admin e admin geral (no PETIC-DF, só a versão em rascunho). A autorização fica
-/// no IPeRegistroService. Erros como { Code, Message }; a validação traz também Campos
-/// (<see cref="PeRespostas"/>).
+/// Registros das seções (E3): o mesmo contrato para o PETIC-DF (uma versão), para o catálogo
+/// do DF (princípios e diretrizes do ciclo) e, desde a E4, para o PDTIC de cada órgão. Mais
+/// os catálogos para os campos de ligação e as planilhas do DF. PETIC-DF e DF: ler, qualquer
+/// papel do módulo; editar, pe_admin e admin geral (no PETIC-DF, só a versão em rascunho).
+/// PDTIC: ler, quem vê o órgão; editar, a equipe do órgão (e o admin geral), só em
+/// elaboração ou devolvido. A autorização fica no IPeRegistroService. Erros como
+/// { Code, Message }; a validação traz também Campos (<see cref="PeRespostas"/>).
 /// </summary>
 [ApiController]
 [Authorize(Policy = ModulosSgdp.PoliticaPlanejamento)]
@@ -63,6 +64,35 @@ public class PeRegistrosController : ControllerBase
     public Task<IActionResult> OrdenarNoPetic(long peticId, string secaoChave, [FromBody] PeOrdemDTO dto) =>
         Executar(async ctx => Ok(await _registros.OrdenarAsync(PeDono.DoPetic(peticId), secaoChave, dto, ctx)));
 
+    // ── PDTIC de um órgão (E4) ──────────────────────────────────────────────
+
+    /// <summary>A seção (campos visíveis no nível do órgão) e os registros do PDTIC.</summary>
+    [HttpGet("pdtic/{pdticId:long}/secoes/{secaoChave}/registros")]
+    public Task<IActionResult> ListarDoPdtic(long pdticId, string secaoChave) =>
+        Executar(async ctx => Ok(await _registros.ListarAsync(PeDono.DoPdtic(pdticId), secaoChave, ctx)));
+
+    /// <summary>Inclui um registro ({ Dados, Vinculos }); devolve 201 com o registro criado.</summary>
+    [HttpPost("pdtic/{pdticId:long}/secoes/{secaoChave}/registros")]
+    public Task<IActionResult> CriarNoPdtic(long pdticId, string secaoChave, [FromBody] JsonElement corpo) =>
+        Executar(async ctx => Criado(await _registros.CriarAsync(PeDono.DoPdtic(pdticId), secaoChave, PeRegistroSalvarDTO.Ler(corpo), ctx)));
+
+    [HttpPut("pdtic/{pdticId:long}/secoes/{secaoChave}/registros/{id:long}")]
+    public Task<IActionResult> AtualizarNoPdtic(long pdticId, string secaoChave, long id, [FromBody] JsonElement corpo) =>
+        Executar(async ctx => Ok(await _registros.AtualizarAsync(PeDono.DoPdtic(pdticId), secaoChave, id, PeRegistroSalvarDTO.Ler(corpo), ctx)));
+
+    [HttpDelete("pdtic/{pdticId:long}/secoes/{secaoChave}/registros/{id:long}")]
+    public Task<IActionResult> ExcluirDoPdtic(long pdticId, string secaoChave, long id) =>
+        Executar(async ctx =>
+        {
+            await _registros.ExcluirAsync(PeDono.DoPdtic(pdticId), secaoChave, id, ctx);
+            return NoContent();
+        });
+
+    /// <summary>Nova ordem ({ Ids }, todos os registros da seção); devolve a lista.</summary>
+    [HttpPut("pdtic/{pdticId:long}/secoes/{secaoChave}/registros/ordem")]
+    public Task<IActionResult> OrdenarNoPdtic(long pdticId, string secaoChave, [FromBody] PeOrdemDTO dto) =>
+        Executar(async ctx => Ok(await _registros.OrdenarAsync(PeDono.DoPdtic(pdticId), secaoChave, dto, ctx)));
+
     // ── Catálogo do DF ──────────────────────────────────────────────────────
 
     [HttpGet("df/secoes/{secaoChave}/registros")]
@@ -102,10 +132,13 @@ public class PeRegistrosController : ControllerBase
 
     // ── Catálogos (campos de ligação) ───────────────────────────────────────
 
-    /// <summary>petic_objetivo e petic_eixo (da versão vigente; sem vigente, lista vazia) ou principio.</summary>
+    /// <summary>
+    /// petic_objetivo e petic_eixo (da versão vigente; sem vigente, lista vazia), principio, ou
+    /// pgia_sistema (os sistemas de IA do PGIA do órgão do PDTIC pdticId, obrigatório nele).
+    /// </summary>
     [HttpGet("catalogos/{catalogo}")]
-    public Task<IActionResult> Catalogo(string catalogo) =>
-        Executar(async ctx => Ok(await _registros.CatalogoAsync(catalogo, ctx)));
+    public Task<IActionResult> Catalogo(string catalogo, [FromQuery] long? pdticId = null) =>
+        Executar(async ctx => Ok(await _registros.CatalogoAsync(catalogo, ctx, pdticId)));
 
     // ── Apoio ───────────────────────────────────────────────────────────────
 

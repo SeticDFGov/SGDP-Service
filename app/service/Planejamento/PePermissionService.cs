@@ -134,6 +134,17 @@ public class PePermissionService : IPePermissionService
     public bool EhDoOrgao(PeUserContext ctx, long orgaoId) =>
         PapeisPlanejamento.EhDeOrgao(ctx.Papel) && ctx.OrgaoId == orgaoId;
 
+    // ── PDTIC dos órgãos (E4) ───────────────────────────────────────────────
+
+    public bool PodeEditarPdtic(PeUserContext ctx, long orgaoId) =>
+        ctx.EhAdminGeral || (ctx.Papel == PapeisPlanejamento.Orgao && ctx.OrgaoId == orgaoId);
+
+    // Plano, seção 4.1: o administrador do módulo e a SGDI comentam; a Secretaria do CGTIC não
+    public bool PodeComentarPdtic(PeUserContext ctx) =>
+        ctx.EhAdminGeral || ctx.Papel is PapeisPlanejamento.Admin or PapeisPlanejamento.Sgdi;
+
+    public bool PodeVerConsolidado(PeUserContext ctx) => VeTodosOsOrgaos(ctx);
+
     public async Task<Dictionary<Guid, PeOrgaoResumo>> OrgaosPorUnidadeAsync(IEnumerable<Guid> unidadeIds)
     {
         var ids = unidadeIds.Distinct().ToList();

@@ -61,6 +61,24 @@ public interface IPePermissionService
     /// <summary>Envia arquivo (anexo de um campo): quem edita alguma coisa no módulo (pe_admin, pe_cgtic, pe_orgao e admin geral).</summary>
     bool PodeEnviarArquivo(PeUserContext ctx);
 
+    // ── PDTIC dos órgãos (E4) ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Abre e edita o PDTIC de um órgão (registros, "não se aplica"): a equipe do órgão
+    /// (pe_orgao) no próprio órgão e o admin geral em qualquer um. A consulta do órgão e os
+    /// papéis globais só leem (a leitura é o PodeVerOrgao).
+    /// </summary>
+    bool PodeEditarPdtic(PeUserContext ctx, long orgaoId);
+
+    /// <summary>
+    /// Comenta um passo do PDTIC (comentário principal): pe_admin, pe_sgdi e admin geral. A
+    /// Secretaria do CGTIC não comenta (plano, seção 4.1); quem responde é a equipe do órgão.
+    /// </summary>
+    bool PodeComentarPdtic(PeUserContext ctx);
+
+    /// <summary>Planilhas consolidadas de todos os órgãos e a lista dos PDTICs: papéis globais e admin geral.</summary>
+    bool PodeVerConsolidado(PeUserContext ctx);
+
     /// <summary>
     /// Órgão ativo de cada unidade, em lote (uma consulta): mesma resolução do
     /// PgiaPermissionService (Users.Unidade para o pgia_orgao ativo daquela unidade).

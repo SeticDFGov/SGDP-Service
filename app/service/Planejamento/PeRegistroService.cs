@@ -19,23 +19,53 @@ public sealed class PeSecaoExportada
     public required List<PeRegistroResponse> Registros { get; init; }
 }
 
+/// <summary>Uma seção do dono com os registros e o que falta em cada um, pelo modelo de hoje.</summary>
+public sealed class PeSecaoAnalisada
+{
+    public required PeSecaoDoDono Secao { get; init; }
+
+    // Na ordem da seção
+    public required List<PeRegistro> Registros { get; init; }
+
+    // Registros com campo obrigatório vazio e os campos que faltam
+    public required List<(PeRegistro Registro, List<PeCampo> Faltando)> Incompletos { get; init; }
+
+    // Seção obrigatória ainda sem registro
+    public bool FaltaRegistro => Secao.Obrigatoria && Registros.Count == 0;
+
+    public bool Completa => !FaltaRegistro && Incompletos.Count == 0;
+}
+
+/// <summary>A análise de um dono: as seções e as ligações que saem dos registros delas.</summary>
+public sealed class PeAnaliseDono
+{
+    public required List<PeSecaoAnalisada> Secoes { get; init; }
+
+    public required List<PeVinculo> Vinculos { get; init; }
+
+    public PeSecaoAnalisada? Secao(string chave) => Secoes.FirstOrDefault(s => s.Secao.Secao.Chave == chave);
+}
+
 /// <summary>
 /// Motor de registros (E3). Para o PETIC-DF e o catálogo do DF, a seção e os campos
-/// aparecem pela situação geral (desligado some); a E4 acrescenta o PDTIC, que aparece
-/// pelo nível do órgão. Regras de cada gravação:
+/// aparecem pela situação geral (desligado some); para o PDTIC de um órgão (E4), pela trilha
+/// do órgão (nível e ajustes; <see cref="PeTrilhaOrgao"/>). Regras de cada gravação:
 /// <list type="bullet">
 /// <item>só os campos visíveis entram; campo escondido (desligado ou apagado) guarda o valor
 /// que já tinha e não é exigido (decisão 13: guarda e esconde);</item>
 /// <item>obrigatório, tipo, tamanho, faixa, casas, opção ativa (a desativada só vale se já
-/// era a guardada), arquivo enviado pela mesma pessoa e ainda sem dono;</item>
+/// era a guardada), arquivo enviado pela mesma pessoa e ainda sem dono, texto rico pela
+/// lista fechada (<see cref="PeTextoRico"/>) com as imagens do próprio módulo;</item>
 /// <item>ligações só com registros do mesmo dono (ligação com seção) ou do catálogo (os do
-/// PETIC-DF, da vigente; sem vigente, a ligação fica opcional); múltipla ou uma só;</item>
+/// PETIC-DF, da vigente; sem vigente, a ligação fica opcional; os sistemas de IA do PGIA,
+/// só do órgão do PDTIC, com os ids no jsonb); múltipla ou uma só;</item>
 /// <item>calculados calculados aqui e guardados no jsonb;</item>
 /// <item>código pelo prefixo da seção e pela sequência do dono (nunca reaproveita);</item>
 /// <item>registro do sistema não se edita nem se apaga; registro ligado por outro não se apaga.</item>
 /// </list>
-/// Gravar um registro do PETIC-DF toca a versão (alterado em e por) com a situação como token
-/// de concorrência: enviar ao CGTIC e gravar ao mesmo tempo não passam os dois.
+/// Gravar um registro do PETIC-DF ou do PDTIC toca a versão (alterado em e por) com a
+/// situação como token de concorrência: enviar e gravar ao mesmo tempo não passam os dois.
+/// No PDTIC, a vigência da seção abrangencia (passo 1.1) é copiada para o pe_pdtic.
 /// </summary>
 public class PeRegistroService : IPeRegistroService
 {
@@ -48,7 +78,7 @@ public class PeRegistroService : IPeRegistroService
         _permissoes = permissoes;
     }
 
-    private sealed record PeDonoAberto(PeDono Dono, PePetic? Petic, bool PodeEditar);
+    private sealed record PeDonoAberto(PeDono Dono, PePetic? Petic, PePdtic? Pdtic, PeTrilhaOrgao? Trilha, bool PodeEditar);
 
     private sealed record PeFonteCatalogo(PeDono Dono, PeSecaoDoDono Secao);
 
@@ -69,17 +99,31 @@ public class PeRegistroService : IPeRegistroService
     public async Task<PeRegistrosResponse> ListarAsync(PeDono dono, string secaoChave, PeUserContext ctx)
     {
         var aberto = await AbrirAsync(dono, ctx, escrita: false);
-        var secao = await SecaoAsync(dono, secaoChave);
+        var secao = await SecaoAsync(aberto, secaoChave);
         return await RespostaDaSecaoAsync(aberto, secao);
     }
 
-    public async Task<List<PeCatalogoItemResponse>> CatalogoAsync(string catalogo, PeUserContext ctx)
+    public async Task<List<PeCatalogoItemResponse>> CatalogoAsync(string catalogo, PeUserContext ctx, long? pdticId = null)
     {
         if (!_permissoes.PodeLerReferenciais(ctx)) throw SemPermissaoDeLer();
         var chave = catalogo?.Trim() ?? string.Empty;
+
+        // Sistemas de IA do inventário do PGIA, do órgão daquele PDTIC (E4)
+        if (PeDominios.Catalogo.DoPgia(chave))
+        {
+            if (pdticId == null)
+                throw new ApiException(ErrorCode.PeDadosInvalidos, "Diga de qual PDTIC (pdticId) são os sistemas de IA.");
+            var orgaoId = (await PePdticService.LerAsync(_context, _permissoes, pdticId.Value, ctx)).OrgaoId;
+            return await _context.PgiaSistemasIa.AsNoTracking()
+                .Where(s => s.OrgaoId == orgaoId)
+                .OrderBy(s => s.Denominacao).ThenBy(s => s.Id)
+                .Select(s => new PeCatalogoItemResponse { Id = s.Id, Codigo = null, Rotulo = s.Denominacao })
+                .ToListAsync();
+        }
+
         if (!PeDominios.Catalogo.SecaoDoCatalogo.ContainsKey(chave))
             throw new ApiException(ErrorCode.PeCatalogoNaoEncontrado,
-                "Catálogo não encontrado. Os catálogos são petic_objetivo, petic_eixo e principio.");
+                "Catálogo não encontrado. Os catálogos são petic_objetivo, petic_eixo, principio e pgia_sistema.");
 
         var fonte = await CatalogoFonteAsync(chave);
         if (fonte == null) return new List<PeCatalogoItemResponse>();
@@ -95,58 +139,75 @@ public class PeRegistroService : IPeRegistroService
 
     public async Task<List<string>> PendenciasAsync(PeDono dono)
     {
-        var montadas = await MontarAsync(await SecoesDoDonoAsync(dono, soNaPlanilha: false));
-        var ids = montadas.Select(s => s.Secao.Id).ToList();
-        var registros = await RegistrosDo(dono).AsNoTracking()
-            .Where(r => ids.Contains(r.SecaoId))
-            .OrderBy(r => r.Ordem).ThenBy(r => r.Id)
-            .ToListAsync();
-        var idsRegistros = registros.Select(r => r.Id).ToList();
-        var ligacoes = new HashSet<(long Origem, long Campo)>();
-        if (idsRegistros.Count > 0)
-        {
-            var linhas = await _context.PeVinculos.AsNoTracking()
-                .Where(v => idsRegistros.Contains(v.RegistroOrigemId))
-                .Select(v => new { v.RegistroOrigemId, v.CampoId })
-                .ToListAsync();
-            foreach (var linha in linhas) ligacoes.Add((linha.RegistroOrigemId, linha.CampoId));
-        }
-        var semVigente = !await _context.PePetics.AnyAsync(p => p.Situacao == PeDominios.SituacaoPetic.Aprovado);
+        var trilha = await TrilhaDoDonoAsync(dono);
+        var secoes = trilha != null
+            ? trilha.SecoesMontadas()
+            : await MontarAsync(await SecoesForaDoPdticAsync(dono.Escopo, soNaPlanilha: false));
+        var analise = await AnalisarAsync(dono, secoes);
 
         var pendencias = new List<string>();
-        foreach (var secao in montadas)
+        foreach (var secao in analise.Secoes)
         {
-            var doSecao = registros.Where(r => r.SecaoId == secao.Secao.Id).ToList();
-            if (doSecao.Count == 0)
+            if (secao.Registros.Count == 0)
             {
-                if (secao.Secao.SituacaoGeral == PeDominios.Situacao.Obrigatorio)
-                    pendencias.Add(secao.EhFormulario
-                        ? $"Preencha \"{secao.Secao.Titulo}\"."
-                        : $"Inclua pelo menos um item em \"{secao.Secao.Titulo}\".");
+                if (secao.Secao.Obrigatoria)
+                    pendencias.Add(secao.Secao.EhFormulario
+                        ? $"Preencha \"{secao.Secao.Secao.Titulo}\"."
+                        : $"Inclua pelo menos um item em \"{secao.Secao.Secao.Titulo}\".");
                 continue;
             }
-
-            foreach (var registro in doSecao)
-            {
-                var dados = PeRegistroDados.Ler(registro.Dados);
-                var faltando = secao.Visiveis
-                    .Where(v => ObrigatorioEfetivo(v, semVigente) && v.Campo.Tipo != PeDominios.TipoCampo.Calculado)
-                    .Where(v => PeRegistroDados.EhLigacao(v.Campo)
-                        ? !ligacoes.Contains((registro.Id, v.Campo.Id))
-                        : PeRegistroDados.EhVazio(dados[v.Campo.Chave]))
-                    .Select(v => $"\"{v.Campo.Rotulo}\"")
-                    .ToList();
-                if (faltando.Count > 0)
-                    pendencias.Add($"{registro.Codigo ?? secao.Secao.Titulo}: preencha {string.Join(", ", faltando)}.");
-            }
+            foreach (var (registro, faltando) in secao.Incompletos)
+                pendencias.Add($"{registro.Codigo ?? secao.Secao.Secao.Titulo}: preencha {string.Join(", ", faltando.Select(c => $"\"{c.Rotulo}\""))}.");
         }
         return pendencias;
     }
 
+    public async Task<PeAnaliseDono> AnalisarAsync(PeDono dono, IReadOnlyList<PeSecaoDoDono> secoes)
+    {
+        var ids = secoes.Select(s => s.Secao.Id).ToList();
+        var registros = ids.Count == 0
+            ? new List<PeRegistro>()
+            : await RegistrosDo(dono).AsNoTracking()
+                .Where(r => ids.Contains(r.SecaoId))
+                .OrderBy(r => r.Ordem).ThenBy(r => r.Id)
+                .ToListAsync();
+        var idsRegistros = registros.Select(r => r.Id).ToList();
+        var vinculos = idsRegistros.Count == 0
+            ? new List<PeVinculo>()
+            : await _context.PeVinculos.AsNoTracking().Where(v => idsRegistros.Contains(v.RegistroOrigemId)).ToListAsync();
+        var ligacoes = vinculos.Select(v => (v.RegistroOrigemId, v.CampoId)).ToHashSet();
+        var semVigente = secoes.Any(s => s.Visiveis.Any(v => EhCatalogoDoPetic(v.Campo)))
+                         && await PeTrilhaOrgao.SemPeticVigenteAsync(_context);
+
+        var analisadas = secoes.Select(secao =>
+        {
+            var doSecao = registros.Where(r => r.SecaoId == secao.Secao.Id).ToList();
+            var incompletos = doSecao
+                .Select(r => (Registro: r, Faltando: Faltando(secao, r, ligacoes, semVigente)))
+                .Where(x => x.Faltando.Count > 0)
+                .ToList();
+            return new PeSecaoAnalisada { Secao = secao, Registros = doSecao, Incompletos = incompletos };
+        }).ToList();
+        return new PeAnaliseDono { Secoes = analisadas, Vinculos = vinculos };
+    }
+
+    /// <summary>Os campos obrigatórios (visíveis, fora os calculados) que o registro deixou vazios.</summary>
+    private static List<PeCampo> Faltando(PeSecaoDoDono secao, PeRegistro registro, ISet<(long, long)> ligacoes, bool semVigente)
+    {
+        var dados = PeRegistroDados.Ler(registro.Dados);
+        return secao.Visiveis
+            .Where(v => ObrigatorioEfetivo(v, semVigente) && v.Campo.Tipo != PeDominios.TipoCampo.Calculado)
+            .Where(v => PeRegistroDados.EhLigacaoPorVinculo(v.Campo)
+                ? !ligacoes.Contains((registro.Id, v.Campo.Id))
+                : PeRegistroDados.EhVazio(dados[v.Campo.Chave]))
+            .Select(v => v.Campo)
+            .ToList();
+    }
+
     public async Task<PeSecaoExportada> ExportarSecaoAsync(PeDono dono, string secaoChave, PeUserContext ctx)
     {
-        await AbrirAsync(dono, ctx, escrita: false);
-        var secao = await SecaoAsync(dono, secaoChave);
+        var aberto = await AbrirAsync(dono, ctx, escrita: false);
+        var secao = await SecaoAsync(aberto, secaoChave);
         if (!secao.Secao.NaPlanilha)
             throw new ApiException(ErrorCode.PeSecaoIndisponivel, "Esta seção não vai para a planilha: o administrador a deixou de fora.");
         return await ExportadaAsync(dono, secao);
@@ -154,11 +215,45 @@ public class PeRegistroService : IPeRegistroService
 
     public async Task<List<PeSecaoExportada>> ExportarSecoesAsync(PeDono dono, PeUserContext ctx)
     {
-        await AbrirAsync(dono, ctx, escrita: false);
+        var aberto = await AbrirAsync(dono, ctx, escrita: false);
         var saida = new List<PeSecaoExportada>();
-        foreach (var secao in await MontarAsync(await SecoesDoDonoAsync(dono, soNaPlanilha: true)))
+        foreach (var secao in await SecoesDoDonoAsync(aberto, soNaPlanilha: true))
             saida.Add(await ExportadaAsync(dono, secao));
         return saida;
+    }
+
+    public async Task<Dictionary<long, List<PeRegistroResponse>>> ExportarDosPdticsAsync(long secaoId,
+        IReadOnlyList<(long PdticId, PeSecaoDoDono Secao)> pdtics)
+    {
+        var ids = pdtics.Select(p => p.PdticId).Distinct().ToList();
+        var registros = ids.Count == 0
+            ? new List<PeRegistro>()
+            : await _context.PeRegistros.AsNoTracking()
+                .Where(r => r.SecaoId == secaoId && r.PdticId != null && ids.Contains(r.PdticId.Value))
+                .OrderBy(r => r.Ordem).ThenBy(r => r.Id)
+                .ToListAsync();
+
+        // Uma consulta por tipo de dado para todos os órgãos (o consolidado passa por dezenas de órgãos)
+        var idsRegistros = registros.Select(r => r.Id).ToList();
+        var comLigacao = pdtics.Any(p => p.Secao.Visiveis.Any(v => PeRegistroDados.EhLigacaoPorVinculo(v.Campo)));
+        var ligacoes = comLigacao && idsRegistros.Count > 0
+            ? await _context.PeVinculos.AsNoTracking().Where(v => idsRegistros.Contains(v.RegistroOrigemId)).ToListAsync()
+            : new List<PeVinculo>();
+        var destinos = await ResumosAsync(ligacoes.Select(v => v.RegistroDestinoId));
+        var porOrigem = ligacoes.ToLookup(v => v.RegistroOrigemId);
+        var camposPgia = pdtics.SelectMany(p => p.Secao.Visiveis)
+            .Where(v => PeRegistroDados.EhLigacaoPgia(v.Campo))
+            .Select(v => v.Campo.Chave)
+            .Distinct()
+            .ToList();
+        var sistemas = await SistemasPgiaAsync(camposPgia, registros);
+
+        var porPdtic = registros.ToLookup(r => r.PdticId!.Value);
+        return pdtics.GroupBy(p => p.PdticId).ToDictionary(g => g.Key, g =>
+        {
+            var secao = g.First().Secao;
+            return porPdtic[g.Key].Select(r => Resposta(secao, r, porOrigem[r.Id], destinos, sistemas)).ToList();
+        });
     }
 
     // ── Escrita ─────────────────────────────────────────────────────────────
@@ -166,7 +261,7 @@ public class PeRegistroService : IPeRegistroService
     public async Task<PeRegistroResponse> CriarAsync(PeDono dono, string secaoChave, PeRegistroSalvarDTO dto, PeUserContext ctx)
     {
         var aberto = await AbrirAsync(dono, ctx, escrita: true);
-        var secao = await SecaoAsync(dono, secaoChave);
+        var secao = await SecaoAsync(aberto, secaoChave);
         var doDono = RegistrosDo(dono).Where(r => r.SecaoId == secao.Secao.Id);
         if (secao.EhFormulario && await doDono.AnyAsync())
             throw new ApiException(ErrorCode.PeFormularioJaPreenchido,
@@ -181,6 +276,7 @@ public class PeRegistroService : IPeRegistroService
         {
             SecaoId = secao.Secao.Id,
             PeticId = dono.PeticId,
+            PdticId = dono.PdticId,
             Codigo = CodigoDe(secao, sequencia.Ultimo),
             Ordem = (await doDono.MaxAsync(r => (int?)r.Ordem) ?? 0) + 1,
             Sistema = false,
@@ -189,7 +285,8 @@ public class PeRegistroService : IPeRegistroService
         };
         _context.PeRegistros.Add(registro);
         Aplicar(registro, gravacao);
-        Tocar(aberto.Petic, ctx, agora);
+        Tocar(aberto, ctx, agora);
+        CopiarVigencia(aberto, secao, gravacao.Dados);
 
         // O id do registro sai na primeira gravação; os arquivos ganham o dono na segunda
         await using var transacao = _context.Database.IsRelational() ? await _context.Database.BeginTransactionAsync() : null;
@@ -207,7 +304,7 @@ public class PeRegistroService : IPeRegistroService
     public async Task<PeRegistroResponse> AtualizarAsync(PeDono dono, string secaoChave, long id, PeRegistroSalvarDTO dto, PeUserContext ctx)
     {
         var aberto = await AbrirAsync(dono, ctx, escrita: true);
-        var secao = await SecaoAsync(dono, secaoChave);
+        var secao = await SecaoAsync(aberto, secaoChave);
         var registro = await RegistroParaEscritaAsync(dono, secao, id);
 
         var gravacao = await ValidarAsync(aberto, secao, registro, dto, ctx);
@@ -217,7 +314,8 @@ public class PeRegistroService : IPeRegistroService
         DarDono(gravacao, registro.Id, ctx, agora);
         registro.AlteradoEm = agora;
         registro.AlteradoPor = ctx.Email;
-        Tocar(aberto.Petic, ctx, agora);
+        Tocar(aberto, ctx, agora);
+        CopiarVigencia(aberto, secao, gravacao.Dados);
         await _context.SaveChangesAsync();
 
         return await UmaRespostaAsync(secao, registro.Id);
@@ -226,7 +324,7 @@ public class PeRegistroService : IPeRegistroService
     public async Task ExcluirAsync(PeDono dono, string secaoChave, long id, PeUserContext ctx)
     {
         var aberto = await AbrirAsync(dono, ctx, escrita: true);
-        var secao = await SecaoAsync(dono, secaoChave);
+        var secao = await SecaoAsync(aberto, secaoChave);
         var registro = await RegistroParaEscritaAsync(dono, secao, id);
 
         var ligadoPor = await _context.PeVinculos.AsNoTracking()
@@ -239,14 +337,15 @@ public class PeRegistroService : IPeRegistroService
 
         _context.PeVinculos.RemoveRange(await _context.PeVinculos.Where(v => v.RegistroOrigemId == id).ToListAsync());
         _context.PeRegistros.Remove(registro);
-        Tocar(aberto.Petic, ctx, DateTime.UtcNow);
+        Tocar(aberto, ctx, DateTime.UtcNow);
+        CopiarVigencia(aberto, secao, null);
         await _context.SaveChangesAsync();
     }
 
     public async Task<PeRegistrosResponse> OrdenarAsync(PeDono dono, string secaoChave, PeOrdemDTO dto, PeUserContext ctx)
     {
         var aberto = await AbrirAsync(dono, ctx, escrita: true);
-        var secao = await SecaoAsync(dono, secaoChave);
+        var secao = await SecaoAsync(aberto, secaoChave);
         var registros = await RegistrosDo(dono).Where(r => r.SecaoId == secao.Secao.Id).ToListAsync();
 
         var ids = dto.Ids ?? new List<long>();
@@ -255,7 +354,7 @@ public class PeRegistroService : IPeRegistroService
 
         for (var i = 0; i < ids.Count; i++)
             registros.Single(r => r.Id == ids[i]).Ordem = i + 1;
-        Tocar(aberto.Petic, ctx, DateTime.UtcNow);
+        Tocar(aberto, ctx, DateTime.UtcNow);
         await _context.SaveChangesAsync();
 
         return await RespostaDaSecaoAsync(aberto, secao);
@@ -290,6 +389,7 @@ public class PeRegistroService : IPeRegistroService
 
         // Valores (no PUT, Dados ausente mantém o que estava)
         var arquivos = new List<(PeCampo Campo, long Id)>();
+        var imagens = new List<(PeCampo Campo, IReadOnlyList<long> Ids)>();
         foreach (var visivel in secao.Visiveis)
         {
             var campo = visivel.Campo;
@@ -319,11 +419,14 @@ public class PeRegistroService : IPeRegistroService
                     dados.Remove(campo.Chave);
                 else
                     dados[campo.Chave] = resultado.Valor;
+
+                if (resultado.Imagens is { Count: > 0 } ids) imagens.Add((campo, ids));
             }
 
             if (visivel.Obrigatorio && PeRegistroDados.EhVazio(dados[campo.Chave]))
                 erros[campo.Chave] = PeValores.MensagemObrigatorio(campo);
         }
+        ValidarVigencia(dados, visiveis, erros);
 
         var gravacao = new PeGravacao { Dados = dados };
 
@@ -358,6 +461,29 @@ public class PeRegistroService : IPeRegistroService
             gravacao.Arquivos.Add(arquivo);
         }
 
+        // Imagens do texto rico: PNG ou JPEG do próprio módulo, enviadas por quem grava e ainda
+        // sem dono, ou já deste registro. Ganham este registro como dono (quem vê o registro vê a imagem)
+        foreach (var (campo, ids) in imagens)
+            foreach (var id in ids)
+            {
+                var arquivo = await _context.PeArquivos.FirstOrDefaultAsync(a => a.Id == id);
+                string? erro = null;
+                if (arquivo == null)
+                    erro = "Uma das imagens não foi encontrada. Envie a imagem de novo.";
+                else if (PeArquivoService.TipoDoArquivo(arquivo.Nome) is not ("png" or "jpg"))
+                    erro = "No texto formatado entram só imagens PNG ou JPEG.";
+                else if (atual != null && arquivo.DonoTipo == PeDominios.DonoArquivo.Registro && arquivo.DonoId == atual.Id)
+                    continue;
+                else if (arquivo.DonoTipo != null || !MesmaPessoa(arquivo.CriadoPor, ctx.Email))
+                    erro = "Uma das imagens não pode ser usada aqui. Envie a imagem de novo.";
+                if (erro != null)
+                {
+                    erros[campo.Chave] = erro;
+                    break;
+                }
+                if (!gravacao.Arquivos.Contains(arquivo!)) gravacao.Arquivos.Add(arquivo!);
+            }
+
         // Ligações (no PUT, Vinculos ausente mantém as que estavam)
         var guardadas = novo
             ? new List<PeVinculo>()
@@ -366,6 +492,29 @@ public class PeRegistroService : IPeRegistroService
         {
             var campo = visivel.Campo;
             if (erros.ContainsKey(campo.Chave)) continue;
+
+            // Sistemas de IA do PGIA: os ids ficam no jsonb do registro
+            if (PeRegistroDados.EhLigacaoPgia(campo))
+            {
+                var atuaisPgia = PeRegistroDados.Ids(guardados[campo.Chave]);
+                var desejadosPgia = dto.Vinculos == null && !novo
+                    ? atuaisPgia
+                    : (dto.Vinculos != null && dto.Vinculos.TryGetValue(campo.Chave, out var idsPgia) ? idsPgia : new List<long>()).Distinct().ToList();
+                var erroPgia = await ValidarLigacaoPgiaAsync(aberto, campo, desejadosPgia);
+                if (erroPgia != null)
+                {
+                    erros[campo.Chave] = erroPgia;
+                    continue;
+                }
+                if (visivel.Obrigatorio && desejadosPgia.Count == 0)
+                {
+                    erros[campo.Chave] = PeValores.MensagemObrigatorio(campo);
+                    continue;
+                }
+                if (desejadosPgia.Count == 0) dados.Remove(campo.Chave);
+                else dados[campo.Chave] = new JsonArray(desejadosPgia.Select(i => (JsonNode)JsonValue.Create(i)).ToArray());
+                continue;
+            }
 
             var atuais = guardadas.Where(v => v.CampoId == campo.Id).ToList();
             var desejados = dto.Vinculos == null && !novo
@@ -403,6 +552,22 @@ public class PeRegistroService : IPeRegistroService
         return gravacao;
     }
 
+    /// <summary>
+    /// Vigência (início e fim): o fim não vem antes do início. Vale para toda seção com os dois
+    /// campos de data (a abrangência do PDTIC, cuja vigência vai para o pe_pdtic).
+    /// </summary>
+    private static void ValidarVigencia(JsonObject dados, IReadOnlyDictionary<string, PeCampo> visiveis, Dictionary<string, string> erros)
+    {
+        var inicio = PeValores.DataGuardada(dados[PeDominios.ChavePdtic.CampoVigenciaInicio]);
+        var fim = PeValores.DataGuardada(dados[PeDominios.ChavePdtic.CampoVigenciaFim]);
+        if (inicio == null || fim == null || fim >= inicio) return;
+
+        var alvo = visiveis.ContainsKey(PeDominios.ChavePdtic.CampoVigenciaFim) ? PeDominios.ChavePdtic.CampoVigenciaFim
+            : visiveis.ContainsKey(PeDominios.ChavePdtic.CampoVigenciaInicio) ? PeDominios.ChavePdtic.CampoVigenciaInicio
+            : null;
+        if (alvo != null && !erros.ContainsKey(alvo)) erros[alvo] = "O fim da vigência não pode ser antes do início.";
+    }
+
     /// <summary>Confere os destinos de um campo de ligação; devolve a mensagem do erro ou nulo.</summary>
     private async Task<string?> ValidarLigacaoAsync(PeDono dono, PeCampo campo, List<long> ids, long? registroId)
     {
@@ -416,20 +581,30 @@ public class PeRegistroService : IPeRegistroService
             var chave = PeConfigCampo.SecaoDaLigacao(campo.Config);
             var alvo = await _context.PeSecoes.AsNoTracking().FirstOrDefaultAsync(s => s.Chave == chave);
             if (alvo == null) return "A seção ligada não existe mais. Atualize a tela.";
-            // Só registros do mesmo dono (a mesma versão do PETIC-DF, o catálogo do DF)
+            // Só registros do mesmo dono (a mesma versão do PETIC-DF, o mesmo PDTIC, o catálogo do DF)
             validos = RegistrosDo(dono).Where(r => r.SecaoId == alvo.Id);
         }
         else
         {
-            var catalogo = PeValores.Texto(campo.Config, "catalogo");
-            if (catalogo == PeDominios.Catalogo.PgiaSistema) return "Este catálogo chega numa próxima entrega.";
-            var fonte = await CatalogoFonteAsync(catalogo);
+            var fonte = await CatalogoFonteAsync(PeValores.Texto(campo.Config, "catalogo"));
             if (fonte == null) return "O catálogo está vazio: não há o que ligar.";
             validos = RegistrosDo(fonte.Dono).Where(r => r.SecaoId == fonte.Secao.Secao.Id);
         }
 
         var encontrados = await validos.Where(r => ids.Contains(r.Id)).CountAsync();
         return encontrados == ids.Count ? null : "Um dos itens escolhidos não pode ser ligado aqui. Atualize a tela.";
+    }
+
+    /// <summary>Ligação com os sistemas de IA do PGIA: só no PDTIC e só os sistemas do órgão dele.</summary>
+    private async Task<string?> ValidarLigacaoPgiaAsync(PeDonoAberto aberto, PeCampo campo, List<long> ids)
+    {
+        if (ids.Count == 0) return null;
+        if (PeValores.Booleano(campo.Config, "multipla") != true && ids.Count > 1) return "Escolha só um item.";
+        if (aberto.Pdtic == null) return "Os sistemas de IA do PGIA só se ligam no PDTIC de um órgão.";
+
+        var orgaoId = aberto.Pdtic.OrgaoId;
+        var encontrados = await _context.PgiaSistemasIa.AsNoTracking().CountAsync(s => s.OrgaoId == orgaoId && ids.Contains(s.Id));
+        return encontrados == ids.Count ? null : "Um dos sistemas escolhidos não está no inventário do PGIA do órgão. Atualize a tela.";
     }
 
     private void Aplicar(PeRegistro registro, PeGravacao gravacao)
@@ -451,23 +626,48 @@ public class PeRegistroService : IPeRegistroService
         }
     }
 
-    /// <summary>Gravar um registro da versão do PETIC-DF marca a versão como alterada (e confere a situação).</summary>
-    private static void Tocar(PePetic? petic, PeUserContext ctx, DateTime agora)
+    /// <summary>Gravar um registro da versão do PETIC-DF ou do PDTIC marca o dono como alterado (e confere a situação).</summary>
+    private static void Tocar(PeDonoAberto aberto, PeUserContext ctx, DateTime agora)
     {
-        if (petic == null) return;
-        petic.AlteradoEm = agora;
-        petic.AlteradoPor = ctx.Email;
+        if (aberto.Petic != null)
+        {
+            aberto.Petic.AlteradoEm = agora;
+            aberto.Petic.AlteradoPor = ctx.Email;
+        }
+        if (aberto.Pdtic != null)
+        {
+            aberto.Pdtic.AlteradoEm = agora;
+            aberto.Pdtic.AlteradoPor = ctx.Email;
+        }
+    }
+
+    /// <summary>
+    /// No PDTIC, a vigência da seção abrangencia (passo 1.1) vai para o pe_pdtic a cada
+    /// gravação (nula quando o registro é apagado). Par invertido não é copiado (a validação
+    /// já recusa quando os campos aparecem).
+    /// </summary>
+    private static void CopiarVigencia(PeDonoAberto aberto, PeSecaoDoDono secao, JsonObject? dados)
+    {
+        if (aberto.Pdtic == null || secao.Secao.Chave != PeDominios.ChavePdtic.SecaoAbrangencia) return;
+        var inicio = dados == null ? null : PeValores.DataGuardada(dados[PeDominios.ChavePdtic.CampoVigenciaInicio]);
+        var fim = dados == null ? null : PeValores.DataGuardada(dados[PeDominios.ChavePdtic.CampoVigenciaFim]);
+        if (inicio != null && fim != null && fim < inicio) return;
+        aberto.Pdtic.VigenciaInicio = inicio;
+        aberto.Pdtic.VigenciaFim = fim;
     }
 
     // ── Dono, seção e registros ─────────────────────────────────────────────
 
     /// <summary>
-    /// Confere quem chama e o dono. Ler: qualquer papel do módulo. Escrever: pe_admin e admin
-    /// geral, e, no PETIC-DF, só a versão em rascunho.
+    /// Confere quem chama e o dono. PETIC-DF e catálogo do DF: ler, qualquer papel do módulo;
+    /// escrever, pe_admin e admin geral, e, no PETIC-DF, só a versão em rascunho. PDTIC (E4):
+    /// ler, quem vê o órgão (papéis globais, admin geral e os dois papéis do próprio órgão);
+    /// escrever, a equipe do órgão (e o admin geral), só em elaboração ou devolvido.
     /// </summary>
     private async Task<PeDonoAberto> AbrirAsync(PeDono dono, PeUserContext ctx, bool escrita)
     {
         if (!_permissoes.PodeLerReferenciais(ctx)) throw SemPermissaoDeLer();
+        if (dono.EhPdtic) return await AbrirPdticAsync(dono, ctx, escrita);
 
         PePetic? petic = null;
         if (dono.Tipo == PeDominios.DonoRegistro.Petic)
@@ -487,7 +687,36 @@ public class PeRegistroService : IPeRegistroService
                 throw new ApiException(ErrorCode.PeSemPermissao, "Só o administrador do módulo edita o PETIC-DF, os princípios e as diretrizes do ciclo.");
             if (!aberta) throw VersaoFechada(petic!);
         }
-        return new PeDonoAberto(dono, petic, papelEdita && aberta);
+        return new PeDonoAberto(dono, petic, null, null, papelEdita && aberta);
+    }
+
+    private async Task<PeDonoAberto> AbrirPdticAsync(PeDono dono, PeUserContext ctx, bool escrita)
+    {
+        var consulta = escrita ? _context.PePdtics : _context.PePdtics.AsNoTracking();
+        var pdtic = await consulta.FirstOrDefaultAsync(p => p.Id == dono.PdticId) ?? throw PePdticService.NaoEncontrado();
+        if (!_permissoes.PodeVerOrgao(ctx, pdtic.OrgaoId))
+            throw new ApiException(ErrorCode.PeSemPermissao, "Você só vê o PDTIC do seu próprio órgão.");
+
+        var papelEdita = _permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId);
+        var aberto = PeDominios.SituacaoPdtic.Editaveis.Contains(pdtic.Situacao);
+        if (escrita)
+        {
+            if (!papelEdita) throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do órgão edita o PDTIC.");
+            if (!aberto) throw PePdticService.Fechado(pdtic);
+        }
+        var trilha = await PeTrilhaOrgao.CarregarAsync(_context, pdtic.OrgaoId, soAtivo: false);
+        return new PeDonoAberto(dono, null, pdtic, trilha, papelEdita && aberto);
+    }
+
+    /// <summary>A trilha do órgão do PDTIC (sem conferir quem chama), ou nulo fora do PDTIC.</summary>
+    private async Task<PeTrilhaOrgao?> TrilhaDoDonoAsync(PeDono dono)
+    {
+        if (!dono.EhPdtic) return null;
+        var orgaoId = await _context.PePdtics.AsNoTracking()
+            .Where(p => p.Id == dono.PdticId)
+            .Select(p => (long?)p.OrgaoId)
+            .FirstOrDefaultAsync() ?? throw PePdticService.NaoEncontrado();
+        return await PeTrilhaOrgao.CarregarAsync(_context, orgaoId, soAtivo: false);
     }
 
     /// <summary>Versão do PETIC-DF fora do rascunho: 409 com a mensagem da situação.</summary>
@@ -496,10 +725,13 @@ public class PeRegistroService : IPeRegistroService
             ? "Esta versão está com o CGTIC e não muda até a decisão."
             : "Esta versão do PETIC-DF já foi aprovada e não muda. Para mudar, crie uma versão nova.");
 
-    /// <summary>Registros de um dono. A E4 acrescenta o PDTIC (e o catálogo do DF passa a exigir pdtic_id nulo).</summary>
-    public IQueryable<PeRegistro> RegistrosDo(PeDono dono) => dono.Tipo == PeDominios.DonoRegistro.Petic
-        ? _context.PeRegistros.Where(r => r.PeticId == dono.PeticId)
-        : _context.PeRegistros.Where(r => r.PeticId == null);
+    /// <summary>Registros de um dono: a versão do PETIC-DF, o PDTIC ou o catálogo do DF (sem nenhum dos dois).</summary>
+    public IQueryable<PeRegistro> RegistrosDo(PeDono dono) => dono.Tipo switch
+    {
+        PeDominios.DonoRegistro.Petic => _context.PeRegistros.Where(r => r.PeticId == dono.PeticId),
+        PeDominios.DonoRegistro.Pdtic => _context.PeRegistros.Where(r => r.PdticId == dono.PdticId),
+        _ => _context.PeRegistros.Where(r => r.PeticId == null && r.PdticId == null)
+    };
 
     private async Task<PeRegistro> RegistroParaEscritaAsync(PeDono dono, PeSecaoDoDono secao, long id)
     {
@@ -511,10 +743,25 @@ public class PeRegistroService : IPeRegistroService
         return registro;
     }
 
-    /// <summary>A seção do dono pela chave: do escopo do dono, não apagada e não desligada.</summary>
-    private async Task<PeSecaoDoDono> SecaoAsync(PeDono dono, string chave)
+    /// <summary>
+    /// A seção do dono pela chave. Fora do PDTIC: do escopo do dono, não apagada e não
+    /// desligada. No PDTIC: da trilha do órgão (o passo e a seção aparecem no nível dele e
+    /// nos ajustes), com os campos e a obrigatoriedade da trilha.
+    /// </summary>
+    private async Task<PeSecaoDoDono> SecaoAsync(PeDonoAberto aberto, string chave)
     {
         var texto = chave?.Trim() ?? string.Empty;
+        if (aberto.Trilha != null)
+        {
+            var entidade = aberto.Trilha.Dados.SecaoPorChave(texto);
+            if (entidade == null || entidade.Escopo != PeDominios.Escopo.Pdtic || entidade.ExcluidoEm != null)
+                throw new ApiException(ErrorCode.PeSecaoIndisponivel, "Esta seção não existe aqui. Atualize a tela.");
+            var visivel = aberto.Trilha.Secao(entidade.Id)
+                ?? throw new ApiException(ErrorCode.PeSecaoIndisponivel, "Esta seção não aparece no nível do órgão.");
+            return aberto.Trilha.Montar(visivel.Secao);
+        }
+
+        var dono = aberto.Dono;
         var secao = await _context.PeSecoes.AsNoTracking().FirstOrDefaultAsync(s => s.Chave == texto);
         // Antes de o carregador trazer os referenciais (versão 2 do modelo inicial), a seção
         // ainda não existe: é o intervalo da atualização, não um endereço errado
@@ -537,10 +784,15 @@ public class PeRegistroService : IPeRegistroService
                || versao < PeCarregadorModelo.VersaoDosReferenciais;
     }
 
-    /// <summary>As seções visíveis do dono, na ordem (as do PETIC-DF ou as do DF).</summary>
-    private async Task<List<PeSecao>> SecoesDoDonoAsync(PeDono dono, bool soNaPlanilha)
+    /// <summary>As seções visíveis do dono, na ordem (as do PDTIC pela trilha do órgão).</summary>
+    private async Task<List<PeSecaoDoDono>> SecoesDoDonoAsync(PeDonoAberto aberto, bool soNaPlanilha) =>
+        aberto.Trilha != null
+            ? aberto.Trilha.SecoesMontadas(soNaPlanilha)
+            : await MontarAsync(await SecoesForaDoPdticAsync(aberto.Dono.Escopo, soNaPlanilha));
+
+    /// <summary>As seções visíveis de um escopo fora do PDTIC (as do PETIC-DF ou as do DF), na ordem.</summary>
+    private async Task<List<PeSecao>> SecoesForaDoPdticAsync(string escopo, bool soNaPlanilha)
     {
-        var escopo = dono.Escopo;
         var secoes = await _context.PeSecoes.AsNoTracking()
             .Where(s => s.Escopo == escopo && s.PassoId == null && s.ExcluidoEm == null)
             .OrderBy(s => s.Ordem).ThenBy(s => s.Id)
@@ -563,6 +815,10 @@ public class PeRegistroService : IPeRegistroService
         return alvos.Any(a => a.Chave == chave && a.Escopo == secao.Escopo && a.Tipo == PeDominios.TipoSecao.Tabela && SecaoVisivel(a));
     }
 
+    /// <summary>
+    /// Monta seções pela situação geral (PETIC-DF e DF). Serve também para o resumo das
+    /// ligações de qualquer seção (o resumo usa o campo principal, visível ou não).
+    /// </summary>
     private async Task<List<PeSecaoDoDono>> MontarAsync(List<PeSecao> secoes)
     {
         if (secoes.Count == 0) return new List<PeSecaoDoDono>();
@@ -597,14 +853,16 @@ public class PeRegistroService : IPeRegistroService
                     .ToList(),
                 Opcoes = opcoes.Where(o => idsDaSecao.Contains(o.CampoId))
                     .GroupBy(o => o.CampoId)
-                    .ToDictionary(g => g.Key, g => g.ToList())
+                    .ToDictionary(g => g.Key, g => g.ToList()),
+                Obrigatoria = secao.SituacaoGeral == PeDominios.Situacao.Obrigatorio
             };
         }).ToList();
     }
 
     /// <summary>
-    /// De onde saem os itens de um catálogo: os do PETIC-DF, da versão vigente (sem vigente,
-    /// nulo); o de princípios, do catálogo do DF. Seção apagada ou desligada: nulo.
+    /// De onde saem os itens de um catálogo feito de registros: os do PETIC-DF, da versão
+    /// vigente (sem vigente, nulo); o de princípios, do catálogo do DF. Seção apagada ou
+    /// desligada, ou o catálogo do PGIA (que não é feito de registros): nulo.
     /// </summary>
     private async Task<PeFonteCatalogo?> CatalogoFonteAsync(string? catalogo)
     {
@@ -634,7 +892,7 @@ public class PeRegistroService : IPeRegistroService
     private async Task<bool> SemVigenteAsync(PeSecaoDoDono secao)
     {
         if (!secao.Visiveis.Any(v => EhCatalogoDoPetic(v.Campo))) return false;
-        return !await _context.PePetics.AnyAsync(p => p.Situacao == PeDominios.SituacaoPetic.Aprovado);
+        return await PeTrilhaOrgao.SemPeticVigenteAsync(_context);
     }
 
     private static bool EhCatalogoDoPetic(PeCampo campo) =>
@@ -745,18 +1003,44 @@ public class PeRegistroService : IPeRegistroService
     private async Task<List<PeRegistroResponse>> ResponderAsync(PeSecaoDoDono secao, List<PeRegistro> registros)
     {
         var ids = registros.Select(r => r.Id).ToList();
-        var temLigacao = secao.Visiveis.Any(v => PeRegistroDados.EhLigacao(v.Campo));
+        var temLigacao = secao.Visiveis.Any(v => PeRegistroDados.EhLigacaoPorVinculo(v.Campo));
         var ligacoes = temLigacao && ids.Count > 0
             ? await _context.PeVinculos.AsNoTracking().Where(v => ids.Contains(v.RegistroOrigemId)).ToListAsync()
             : new List<PeVinculo>();
         var destinos = await ResumosAsync(ligacoes.Select(v => v.RegistroDestinoId));
         var porOrigem = ligacoes.ToLookup(v => v.RegistroOrigemId);
+        var sistemas = await SistemasPgiaAsync(
+            secao.Visiveis.Where(v => PeRegistroDados.EhLigacaoPgia(v.Campo)).Select(v => v.Campo.Chave).ToList(), registros);
 
-        return registros.Select(r => Resposta(secao, r, porOrigem[r.Id], destinos)).ToList();
+        return registros.Select(r => Resposta(secao, r, porOrigem[r.Id], destinos, sistemas)).ToList();
+    }
+
+    /// <summary>Nome dos sistemas de IA do PGIA ligados nos campos dados (ligação com o PGIA), em lote.</summary>
+    private async Task<Dictionary<long, PeVinculoResponse>> SistemasPgiaAsync(IReadOnlyList<string> campos, List<PeRegistro> registros)
+    {
+        if (campos.Count == 0 || registros.Count == 0) return new Dictionary<long, PeVinculoResponse>();
+
+        var ids = registros.SelectMany(r =>
+            {
+                var dados = PeRegistroDados.Ler(r.Dados);
+                return campos.SelectMany(c => PeRegistroDados.Ids(dados[c]));
+            })
+            .Distinct()
+            .ToList();
+        if (ids.Count == 0) return new Dictionary<long, PeVinculoResponse>();
+
+        return await _context.PgiaSistemasIa.AsNoTracking()
+            .Where(s => ids.Contains(s.Id))
+            .ToDictionaryAsync(s => s.Id, s => new PeVinculoResponse
+            {
+                RegistroId = s.Id,
+                Codigo = null,
+                Resumo = s.Denominacao
+            });
     }
 
     private static PeRegistroResponse Resposta(PeSecaoDoDono secao, PeRegistro registro, IEnumerable<PeVinculo> ligacoes,
-        IReadOnlyDictionary<long, PeVinculoResponse> destinos)
+        IReadOnlyDictionary<long, PeVinculoResponse> destinos, IReadOnlyDictionary<long, PeVinculoResponse> sistemas)
     {
         var dados = PeRegistroDados.Ler(registro.Dados);
         var resposta = new PeRegistroResponse
@@ -775,6 +1059,18 @@ public class PeRegistroService : IPeRegistroService
         foreach (var visivel in secao.Visiveis)
         {
             var campo = visivel.Campo;
+            if (PeRegistroDados.EhLigacaoPgia(campo))
+            {
+                // Na ordem em que foram escolhidos (sistema que saiu do inventário some)
+                var doPgia = PeRegistroDados.Ids(dados[campo.Chave])
+                    .Select(id => sistemas.GetValueOrDefault(id))
+                    .Where(s => s != null).Select(s => s!)
+                    .Select(s => new PeVinculoResponse { RegistroId = s.RegistroId, Codigo = null, Resumo = PeValores.Resumo(s.Resumo) })
+                    .ToList();
+                resposta.Vinculos[campo.Chave] = doPgia;
+                if (doPgia.Count > 0) resposta.Rotulos[campo.Chave] = string.Join(", ", doPgia.Select(s => s.Resumo));
+                continue;
+            }
             if (PeRegistroDados.EhLigacao(campo))
             {
                 var ligados = lista.Where(v => v.CampoId == campo.Id)
@@ -817,7 +1113,7 @@ public class PeRegistroService : IPeRegistroService
         });
     }
 
-    private static string ResumoDe(PeSecaoDoDono secao, PeRegistro registro)
+    internal static string ResumoDe(PeSecaoDoDono secao, PeRegistro registro)
     {
         var campo = secao.CampoDoResumo();
         var texto = campo == null

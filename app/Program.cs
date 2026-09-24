@@ -155,6 +155,10 @@ builder.Services.AddScoped<IPePeticService, service.Planejamento.PePeticService>
 builder.Services.AddScoped<IPeDeliberacaoService, service.Planejamento.PeDeliberacaoService>();
 builder.Services.AddScoped<IPeArquivoService, service.Planejamento.PeArquivoService>();
 builder.Services.AddScoped<IPePlanilhaService, service.Planejamento.PePlanilhaService>();
+// PDTIC dos órgãos (E4): o PDTIC, a situação dos passos, o "não se aplica", os temas, o PGIA
+// (só leitura) e os comentários
+builder.Services.AddScoped<IPePdticService, service.Planejamento.PePdticService>();
+builder.Services.AddScoped<IPeComentarioService, service.Planejamento.PeComentarioService>();
 // Modelo inicial (trilha e campos do PDTIC, e os referenciais do DF e do PETIC-DF, com os
 // princípios do art. 4º): carregado ao subir, fora das requisições.
 // Sem as tabelas (intervalo entre o PR e a migration do merge) só registra no log e

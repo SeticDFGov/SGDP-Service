@@ -88,6 +88,10 @@ namespace Models
         public DbSet<PeRegistroSequencia> PeRegistroSequencias { get; set; }
         public DbSet<PeArquivo> PeArquivos { get; set; }
         public DbSet<PeArquivoConteudo> PeArquivosConteudo { get; set; }
+        // PDTIC dos órgãos (E4): o PDTIC, o "não se aplica" de cada passo e os comentários
+        public DbSet<PePdtic> PePdtics { get; set; }
+        public DbSet<PePdticPasso> PePdticPassos { get; set; }
+        public DbSet<PeComentario> PeComentarios { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

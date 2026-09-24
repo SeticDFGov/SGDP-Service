@@ -1,0 +1,644 @@
+using api.Common;
+using api.Planejamento;
+using app.Auth;
+using Microsoft.EntityFrameworkCore;
+using Models;
+using Models.Pgia;
+using Models.Planejamento;
+using service.Interface;
+
+namespace service.Planejamento;
+
+/// <summary>
+/// O PDTIC de cada órgão (E4): abrir (um atual por órgão), ler, listar os atuais (papéis
+/// globais), a situação de cada passo da trilha com os avisos do guia, o "não se aplica",
+/// a conferência dos temas das ações (incisos V, VI e IX) e os sistemas de IA do PGIA
+/// (inciso VIII, só leitura). Os registros das seções ficam no motor (PeRegistroService,
+/// dono PDTIC); os comentários, no PeComentarioService.
+/// <list type="bullet">
+/// <item>Situação do passo: "atencao" quando há comentário aberto; "nao_se_aplica" quando o
+/// órgão marcou (e a marca ainda vale: passo opcional, que aceita, não travado); "feito" ou
+/// "pendente" nos passos de dados (todas as seções com os obrigatórios preenchidos, e a
+/// seção obrigatória com pelo menos um registro) e no de conferência de temas (cada tema
+/// com ação ou com justificativa); "continuo" nos tipos das próximas entregas.</item>
+/// <item>Próximo passo: o primeiro pendente ou em atenção, na ordem da trilha.</item>
+/// <item>Avisos (não bloqueiam): fraqueza da SWOT sem necessidade ligada e ameaça sem risco
+/// ligado (no passo da SWOT) e equipe de elaboração só de TIC (no passo da equipe).</item>
+/// </list>
+/// </summary>
+public class PePdticService : IPePdticService
+{
+    private const int TamanhoPaginaPadrao = 20;
+    private const int TamanhoPaginaMaximo = 100;
+    private const int MaximoJustificativa = 1000;
+
+    private readonly AppDbContext _context;
+    private readonly IPeRegistroService _registros;
+    private readonly IPePermissionService _permissoes;
+
+    public PePdticService(AppDbContext context, IPeRegistroService registros, IPePermissionService permissoes)
+    {
+        _context = context;
+        _registros = registros;
+        _permissoes = permissoes;
+    }
+
+    // ── PDTIC ───────────────────────────────────────────────────────────────
+
+    public async Task<PePdticResponse?> AtualAsync(long? orgaoId, PeUserContext ctx)
+    {
+        var alvo = OrgaoAlvo(orgaoId, ctx);
+        var pdtic = await _context.PePdtics.AsNoTracking()
+            .Where(p => p.OrgaoId == alvo && !PeDominios.SituacaoPdtic.Encerradas.Contains(p.Situacao))
+            .OrderByDescending(p => p.Id)
+            .FirstOrDefaultAsync();
+        return pdtic == null ? null : await RespostaAsync(pdtic, ctx);
+    }
+
+    public async Task<PePdticResponse> ObterAsync(long id, PeUserContext ctx) =>
+        await RespostaAsync(await LerAsync(_context, _permissoes, id, ctx), ctx);
+
+    public async Task<PePdticResponse> AbrirAsync(PePdticCriarDTO dto, PeUserContext ctx)
+    {
+        long orgaoId;
+        if (ctx.EhAdminGeral)
+        {
+            orgaoId = dto.OrgaoId ?? ctx.OrgaoId
+                ?? throw new ApiException(ErrorCode.PeOrgaoObrigatorio, "Escolha o órgão do PDTIC.");
+        }
+        else if (ctx.Papel == PapeisPlanejamento.Orgao)
+        {
+            orgaoId = ctx.OrgaoId ?? throw SemOrgao();
+            if (dto.OrgaoId != null && dto.OrgaoId != orgaoId)
+                throw new ApiException(ErrorCode.PeSemPermissao, "Você só abre o PDTIC do seu próprio órgão.");
+        }
+        else
+        {
+            throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do órgão abre o PDTIC.");
+        }
+
+        var orgao = await _context.PgiaOrgaos.AsNoTracking().FirstOrDefaultAsync(o => o.Id == orgaoId && o.Ativo)
+            ?? throw new ApiException(ErrorCode.PeOrgaoNaoEncontrado, "Órgão não encontrado ou desativado.");
+
+        var anteriores = await _context.PePdtics.AsNoTracking()
+            .Where(p => p.OrgaoId == orgaoId)
+            .OrderByDescending(p => p.Id)
+            .ToListAsync();
+        var atual = anteriores.FirstOrDefault(p => !PeDominios.SituacaoPdtic.Encerradas.Contains(p.Situacao));
+        if (atual != null)
+            throw new ApiException(ErrorCode.PePdticJaExiste,
+                $"O órgão já tem um PDTIC em andamento (versão {atual.Versao}, {PeDominios.SituacaoPdtic.Rotulo(atual.Situacao).ToLowerInvariant()}). Continue por ele.");
+
+        var agora = DateTime.UtcNow;
+        var pdtic = new PePdtic
+        {
+            OrgaoId = orgao.Id,
+            Versao = anteriores.Count == 0 ? "1.0" : PePeticService.ProximaVersao(anteriores.Select(p => p.Versao)),
+            Situacao = PeDominios.SituacaoPdtic.EmElaboracao,
+            AnteriorId = anteriores.FirstOrDefault()?.Id,
+            CriadoEm = agora,
+            CriadoPor = ctx.Email
+        };
+        _context.PePdtics.Add(pdtic);
+        await _context.SaveChangesAsync();
+        return await RespostaAsync(pdtic, ctx);
+    }
+
+    public async Task<PagedResponse<PePdticResponse>> ListarAsync(PePdticConsulta consulta, PeUserContext ctx)
+    {
+        if (!_permissoes.PodeVerConsolidado(ctx))
+            throw new ApiException(ErrorCode.PeSemPermissao, "A lista dos PDTICs de todos os órgãos é da SGDI, da Secretaria do CGTIC e do administrador do módulo.");
+
+        var pageSize = consulta.PageSize < 1 ? TamanhoPaginaPadrao : Math.Min(consulta.PageSize, TamanhoPaginaMaximo);
+        var page = Math.Clamp(consulta.Page, 1, int.MaxValue / pageSize);
+
+        var query = from p in _context.PePdtics.AsNoTracking()
+                    join o in _context.PgiaOrgaos.AsNoTracking() on p.OrgaoId equals o.Id
+                    where !PeDominios.SituacaoPdtic.Encerradas.Contains(p.Situacao)
+                    select new { Pdtic = p, Orgao = o };
+        if (!string.IsNullOrWhiteSpace(consulta.Situacao))
+        {
+            // Fora do domínio: lista vazia, nunca "todos" em silêncio
+            var situacao = consulta.Situacao.Trim();
+            query = PeDominios.SituacaoPdtic.Todas.Contains(situacao)
+                ? query.Where(x => x.Pdtic.Situacao == situacao)
+                : query.Where(x => false);
+        }
+        if (!string.IsNullOrWhiteSpace(consulta.Filtro))
+        {
+            // ToLower().Contains() vale no Npgsql e no InMemory
+            var filtro = consulta.Filtro.Trim().ToLower();
+            query = query.Where(x => x.Orgao.Sigla.ToLower().Contains(filtro) || x.Orgao.Nome.ToLower().Contains(filtro));
+        }
+
+        var total = await query.CountAsync();
+        var linhas = await query
+            .OrderBy(x => x.Orgao.Sigla).ThenBy(x => x.Orgao.Nome).ThenBy(x => x.Pdtic.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+        var niveis = await PeTrilhaOrgao.NiveisDosOrgaosAsync(_context, linhas.Select(l => l.Orgao.Id));
+
+        return new PagedResponse<PePdticResponse>(
+            linhas.Select(l => Resposta(l.Pdtic, l.Orgao, niveis.GetValueOrDefault(l.Orgao.Id), ctx)).ToList(), total, page, pageSize);
+    }
+
+    // ── Situação dos passos ─────────────────────────────────────────────────
+
+    public async Task<PePdticSituacaoResponse> SituacaoAsync(long id, PeUserContext ctx)
+    {
+        var pdtic = await LerAsync(_context, _permissoes, id, ctx);
+        var trilha = await PeTrilhaOrgao.CarregarAsync(_context, pdtic.OrgaoId, soAtivo: false);
+        return await CalcularSituacaoAsync(pdtic, trilha);
+    }
+
+    /// <summary>A situação de cada passo visível da trilha do órgão (sem conferir quem chama).</summary>
+    public async Task<PePdticSituacaoResponse> CalcularSituacaoAsync(PePdtic pdtic, PeTrilhaOrgao trilha)
+    {
+        var marcas = await _context.PePdticPassos.AsNoTracking()
+            .Where(p => p.PdticId == pdtic.Id && p.NaoSeAplica)
+            .ToDictionaryAsync(p => p.PassoId);
+        var abertos = (await _context.PeComentarios.AsNoTracking()
+                .Where(c => c.PdticId == pdtic.Id && c.PaiId == null && c.ResolvidoEm == null)
+                .Select(c => c.PassoId)
+                .ToListAsync())
+            .GroupBy(p => p)
+            .ToDictionary(g => g.Key, g => g.Count());
+        var analise = await _registros.AnalisarAsync(PeDono.DoPdtic(pdtic.Id), trilha.SecoesMontadas());
+        var completas = analise.Secoes.ToDictionary(s => s.Secao.Secao.Id, s => s.Completa);
+
+        // Marca que ainda vale (o passo continua opcional, aceita e não é travado)
+        bool NaoSeAplica(PeTrilhaPasso passo) => marcas.ContainsKey(passo.Id) && RecusaDoNaoSeAplica(passo) == null;
+
+        var avisos = Avisos(trilha, analise, NaoSeAplica);
+        var temasOk = Temas(trilha, analise).All(t => t.Acoes.Count > 0 || !string.IsNullOrWhiteSpace(t.Justificativa));
+
+        var passos = trilha.Passos.Select(passo =>
+        {
+            var comentarios = abertos.GetValueOrDefault(passo.Id);
+            var marcado = NaoSeAplica(passo);
+            var situacao = comentarios > 0 ? PeDominios.SituacaoPasso.Atencao
+                : marcado ? PeDominios.SituacaoPasso.NaoSeAplica
+                : passo.Tipo switch
+                {
+                    PeDominios.TipoPasso.Dados => passo.Secoes.All(s => completas.GetValueOrDefault(s.Id, true))
+                        ? PeDominios.SituacaoPasso.Feito
+                        : PeDominios.SituacaoPasso.Pendente,
+                    PeDominios.TipoPasso.ConferenciaTemas => temasOk && passo.Secoes.All(s => completas.GetValueOrDefault(s.Id, true))
+                        ? PeDominios.SituacaoPasso.Feito
+                        : PeDominios.SituacaoPasso.Pendente,
+                    _ => PeDominios.SituacaoPasso.Continuo
+                };
+            var marca = marcado ? marcas[passo.Id] : null;
+            return new PePassoSituacaoResponse
+            {
+                PassoId = passo.Id,
+                Chave = passo.Chave,
+                Numero = passo.Numero,
+                Situacao = situacao,
+                NaoSeAplica = marca == null
+                    ? null
+                    : new PeNaoSeAplicaResponse { Justificativa = marca.Justificativa ?? string.Empty, MarcadoEm = marca.MarcadoEm, MarcadoPor = marca.MarcadoPor },
+                ComentariosAbertos = comentarios,
+                Avisos = avisos.GetValueOrDefault(passo.Id) ?? new List<string>()
+            };
+        }).ToList();
+
+        return new PePdticSituacaoResponse
+        {
+            ProximoPasso = passos.FirstOrDefault(p => p.Situacao is PeDominios.SituacaoPasso.Pendente or PeDominios.SituacaoPasso.Atencao)?.Numero,
+            Passos = passos
+        };
+    }
+
+    /// <summary>
+    /// Avisos do guia, por passo: fraqueza da SWOT sem necessidade ligada e ameaça sem risco
+    /// ligado (no passo da SWOT, quando o campo de ligação aparece para o órgão) e equipe de
+    /// elaboração só de TIC (no passo da equipe). Passo marcado "não se aplica" não avisa.
+    /// </summary>
+    private static Dictionary<long, List<string>> Avisos(PeTrilhaOrgao trilha, PeAnaliseDono analise, Func<PeTrilhaPasso, bool> naoSeAplica)
+    {
+        var avisos = new Dictionary<long, List<string>>();
+        void Avisar(long passoId, string texto)
+        {
+            if (!avisos.TryGetValue(passoId, out var lista)) avisos[passoId] = lista = new List<string>();
+            lista.Add(texto);
+        }
+
+        // Fraqueza sem necessidade e ameaça sem risco: a origem da SWOT é ligada pelo campo da outra seção
+        void SemLigacao(string secaoSwot, string secaoQueLiga, string campoQueLiga, string uma, string varias, string complemento)
+        {
+            var swot = trilha.Secao(secaoSwot);
+            var liga = trilha.Secao(secaoQueLiga);
+            var campo = trilha.Campo(secaoQueLiga, campoQueLiga);
+            if (swot == null || liga == null || campo == null || naoSeAplica(swot.Value.Passo) || naoSeAplica(liga.Value.Passo)) return;
+
+            var ligadas = analise.Vinculos.Where(v => v.CampoId == campo.Id).Select(v => v.RegistroDestinoId).ToHashSet();
+            var soltas = (analise.Secao(secaoSwot)?.Registros ?? new List<PeRegistro>())
+                .Where(r => !ligadas.Contains(r.Id))
+                .Select(r => r.Codigo ?? $"#{r.Ordem}")
+                .ToList();
+            if (soltas.Count == 0) return;
+            var texto = soltas.Count == 1 ? string.Format(uma, soltas[0]) : string.Format(varias, Lista(soltas));
+            Avisar(swot.Value.Passo.Id, $"{texto} {string.Format(complemento, liga.Value.Passo.Numero)}");
+        }
+
+        SemLigacao(PeDominios.ChavePdtic.SecaoFraquezas, PeDominios.ChavePdtic.SecaoNecessidades, PeDominios.ChavePdtic.CampoFraqueza,
+            "A fraqueza {0} ainda não tem necessidade de TIC ligada.",
+            "As fraquezas {0} ainda não têm necessidade de TIC ligada.",
+            "O guia recomenda que cada fraqueza vire pelo menos uma necessidade: faça a ligação no passo {0}.");
+        SemLigacao(PeDominios.ChavePdtic.SecaoAmeacas, PeDominios.ChavePdtic.SecaoRiscos, PeDominios.ChavePdtic.CampoAmeaca,
+            "A ameaça {0} ainda não tem risco ligado.",
+            "As ameaças {0} ainda não têm risco ligado.",
+            "O guia recomenda tratar cada ameaça no plano de riscos: faça a ligação no passo {0}.");
+
+        // Equipe de elaboração só de TIC (o guia pede também as áreas finalísticas)
+        var equipe = trilha.Secao(PeDominios.ChavePdtic.SecaoEquipe);
+        if (equipe != null && trilha.Campo(PeDominios.ChavePdtic.SecaoEquipe, PeDominios.ChavePdtic.CampoTipoArea) != null
+            && !naoSeAplica(equipe.Value.Passo))
+        {
+            var areas = (analise.Secao(PeDominios.ChavePdtic.SecaoEquipe)?.Registros ?? new List<PeRegistro>())
+                .Select(r => PeRegistroDados.Texto(PeRegistroDados.Ler(r.Dados)[PeDominios.ChavePdtic.CampoTipoArea]))
+                .Where(a => a != null)
+                .ToList();
+            if (areas.Count > 0 && areas.All(a => a == PeDominios.ChavePdtic.AreaTic))
+                Avisar(equipe.Value.Passo.Id,
+                    "A equipe de elaboração tem só pessoas da área de TIC. O guia recomenda incluir também pessoas das áreas finalísticas do órgão.");
+        }
+        return avisos;
+    }
+
+    /// <summary>"D01", "D01 e D02", "D01, D02 e D03", até cinco e depois "e mais N".</summary>
+    private static string Lista(IReadOnlyList<string> itens)
+    {
+        if (itens.Count > 5) return string.Join(", ", itens.Take(5)) + $" e mais {itens.Count - 5}";
+        return itens.Count == 1 ? itens[0] : string.Join(", ", itens.Take(itens.Count - 1)) + " e " + itens[^1];
+    }
+
+    // ── Não se aplica ───────────────────────────────────────────────────────
+
+    public async Task<PePassoSituacaoResponse> MarcarNaoSeAplicaAsync(long id, long passoId, PeNaoSeAplicaDTO dto, PeUserContext ctx)
+    {
+        var (pdtic, trilha, passo) = await PassoParaMarcarAsync(id, passoId, ctx);
+        if (RecusaDoNaoSeAplica(passo) is string recusa) throw new ApiException(ErrorCode.PeNaoSeAplicaRecusado, recusa);
+
+        var justificativa = dto.Justificativa?.Trim();
+        if (string.IsNullOrEmpty(justificativa))
+            throw new ApiException(ErrorCode.PeJustificativaObrigatoria, "Explique por que este passo não se aplica ao órgão.");
+        if (justificativa.Length > MaximoJustificativa)
+            throw new ApiException(ErrorCode.PeDadosInvalidos, $"A justificativa tem no máximo {MaximoJustificativa} caracteres.");
+
+        var agora = DateTime.UtcNow;
+        var linha = await _context.PePdticPassos.FirstOrDefaultAsync(p => p.PdticId == id && p.PassoId == passoId);
+        if (linha == null)
+        {
+            linha = new PePdticPasso { PdticId = id, PassoId = passoId };
+            _context.PePdticPassos.Add(linha);
+        }
+        linha.NaoSeAplica = true;
+        linha.Justificativa = justificativa;
+        linha.MarcadoEm = agora;
+        linha.MarcadoPor = ctx.Email;
+        pdtic.AlteradoEm = agora;
+        pdtic.AlteradoPor = ctx.Email;
+        await _context.SaveChangesAsync();
+
+        return (await CalcularSituacaoAsync(pdtic, trilha)).Passos.Single(p => p.PassoId == passoId);
+    }
+
+    public async Task<PePassoSituacaoResponse> DesmarcarNaoSeAplicaAsync(long id, long passoId, PeUserContext ctx)
+    {
+        var (pdtic, trilha, _) = await PassoParaMarcarAsync(id, passoId, ctx);
+
+        var linha = await _context.PePdticPassos.FirstOrDefaultAsync(p => p.PdticId == id && p.PassoId == passoId);
+        if (linha is { NaoSeAplica: true })
+        {
+            var agora = DateTime.UtcNow;
+            linha.NaoSeAplica = false;
+            linha.Justificativa = null;
+            linha.MarcadoEm = agora;
+            linha.MarcadoPor = ctx.Email;
+            pdtic.AlteradoEm = agora;
+            pdtic.AlteradoPor = ctx.Email;
+            await _context.SaveChangesAsync();
+        }
+        return (await CalcularSituacaoAsync(pdtic, trilha)).Passos.Single(p => p.PassoId == passoId);
+    }
+
+    /// <summary>
+    /// "Não se aplica" só em passo opcional no nível do órgão (e nos ajustes), que aceite e não
+    /// seja travado. Devolve o motivo da recusa, ou nulo quando pode.
+    /// </summary>
+    public static string? RecusaDoNaoSeAplica(PeTrilhaPasso passo)
+    {
+        if (passo.Travado)
+            return "Este passo é um dos nove conteúdos mínimos do PDTIC (art. 12, § 2º, do Decreto nº 48.900/2026) e não pode ficar como \"não se aplica\".";
+        if (!passo.AceitaNaoSeAplica) return "Este passo não aceita \"não se aplica\".";
+        if (passo.Situacao != PeDominios.Situacao.Opcional)
+            return "Este passo é obrigatório no nível do órgão e não pode ficar como \"não se aplica\".";
+        return null;
+    }
+
+    private async Task<(PePdtic Pdtic, PeTrilhaOrgao Trilha, PeTrilhaPasso Passo)> PassoParaMarcarAsync(long id, long passoId, PeUserContext ctx)
+    {
+        var pdtic = await LerAsync(_context, _permissoes, id, ctx, rastrear: true);
+        if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
+            throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do órgão marca um passo como \"não se aplica\".");
+        if (!PeDominios.SituacaoPdtic.Editaveis.Contains(pdtic.Situacao)) throw Fechado(pdtic);
+
+        var trilha = await PeTrilhaOrgao.CarregarAsync(_context, pdtic.OrgaoId, soAtivo: false);
+        var passo = trilha.Passo(passoId)
+            ?? throw new ApiException(ErrorCode.PePassoIndisponivel, "Este passo não está na trilha do órgão. Atualize a tela.");
+        return (pdtic, trilha, passo);
+    }
+
+    // ── Temas das ações (incisos V, VI e IX) ────────────────────────────────
+
+    public async Task<PeTemasResponse> TemasAsync(long id, PeUserContext ctx)
+    {
+        var pdtic = await LerAsync(_context, _permissoes, id, ctx);
+        var trilha = await PeTrilhaOrgao.CarregarAsync(_context, pdtic.OrgaoId, soAtivo: false);
+        var secoes = new[] { PeDominios.TemaDecreto.SecaoAcoes, PeDominios.TemaDecreto.SecaoJustificativas }
+            .Select(chave => trilha.Secao(chave))
+            .Where(s => s != null)
+            .Select(s => trilha.Montar(s!.Value.Secao))
+            .ToList();
+        var analise = await _registros.AnalisarAsync(PeDono.DoPdtic(id), secoes);
+        return new PeTemasResponse { Temas = Temas(trilha, analise) };
+    }
+
+    /// <summary>
+    /// Os três temas do decreto com as ações do PDTIC marcadas em cada um (campo acoes.tema) e a
+    /// justificativa de tema sem ação (seção temas_sem_acao, quando o campo aparece para o órgão).
+    /// </summary>
+    private static List<PeTemaResponse> Temas(PeTrilhaOrgao trilha, PeAnaliseDono analise)
+    {
+        var acoes = analise.Secao(PeDominios.TemaDecreto.SecaoAcoes);
+        var campoTema = trilha.Dados.SecaoPorChave(PeDominios.TemaDecreto.SecaoAcoes) is PeSecao secaoAcoes
+            ? trilha.Dados.CamposDaSecao(secaoAcoes.Id, incluirExcluidos: true).FirstOrDefault(c => c.Chave == PeDominios.TemaDecreto.CampoTema)
+            : null;
+        var opcoesTema = campoTema == null ? new List<PeOpcao>() : trilha.Dados.OpcoesDoCampo(campoTema.Id).ToList();
+        var campoSituacao = acoes?.Secao.Visiveis.FirstOrDefault(v => v.Campo.Chave == PeDominios.TemaDecreto.CampoSituacao)?.Campo;
+
+        var justificativas = analise.Secao(PeDominios.TemaDecreto.SecaoJustificativas);
+        var dadosJustificativa = PeRegistroDados.Ler(justificativas?.Registros.FirstOrDefault()?.Dados);
+
+        return PeDominios.TemaDecreto.Todos.Select(tema =>
+        {
+            var doTema = (acoes?.Registros ?? new List<PeRegistro>())
+                .Select(r => (Registro: r, Dados: PeRegistroDados.Ler(r.Dados)))
+                .Where(x => PeRegistroDados.Textos(x.Dados[PeDominios.TemaDecreto.CampoTema]).Contains(tema.Valor))
+                .Select(x => new PeTemaAcaoResponse
+                {
+                    RegistroId = x.Registro.Id,
+                    Codigo = x.Registro.Codigo,
+                    Descricao = PeRegistroDados.Texto(x.Dados[PeDominios.TemaDecreto.CampoDescricao]) ?? string.Empty,
+                    Situacao = campoSituacao == null
+                        ? null
+                        : PeValores.Rotulo(campoSituacao, acoes!.Secao.OpcoesDe(campoSituacao), x.Dados[campoSituacao.Chave])
+                })
+                .ToList();
+            var justificativaVisivel = justificativas?.Secao.Visiveis.Any(v => v.Campo.Chave == tema.CampoJustificativa) == true;
+            var justificativa = justificativaVisivel ? PeRegistroDados.Texto(dadosJustificativa[tema.CampoJustificativa]) : null;
+            return new PeTemaResponse
+            {
+                Valor = tema.Valor,
+                Rotulo = opcoesTema.FirstOrDefault(o => o.Valor == tema.Valor)?.Rotulo ?? tema.Valor,
+                Inciso = tema.Inciso,
+                Acoes = doTema,
+                Justificativa = string.IsNullOrWhiteSpace(justificativa) ? null : justificativa
+            };
+        }).ToList();
+    }
+
+    // ── Sistemas de IA do PGIA (inciso VIII) ────────────────────────────────
+
+    public async Task<List<PeSistemaIaPgiaResponse>> SistemasIaAsync(long id, PeUserContext ctx)
+    {
+        var pdtic = await LerAsync(_context, _permissoes, id, ctx);
+        return await _context.PgiaSistemasIa.AsNoTracking()
+            .Where(s => s.OrgaoId == pdtic.OrgaoId)
+            .OrderBy(s => s.Denominacao).ThenBy(s => s.Id)
+            .Select(s => new PeSistemaIaPgiaResponse
+            {
+                Id = s.Id,
+                Nome = s.Denominacao,
+                Finalidade = s.Finalidade,
+                Classificacao = s.ClassificacaoRiscoAtual,
+                Base = s.EnquadramentoLegal,
+                Situacao = s.StatusCicloVida
+            })
+            .ToListAsync();
+    }
+
+    // ── Apoio ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// O PDTIC para quem pode ver o órgão dele (papéis globais, admin geral e os dois papéis
+    /// do próprio órgão): 404 se não existe, 403 se é de outro órgão.
+    /// </summary>
+    internal static async Task<PePdtic> LerAsync(AppDbContext context, IPePermissionService permissoes, long id, PeUserContext ctx,
+        bool rastrear = false)
+    {
+        if (!permissoes.PodeLerReferenciais(ctx))
+            throw new ApiException(ErrorCode.PeSemPermissao, "Você ainda não tem papel na Governança Estratégica. Fale com o administrador do módulo.");
+        var consulta = rastrear ? context.PePdtics : context.PePdtics.AsNoTracking();
+        var pdtic = await consulta.FirstOrDefaultAsync(p => p.Id == id) ?? throw NaoEncontrado();
+        if (!permissoes.PodeVerOrgao(ctx, pdtic.OrgaoId))
+            throw new ApiException(ErrorCode.PeSemPermissao, "Você só vê o PDTIC do seu próprio órgão.");
+        return pdtic;
+    }
+
+    internal static ApiException NaoEncontrado() => new(ErrorCode.PePdticNaoEncontrado, "PDTIC não encontrado. Atualize a tela.");
+
+    /// <summary>PDTIC fora de em_elaboracao e devolvido: 409 com a mensagem da situação.</summary>
+    internal static ApiException Fechado(PePdtic pdtic) => new(ErrorCode.PePdticFechado, pdtic.Situacao switch
+    {
+        PeDominios.SituacaoPdtic.EmAprovacao => "Este PDTIC foi enviado para aprovação e não muda até a decisão.",
+        PeDominios.SituacaoPdtic.Aprovado or PeDominios.SituacaoPdtic.Publicado or PeDominios.SituacaoPdtic.EmAcompanhamento =>
+            "Este PDTIC já foi aprovado e não muda mais. Para mudar, é preciso abrir uma revisão.",
+        _ => "Este PDTIC já foi encerrado e não muda mais."
+    });
+
+    private static ApiException SemOrgao() => new(ErrorCode.PeOrgaoNaoEncontrado,
+        "Seu usuário ainda não está ligado a um órgão. Fale com o administrador do módulo.");
+
+    /// <summary>
+    /// O órgão pedido: com orgaoId, quem vê o órgão; sem ele, o da própria pessoa (papel de
+    /// órgão, ou papel global com órgão; papel global sem órgão precisa dizer qual).
+    /// </summary>
+    private long OrgaoAlvo(long? orgaoId, PeUserContext ctx)
+    {
+        if (orgaoId != null)
+        {
+            if (!_permissoes.PodeVerOrgao(ctx, orgaoId.Value))
+                throw new ApiException(ErrorCode.PeSemPermissao, "Você só vê o PDTIC do seu próprio órgão.");
+            return orgaoId.Value;
+        }
+        if (PapeisPlanejamento.EhDeOrgao(ctx.Papel)) return ctx.OrgaoId ?? throw SemOrgao();
+        if (_permissoes.VeTodosOsOrgaos(ctx))
+            return ctx.OrgaoId ?? throw new ApiException(ErrorCode.PeOrgaoObrigatorio, "Escolha o órgão para ver o PDTIC dele.");
+        throw new ApiException(ErrorCode.PeSemPermissao, "Você ainda não tem papel na Governança Estratégica. Fale com o administrador do módulo.");
+    }
+
+    private async Task<PePdticResponse> RespostaAsync(PePdtic pdtic, PeUserContext ctx)
+    {
+        var orgao = await _context.PgiaOrgaos.AsNoTracking().FirstAsync(o => o.Id == pdtic.OrgaoId);
+        var niveis = await PeTrilhaOrgao.NiveisDosOrgaosAsync(_context, new[] { orgao.Id });
+        return Resposta(pdtic, orgao, niveis.GetValueOrDefault(orgao.Id), ctx);
+    }
+
+    private PePdticResponse Resposta(PePdtic pdtic, PgiaOrgao orgao, PeNivel? nivel, PeUserContext ctx) => new()
+    {
+        Id = pdtic.Id,
+        OrgaoId = orgao.Id,
+        OrgaoSigla = orgao.Sigla,
+        OrgaoNome = orgao.Nome,
+        Versao = pdtic.Versao,
+        Situacao = pdtic.Situacao,
+        VigenciaInicio = pdtic.VigenciaInicio,
+        VigenciaFim = pdtic.VigenciaFim,
+        RegistradoExternamente = pdtic.RegistradoExternamente,
+        AnteriorId = pdtic.AnteriorId,
+        NivelId = nivel?.Id,
+        NivelNome = nivel?.Nome,
+        PodeEditar = _permissoes.PodeEditarPdtic(ctx, orgao.Id) && PeDominios.SituacaoPdtic.Editaveis.Contains(pdtic.Situacao),
+        CriadoEm = pdtic.CriadoEm,
+        CriadoPor = pdtic.CriadoPor
+    };
+}
+
+/// <summary>
+/// Comentários dos passos do PDTIC (E4), pelo quadro de papéis do plano (seção 4.1): o
+/// administrador do módulo, a SGDI e o admin geral comentam (a Secretaria do CGTIC não); a
+/// equipe do órgão responde e marca como resolvido; quem comentou também resolve. Um nível
+/// de resposta. Quem vê o órgão lê.
+/// </summary>
+public class PeComentarioService : IPeComentarioService
+{
+    public const int MaximoTexto = 2000;
+
+    private readonly AppDbContext _context;
+    private readonly IPePermissionService _permissoes;
+
+    public PeComentarioService(AppDbContext context, IPePermissionService permissoes)
+    {
+        _context = context;
+        _permissoes = permissoes;
+    }
+
+    public async Task<List<PeComentarioResponse>> ListarAsync(long pdticId, long? passoId, PeUserContext ctx)
+    {
+        await PePdticService.LerAsync(_context, _permissoes, pdticId, ctx);
+        var query = _context.PeComentarios.AsNoTracking().Where(c => c.PdticId == pdticId);
+        if (passoId != null) query = query.Where(c => c.PassoId == passoId);
+        var todos = await query.OrderBy(c => c.CriadoEm).ThenBy(c => c.Id).ToListAsync();
+        var respostas = todos.Where(c => c.PaiId != null).ToLookup(c => c.PaiId!.Value);
+        return todos.Where(c => c.PaiId == null).Select(c => Resposta(c, respostas[c.Id])).ToList();
+    }
+
+    public async Task<PeComentarioResponse> CriarAsync(long pdticId, PeComentarioCriarDTO dto, PeUserContext ctx)
+    {
+        var pdtic = await PePdticService.LerAsync(_context, _permissoes, pdticId, ctx);
+        var texto = dto.Texto?.Trim();
+        if (string.IsNullOrEmpty(texto)) throw Invalido("Escreva o comentário.");
+        if (texto.Length > MaximoTexto) throw Invalido($"O comentário tem no máximo {MaximoTexto} caracteres (o texto tem {texto.Length}).");
+
+        long passoId;
+        long? paiId = null;
+        if (dto.PaiId != null)
+        {
+            var pai = await _context.PeComentarios.AsNoTracking().FirstOrDefaultAsync(c => c.Id == dto.PaiId && c.PdticId == pdticId)
+                ?? throw new ApiException(ErrorCode.PeComentarioNaoEncontrado, "O comentário respondido não foi encontrado. Atualize a tela.");
+            if (pai.PaiId != null) throw Invalido("Responda ao comentário principal, não a uma resposta.");
+            if (dto.PassoId != null && dto.PassoId != pai.PassoId) throw Invalido("A resposta precisa ser do mesmo passo do comentário.");
+            // Responde a equipe do órgão (e o admin geral, que tem tudo)
+            if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
+                throw new ApiException(ErrorCode.PeSemPermissao, "Quem responde aos comentários é a equipe do órgão.");
+            if (pai.ResolvidoEm != null)
+                throw new ApiException(ErrorCode.PeComentarioResolvido,
+                    "Este comentário já foi resolvido. Para continuar a conversa, faça um comentário novo.");
+            passoId = pai.PassoId;
+            paiId = pai.Id;
+        }
+        else
+        {
+            if (!_permissoes.PodeComentarPdtic(ctx))
+                throw new ApiException(ErrorCode.PeSemPermissao,
+                    "Só a SGDI e o administrador do módulo comentam os passos. A equipe do órgão responde aos comentários.");
+            if (dto.PassoId == null) throw Invalido("Diga em que passo é o comentário.");
+            var trilha = await PeTrilhaOrgao.CarregarAsync(_context, pdtic.OrgaoId, soAtivo: false);
+            if (trilha.Passo(dto.PassoId.Value) == null)
+                throw new ApiException(ErrorCode.PePassoIndisponivel, "Este passo não está na trilha do órgão. Atualize a tela.");
+            passoId = dto.PassoId.Value;
+        }
+
+        var nome = await _context.Users.AsNoTracking().Where(u => u.Id == ctx.UserId).Select(u => u.Nome).FirstOrDefaultAsync();
+        var comentario = new PeComentario
+        {
+            PdticId = pdticId,
+            PassoId = passoId,
+            PaiId = paiId,
+            Texto = texto,
+            AutorEmail = ctx.Email,
+            AutorNome = string.IsNullOrWhiteSpace(nome) ? ctx.Email : nome.Trim(),
+            CriadoEm = DateTime.UtcNow
+        };
+        _context.PeComentarios.Add(comentario);
+        await _context.SaveChangesAsync();
+        return await ConversaAsync(paiId ?? comentario.Id);
+    }
+
+    public async Task<PeComentarioResponse> ResolverAsync(long id, PeUserContext ctx)
+    {
+        var comentario = await _context.PeComentarios.FirstOrDefaultAsync(c => c.Id == id)
+            ?? throw new ApiException(ErrorCode.PeComentarioNaoEncontrado, "Comentário não encontrado. Atualize a tela.");
+        var pdtic = await PePdticService.LerAsync(_context, _permissoes, comentario.PdticId, ctx);
+        if (comentario.PaiId != null) throw Invalido("Só o comentário principal é resolvido: a resposta acompanha o dele.");
+
+        var autor = string.Equals(comentario.AutorEmail.Trim(), ctx.Email.Trim(), StringComparison.OrdinalIgnoreCase);
+        if (!autor && !_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
+            throw new ApiException(ErrorCode.PeSemPermissao, "Quem resolve o comentário é a equipe do órgão ou quem comentou.");
+
+        // Já resolvido: fica como estava (dois cliques não mudam quem resolveu)
+        if (comentario.ResolvidoEm == null)
+        {
+            comentario.ResolvidoEm = DateTime.UtcNow;
+            comentario.ResolvidoPor = ctx.Email;
+            await _context.SaveChangesAsync();
+        }
+        return await ConversaAsync(comentario.Id);
+    }
+
+    /// <summary>O comentário principal com as respostas, em ordem.</summary>
+    private async Task<PeComentarioResponse> ConversaAsync(long id)
+    {
+        var linhas = await _context.PeComentarios.AsNoTracking()
+            .Where(c => c.Id == id || c.PaiId == id)
+            .OrderBy(c => c.CriadoEm).ThenBy(c => c.Id)
+            .ToListAsync();
+        return Resposta(linhas.Single(c => c.Id == id), linhas.Where(c => c.PaiId == id));
+    }
+
+    private static PeComentarioResponse Resposta(PeComentario c, IEnumerable<PeComentario> respostas) => new()
+    {
+        Id = c.Id,
+        PassoId = c.PassoId,
+        Texto = c.Texto,
+        AutorNome = c.AutorNome,
+        AutorEmail = c.AutorEmail,
+        CriadoEm = c.CriadoEm,
+        ResolvidoEm = c.ResolvidoEm,
+        ResolvidoPor = c.ResolvidoPor,
+        Respostas = respostas.Select(r => new PeComentarioRespostaResponse
+        {
+            Id = r.Id,
+            Texto = r.Texto,
+            AutorNome = r.AutorNome,
+            AutorEmail = r.AutorEmail,
+            CriadoEm = r.CriadoEm
+        }).ToList()
+    };
+
+    private static ApiException Invalido(string mensagem) => new(ErrorCode.PeComentarioInvalido, mensagem);
+}

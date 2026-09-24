@@ -154,7 +154,8 @@ public static class PeDominios
         /// <summary>
         /// Catálogos feitos de registros (E3): a chave da seção de onde saem os itens. Os dois
         /// do PETIC-DF leem a versão vigente; o de princípios lê o catálogo do DF. O
-        /// pgia_sistema não é feito de registros (chega com o PDTIC, na E4).
+        /// pgia_sistema não é feito de registros: lê o inventário do PGIA do órgão do PDTIC
+        /// (E4), e a ligação fica no jsonb do registro (lista de ids), não em pe_vinculo.
         /// </summary>
         public static readonly IReadOnlyDictionary<string, string> SecaoDoCatalogo = new Dictionary<string, string>
         {
@@ -165,6 +166,9 @@ public static class PeDominios
 
         /// <summary>Catálogo que sai do PETIC-DF vigente (sem vigente, a ligação fica opcional).</summary>
         public static bool DoPetic(string? catalogo) => catalogo is PeticObjetivo or PeticEixo;
+
+        /// <summary>Catálogo dos sistemas de IA do PGIA (só no PDTIC; ids guardados no jsonb).</summary>
+        public static bool DoPgia(string? catalogo) => catalogo == PgiaSistema;
     }
 
     // ── Referenciais e registros (E3) ──────────────────────────────────────────
@@ -210,15 +214,125 @@ public static class PeDominios
     }
 
     /// <summary>
-    /// Dono dos registros: o catálogo do DF (escopo df, sem dono) ou uma versão do PETIC-DF
-    /// (escopo petic). A E4 acrescenta o PDTIC de cada órgão.
+    /// Dono dos registros: o catálogo do DF (escopo df, sem dono), uma versão do PETIC-DF
+    /// (escopo petic) ou o PDTIC de um órgão (escopo pdtic, desde a E4).
     /// </summary>
     public static class DonoRegistro
     {
         public const string Df = "df";
         public const string Petic = "petic";
+        public const string Pdtic = "pdtic";
 
-        public static readonly string[] Todos = { Df, Petic };
+        public static readonly string[] Todos = { Df, Petic, Pdtic };
+    }
+
+    // ── PDTIC dos órgãos (E4) ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Situação do PDTIC de um órgão (pe_pdtic.situacao), no ciclo da decisão 18 do plano. A
+    /// E4 abre em elaboração; as transições seguintes (envio, deliberação, publicação,
+    /// acompanhamento, encerramento, revisão) chegam na E7.
+    /// </summary>
+    public static class SituacaoPdtic
+    {
+        public const string EmElaboracao = "em_elaboracao";
+        public const string EmAprovacao = "em_aprovacao";
+        public const string Devolvido = "devolvido";
+        public const string Aprovado = "aprovado";
+        public const string Publicado = "publicado";
+        public const string EmAcompanhamento = "em_acompanhamento";
+        public const string Encerrado = "encerrado";
+        public const string Substituido = "substituido";
+
+        public static readonly string[] Todas =
+            { EmElaboracao, EmAprovacao, Devolvido, Aprovado, Publicado, EmAcompanhamento, Encerrado, Substituido };
+
+        // Fora do "atual": o órgão pode abrir outro PDTIC (índice único parcial ux_pe_pdtic_atual)
+        public static readonly string[] Encerradas = { Encerrado, Substituido };
+
+        // A equipe do órgão edita os registros só nestas
+        public static readonly string[] Editaveis = { EmElaboracao, Devolvido };
+
+        /// <summary>Texto para a tela e para as planilhas.</summary>
+        public static string Rotulo(string situacao) => situacao switch
+        {
+            EmElaboracao => "Em elaboração",
+            EmAprovacao => "Em aprovação",
+            Devolvido => "Devolvido para ajuste",
+            Aprovado => "Aprovado",
+            Publicado => "Publicado",
+            EmAcompanhamento => "Em acompanhamento",
+            Encerrado => "Encerrado",
+            Substituido => "Substituído",
+            _ => situacao
+        };
+    }
+
+    /// <summary>
+    /// Situação de cada passo da trilha do PDTIC (GET pdtic/{id}/situacao), calculada no
+    /// servidor. "continuo" vale para os tipos de passo das próximas entregas (documento,
+    /// fluxo, aprovação, envio, deliberação, publicação e monitoramento).
+    /// </summary>
+    public static class SituacaoPasso
+    {
+        public const string Feito = "feito";
+        public const string Pendente = "pendente";
+        // Há comentário aberto no passo
+        public const string Atencao = "atencao";
+        public const string NaoSeAplica = "nao_se_aplica";
+        public const string Continuo = "continuo";
+
+        public static readonly string[] Todas = { Feito, Pendente, Atencao, NaoSeAplica, Continuo };
+    }
+
+    /// <summary>
+    /// Chaves de seções e campos do modelo inicial que o código do PDTIC usa: a vigência
+    /// (copiada para pe_pdtic) e os avisos do guia (fraqueza sem necessidade, ameaça sem
+    /// risco, equipe só de TIC). São itens do sistema: não mudam de chave nem de tipo.
+    /// </summary>
+    public static class ChavePdtic
+    {
+        public const string SecaoAbrangencia = "abrangencia";
+        public const string CampoVigenciaInicio = "vigencia_inicio";
+        public const string CampoVigenciaFim = "vigencia_fim";
+
+        public const string SecaoEquipe = "equipe_elaboracao";
+        public const string CampoTipoArea = "tipo_area";
+        public const string AreaTic = "tic";
+        public const string AreaFinalistica = "finalistica";
+
+        public const string SecaoFraquezas = "swot_fraquezas";
+        public const string SecaoNecessidades = "necessidades";
+        public const string CampoFraqueza = "fraqueza";
+
+        public const string SecaoAmeacas = "swot_ameacas";
+        public const string SecaoRiscos = "riscos";
+        public const string CampoAmeaca = "ameaca";
+    }
+
+    /// <summary>
+    /// Os três temas do decreto que o passo de conferência (tipo conferencia_temas) confere:
+    /// segurança da informação e continuidade (inciso V), transformação digital e
+    /// interoperabilidade (VI) e governança de dados (IX) do art. 12, § 2º. O valor é o da
+    /// opção travada do campo acoes.tema; a justificativa de tema sem ação fica no campo da
+    /// seção temas_sem_acao (formulário opcional do passo 3.4).
+    /// </summary>
+    public static class TemaDecreto
+    {
+        public const string SecaoAcoes = "acoes";
+        public const string CampoTema = "tema";
+        public const string CampoDescricao = "descricao";
+        public const string CampoSituacao = "situacao";
+        public const string SecaoJustificativas = "temas_sem_acao";
+
+        public sealed record Tema(string Valor, string Inciso, string CampoJustificativa);
+
+        public static readonly IReadOnlyList<Tema> Todos = new[]
+        {
+            new Tema("seguranca", "V", "justificativa_seguranca"),
+            new Tema("transformacao_digital", "VI", "justificativa_transformacao"),
+            new Tema("governanca_dados", "IX", "justificativa_dados")
+        };
     }
 
     /// <summary>

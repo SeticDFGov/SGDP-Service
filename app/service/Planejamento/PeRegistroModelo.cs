@@ -5,21 +5,31 @@ using Models.Planejamento;
 namespace service.Planejamento;
 
 /// <summary>
-/// Dono de um conjunto de registros: o catálogo do DF (sem id) ou uma versão do PETIC-DF.
-/// O escopo da seção precisa ser o do dono (df com df, petic com petic). A E4 acrescenta o
-/// PDTIC de cada órgão.
+/// Dono de um conjunto de registros: o catálogo do DF (sem id), uma versão do PETIC-DF ou o
+/// PDTIC de um órgão (E4). O escopo da seção precisa ser o do dono (df com df, petic com
+/// petic, pdtic com pdtic). No PDTIC, a seção e os campos aparecem pela trilha do órgão
+/// (nível e ajustes); nos outros, pela situação geral.
 /// </summary>
-public sealed record PeDono(string Tipo, long? PeticId)
+public sealed record PeDono(string Tipo, long? PeticId, long? PdticId = null)
 {
     public static readonly PeDono Df = new(PeDominios.DonoRegistro.Df, null);
 
     public static PeDono DoPetic(long peticId) => new(PeDominios.DonoRegistro.Petic, peticId);
 
-    /// <summary>Escopo das seções deste dono (pe_secao.escopo).</summary>
-    public string Escopo => Tipo == PeDominios.DonoRegistro.Petic ? PeDominios.Escopo.Petic : PeDominios.Escopo.Df;
+    public static PeDono DoPdtic(long pdticId) => new(PeDominios.DonoRegistro.Pdtic, null, pdticId);
 
-    /// <summary>Chave da sequência dos códigos (pe_registro_sequencia.dono): "df" ou "petic:12".</summary>
-    public string Chave => PeticId is long id ? $"{Tipo}:{id}" : Tipo;
+    public bool EhPdtic => Tipo == PeDominios.DonoRegistro.Pdtic;
+
+    /// <summary>Escopo das seções deste dono (pe_secao.escopo).</summary>
+    public string Escopo => Tipo switch
+    {
+        PeDominios.DonoRegistro.Petic => PeDominios.Escopo.Petic,
+        PeDominios.DonoRegistro.Pdtic => PeDominios.Escopo.Pdtic,
+        _ => PeDominios.Escopo.Df
+    };
+
+    /// <summary>Chave da sequência dos códigos (pe_registro_sequencia.dono): "df", "petic:12" ou "pdtic:7".</summary>
+    public string Chave => (PeticId ?? PdticId) is long id ? $"{Tipo}:{id}" : Tipo;
 }
 
 /// <summary>Um campo que o dono vê, com a obrigatoriedade já resolvida.</summary>
@@ -39,6 +49,9 @@ public sealed class PeSecaoDoDono
     public required List<PeCampoVisivel> Visiveis { get; init; }
 
     public required Dictionary<long, List<PeOpcao>> Opcoes { get; init; }
+
+    // A seção é obrigatória para o dono (situação geral fora do PDTIC; no PDTIC, a da trilha do órgão)
+    public bool Obrigatoria { get; init; }
 
     public IReadOnlyList<PeOpcao> OpcoesDe(PeCampo campo) =>
         Opcoes.TryGetValue(campo.Id, out var lista) ? lista : Array.Empty<PeOpcao>();
@@ -143,4 +156,32 @@ public static class PeRegistroDados
 
     public static bool EhLigacao(PeCampo campo) =>
         campo.Tipo is PeDominios.TipoCampo.LigacaoSecao or PeDominios.TipoCampo.LigacaoCatalogo;
+
+    /// <summary>
+    /// Ligação com o catálogo dos sistemas de IA do PGIA (E4): os ids ficam no jsonb do
+    /// registro (lista de números), porque o destino não é um registro (pe_vinculo liga só
+    /// registros). Na resposta e no corpo, continua em Vinculos, como as outras ligações.
+    /// </summary>
+    public static bool EhLigacaoPgia(PeCampo campo) =>
+        campo.Tipo == PeDominios.TipoCampo.LigacaoCatalogo && PeDominios.Catalogo.DoPgia(PeValores.Texto(campo.Config, "catalogo"));
+
+    /// <summary>Ligação gravada em pe_vinculo (com seção ou com catálogo feito de registros).</summary>
+    public static bool EhLigacaoPorVinculo(PeCampo campo) => EhLigacao(campo) && !EhLigacaoPgia(campo);
+
+    /// <summary>Os ids guardados numa lista do jsonb (ligação com o PGIA), sem repetir, na ordem.</summary>
+    public static List<long> Ids(JsonNode? valor)
+    {
+        var ids = new List<long>();
+        if (valor is not JsonArray lista) return ids;
+        foreach (var item in lista)
+        {
+            if (item is not JsonValue v) continue;
+            long? id = v.TryGetValue<long>(out var l) ? l
+                : v.TryGetValue<int>(out var i) ? i
+                : v.TryGetValue<JsonElement>(out var e) && e.ValueKind == JsonValueKind.Number && e.TryGetInt64(out var el) ? el
+                : null;
+            if (id != null && !ids.Contains(id.Value)) ids.Add(id.Value);
+        }
+        return ids;
+    }
 }

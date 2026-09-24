@@ -30,7 +30,7 @@ public abstract class PeReferenciaisTestBase : PeModeloTestBase
         Petics = new PePeticService(Context, Registros, Permissoes);
         Deliberacoes = new PeDeliberacaoService(Context);
         Arquivos = new PeArquivoService(Context, Permissoes);
-        Planilhas = new PePlanilhaService(Context, Registros);
+        Planilhas = new PePlanilhaService(Context, Registros, Permissoes);
     }
 
     protected Task<PeUserContext> Admin() => ContextoDe(UserPeAdmin);
