@@ -4,6 +4,7 @@ using app.Models;
 using Models.Pgia;
 using Models.Contratacoes;
 using Models.Acesso;
+using Models.Planejamento;
 
 namespace Models
 {
@@ -61,6 +62,11 @@ namespace Models
         // Pedidos de acesso feitos no card da tela inicial: tabela pedido_acesso
         public DbSet<PedidoAcesso> PedidosAcesso { get; set; }
 
+        // Módulo Governança Estratégica: tabelas com prefixo pe_. O cálculo do acesso de
+        // cada requisição nunca lê estas tabelas (regra do deploy, ver PapeisPlanejamento)
+        public DbSet<PePapelUsuario> PePapeisUsuario { get; set; }
+        public DbSet<PePapelUsuarioHistorico> PePapeisUsuarioHistorico { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -96,6 +102,9 @@ namespace Models
 
             // Gestão de acessos por módulo: mapeamento isolado em AcessoModelConfiguration
             modelBuilder.ApplyAcessoConfiguration();
+
+            // Módulo Governança Estratégica: mapeamento isolado em PeModelConfiguration
+            modelBuilder.ApplyPeConfiguration();
         }
     }
 

@@ -10,8 +10,9 @@ namespace Controllers;
 /// Pedidos de acesso aos módulos. Pedir e ver os próprios pedidos vale para
 /// qualquer usuário autenticado, inclusive quem ainda não tem módulo algum (é para
 /// ele que o botão existe), por isso a classe não exige a política de um módulo.
-/// Decidir é da administração (todos os módulos que o sistema libera) e da SGDI
-/// (só o PGIA); quem não decide nada recebe 403 na fila e zero na contagem.
+/// Decidir é da administração (todos os módulos que o sistema libera), da SGDI
+/// (só o PGIA) e do administrador da Governança Estratégica (só esse módulo); quem
+/// não decide nada recebe 403 na fila e zero na contagem.
 /// </summary>
 [ApiController]
 [Authorize]
@@ -74,7 +75,10 @@ public class PedidoAcessoController : ControllerBase
         return Ok(new PedidosAcessoPendentesResponse { Total = total });
     }
 
-    /// <summary>Aprova e libera o módulo na hora. No PGIA, { PapelPgia } define o papel (nulo = agente).</summary>
+    /// <summary>
+    /// Aprova e libera o módulo na hora. No PGIA, { PapelPgia } define o papel (nulo =
+    /// agente). Na Governança Estratégica, { PapelPlanejamento } é obrigatório.
+    /// </summary>
     [HttpPost("{id:long}/aprovar")]
     public async Task<IActionResult> Aprovar(long id, [FromBody] PedidoAcessoAprovarDTO dto)
     {

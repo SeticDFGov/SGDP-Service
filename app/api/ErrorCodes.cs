@@ -93,4 +93,11 @@ public enum ErrorCode
     PedidoAcessoInvalido = 903,
     PedidoAcessoJaDecidido = 904,
     PedidoAcessoForaDoEscopo = 905,
+
+    // Módulo Governança Estratégica (planejamento): faixa 1000 a 1099, respondida como
+    // { Code, Message } com 400, 403, 404 ou 409 (padrão do AcessoController)
+    PeUsuarioNaoEncontrado = 1000,  // 404
+    PePapelInvalido = 1001,         // 400
+    PeSemPermissao = 1002,          // 403
+    PeAutoRebaixamento = 1003,      // 409: pe_admin tirando ou trocando o próprio papel
 }

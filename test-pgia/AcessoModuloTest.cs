@@ -5,13 +5,16 @@ using app.Models;
 using Controllers;
 using Controllers.Contratacoes;
 using Controllers.Pgia;
+using Controllers.Planejamento;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Models;
 using Models.Acesso;
+using Models.Planejamento;
 using Repositorio;
 using Repositorio.Pgia;
 using service;
@@ -124,6 +127,7 @@ public class AcessoModuloTest : PgiaTestBase
     [Theory]
     [InlineData(ModulosSgdp.Demandas)]
     [InlineData(ModulosSgdp.Pgia)]
+    [InlineData(ModulosSgdp.Planejamento)]
     public void ConcessaoDoSistema_DaAcessoAoModulo(string modulo)
     {
         var modulos = AcessoModuloService.CalcularModulos(false, false, false, null, null, new[] { modulo });
@@ -455,6 +459,7 @@ public class AcessoModuloTest : PgiaTestBase
             [typeof(CtrProcessoController)] = ModulosSgdp.PoliticaContratacoes,
             [typeof(CtrManifestacaoController)] = ModulosSgdp.PoliticaContratacoes,
             [typeof(CtrImportacaoController)] = ModulosSgdp.PoliticaContratacoes,
+            [typeof(PePessoasController)] = ModulosSgdp.PoliticaPlanejamento,
             [typeof(PgiaAdminController)] = "role:admin",
             [typeof(CtrAdminController)] = "role:admin",
             [typeof(AcessoController)] = "role:admin",
@@ -599,5 +604,289 @@ public class AcessoModuloTest : PgiaTestBase
             .DefinirAcessoModuloPessoa(Guid.NewGuid(), new AcessoModuloToggleDTO { Ativo = true });
 
         Assert.IsType<NotFoundObjectResult>(resultado);
+    }
+
+    // ── Governança Estratégica (planejamento) ─────────────────────────────────
+
+    /// <summary>Papel e concessão do módulo, gravados juntos (como o serviço grava).</summary>
+    private void DarPapelPlanejamento(User user, string papel)
+    {
+        Context.PePapeisUsuario.Add(new PePapelUsuario
+        {
+            UserId = user.Id,
+            Papel = papel,
+            ConcedidoEm = DateTime.UtcNow,
+            ConcedidoPor = Autor
+        });
+        Conceder(user, ModulosSgdp.Planejamento);
+    }
+
+    private PePapelUsuario? PapelPlanejamentoDe(User user) =>
+        Context.PePapeisUsuario.AsNoTracking().SingleOrDefault(p => p.UserId == user.Id);
+
+    private List<PePapelUsuarioHistorico> HistoricoPlanejamentoDe(User user) =>
+        Context.PePapeisUsuarioHistorico.AsNoTracking().Where(h => h.UserId == user.Id).OrderBy(h => h.Id).ToList();
+
+    [Fact]
+    public void Planejamento_VemDaConcessao_ESomaComAsOutrasFontes()
+    {
+        // CalcularModulos nem recebe o papel do módulo: a concessão basta (regra do deploy)
+        Assert.Equal(new[] { ModulosSgdp.Demandas, ModulosSgdp.Planejamento },
+            AcessoModuloService.CalcularModulos(false, true, false, null, null, new[] { ModulosSgdp.Planejamento }));
+        Assert.Equal(new[] { ModulosSgdp.Pgia, ModulosSgdp.Contratacoes, ModulosSgdp.Planejamento },
+            AcessoModuloService.CalcularModulos(false, false, true, null, PapeisContratacoes.Analise,
+                new[] { ModulosSgdp.Planejamento, ModulosSgdp.Pgia }));
+        Assert.Contains(ModulosSgdp.Planejamento,
+            AcessoModuloService.CalcularModulos(true, false, false, null, null, Array.Empty<string>()));
+    }
+
+    [Fact]
+    public async Task Planejamento_ConcessaoValeNaRequisicao_EAPoliticaDoModuloExigeAClaim()
+    {
+        DarPapelPlanejamento(UserSemPapel, PapeisPlanejamento.Orgao);
+        var transformacao = new ModuloAcessoClaimsTransformation(_service);
+
+        var comModulo = await transformacao.TransformAsync(Principal(UserSemPapel.Email));
+        var semModulo = await new ModuloAcessoClaimsTransformation(_service).TransformAsync(Principal(UserOrgaoSes.Email));
+
+        Assert.Equal(new[] { ModulosSgdp.Planejamento }, comModulo.FindAll(ModulosSgdp.ClaimModulo).Select(c => c.Value));
+
+        var autorizacao = new ServiceCollection()
+            .AddLogging()
+            .AddAuthorization(ModulosSgdp.AdicionarPoliticas)
+            .BuildServiceProvider()
+            .GetRequiredService<IAuthorizationService>();
+        Assert.True((await autorizacao.AuthorizeAsync(comModulo, ModulosSgdp.PoliticaPlanejamento)).Succeeded);
+        Assert.False((await autorizacao.AuthorizeAsync(semModulo, ModulosSgdp.PoliticaPlanejamento)).Succeeded);
+    }
+
+    [Fact]
+    public async Task DefinirAcessos_SemOsCamposDoPlanejamento_NaoMexeNoModulo()
+    {
+        DarPapelPlanejamento(UserSemPapel, PapeisPlanejamento.Sgdi);
+
+        // Front antigo: não conhece o módulo e não manda os campos
+        var resposta = await _service.DefinirAcessosAsync(UserSemPapel.Id, new AcessoUsuarioUpdateDTO { Demandas = true }, Autor);
+
+        Assert.Equal(PapeisPlanejamento.Sgdi, resposta.PapelPlanejamento);
+        Assert.Equal(new[] { ModulosSgdp.Demandas, ModulosSgdp.Planejamento }, resposta.Modulos);
+        Assert.Equal(PapeisPlanejamento.Sgdi, PapelPlanejamentoDe(UserSemPapel)!.Papel);
+        Assert.Single(AcessosDe(UserSemPapel), a => a.Modulo == ModulosSgdp.Planejamento);
+        Assert.Empty(HistoricoPlanejamentoDe(UserSemPapel));
+    }
+
+    [Fact]
+    public async Task DefinirAcessos_PlanejamentoSemPapel_Recusa_SemGravarNada()
+    {
+        var ex = await Assert.ThrowsAsync<ApiException>(() => _service.DefinirAcessosAsync(UserSemPapel.Id,
+            new AcessoUsuarioUpdateDTO { Demandas = true, Planejamento = true }, Autor));
+
+        Assert.Equal((int)ErrorCode.AcessoInvalido, ex.Error.Code);
+        Assert.Empty(AcessosDe(UserSemPapel));
+        Assert.Null(PapelPlanejamentoDe(UserSemPapel));
+    }
+
+    [Fact]
+    public async Task DefinirAcessos_PlanejamentoComPapel_GravaConcessaoPapelEHistorico_EEncerraOPedido()
+    {
+        Context.PedidosAcesso.Add(new PedidoAcesso
+        {
+            UserId = UserSemPapel.Id,
+            Modulo = ModulosSgdp.Planejamento,
+            Situacao = SituacaoPedidoAcesso.Pendente,
+            CriadoEm = DateTime.UtcNow
+        });
+        Context.SaveChanges();
+
+        var resposta = await _service.DefinirAcessosAsync(UserSemPapel.Id,
+            new AcessoUsuarioUpdateDTO { Planejamento = true, PapelPlanejamento = PapeisPlanejamento.Orgao }, Autor);
+
+        Assert.Equal(PapeisPlanejamento.Orgao, resposta.PapelPlanejamento);
+        Assert.Equal(new[] { ModulosSgdp.Planejamento }, resposta.Modulos);
+        Assert.Contains(resposta.Concedidos, c => c.Modulo == ModulosSgdp.Planejamento && c.ConcedidoPor == Autor);
+
+        var historico = Assert.Single(HistoricoPlanejamentoDe(UserSemPapel));
+        Assert.Null(historico.PapelAnterior);
+        Assert.Equal(PapeisPlanejamento.Orgao, historico.PapelNovo);
+        Assert.Equal(PeDominios.OrigemPapel.GestaoAcessos, historico.Origem);
+        Assert.Equal(Autor, historico.AlteradoPor);
+
+        var pedido = Context.PedidosAcesso.AsNoTracking().Single(p => p.UserId == UserSemPapel.Id);
+        Assert.Equal(SituacaoPedidoAcesso.Aprovado, pedido.Situacao);
+        Assert.Equal(Autor, pedido.DecididoPor);
+    }
+
+    [Fact]
+    public async Task DefinirAcessos_PlanejamentoSemPapelNovo_MantemOPapelAtual_ETrocarGravaHistorico()
+    {
+        DarPapelPlanejamento(UserSemPapel, PapeisPlanejamento.Cgtic);
+
+        var mantido = await _service.DefinirAcessosAsync(UserSemPapel.Id, new AcessoUsuarioUpdateDTO { Planejamento = true }, Autor);
+        Assert.Equal(PapeisPlanejamento.Cgtic, mantido.PapelPlanejamento);
+        Assert.Empty(HistoricoPlanejamentoDe(UserSemPapel));
+
+        var trocado = await _service.DefinirAcessosAsync(UserSemPapel.Id,
+            new AcessoUsuarioUpdateDTO { Planejamento = true, PapelPlanejamento = PapeisPlanejamento.Sgdi }, "outro.admin@df.gov.br");
+        Assert.Equal(PapeisPlanejamento.Sgdi, trocado.PapelPlanejamento);
+        var historico = Assert.Single(HistoricoPlanejamentoDe(UserSemPapel));
+        Assert.Equal(PapeisPlanejamento.Cgtic, historico.PapelAnterior);
+        Assert.Equal(PapeisPlanejamento.Sgdi, historico.PapelNovo);
+        Assert.Equal("outro.admin@df.gov.br", PapelPlanejamentoDe(UserSemPapel)!.AlteradoPor);
+    }
+
+    [Fact]
+    public async Task DefinirAcessos_PlanejamentoFalse_TiraAcessoEPapel()
+    {
+        DarPapelPlanejamento(UserSemPapel, PapeisPlanejamento.Admin);
+
+        var resposta = await _service.DefinirAcessosAsync(UserSemPapel.Id, new AcessoUsuarioUpdateDTO { Planejamento = false }, Autor);
+
+        Assert.Null(resposta.PapelPlanejamento);
+        Assert.DoesNotContain(ModulosSgdp.Planejamento, resposta.Modulos);
+        Assert.Null(PapelPlanejamentoDe(UserSemPapel));
+        Assert.DoesNotContain(AcessosDe(UserSemPapel), a => a.Modulo == ModulosSgdp.Planejamento);
+
+        var historico = Assert.Single(HistoricoPlanejamentoDe(UserSemPapel));
+        Assert.Equal(PapeisPlanejamento.Admin, historico.PapelAnterior);
+        Assert.Null(historico.PapelNovo);
+        Assert.Equal(PeDominios.OrigemPapel.GestaoAcessos, historico.Origem);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(false)]
+    public async Task DefinirAcessos_PapelPlanejamentoSemOModulo_Recusa(bool? planejamento)
+    {
+        var ex = await Assert.ThrowsAsync<ApiException>(() => _service.DefinirAcessosAsync(UserSemPapel.Id,
+            new AcessoUsuarioUpdateDTO { Planejamento = planejamento, PapelPlanejamento = PapeisPlanejamento.Sgdi }, Autor));
+
+        Assert.Equal((int)ErrorCode.AcessoInvalido, ex.Error.Code);
+        Assert.Null(PapelPlanejamentoDe(UserSemPapel));
+    }
+
+    [Theory]
+    [InlineData("pgia_sgdi")]
+    [InlineData("pe_xpto")]
+    public async Task DefinirAcessos_PapelPlanejamentoForaDoDominio_Recusa(string papel)
+    {
+        var ex = await Assert.ThrowsAsync<ApiException>(() => _service.DefinirAcessosAsync(UserSemPapel.Id,
+            new AcessoUsuarioUpdateDTO { Planejamento = true, PapelPlanejamento = papel }, Autor));
+
+        Assert.Equal((int)ErrorCode.AcessoInvalido, ex.Error.Code);
+        Assert.Empty(AcessosDe(UserSemPapel));
+    }
+
+    [Fact]
+    public async Task ListarUsuarios_FiltroPlanejamento_ConcessaoOuAdmin_EMostraOPapel()
+    {
+        DarPapelPlanejamento(UserSemPapel, PapeisPlanejamento.Orgao);
+        Conceder(UserAdmin, ModulosSgdp.Administracao, OrigemAcesso.Keycloak);
+
+        var pagina = await _service.ListarUsuariosAsync(new AcessoUsuariosConsulta { Modulo = ModulosSgdp.Planejamento, PageSize = 100 });
+
+        Assert.Equal(new[] { UserAdmin.Id, UserSemPapel.Id }.OrderBy(id => id), pagina.Items.Select(u => u.Id).OrderBy(id => id));
+        var carlos = pagina.Items.Single(u => u.Id == UserSemPapel.Id);
+        Assert.Equal(PapeisPlanejamento.Orgao, carlos.PapelPlanejamento);
+        Assert.Contains(ModulosSgdp.Planejamento, carlos.Modulos);
+        Assert.Contains(carlos.Concedidos, c => c.Modulo == ModulosSgdp.Planejamento);
+        Assert.Null(pagina.Items.Single(u => u.Id == UserAdmin.Id).PapelPlanejamento);
+
+        // Quem tem só a Governança Estratégica não é "sem acesso"
+        var nenhum = await _service.ListarUsuariosAsync(new AcessoUsuariosConsulta { Modulo = AcessoModuloService.FiltroSemAcesso });
+        Assert.DoesNotContain(nenhum.Items, u => u.Id == UserSemPapel.Id);
+
+        Assert.Equal(PapeisPlanejamento.Orgao, (await _service.ObterUsuarioAsync(UserSemPapel.Id)).PapelPlanejamento);
+    }
+
+    [Fact]
+    public async Task DefinirConcessao_Planejamento_Recusa_PorqueOAcessoAndaComOPapel()
+    {
+        var ex = await Assert.ThrowsAsync<ApiException>(() =>
+            _service.DefinirConcessaoAsync(UserSemPapel.Id, ModulosSgdp.Planejamento, true, Autor));
+
+        Assert.Equal((int)ErrorCode.AcessoInvalido, ex.Error.Code);
+        Assert.Empty(AcessosDe(UserSemPapel));
+    }
+
+    /// <summary>
+    /// AppDbContext sem as tabelas pe_ no modelo: simula o intervalo do deploy (código
+    /// publicado, migration ainda não aplicada). Qualquer leitura de tabela pe_ lança.
+    /// </summary>
+    private sealed class ContextoSemTabelasPe : AppDbContext
+    {
+        public ContextoSemTabelasPe(DbContextOptions<AppDbContext> options) : base(options) { }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+            modelBuilder.Ignore<PePapelUsuario>();
+            modelBuilder.Ignore<PePapelUsuarioHistorico>();
+        }
+    }
+
+    /// <summary>
+    /// Regra do deploy: o PR publica o código antes de a migration rodar (só no merge).
+    /// Sem as tabelas pe_, o login, a claims transformation, o /me, a gestão de acessos
+    /// (com o front antigo) e os pedidos de acesso continuam funcionando.
+    /// </summary>
+    [Fact]
+    public async Task IntervaloDoDeploy_SemAsTabelasPe_OCaminhoDeCadaRequisicaoContinuaDePe()
+    {
+        var opcoes = new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options;
+        using var contexto = new ContextoSemTabelasPe(opcoes);
+
+        // A simulação vale: ler a tabela do papel lança
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PePapeisUsuario.AnyAsync());
+
+        var sgdi = new User { KeycloakId = "kc-sgdi", Nome = "Sofia da SGDI", Email = "sofia@sgdi.df.gov.br", PapelPgia = PapeisPgia.Sgdi };
+        var comum = new User { KeycloakId = "kc-comum", Nome = "Carlos Comum", Email = "carlos@df.gov.br" };
+        contexto.Users.AddRange(sgdi, comum);
+        contexto.AcessosModulo.Add(new AcessoModulo
+        {
+            UserId = comum.Id,
+            Modulo = ModulosSgdp.Demandas,
+            Origem = OrigemAcesso.Sistema,
+            ConcedidoEm = DateTime.UtcNow,
+            ConcedidoPor = Autor
+        });
+        contexto.PedidosAcesso.Add(new PedidoAcesso
+        {
+            UserId = comum.Id,
+            Modulo = ModulosSgdp.Pgia,
+            Situacao = SituacaoPedidoAcesso.Pendente,
+            CriadoEm = DateTime.UtcNow
+        });
+        await contexto.SaveChangesAsync();
+
+        var acessos = new AcessoModuloService(contexto);
+        var pedidos = new PedidoAcessoService(contexto, acessos);
+        var principalComum = PrincipalComSub("kc-comum", comum.Email);
+        var principalAdmin = PrincipalComSub("kc-admin", "admin@df.gov.br", Perfis.Admin);
+
+        // Claims transformation (toda requisição)
+        var transformado = await new ModuloAcessoClaimsTransformation(acessos).TransformAsync(principalComum);
+        Assert.Equal(new[] { ModulosSgdp.Demandas }, transformado.FindAll(ModulosSgdp.ClaimModulo).Select(c => c.Value));
+
+        // /me do admin: Modulos já traz o módulo novo, sem ler tabela nova
+        var me = new AuthController(new AuthRepositorio(contexto), null!, Options.Create(new AuthSettings()), acessos)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = principalAdmin } }
+        };
+        var corpo = Assert.IsType<OkObjectResult>(await me.GetCurrentUser()).Value!;
+        Assert.Contains(ModulosSgdp.Planejamento, (List<string>)Propriedade(corpo, "Modulos")!);
+
+        // Gestão de acessos: lista, usuário e o PUT do front antigo (sem os campos novos)
+        var lista = await acessos.ListarUsuariosAsync(new AcessoUsuariosConsulta { PageSize = 100 });
+        Assert.All(lista.Items, u => Assert.Null(u.PapelPlanejamento));
+        var definido = await acessos.DefinirAcessosAsync(comum.Id, new AcessoUsuarioUpdateDTO { Demandas = true, Pgia = true }, Autor);
+        Assert.Equal(new[] { ModulosSgdp.Demandas, ModulosSgdp.Pgia }, definido.Modulos);
+
+        // Pedidos de acesso: quem decide, a fila e pedir
+        Assert.Equal(new[] { ModulosSgdp.Pgia }, (await pedidos.DecisorAsync(PrincipalComSub("kc-sgdi", sgdi.Email))).Modulos);
+        var fila = await pedidos.ListarAsync(new PedidosAcessoConsulta(), await pedidos.DecisorAsync(principalAdmin));
+        Assert.All(fila.Items, p => Assert.Null(p.PapelPlanejamento));
+        var novo = await pedidos.CriarAsync(PrincipalComSub("kc-sgdi", sgdi.Email),
+            new PedidoAcessoCreateDTO { Modulo = ModulosSgdp.Demandas });
+        Assert.Equal(SituacaoPedidoAcesso.Pendente, novo.Situacao);
     }
 }

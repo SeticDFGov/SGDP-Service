@@ -14,7 +14,10 @@ namespace service.Acesso;
 /// Pedidos de acesso aos módulos (tabela pedido_acesso). Escreve direto no
 /// AppDbContext, como o AcessoModuloService, e libera o módulo pelo
 /// <see cref="IAcessoModuloService.PrepararLiberacaoAsync"/>: aprovar um pedido
-/// grava exatamente o que a tela de gestão de acessos gravaria.
+/// grava exatamente o que a tela de gestão de acessos gravaria (na Governança
+/// Estratégica, a concessão com o papel do módulo e a linha do histórico).
+/// Regra do deploy: pe_papel_usuario só é lida para quem tem a claim do módulo
+/// (quem decide) ou quando a página tem pedido do módulo (a fila).
 /// </summary>
 public class PedidoAcessoService : IPedidoAcessoService
 {
@@ -111,13 +114,26 @@ public class PedidoAcessoService : IPedidoAcessoService
         if (principal.IsInRole(Perfis.Admin))
             return new DecisorPedidos(email ?? string.Empty, ModulosSgdp.Liberaveis);
 
+        var user = await UsuarioDoPrincipalAsync(principal);
+        if (user == null)
+            return new DecisorPedidos(email ?? string.Empty, Array.Empty<string>());
+
+        // Quem tem os dois papéis decide os dois módulos
+        var modulos = new List<string>();
+
         // A SGDI cuida das pessoas do PGIA (tela Pessoas e acessos): decide os
         // pedidos desse módulo
-        var user = await UsuarioDoPrincipalAsync(principal);
-        if (user?.PapelPgia == PapeisPgia.Sgdi)
-            return new DecisorPedidos(email ?? user.Email, new[] { ModulosSgdp.Pgia });
+        if (user.PapelPgia == PapeisPgia.Sgdi)
+            modulos.Add(ModulosSgdp.Pgia);
 
-        return new DecisorPedidos(email ?? string.Empty, Array.Empty<string>());
+        // O administrador da Governança Estratégica decide os pedidos do módulo. Regra
+        // do deploy: pe_papel_usuario só é consultada para quem tem a claim do módulo, e
+        // a concessão que dá essa claim só existe depois da migration
+        if (principal.HasClaim(ModulosSgdp.ClaimModulo, ModulosSgdp.Planejamento)
+            && await _context.PePapeisUsuario.AnyAsync(p => p.UserId == user.Id && p.Papel == PapeisPlanejamento.Admin))
+            modulos.Add(ModulosSgdp.Planejamento);
+
+        return new DecisorPedidos(email ?? user.Email, modulos);
     }
 
     public async Task<PagedResponse<PedidoAcessoResponse>> ListarAsync(PedidosAcessoConsulta consulta, DecisorPedidos decisor)
@@ -158,7 +174,9 @@ public class PedidoAcessoService : IPedidoAcessoService
             .AsNoTracking()
             .ToListAsync();
 
-        return new PagedResponse<PedidoAcessoResponse>(pedidos.Select(Mapear).ToList(), total, page, pageSize);
+        var papeisPlanejamento = await PapeisPlanejamentoAsync(pedidos);
+        return new PagedResponse<PedidoAcessoResponse>(
+            pedidos.Select(p => Mapear(p, papeisPlanejamento)).ToList(), total, page, pageSize);
     }
 
     public async Task<int> ContarPendentesAsync(DecisorPedidos decisor, string? modulo) =>
@@ -168,9 +186,11 @@ public class PedidoAcessoService : IPedidoAcessoService
     {
         var pedido = await PedidoParaDecidirAsync(pedidoId, decisor);
         var papel = string.IsNullOrWhiteSpace(dto.PapelPgia) ? null : dto.PapelPgia.Trim();
+        var papelPlanejamento = PapelPlanejamentoDaAprovacao(pedido.Modulo, dto.PapelPlanejamento);
 
         // A mesma gravação da tela de gestão de acessos (valida o módulo e o papel)
-        await _acessos.PrepararLiberacaoAsync(pedido.UserId, pedido.Modulo, papel, decisor.Email);
+        await _acessos.PrepararLiberacaoAsync(pedido.UserId, pedido.Modulo, papel, decisor.Email,
+            papelPlanejamento, pedido.Id);
 
         pedido.Situacao = SituacaoPedidoAcesso.Aprovado;
         pedido.DecididoEm = DateTime.UtcNow;
@@ -202,6 +222,52 @@ public class PedidoAcessoService : IPedidoAcessoService
     }
 
     // ── Apoio ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Na Governança Estratégica o acesso vem junto com o papel do módulo: aprovar exige
+    /// um dos cinco papéis. Nos outros módulos o campo tem de vir vazio.
+    /// </summary>
+    private static string? PapelPlanejamentoDaAprovacao(string modulo, string? informado)
+    {
+        var papel = string.IsNullOrWhiteSpace(informado) ? null : informado.Trim();
+
+        if (modulo != ModulosSgdp.Planejamento)
+        {
+            if (papel != null)
+                throw new ApiException(ErrorCode.PedidoAcessoInvalido,
+                    "O papel na Governança Estratégica só vale para os pedidos desse módulo.");
+            return null;
+        }
+
+        if (papel == null)
+            throw new ApiException(ErrorCode.PedidoAcessoInvalido,
+                "Escolha o papel da pessoa na Governança Estratégica para aprovar o pedido.");
+
+        if (!PapeisPlanejamento.EhValido(papel))
+            throw new ApiException(ErrorCode.PedidoAcessoInvalido,
+                $"Papel na Governança Estratégica inválido: {papel}. Escolha um dos cinco papéis do módulo.");
+
+        return papel;
+    }
+
+    /// <summary>
+    /// Papel atual na Governança Estratégica de quem pediu esse módulo, em lote (uma
+    /// consulta por página). Sem pedido do módulo na página a tabela nem é lida: antes
+    /// da migration o CHECK antigo de pedido_acesso não deixa existir pedido dele.
+    /// </summary>
+    private async Task<Dictionary<Guid, string>> PapeisPlanejamentoAsync(IEnumerable<PedidoAcesso> pedidos)
+    {
+        var ids = pedidos
+            .Where(p => p.Modulo == ModulosSgdp.Planejamento)
+            .Select(p => p.UserId)
+            .Distinct()
+            .ToList();
+        if (ids.Count == 0) return new Dictionary<Guid, string>();
+
+        return await _context.PePapeisUsuario.AsNoTracking()
+            .Where(p => ids.Contains(p.UserId))
+            .ToDictionaryAsync(p => p.UserId, p => p.Papel);
+    }
 
     private async Task<PedidoAcesso> PedidoParaDecidirAsync(long pedidoId, DecisorPedidos decisor)
     {
@@ -241,7 +307,7 @@ public class PedidoAcessoService : IPedidoAcessoService
         var pedido = await _context.PedidosAcesso.AsNoTracking()
             .Include(p => p.User).ThenInclude(u => u!.Unidade)
             .FirstAsync(p => p.Id == pedidoId);
-        return Mapear(pedido);
+        return Mapear(pedido, await PapeisPlanejamentoAsync(new[] { pedido }));
     }
 
     /// <summary>
@@ -291,7 +357,7 @@ public class PedidoAcessoService : IPedidoAcessoService
         MotivoRecusa = p.Situacao == SituacaoPedidoAcesso.Recusado ? p.MotivoRecusa : null
     };
 
-    private static PedidoAcessoResponse Mapear(PedidoAcesso p) => new()
+    private static PedidoAcessoResponse Mapear(PedidoAcesso p, IReadOnlyDictionary<Guid, string> papeisPlanejamento) => new()
     {
         Id = p.Id,
         UserId = p.UserId,
@@ -305,6 +371,8 @@ public class PedidoAcessoService : IPedidoAcessoService
         DecididoEm = p.DecididoEm,
         DecididoPor = p.DecididoPor,
         PapelPgia = p.PapelPgia,
+        // O papel de hoje no módulo, para a fila mostrar (pedido_acesso não guarda esse papel)
+        PapelPlanejamento = p.Modulo == ModulosSgdp.Planejamento ? papeisPlanejamento.GetValueOrDefault(p.UserId) : null,
         MotivoRecusa = p.MotivoRecusa
     };
 }

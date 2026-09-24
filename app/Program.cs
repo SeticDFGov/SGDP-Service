@@ -141,6 +141,12 @@ builder.Services.AddScoped<ICtrProcessoService, service.Contratacoes.CtrProcesso
 builder.Services.AddScoped<ICtrManifestacaoService, service.Contratacoes.CtrManifestacaoService>();
 builder.Services.AddScoped<ICtrImportacaoService, service.Contratacoes.CtrImportacaoService>();
 
+// Serviços do módulo Governança Estratégica (planejamento). O cálculo do acesso de
+// cada requisição não passa por eles: nenhuma tabela pe_ é lida fora das actions do
+// módulo, das telas de acesso e da fila de pedidos (regra do deploy)
+builder.Services.AddScoped<IPePermissionService, service.Planejamento.PePermissionService>();
+builder.Services.AddScoped<IPePessoaService, service.Planejamento.PePessoaService>();
+
 builder.Services.AddScoped<HttpClient>();
 
 builder.Services.AddEndpointsApiExplorer();

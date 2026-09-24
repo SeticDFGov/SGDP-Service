@@ -1,4 +1,4 @@
-# Rodar o SGDP + módulos PGIA e Supervisão Contínua das Contratações localmente (antes de subir para produção)
+# Rodar o SGDP + módulos PGIA, Supervisão Contínua das Contratações e Governança Estratégica localmente (antes de subir para produção)
 
 **Totalmente independente — não precisa de Keycloak.** Guia validado nesta máquina em 28/08/2026: migrations das fases 0 a 5 aplicadas num PostgreSQL 16 real, API de pé em modo local, login de teste, órgão PGIA criado com os prazos instanciados e endpoint público anônimo respondendo.
 
@@ -18,7 +18,9 @@ docker run -d --name sgdp-local-pg -e POSTGRES_USER=sgdp_user -e POSTGRES_PASSWO
 
 Usuário/senha/banco casam com `app/appsettings.Development.json` (`Host=localhost;Port=5432;Database=postgres;Username=sgdp_user;Password=sgdp_password_dev`). Alternativa: `docker compose up -d postgres` na raiz do `SGDP-Service-main` (exige `.env` copiado do `.env.example` com `POSTGRES_USER=user` e `POSTGRES_PASSWORD=password`).
 
-## 2. Migrations (cria as tabelas do SGDP, as 24 `pgia_*` com seeds e as 2 `ctr_*`)
+## 2. Migrations (cria as tabelas do SGDP, as 24 `pgia_*` com seeds, as 2 `ctr_*` e as 2 `pe_*`)
+
+A última é a `20260924151108_PeAcessoPapeis` (Governança Estratégica: `pe_papel_usuario`, `pe_papel_usuario_historico` e os CHECKs de módulo com `planejamento`). Sem ela aplicada, a API sobe, o login e os outros módulos funcionam, mas as telas da Governança Estratégica falham (regra do deploy, ver o `CLAUDE.md`).
 
 ```bash
 cd SGDP-Service-main/app
@@ -64,12 +66,13 @@ Abre em `http://localhost:4200` (o `environment.ts` já aponta para `http://loca
 
 ## 5. Entrar com usuários de teste
 
-Abra `http://localhost:4200/auth/local` (há um link "entrar no modo local" na tela de login quando o build não é de produção). **Desde o isolamento entre módulos (2026-09-21), toda persona entra pela tela inicial `/inicio`**, com os cards dos quatro módulos: os liberados ficam ativos e os demais em cinza. A tela tem estes blocos:
+Abra `http://localhost:4200/auth/local` (há um link "entrar no modo local" na tela de login quando o build não é de produção). **Desde o isolamento entre módulos (2026-09-21), toda persona entra pela tela inicial `/inicio`**, com os cards dos módulos: os liberados ficam ativos e os demais em cinza (desde 2026-09-24 a Governança Estratégica é o primeiro card; a Administração só aparece para o admin). A tela tem estes blocos:
 
 - **Isolamento entre módulos**: Bruna Básico (sem acesso algum: os três módulos em cinza, sem o card da Administração, e o botão "Pedir acesso"), Débora Demandas (só Demandas, em consulta, por concessão do sistema) e Marina Multimódulo (gestor + papel de órgão no PGIA + Supervisão Contínua: três módulos).
 
 - **Papéis do PGIA** — uma persona por papel do decreto; pelo card do PGIA cada uma abre a **trilha numerada do seu papel**: Otávio (`pgia_orgao` → área do órgão), Sofia (`pgia_sgdi` → governança central), Caio (`pgia_cgtic` → comitê), Alice (agente pública **sem** papel → registrar uso/incidentes do art. 13), Aurélio (`pgia_auditoria` → auditorias designadas) e o botão **Cidadão** (página pública, sem login). O backend provisiona tudo sozinho no primeiro clique: papel, unidade e um "Órgão de Teste do PGIA" (sigla TESTE) já com os 6 prazos de adesão.
 - **Supervisão Contínua das Contratações** — persona **Clara das Contratações** (`contratacoes@local.teste`, perfil `basico` + papel `ctr_analise`), que entra direto em `/analises`: processos de contratações de TIC, painel, manifestações ao TCDF e importação da planilha. O backend provisiona o papel e a unidade central de teste no primeiro clique.
+- **Governança Estratégica** (desde 2026-09-24): uma persona por papel do módulo, todas com perfil `basico` e o campo `PapelPlanejamento` no login local: administradora do módulo (`pe_admin`, vê "Pessoas e acessos" e a fila de pedidos do módulo), equipe da SGDI (`pe_sgdi`), Secretaria do CGTIC (`pe_cgtic`), equipe do órgão (`pe_orgao`) e consulta do mesmo órgão (`pe_orgao_consulta`). O backend grava o papel e a concessão do módulo juntos (com histórico, origem `modo_local`); as duas personas de órgão ficam na unidade `SES`, com o órgão SES ("Secretaria de Estado de Saúde", criado no primeiro clique com os prazos do PGIA), e as globais na Unidade Central de Teste. Os nomes estão na tela `/auth/local`. No formulário livre, "Conceder Governança Estratégica" manda o papel escolhido (`planejamento` em `ConcederModulos` sem papel só vale para quem já tem um).
 - **Perfis do SGDP**: Ana Admin (todos os módulos, inclusive Administração, com Pedidos de acesso e Gestão de acessos) e Gabriel Gestor (só Demandas, criando e editando).
 - **Formulário livre** — nome + e-mail + perfil + papel PGIA opcional + papel de supervisão contínua opcional + concessões do sistema (Demandas e/ou PGIA de agente).
 
@@ -117,6 +120,18 @@ Para trocar de usuário: Sair → `/auth/local` de novo. Papéis também podem s
 8. **Sofia da SGDI**: 6 etapas, a fila de homologação como passo 3.1 e, em 1.2 "Pessoas e acessos", a fila de pedidos do PGIA e a coluna "Entra no PGIA?" com o botão "Liberar como agente".
 9. **Ana Admin** no PGIA: "Ver a trilha de" alterna entre as trilhas de órgão, SGDI, CGTIC, auditoria e agente.
 
+## 9. Roteiro de fumaça da Governança Estratégica (E1: base e acesso)
+
+Antes, aplique a migration `20260924151108_PeAcessoPapeis` (comando da seção 2).
+
+1. **Ana Admin** → `/inicio`: cinco cards, com a Governança Estratégica primeiro. `GET /api/Auth/me` traz `planejamento` em `Modulos`.
+2. **Pedido com papel**: a Bruna Básico pede a Governança Estratégica. A administradora do módulo vê o pedido em "Pessoas e acessos" (e a Ana, em Pedidos de acesso) e aprova escolhendo um dos cinco papéis. Aprovar sem papel volta 400 com a mensagem "Escolha o papel da pessoa na Governança Estratégica para aprovar o pedido." Aprovado, a Bruna vê o módulo ativo sem novo login, e `GET api/planejamento/meu-papel` traz o papel.
+3. **Quem decide**: a administradora do módulo só vê os pedidos da Governança Estratégica (aprovar um de Demandas volta 403); a Sofia da SGDI continua decidindo só o PGIA.
+4. **Pessoas e acessos** (administradora do módulo ou Ana Admin): a lista mostra quem tem papel, com o órgão; os filtros por nome ou e-mail e por papel funcionam; a busca de candidatas começa com 3 letras e não mostra quem já tem papel; trocar o papel e tirar o acesso refletem na hora. A administradora tentando tirar ou trocar o próprio papel recebe 409 ("Você não pode tirar nem trocar o seu próprio papel de administrador do módulo..."). As outras personas do módulo recebem 403 nessa tela.
+5. **Gestão de acessos** (Ana Admin): a coluna da Governança Estratégica mostra o papel; ligar o módulo sem papel volta 400; desligar tira o papel junto. Salvar outro módulo sem mexer na Governança Estratégica não muda o acesso nem o papel.
+6. **Personas de órgão**: equipe e consulta do órgão entram com o órgão SES em `meu-papel` (`OrgaoSigla` "SES"). Dar papel de órgão a alguém sem unidade grava e volta com `OrgaoId` nulo (a tela avisa).
+7. **Regressão**: os outros módulos, o login e os pedidos de Demandas, PGIA e Supervisão Contínua seguem como antes.
+
 ## Limpeza
 
 ```bash
@@ -127,4 +142,4 @@ docker rm -f sgdp-local-pg sgdp-api
 
 - **Nunca** ligue `Auth__ModoLocal` fora da sua máquina: em produção a aplicação nem sobe com a flag, e em qualquer ambiente compartilhado ela abriria login sem senha. Sem a flag, a API volta ao Keycloak normalmente.
 - Os usuários do modo local usam e-mails `*.local.teste` — não misture com dados reais.
-- O projeto `test/` legado não compila (problema conhecido). Os testes do PGIA rodam com `dotnet test test-pgia/test-pgia.csproj` e os do módulo Supervisão Contínua das Contratações com `dotnet test test-contratacoes/test-contratacoes.csproj`.
+- O projeto `test/` legado não compila (problema conhecido). Os testes do PGIA rodam com `dotnet test test-pgia/test-pgia.csproj`, os do módulo Supervisão Contínua das Contratações com `dotnet test test-contratacoes/test-contratacoes.csproj` e os da Governança Estratégica com `dotnet test test-planejamento/test-planejamento.csproj`.
