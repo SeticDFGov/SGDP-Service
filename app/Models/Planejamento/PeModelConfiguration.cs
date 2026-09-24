@@ -69,5 +69,385 @@ public static class PeModelConfiguration
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("fk_pe_papel_usuario_historico_user");
         });
+
+        modelBuilder.ApplyPeModeloConfiguration();
+    }
+
+    // ── Modelo configurável e níveis de maturidade (E2) ──────────────────────
+
+    // Chaves: minúsculas e números, com hífen (etapa e passo) ou sublinhado (o resto).
+    // A chave do campo é a chave do valor no jsonb dos registros
+    private const string ChaveComHifen = "^[a-z][a-z0-9-]*$";
+    private const string ChaveComSublinhado = "^[a-z][a-z0-9_]*$";
+
+    // "I" a "IX", ou vários separados por vírgula ("V,VI,IX")
+    private const string Incisos = "^(I|II|III|IV|V|VI|VII|VIII|IX)(,(I|II|III|IV|V|VI|VII|VIII|IX))*$";
+
+    private static string SituacaoOuNula(string coluna) =>
+        $"{coluna} IS NULL OR {EmLista(coluna, PeDominios.Situacao.Todas)}";
+
+    private static void Auditoria<T>(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<T> entity)
+        where T : class
+    {
+        entity.Property<DateTime>("CriadoEm").HasColumnName("criado_em").HasDefaultValueSql("NOW()");
+        entity.Property<string>("CriadoPor").HasColumnName("criado_por").HasMaxLength(200).IsRequired();
+        entity.Property<DateTime?>("AlteradoEm").HasColumnName("alterado_em");
+        entity.Property<string?>("AlteradoPor").HasColumnName("alterado_por").HasMaxLength(200);
+    }
+
+    private static void ApplyPeModeloConfiguration(this ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PeNivel>(entity =>
+        {
+            entity.ToTable("pe_nivel", t =>
+                t.HasCheckConstraint("ck_pe_nivel_codigo", $"codigo ~ '{ChaveComSublinhado}'"));
+
+            entity.HasKey(n => n.Id).HasName("pk_pe_nivel");
+            entity.Property(n => n.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(n => n.Codigo).HasColumnName("codigo").HasMaxLength(40).IsRequired();
+            entity.Property(n => n.Nome).HasColumnName("nome").HasMaxLength(100).IsRequired();
+            entity.Property(n => n.Descricao).HasColumnName("descricao").HasMaxLength(1000);
+            entity.Property(n => n.Ordem).HasColumnName("ordem");
+            entity.Property(n => n.Ativo).HasColumnName("ativo");
+            Auditoria(entity);
+
+            entity.HasIndex(n => n.Codigo).IsUnique().HasDatabaseName("ux_pe_nivel_codigo");
+        });
+
+        modelBuilder.Entity<PeEtapa>(entity =>
+        {
+            entity.ToTable("pe_etapa", t =>
+                t.HasCheckConstraint("ck_pe_etapa_chave", $"chave ~ '{ChaveComHifen}'"));
+
+            entity.HasKey(e => e.Id).HasName("pk_pe_etapa");
+            entity.Property(e => e.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(e => e.Chave).HasColumnName("chave").HasMaxLength(60).IsRequired();
+            entity.Property(e => e.Titulo).HasColumnName("titulo").HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Descricao).HasColumnName("descricao").HasMaxLength(1000);
+            entity.Property(e => e.ReferenciaGuia).HasColumnName("referencia_guia").HasMaxLength(100);
+            entity.Property(e => e.Ordem).HasColumnName("ordem");
+            entity.Property(e => e.Sistema).HasColumnName("sistema");
+            Auditoria(entity);
+
+            entity.HasIndex(e => e.Chave).IsUnique().HasDatabaseName("ux_pe_etapa_chave");
+        });
+
+        modelBuilder.Entity<PePasso>(entity =>
+        {
+            entity.ToTable("pe_passo", t =>
+            {
+                t.HasCheckConstraint("ck_pe_passo_tipo", EmLista("tipo", PeDominios.TipoPasso.Todos));
+                t.HasCheckConstraint("ck_pe_passo_inciso", $"inciso_decreto IS NULL OR inciso_decreto ~ '{Incisos}'");
+                // "etapa.passo", com hífen nas duas partes ("preparacao.abrangencia")
+                t.HasCheckConstraint("ck_pe_passo_chave", "chave ~ '^[a-z][a-z0-9-]*\\.[a-z0-9][a-z0-9-]*$'");
+            });
+
+            entity.HasKey(p => p.Id).HasName("pk_pe_passo");
+            entity.Property(p => p.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(p => p.EtapaId).HasColumnName("etapa_id");
+            entity.Property(p => p.Chave).HasColumnName("chave").HasMaxLength(100).IsRequired();
+            entity.Property(p => p.Titulo).HasColumnName("titulo").HasMaxLength(200).IsRequired();
+            entity.Property(p => p.OQueFazer).HasColumnName("o_que_fazer").HasMaxLength(2000).IsRequired();
+            entity.Property(p => p.BaseLegal).HasColumnName("base_legal").HasMaxLength(200);
+            entity.Property(p => p.ReferenciaGuia).HasColumnName("referencia_guia").HasMaxLength(100);
+            entity.Property(p => p.Tipo).HasColumnName("tipo").HasMaxLength(30).IsRequired();
+            entity.Property(p => p.IncisoDecreto).HasColumnName("inciso_decreto").HasMaxLength(40);
+            entity.Property(p => p.Travado).HasColumnName("travado");
+            entity.Property(p => p.AceitaNaoSeAplica).HasColumnName("aceita_nao_se_aplica");
+            entity.Property(p => p.Ordem).HasColumnName("ordem");
+            entity.Property(p => p.Sistema).HasColumnName("sistema");
+            entity.Property(p => p.ExcluidoEm).HasColumnName("excluido_em");
+            Auditoria(entity);
+
+            entity.HasIndex(p => p.Chave).IsUnique().HasDatabaseName("ux_pe_passo_chave");
+            entity.HasIndex(p => new { p.EtapaId, p.Ordem }).HasDatabaseName("ix_pe_passo_etapa");
+
+            // Etapa não é apagada nesta entrega; se um dia for, não leva os passos junto
+            entity.HasOne(p => p.Etapa)
+                .WithMany(e => e.Passos)
+                .HasForeignKey(p => p.EtapaId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_passo_etapa");
+        });
+
+        modelBuilder.Entity<PePassoNivel>(entity =>
+        {
+            entity.ToTable("pe_passo_nivel", t =>
+                t.HasCheckConstraint("ck_pe_passo_nivel_situacao", EmLista("situacao", PeDominios.Situacao.Todas)));
+
+            entity.HasKey(n => new { n.PassoId, n.NivelId }).HasName("pk_pe_passo_nivel");
+            entity.Property(n => n.PassoId).HasColumnName("passo_id");
+            entity.Property(n => n.NivelId).HasColumnName("nivel_id");
+            entity.Property(n => n.Situacao).HasColumnName("situacao").HasMaxLength(20).IsRequired();
+
+            entity.HasIndex(n => n.NivelId).HasDatabaseName("ix_pe_passo_nivel_nivel");
+
+            entity.HasOne(n => n.Passo)
+                .WithMany(p => p.Niveis)
+                .HasForeignKey(n => n.PassoId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_passo_nivel_passo");
+
+            entity.HasOne(n => n.Nivel)
+                .WithMany()
+                .HasForeignKey(n => n.NivelId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_passo_nivel_nivel");
+        });
+
+        modelBuilder.Entity<PeSecao>(entity =>
+        {
+            entity.ToTable("pe_secao", t =>
+            {
+                t.HasCheckConstraint("ck_pe_secao_escopo", EmLista("escopo", PeDominios.Escopo.Todos));
+                t.HasCheckConstraint("ck_pe_secao_tipo", EmLista("tipo", PeDominios.TipoSecao.Todos));
+                t.HasCheckConstraint("ck_pe_secao_inciso", $"inciso_decreto IS NULL OR inciso_decreto ~ '{Incisos}'");
+                t.HasCheckConstraint("ck_pe_secao_chave", $"chave ~ '{ChaveComSublinhado}'");
+                t.HasCheckConstraint("ck_pe_secao_situacao_geral", SituacaoOuNula("situacao_geral"));
+                // Seção do PDTIC pertence a um passo e depende do nível; as do PETIC-DF e do
+                // DF não têm passo e usam a situação geral
+                t.HasCheckConstraint("ck_pe_secao_escopo_passo",
+                    $"(escopo = '{PeDominios.Escopo.Pdtic}') = (passo_id IS NOT NULL)");
+                t.HasCheckConstraint("ck_pe_secao_escopo_situacao",
+                    $"(escopo = '{PeDominios.Escopo.Pdtic}') = (situacao_geral IS NULL)");
+            });
+
+            entity.HasKey(s => s.Id).HasName("pk_pe_secao");
+            entity.Property(s => s.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(s => s.PassoId).HasColumnName("passo_id");
+            entity.Property(s => s.Escopo).HasColumnName("escopo").HasMaxLength(10).IsRequired();
+            entity.Property(s => s.Chave).HasColumnName("chave").HasMaxLength(60).IsRequired();
+            entity.Property(s => s.Titulo).HasColumnName("titulo").HasMaxLength(200).IsRequired();
+            entity.Property(s => s.Ajuda).HasColumnName("ajuda").HasMaxLength(2000);
+            entity.Property(s => s.Tipo).HasColumnName("tipo").HasMaxLength(20).IsRequired();
+            entity.Property(s => s.PrefixoCodigo).HasColumnName("prefixo_codigo").HasMaxLength(10);
+            entity.Property(s => s.Ordem).HasColumnName("ordem");
+            entity.Property(s => s.NoDocumento).HasColumnName("no_documento");
+            entity.Property(s => s.NaPlanilha).HasColumnName("na_planilha");
+            entity.Property(s => s.Travada).HasColumnName("travada");
+            entity.Property(s => s.IncisoDecreto).HasColumnName("inciso_decreto").HasMaxLength(40);
+            entity.Property(s => s.SituacaoGeral).HasColumnName("situacao_geral").HasMaxLength(20);
+            entity.Property(s => s.Sistema).HasColumnName("sistema");
+            entity.Property(s => s.ExcluidoEm).HasColumnName("excluido_em");
+            Auditoria(entity);
+
+            entity.HasIndex(s => s.Chave).IsUnique().HasDatabaseName("ux_pe_secao_chave");
+            entity.HasIndex(s => new { s.PassoId, s.Ordem }).HasDatabaseName("ix_pe_secao_passo");
+
+            entity.HasOne(s => s.Passo)
+                .WithMany(p => p.Secoes)
+                .HasForeignKey(s => s.PassoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_secao_passo");
+        });
+
+        modelBuilder.Entity<PeSecaoNivel>(entity =>
+        {
+            entity.ToTable("pe_secao_nivel", t =>
+                t.HasCheckConstraint("ck_pe_secao_nivel_situacao", EmLista("situacao", PeDominios.Situacao.Todas)));
+
+            entity.HasKey(n => new { n.SecaoId, n.NivelId }).HasName("pk_pe_secao_nivel");
+            entity.Property(n => n.SecaoId).HasColumnName("secao_id");
+            entity.Property(n => n.NivelId).HasColumnName("nivel_id");
+            entity.Property(n => n.Situacao).HasColumnName("situacao").HasMaxLength(20).IsRequired();
+
+            entity.HasIndex(n => n.NivelId).HasDatabaseName("ix_pe_secao_nivel_nivel");
+
+            entity.HasOne(n => n.Secao)
+                .WithMany(s => s.Niveis)
+                .HasForeignKey(n => n.SecaoId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_secao_nivel_secao");
+
+            entity.HasOne(n => n.Nivel)
+                .WithMany()
+                .HasForeignKey(n => n.NivelId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_secao_nivel_nivel");
+        });
+
+        modelBuilder.Entity<PeCampo>(entity =>
+        {
+            entity.ToTable("pe_campo", t =>
+            {
+                t.HasCheckConstraint("ck_pe_campo_tipo", EmLista("tipo", PeDominios.TipoCampo.Todos));
+                t.HasCheckConstraint("ck_pe_campo_chave", $"chave ~ '{ChaveComSublinhado}'");
+                t.HasCheckConstraint("ck_pe_campo_largura",
+                    $"largura IS NULL OR {EmLista("largura", PeDominios.Largura.Todas)}");
+                t.HasCheckConstraint("ck_pe_campo_situacao_geral", SituacaoOuNula("situacao_geral"));
+            });
+
+            entity.HasKey(c => c.Id).HasName("pk_pe_campo");
+            entity.Property(c => c.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(c => c.SecaoId).HasColumnName("secao_id");
+            entity.Property(c => c.Chave).HasColumnName("chave").HasMaxLength(60).IsRequired();
+            entity.Property(c => c.Rotulo).HasColumnName("rotulo").HasMaxLength(200).IsRequired();
+            entity.Property(c => c.Ajuda).HasColumnName("ajuda").HasMaxLength(2000);
+            entity.Property(c => c.Tipo).HasColumnName("tipo").HasMaxLength(30).IsRequired();
+            entity.Property(c => c.Config).HasColumnName("config").HasColumnType("jsonb").IsRequired();
+            entity.Property(c => c.Principal).HasColumnName("principal");
+            entity.Property(c => c.Travado).HasColumnName("travado");
+            entity.Property(c => c.Ordem).HasColumnName("ordem");
+            entity.Property(c => c.NoDocumento).HasColumnName("no_documento");
+            entity.Property(c => c.NaPlanilha).HasColumnName("na_planilha");
+            entity.Property(c => c.Largura).HasColumnName("largura").HasMaxLength(10);
+            entity.Property(c => c.SituacaoGeral).HasColumnName("situacao_geral").HasMaxLength(20);
+            entity.Property(c => c.Sistema).HasColumnName("sistema");
+            entity.Property(c => c.ExcluidoEm).HasColumnName("excluido_em");
+            Auditoria(entity);
+
+            // A chave é única na seção, inclusive entre os apagados: os dados de um campo
+            // apagado continuam no jsonb com a chave dele
+            entity.HasIndex(c => new { c.SecaoId, c.Chave }).IsUnique().HasDatabaseName("ux_pe_campo_secao_chave");
+
+            entity.HasOne(c => c.Secao)
+                .WithMany(s => s.Campos)
+                .HasForeignKey(c => c.SecaoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_campo_secao");
+        });
+
+        modelBuilder.Entity<PeCampoNivel>(entity =>
+        {
+            entity.ToTable("pe_campo_nivel", t =>
+                t.HasCheckConstraint("ck_pe_campo_nivel_situacao", EmLista("situacao", PeDominios.Situacao.Todas)));
+
+            entity.HasKey(n => new { n.CampoId, n.NivelId }).HasName("pk_pe_campo_nivel");
+            entity.Property(n => n.CampoId).HasColumnName("campo_id");
+            entity.Property(n => n.NivelId).HasColumnName("nivel_id");
+            entity.Property(n => n.Situacao).HasColumnName("situacao").HasMaxLength(20).IsRequired();
+
+            entity.HasIndex(n => n.NivelId).HasDatabaseName("ix_pe_campo_nivel_nivel");
+
+            entity.HasOne(n => n.Campo)
+                .WithMany(c => c.Niveis)
+                .HasForeignKey(n => n.CampoId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_campo_nivel_campo");
+
+            entity.HasOne(n => n.Nivel)
+                .WithMany()
+                .HasForeignKey(n => n.NivelId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_campo_nivel_nivel");
+        });
+
+        modelBuilder.Entity<PeOpcao>(entity =>
+        {
+            entity.ToTable("pe_opcao", t =>
+            {
+                t.HasCheckConstraint("ck_pe_opcao_valor", "valor ~ '^[a-z0-9][a-z0-9_]*$'");
+                t.HasCheckConstraint("ck_pe_opcao_cor", $"cor IS NULL OR {EmLista("cor", PeDominios.Cor.Todas)}");
+            });
+
+            entity.HasKey(o => o.Id).HasName("pk_pe_opcao");
+            entity.Property(o => o.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(o => o.CampoId).HasColumnName("campo_id");
+            entity.Property(o => o.Valor).HasColumnName("valor").HasMaxLength(60).IsRequired();
+            entity.Property(o => o.Rotulo).HasColumnName("rotulo").HasMaxLength(200).IsRequired();
+            entity.Property(o => o.Ordem).HasColumnName("ordem");
+            entity.Property(o => o.Ativa).HasColumnName("ativa");
+            entity.Property(o => o.Cor).HasColumnName("cor").HasMaxLength(20);
+            entity.Property(o => o.Travada).HasColumnName("travada");
+            entity.Property(o => o.Sistema).HasColumnName("sistema");
+            Auditoria(entity);
+
+            entity.HasIndex(o => new { o.CampoId, o.Valor }).IsUnique().HasDatabaseName("ux_pe_opcao_campo_valor");
+
+            entity.HasOne(o => o.Campo)
+                .WithMany(c => c.Opcoes)
+                .HasForeignKey(o => o.CampoId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_opcao_campo");
+        });
+
+        modelBuilder.Entity<PeOrgaoConfig>(entity =>
+        {
+            entity.ToTable("pe_orgao_config");
+
+            entity.HasKey(c => c.OrgaoId).HasName("pk_pe_orgao_config");
+            entity.Property(c => c.OrgaoId).HasColumnName("orgao_id").ValueGeneratedNever();
+            entity.Property(c => c.NivelId).HasColumnName("nivel_id");
+            entity.Property(c => c.Justificativa).HasColumnName("justificativa").HasMaxLength(1000).IsRequired();
+            entity.Property(c => c.DefinidoEm).HasColumnName("definido_em").HasDefaultValueSql("NOW()");
+            entity.Property(c => c.DefinidoPor).HasColumnName("definido_por").HasMaxLength(200).IsRequired();
+
+            entity.HasIndex(c => c.NivelId).HasDatabaseName("ix_pe_orgao_config_nivel");
+
+            // Órgão do PGIA não é apagado (só desativado): a FK só impede apagar por engano
+            entity.HasOne(c => c.Orgao)
+                .WithMany()
+                .HasForeignKey(c => c.OrgaoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_orgao_config_orgao");
+
+            // Nível em uso não é apagado (é desativado)
+            entity.HasOne(c => c.Nivel)
+                .WithMany()
+                .HasForeignKey(c => c.NivelId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_orgao_config_nivel");
+        });
+
+        modelBuilder.Entity<PeOrgaoAjuste>(entity =>
+        {
+            entity.ToTable("pe_orgao_ajuste", t =>
+            {
+                t.HasCheckConstraint("ck_pe_orgao_ajuste_alvo", EmLista("alvo_tipo", PeDominios.AlvoAjuste.Todos));
+                t.HasCheckConstraint("ck_pe_orgao_ajuste_situacao", EmLista("situacao", PeDominios.Situacao.Todas));
+            });
+
+            entity.HasKey(a => a.Id).HasName("pk_pe_orgao_ajuste");
+            entity.Property(a => a.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(a => a.OrgaoId).HasColumnName("orgao_id");
+            entity.Property(a => a.AlvoTipo).HasColumnName("alvo_tipo").HasMaxLength(10).IsRequired();
+            entity.Property(a => a.AlvoId).HasColumnName("alvo_id");
+            entity.Property(a => a.Situacao).HasColumnName("situacao").HasMaxLength(20).IsRequired();
+            entity.Property(a => a.Justificativa).HasColumnName("justificativa").HasMaxLength(1000);
+            Auditoria(entity);
+
+            entity.HasIndex(a => new { a.OrgaoId, a.AlvoTipo, a.AlvoId }).IsUnique()
+                .HasDatabaseName("ux_pe_orgao_ajuste_alvo");
+
+            entity.HasOne(a => a.Orgao)
+                .WithMany()
+                .HasForeignKey(a => a.OrgaoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_orgao_ajuste_orgao");
+        });
+
+        modelBuilder.Entity<PeConfiguracao>(entity =>
+        {
+            entity.ToTable("pe_configuracao");
+
+            entity.HasKey(c => c.Chave).HasName("pk_pe_configuracao");
+            entity.Property(c => c.Chave).HasColumnName("chave").HasMaxLength(100);
+            entity.Property(c => c.Valor).HasColumnName("valor").HasColumnType("jsonb").IsRequired();
+            Auditoria(entity);
+        });
+
+        modelBuilder.Entity<PeModeloHistorico>(entity =>
+        {
+            entity.ToTable("pe_modelo_historico", t =>
+            {
+                t.HasCheckConstraint("ck_pe_modelo_historico_entidade",
+                    EmLista("entidade", PeDominios.EntidadeHistorico.Todas));
+                t.HasCheckConstraint("ck_pe_modelo_historico_acao", EmLista("acao", PeDominios.AcaoHistorico.Todas));
+            });
+
+            entity.HasKey(h => h.Id).HasName("pk_pe_modelo_historico");
+            entity.Property(h => h.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(h => h.Entidade).HasColumnName("entidade").HasMaxLength(20).IsRequired();
+            entity.Property(h => h.EntidadeId).HasColumnName("entidade_id");
+            entity.Property(h => h.Acao).HasColumnName("acao").HasMaxLength(20).IsRequired();
+            entity.Property(h => h.Antes).HasColumnName("antes").HasColumnType("jsonb");
+            entity.Property(h => h.Depois).HasColumnName("depois").HasColumnType("jsonb");
+            entity.Property(h => h.AlteradoEm).HasColumnName("alterado_em").HasDefaultValueSql("NOW()");
+            entity.Property(h => h.AlteradoPor).HasColumnName("alterado_por").HasMaxLength(200).IsRequired();
+
+            // Histórico de um item e o "o que mudou" geral, do mais novo para o mais antigo
+            entity.HasIndex(h => new { h.Entidade, h.EntidadeId }).HasDatabaseName("ix_pe_modelo_historico_entidade");
+            entity.HasIndex(h => h.AlteradoEm).HasDatabaseName("ix_pe_modelo_historico_data");
+        });
     }
 }

@@ -146,6 +146,13 @@ builder.Services.AddScoped<ICtrImportacaoService, service.Contratacoes.CtrImport
 // módulo, das telas de acesso e da fila de pedidos (regra do deploy)
 builder.Services.AddScoped<IPePermissionService, service.Planejamento.PePermissionService>();
 builder.Services.AddScoped<IPePessoaService, service.Planejamento.PePessoaService>();
+builder.Services.AddScoped<IPeModeloService, service.Planejamento.PeModeloService>();
+builder.Services.AddScoped<IPeOrgaoService, service.Planejamento.PeOrgaoService>();
+// Modelo inicial (trilha e campos do PDTIC): carregado ao subir, fora das requisições.
+// Sem as tabelas (intervalo entre o PR e a migration do merge) só registra no log e
+// tenta de novo mais tarde; o boot e os outros módulos seguem normais
+builder.Services.AddScoped<service.Planejamento.PeCarregadorModelo>();
+builder.Services.AddHostedService<service.Planejamento.PeCarregadorModeloHostedService>();
 
 builder.Services.AddScoped<HttpClient>();
 

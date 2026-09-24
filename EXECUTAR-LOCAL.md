@@ -18,9 +18,9 @@ docker run -d --name sgdp-local-pg -e POSTGRES_USER=sgdp_user -e POSTGRES_PASSWO
 
 Usuário/senha/banco casam com `app/appsettings.Development.json` (`Host=localhost;Port=5432;Database=postgres;Username=sgdp_user;Password=sgdp_password_dev`). Alternativa: `docker compose up -d postgres` na raiz do `SGDP-Service-main` (exige `.env` copiado do `.env.example` com `POSTGRES_USER=user` e `POSTGRES_PASSWORD=password`).
 
-## 2. Migrations (cria as tabelas do SGDP, as 24 `pgia_*` com seeds, as 2 `ctr_*` e as 2 `pe_*`)
+## 2. Migrations (cria as tabelas do SGDP, as 24 `pgia_*` com seeds, as 2 `ctr_*` e as 15 `pe_*`)
 
-A última é a `20260924151108_PeAcessoPapeis` (Governança Estratégica: `pe_papel_usuario`, `pe_papel_usuario_historico` e os CHECKs de módulo com `planejamento`). Sem ela aplicada, a API sobe, o login e os outros módulos funcionam, mas as telas da Governança Estratégica falham (regra do deploy, ver o `CLAUDE.md`).
+A última é a `20260924162542_PeModeloConfiguravel` (Governança Estratégica, E2: as 13 tabelas do modelo configurável; o modelo inicial é carregado sozinho quando a API sobe). Antes dela vem a `20260924151108_PeAcessoPapeis` (E1: `pe_papel_usuario`, `pe_papel_usuario_historico` e os CHECKs de módulo com `planejamento`). Sem elas aplicadas, a API sobe, o login e os outros módulos funcionam, mas as telas da Governança Estratégica falham (regra do deploy, ver o `CLAUDE.md`).
 
 ```bash
 cd SGDP-Service-main/app
@@ -131,6 +131,19 @@ Antes, aplique a migration `20260924151108_PeAcessoPapeis` (comando da seção 2
 5. **Gestão de acessos** (Ana Admin): a coluna da Governança Estratégica mostra o papel; ligar o módulo sem papel volta 400; desligar tira o papel junto. Salvar outro módulo sem mexer na Governança Estratégica não muda o acesso nem o papel.
 6. **Personas de órgão**: equipe e consulta do órgão entram com o órgão SES em `meu-papel` (`OrgaoSigla` "SES"). Dar papel de órgão a alguém sem unidade grava e volta com `OrgaoId` nulo (a tela avisa).
 7. **Regressão**: os outros módulos, o login e os pedidos de Demandas, PGIA e Supervisão Contínua seguem como antes.
+
+## 10. Roteiro de fumaça da Governança Estratégica (E2: modelo configurável e níveis)
+
+Antes, aplique a migration `20260924162542_PeModeloConfiguravel` (comando da seção 2) e suba a API de novo. O log mostra "Governança Estratégica: modelo inicial versão 1 carregado (antes: 0). Novos: 3 níveis, 7 etapas, 50 passos, 68 seções, 345 campos, 262 opções, 1 configurações." Se a API subiu antes da migration, o carregador avisa no log que as tabelas ainda não existem e tenta de novo sozinho (30 s, 1, 2 e 5 minutos, depois a cada 10); reiniciar a API também resolve. Nesse intervalo, as telas do modelo recebem 409 com a mensagem "A Governança Estratégica está sendo atualizada...", e o resto do sistema segue normal.
+
+1. **Administradora do módulo** (ou Ana Admin), níveis: Básico, Intermediário e Avançado, nessa ordem. Crie um nível (o código sai do nome), renomeie, mude a ordem e desative; desativar o último nível ativo volta 409 ("Este é o único nível ativo...").
+2. **Modelo**: 7 etapas e 50 passos. Os passos 2.3, 2.4, 2.9, 2.10, 3.3, 3.4 e 3.5 (numeração do Avançado) são travados: desligar num nível volta 409 com a mensagem do art. 12, § 2º; o mesmo para o campo principal das seções travadas e para o campo "Tema" das ações. Passo do sistema aceita novo título e nova situação, mas não troca de tipo nem é apagado (409). Crie um passo (nasce opcional só no Avançado), uma seção e um campo (nascem desligados), apague o passo criado (some da lista; volta com "mostrar apagados" e continua com as seções).
+3. **Critérios de priorização**: a prioridade das necessidades de TIC é o produto de gravidade, urgência e tendência (números de 1 a 5). Troque para soma ponderada com pesos e volte; cálculo com campo que não existe ou que não é número volta 400.
+4. **Nível de cada órgão**: a SES aparece no Básico, marcada como padrão. Trocar o nível sem justificativa volta 400; com justificativa, grava, e o histórico mostra "Básico (padrão)" como anterior. Nível desativado não pode ser escolhido (409).
+5. **Ajustes do órgão**: ligue o plano de trabalho para a SES no Básico: na trilha dela, ele aparece como 1.8, marcado como ajustado. Desligar para o órgão um item travado volta 409; mandar a lista sem um ajuste (ou com a situação vazia) tira o ajuste.
+6. **Otávio do Órgão** (equipe da SES): a trilha vem do back-end (`GET api/planejamento/modelo/trilha`). No Básico são 23 passos em 6 etapas: "Avalie no meio do caminho" não aparece, e "Feche o ciclo" vira a etapa 6. Um passo de dados mostra as seções e os campos que vai pedir. Com a SES no Avançado, são os 50 passos, com a numeração da seção 7 do plano.
+7. **Sofia da SGDI** e a Secretaria do CGTIC: leem o modelo, veem a trilha de qualquer órgão ("Ver a trilha de") e o histórico do modelo, mas não alteram nada (403). A consulta do órgão só lê a trilha do próprio órgão.
+8. **Regressão**: login, `/api/Auth/me`, "Pessoas e acessos" (E1) e os outros módulos seguem como antes.
 
 ## Limpeza
 

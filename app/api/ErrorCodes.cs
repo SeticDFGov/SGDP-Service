@@ -100,4 +100,21 @@ public enum ErrorCode
     PePapelInvalido = 1001,         // 400
     PeSemPermissao = 1002,          // 403
     PeAutoRebaixamento = 1003,      // 409: pe_admin tirando ou trocando o próprio papel
+    // Modelo configurável e níveis de maturidade (E2): faixa 1010 a 1029
+    PeItemNaoEncontrado = 1010,         // 404: nível, etapa, passo, seção, campo ou opção
+    PeOrgaoNaoEncontrado = 1011,        // 404: órgão inexistente ou inativo; papel de órgão sem órgão
+    PeDadosInvalidos = 1012,            // 400: texto vazio ou longo demais, valor fora do domínio
+    PeItemTravado = 1013,               // 409: item travado (art. 12, § 2º) não desliga nem desativa
+    PeItemDoSistema = 1014,             // 409: item do sistema não muda de tipo nem de chave e não é apagado
+    PeChaveDuplicada = 1015,            // 409: chave, código ou valor já usado
+    PeConfigInvalida = 1016,            // 400: config do campo não serve para o tipo
+    PeOrdemInvalida = 1017,             // 400: a lista de ids não é a dos itens do grupo
+    PeNivelInativo = 1018,              // 409: nível desativado não pode ser escolhido
+    PeUltimoNivelAtivo = 1019,          // 409: o último nível ativo não pode ser desativado
+    PeJustificativaObrigatoria = 1020,  // 400: troca de nível sem justificativa
+    PeOrgaoObrigatorio = 1021,          // 400: papel global pedindo a trilha sem dizer o órgão
+    PeItemExcluido = 1022,              // 409: item apagado não é editado
+    PeItemEmUso = 1023,                 // 409: item usado por um cálculo ou por uma ligação
+    PeModeloIndisponivel = 1024,        // 409: modelo ainda não carregado (migration ou carregador pendente)
+    PeConflitoGravacao = 1025,          // 409: outra pessoa gravou ao mesmo tempo
 }

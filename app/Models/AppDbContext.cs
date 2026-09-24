@@ -66,6 +66,20 @@ namespace Models
         // cada requisição nunca lê estas tabelas (regra do deploy, ver PapeisPlanejamento)
         public DbSet<PePapelUsuario> PePapeisUsuario { get; set; }
         public DbSet<PePapelUsuarioHistorico> PePapeisUsuarioHistorico { get; set; }
+        // Modelo configurável e níveis de maturidade (E2)
+        public DbSet<PeNivel> PeNiveis { get; set; }
+        public DbSet<PeEtapa> PeEtapas { get; set; }
+        public DbSet<PePasso> PePassos { get; set; }
+        public DbSet<PePassoNivel> PePassosNivel { get; set; }
+        public DbSet<PeSecao> PeSecoes { get; set; }
+        public DbSet<PeSecaoNivel> PeSecoesNivel { get; set; }
+        public DbSet<PeCampo> PeCampos { get; set; }
+        public DbSet<PeCampoNivel> PeCamposNivel { get; set; }
+        public DbSet<PeOpcao> PeOpcoes { get; set; }
+        public DbSet<PeOrgaoConfig> PeOrgaosConfig { get; set; }
+        public DbSet<PeOrgaoAjuste> PeOrgaosAjuste { get; set; }
+        public DbSet<PeConfiguracao> PeConfiguracoes { get; set; }
+        public DbSet<PeModeloHistorico> PeModeloHistorico { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

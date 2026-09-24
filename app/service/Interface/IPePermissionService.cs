@@ -30,6 +30,15 @@ public interface IPePermissionService
     /// </summary>
     bool EhDoOrgao(PeUserContext ctx, long orgaoId);
 
+    /// <summary>Lê o modelo e a trilha (GET modelo): qualquer papel do módulo e o admin geral.</summary>
+    bool PodeLerModelo(PeUserContext ctx);
+
+    /// <summary>Altera o modelo, os níveis e o nível e os ajustes de cada órgão: pe_admin e admin geral.</summary>
+    bool PodeConfigurarModelo(PeUserContext ctx);
+
+    /// <summary>Vê um órgão: papéis globais e admin geral (todos) ou papel de órgão no próprio.</summary>
+    bool PodeVerOrgao(PeUserContext ctx, long orgaoId);
+
     /// <summary>
     /// Órgão ativo de cada unidade, em lote (uma consulta): mesma resolução do
     /// PgiaPermissionService (Users.Unidade para o pgia_orgao ativo daquela unidade).

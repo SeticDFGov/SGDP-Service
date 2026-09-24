@@ -37,6 +37,14 @@
     <Folder Include="service\consts\" />
   </ItemGroup>
 
+  <!-- Governança Estratégica: modelo inicial (trilha e campos do PDTIC) embutido no
+       assembly, lido pelo PeCarregadorModelo; não vai como arquivo solto na publicação -->
+  <ItemGroup>
+    <Content Remove="Models\Planejamento\Seed\**" />
+    <None Remove="Models\Planejamento\Seed\**" />
+    <EmbeddedResource Include="Models\Planejamento\Seed\modelo-inicial.json" LogicalName="Planejamento.modelo-inicial.json" />
+  </ItemGroup>
+
 
 
 

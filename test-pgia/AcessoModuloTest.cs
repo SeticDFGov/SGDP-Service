@@ -460,6 +460,8 @@ public class AcessoModuloTest : PgiaTestBase
             [typeof(CtrManifestacaoController)] = ModulosSgdp.PoliticaContratacoes,
             [typeof(CtrImportacaoController)] = ModulosSgdp.PoliticaContratacoes,
             [typeof(PePessoasController)] = ModulosSgdp.PoliticaPlanejamento,
+            [typeof(PeModeloController)] = ModulosSgdp.PoliticaPlanejamento,
+            [typeof(PeOrgaosController)] = ModulosSgdp.PoliticaPlanejamento,
             [typeof(PgiaAdminController)] = "role:admin",
             [typeof(CtrAdminController)] = "role:admin",
             [typeof(AcessoController)] = "role:admin",
@@ -811,6 +813,8 @@ public class AcessoModuloTest : PgiaTestBase
     /// <summary>
     /// AppDbContext sem as tabelas pe_ no modelo: simula o intervalo do deploy (código
     /// publicado, migration ainda não aplicada). Qualquer leitura de tabela pe_ lança.
+    /// Tira todas as entidades do módulo (Models.Planejamento), inclusive as das
+    /// próximas entregas.
     /// </summary>
     private sealed class ContextoSemTabelasPe : AppDbContext
     {
@@ -819,8 +823,11 @@ public class AcessoModuloTest : PgiaTestBase
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-            modelBuilder.Ignore<PePapelUsuario>();
-            modelBuilder.Ignore<PePapelUsuarioHistorico>();
+            var doModulo = modelBuilder.Model.GetEntityTypes()
+                .Select(t => t.ClrType)
+                .Where(t => t.Namespace == typeof(PePapelUsuario).Namespace)
+                .ToList();
+            foreach (var tipo in doModulo) modelBuilder.Ignore(tipo);
         }
     }
 
@@ -835,8 +842,10 @@ public class AcessoModuloTest : PgiaTestBase
         var opcoes = new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options;
         using var contexto = new ContextoSemTabelasPe(opcoes);
 
-        // A simulação vale: ler a tabela do papel lança
+        // A simulação vale: ler a tabela do papel (E1) e as do modelo (E2) lança
         await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PePapeisUsuario.AnyAsync());
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PeNiveis.AnyAsync());
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PeOrgaosConfig.AnyAsync());
 
         var sgdi = new User { KeycloakId = "kc-sgdi", Nome = "Sofia da SGDI", Email = "sofia@sgdi.df.gov.br", PapelPgia = PapeisPgia.Sgdi };
         var comum = new User { KeycloakId = "kc-comum", Nome = "Carlos Comum", Email = "carlos@df.gov.br" };

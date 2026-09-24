@@ -102,6 +102,15 @@ public class PePermissionService : IPePermissionService
     public bool VeTodosOsOrgaos(PeUserContext ctx) =>
         ctx.EhAdminGeral || PapeisPlanejamento.EhGlobal(ctx.Papel);
 
+    public bool PodeLerModelo(PeUserContext ctx) =>
+        ctx.EhAdminGeral || PapeisPlanejamento.EhValido(ctx.Papel);
+
+    public bool PodeConfigurarModelo(PeUserContext ctx) =>
+        ctx.EhAdminGeral || ctx.Papel == PapeisPlanejamento.Admin;
+
+    public bool PodeVerOrgao(PeUserContext ctx, long orgaoId) =>
+        VeTodosOsOrgaos(ctx) || EhDoOrgao(ctx, orgaoId);
+
     public bool EhDoOrgao(PeUserContext ctx, long orgaoId) =>
         PapeisPlanejamento.EhDeOrgao(ctx.Papel) && ctx.OrgaoId == orgaoId;
 
