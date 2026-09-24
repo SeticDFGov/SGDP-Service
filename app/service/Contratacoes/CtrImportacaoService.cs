@@ -191,8 +191,23 @@ public class CtrImportacaoService : ICtrImportacaoService
         if (!colunas.Criticidade) candidato.Criticidade = existente.Criticidade;
         if (!colunas.Origem) candidato.Origem = existente.Origem;
         // Bloco dos sete critérios: ausente, as respostas gravadas (e a criticidade calculada
-        // delas) ficam; presente e todo vazio, limpa as respostas e a coluna Criticidade decide
-        if (!colunas.CriteriosCriticidade) candidato.CriteriosCriticidade = existente.CriteriosCriticidade;
+        // delas) ficam; presente e todo vazio, limpa as respostas e a coluna Criticidade decide.
+        // Presente com o II vazio, a resposta gravada à pergunta ANTERIOR do II fica (é a
+        // referência que a tela mostra até alguém responder à pergunta nova)
+        candidato.CriteriosCriticidade = colunas.CriteriosCriticidade
+            ? CtrCriticidade.ManterRespostaPerguntaAnteriorII(candidato.CriteriosCriticidade, existente.CriteriosCriticidade)
+            : existente.CriteriosCriticidade;
+
+        // Campos que a planilha NÃO tem coluna nenhuma (pedido de 2026-09-24: Nº SEI do
+        // Formulário, documento SEI do pedido de esclarecimentos e a análise técnica): o que
+        // está gravado fica sempre. O documento do pedido ainda passa pela validação, que o
+        // anula quando o arquivo limpou a data do pedido (é parte do pedido)
+        candidato.NumeroSeiFormulario = existente.NumeroSeiFormulario;
+        candidato.EsclarecimentoDocumentoSei = existente.EsclarecimentoDocumentoSei;
+        candidato.AnaliseTecnicaEncaminhadaEm = existente.AnaliseTecnicaEncaminhadaEm;
+        candidato.AnaliseTecnicaArea = existente.AnaliseTecnicaArea;
+        candidato.AnaliseTecnicaRetornoEm = existente.AnaliseTecnicaRetornoEm;
+        candidato.AnaliseTecnicaRetornoResumo = existente.AnaliseTecnicaRetornoResumo;
         // Os dados da contratação, cada um pela sua coluna (arquivo de 29 colunas ou a planilha
         // legada não os conhecem e não podem apagá-los)
         if (!colunas.ValorEstimado) candidato.ValorEstimado = existente.ValorEstimado;

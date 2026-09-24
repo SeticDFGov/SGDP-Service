@@ -30,23 +30,27 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
             .ToDictionary(par => par[0].Trim(), par => par[1].Trim());
 
     // ══ 1. A regra (fonte única: CtrCriticidade) ═════════════════════════════
+    // Regra de 2026-09-24: II Sim 0 e os demais 1 (sem resposta = Desconhecido), III Sim 0 e
+    // Não 1 (o padrão). Por isso o processo todo no padrão já soma 2 (II + III). Os casos da
+    // pergunta nova do II e da anterior estão em CtrCriticidadeRegraNovaTest.
 
     [Theory]
-    [InlineData("", CtrDominios.Criticidade.Baixa, 0)]
+    [InlineData("", CtrDominios.Criticidade.Baixa, 2)]
+    [InlineData("II=Sim,III=Sim", CtrDominios.Criticidade.Baixa, 0)]
     [InlineData("III=Sim", CtrDominios.Criticidade.Baixa, 1)]
-    [InlineData("V=Sim", CtrDominios.Criticidade.Media, 3)]
-    [InlineData("II=Alto", CtrDominios.Criticidade.Media, 3)]
-    [InlineData("II=Baixo,IV=Médio", CtrDominios.Criticidade.Media, 3)]
-    [InlineData("V=Sim,VI=Médio", CtrDominios.Criticidade.Media, 5)]
-    [InlineData("II=Alto,IV=Alto", CtrDominios.Criticidade.Alta, 6)]
-    [InlineData("V=Sim,VI=Médio,III=Sim", CtrDominios.Criticidade.Alta, 6)]
-    [InlineData("VII=Sim", CtrDominios.Criticidade.Alta, 0)]
-    [InlineData("II=Alto,III=Sim,IV=Alto,V=Sim,VI=Alto", CtrDominios.Criticidade.Alta, 13)]
-    // Alinhado à EGD/DF é bom: tira 1 ponto e pode baixar a categoria; sozinho não fica negativo
-    [InlineData("I=Sim", CtrDominios.Criticidade.Baixa, 0)]
-    [InlineData("I=Sim,II=Alto", CtrDominios.Criticidade.Baixa, 2)]
-    [InlineData("I=Sim,II=Alto,IV=Alto", CtrDominios.Criticidade.Media, 5)]
-    [InlineData("I=Sim,VII=Sim", CtrDominios.Criticidade.Alta, 0)]
+    [InlineData("V=Sim", CtrDominios.Criticidade.Media, 5)]
+    [InlineData("II=Sim,III=Sim,V=Sim", CtrDominios.Criticidade.Media, 3)]
+    [InlineData("IV=Baixo", CtrDominios.Criticidade.Media, 3)]
+    [InlineData("V=Sim,VI=Baixo", CtrDominios.Criticidade.Alta, 6)]
+    [InlineData("II=Sim,IV=Alto,VI=Médio", CtrDominios.Criticidade.Alta, 6)]
+    [InlineData("VII=Sim", CtrDominios.Criticidade.Alta, 2)]
+    [InlineData("II=Não,III=Não,IV=Alto,V=Sim,VI=Alto", CtrDominios.Criticidade.Alta, 11)]
+    // Alinhado à EGD/DF é bom: tira 1 ponto e pode baixar a categoria; a soma não fica negativa
+    [InlineData("I=Sim", CtrDominios.Criticidade.Baixa, 1)]
+    [InlineData("I=Sim,II=Sim,III=Sim", CtrDominios.Criticidade.Baixa, 0)]
+    [InlineData("I=Sim,IV=Baixo", CtrDominios.Criticidade.Baixa, 2)]
+    [InlineData("I=Sim,IV=Baixo,V=Sim", CtrDominios.Criticidade.Media, 5)]
+    [InlineData("I=Sim,II=Sim,III=Sim,VII=Sim", CtrDominios.Criticidade.Alta, 0)]
     public void Calcular_PontuaCadaCriterioEOValorEstimadoDecideSozinho(string texto, string esperada, int pontos)
     {
         var respostas = CtrCriticidade.Normalizar(Respostas(texto));
@@ -61,17 +65,20 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
         var respostas = CtrCriticidade.Normalizar(new Dictionary<string, string>
         {
             ["vii"] = "sim",
-            ["ii"] = "medio",
+            ["iv"] = "medio",
             ["I"] = "NAO",
             ["VI"] = ""    // vazia = não respondida
         });
 
         Assert.Equal(CtrDominios.CriterioCriticidade.Todos.OrderBy(c => c), respostas.Keys.OrderBy(c => c));
         Assert.Equal(CtrDominios.CriterioCriticidade.Sim, respostas[CtrDominios.CriterioCriticidade.ValorEstimado]);
-        Assert.Equal(CtrDominios.CriterioCriticidade.Medio, respostas[CtrDominios.CriterioCriticidade.ImpactoServicos]);
+        Assert.Equal(CtrDominios.CriterioCriticidade.Medio, respostas[CtrDominios.CriterioCriticidade.ImpactoArquitetura]);
         Assert.Equal(CtrDominios.CriterioCriticidade.Nao, respostas[CtrDominios.CriterioCriticidade.AlinhamentoEgd]);
         Assert.Equal(CtrDominios.CriterioCriticidade.Nenhum, respostas[CtrDominios.CriterioCriticidade.RiscosSeguranca]);
         Assert.Equal(CtrDominios.CriterioCriticidade.Nao, respostas[CtrDominios.CriterioCriticidade.Compartilhamento]);
+        // O II sem resposta fica em Desconhecido (desde 2026-09-24)
+        Assert.Equal(CtrDominios.CriterioCriticidade.Desconhecido,
+            respostas[CtrDominios.CriterioCriticidade.ProjetoTransformacaoDigital]);
     }
 
     [Theory]
@@ -94,7 +101,7 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
         var json = CtrCriticidade.Serializar(respostas);
 
         // Na ordem dos incisos e com os acentos legíveis (não escapados)
-        Assert.StartsWith("{\"I\":\"Sim\",\"II\":\"Nenhum\"", json);
+        Assert.StartsWith("{\"I\":\"Sim\",\"II\":\"Desconhecido\"", json);
         Assert.Contains("\"VI\":\"Alto\"", json);
         Assert.Contains("Não", json);
         Assert.Equal(respostas, CtrCriticidade.Desserializar(json));
@@ -114,8 +121,9 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
 
         var resposta = await _processos.CriarAsync(dto, ctx);
 
+        // II sem resposta (1) + III Não (1) + V Sim (3) + VI Alto (3)
         Assert.Equal(CtrDominios.Criticidade.Alta, resposta.Criticidade);
-        Assert.Equal(6, resposta.PontosCriticidade);
+        Assert.Equal(8, resposta.PontosCriticidade);
         Assert.NotNull(resposta.CriteriosCriticidade);
         Assert.Equal(7, resposta.CriteriosCriticidade!.Count);
         Assert.Equal(CtrDominios.CriterioCriticidade.Nao, resposta.CriteriosCriticidade["I"]);
@@ -161,8 +169,8 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
         var ctx = await ContextoAnalistaAsync();
         var processo = SemearProcesso("04044-00000504/2026-14", p =>
         {
-            p.CriteriosCriticidade = CtrCriticidade.Serializar(CtrCriticidade.Normalizar(Respostas("II=Alto,IV=Alto")));
-            p.Criticidade = CtrDominios.Criticidade.Alta;
+            p.CriteriosCriticidade = CtrCriticidade.Serializar(CtrCriticidade.Normalizar(Respostas("II=Sim,IV=Alto,V=Sim")));
+            p.Criticidade = CtrDominios.Criticidade.Media; // desatualizada: a validação a recalcula
         });
 
         var dto = NovoProcessoDto("04044-00000504/2026-14");
@@ -171,9 +179,10 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
 
         var resposta = await _processos.AtualizarAsync(processo.Id, dto, ctx);
 
+        // II Sim (0) + III Não (1) + IV Alto (3) + V Sim (3)
         Assert.Equal(CtrDominios.Criticidade.Alta, resposta.Criticidade);
-        Assert.Equal(6, resposta.PontosCriticidade);
-        Assert.Equal(CtrDominios.CriterioCriticidade.Alto, resposta.CriteriosCriticidade!["II"]);
+        Assert.Equal(7, resposta.PontosCriticidade);
+        Assert.Equal(CtrDominios.CriterioCriticidade.Sim, resposta.CriteriosCriticidade!["II"]);
     }
 
     [Fact]
@@ -198,11 +207,11 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
         dto.Criticidade = CtrDominios.Criticidade.Media;
         Assert.Equal(CtrDominios.Criticidade.Media, (await _processos.AtualizarAsync(processo.Id, dto, ctx)).Criticidade);
 
-        // Avaliados os critérios, a regra automática assume
+        // Avaliados os critérios, a regra automática assume (todos no padrão: II e III somam 2)
         dto.CriteriosCriticidade = Respostas("");
         var avaliado = await _processos.AtualizarAsync(processo.Id, dto, ctx);
         Assert.Equal(CtrDominios.Criticidade.Baixa, avaliado.Criticidade);
-        Assert.Equal(0, avaliado.PontosCriticidade);
+        Assert.Equal(2, avaliado.PontosCriticidade);
     }
 
     // ══ 3. Ordem da lista ════════════════════════════════════════════════════
@@ -359,9 +368,10 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
     [Fact]
     public void Csv_Ler_RespostasPreenchidas_DerivamACriticidadeEAsAusentesRecebemOPadrao()
     {
-        // Colunas 22..28 = critérios I..VII; V=Sim (3) e II=alto (3) dão Alta
+        // Colunas 22..28 = critérios I..VII; V=Sim (3) e VI=alto (3), mais II e III no padrão
+        // (1 cada), dão Alta
         var csv = string.Join(";", CtrCsv.Cabecalho) + "\r\n"
-            + LinhaDoExport("04044-00000540/2026-11", "", (26, "Sim"), (23, "alto")) + "\r\n";
+            + LinhaDoExport("04044-00000540/2026-11", "", (26, "Sim"), (27, "alto")) + "\r\n";
 
         var linha = Assert.Single(CtrCsv.Ler(BytesUtf8ComBom(csv)));
 
@@ -369,22 +379,28 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
         var dados = linha.Dados!;
         Assert.NotNull(dados.CriteriosCriticidade);
         Assert.Equal(CtrDominios.CriterioCriticidade.Sim, dados.CriteriosCriticidade![CtrDominios.CriterioCriticidade.TecnologiasEmergentes]);
-        Assert.Equal(CtrDominios.CriterioCriticidade.Alto, dados.CriteriosCriticidade[CtrDominios.CriterioCriticidade.ImpactoServicos]);
-        Assert.Equal(CtrDominios.CriterioCriticidade.Nao, dados.CriteriosCriticidade[CtrDominios.CriterioCriticidade.AlinhamentoEgd]);
-        Assert.Equal(CtrDominios.CriterioCriticidade.Nenhum, dados.CriteriosCriticidade[CtrDominios.CriterioCriticidade.RiscosSeguranca]);
+        Assert.Equal(CtrDominios.CriterioCriticidade.Alto, dados.CriteriosCriticidade[CtrDominios.CriterioCriticidade.RiscosSeguranca]);
+        // Desde 2026-09-24 o parser guarda só as respondidas: o padrão entra na validação
+        Assert.Equal(2, dados.CriteriosCriticidade.Count);
 
-        // A criticidade só é derivada na validação do service (o parser guarda as respostas)
+        // A criticidade só é derivada na validação do service, que completa o bloco
         var candidato = new CtrProcesso();
         CtrProcessoService.AplicarDto(candidato, dados);
         CtrProcessoService.ValidarProcesso(candidato, numeroDuplicado: false);
         Assert.Equal(CtrDominios.Criticidade.Alta, candidato.Criticidade);
+        var completas = CtrCriticidade.Desserializar(candidato.CriteriosCriticidade)!;
+        Assert.Equal(7, completas.Count);
+        Assert.Equal(CtrDominios.CriterioCriticidade.Nao, completas[CtrDominios.CriterioCriticidade.AlinhamentoEgd]);
+        Assert.Equal(CtrDominios.CriterioCriticidade.Desconhecido,
+            completas[CtrDominios.CriterioCriticidade.ProjetoTransformacaoDigital]);
+        Assert.Equal(CtrDominios.CriterioCriticidade.Nenhum, completas[CtrDominios.CriterioCriticidade.ImpactoArquitetura]);
     }
 
     [Fact]
     public void Csv_Ler_CriticidadeQueNaoConfereComOsCriterios_RejeitaALinha()
     {
         var csv = string.Join(";", CtrCsv.Cabecalho) + "\r\n"
-            + LinhaDoExport("04044-00000541/2026-12", "Baixa", (26, "Sim"), (23, "Alto")) + "\r\n";
+            + LinhaDoExport("04044-00000541/2026-12", "Baixa", (26, "Sim"), (27, "Alto")) + "\r\n";
 
         var linha = Assert.Single(CtrCsv.Ler(BytesUtf8ComBom(csv)));
 
@@ -449,7 +465,7 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
         var celulas = texto.Split("\r\n", StringSplitOptions.RemoveEmptyEntries)[1].Split(';');
         Assert.Equal(32, celulas.Length);
         Assert.Equal("Alta", celulas[17]);
-        Assert.Equal(new[] { "Não", "Nenhum", "Sim", "Médio", "Não", "Alto", "Não" }, celulas[22..29]);
+        Assert.Equal(new[] { "Não", "Desconhecido", "Sim", "Médio", "Não", "Alto", "Não" }, celulas[22..29]);
         // Os dados da contratação, não informados neste processo, saem vazios
         Assert.Equal(new[] { "", "", "" }, celulas[29..]);
 
