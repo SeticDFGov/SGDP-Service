@@ -21,7 +21,9 @@ namespace service.Planejamento;
 /// O arquivo nasce sem dono; ganha dono quando um registro o usa num campo de arquivo (ou,
 /// desde a E4, como imagem de um texto rico). Baixa quem pode ver o dono do registro
 /// (PETIC-DF e catálogo do DF: qualquer papel do módulo; PDTIC: quem vê o órgão); sem dono
-/// (ou com o registro apagado), só quem enviou.
+/// (ou com o registro apagado), só quem enviou. Desde a E5, o documento do PDTIC também dá
+/// dono: o modelo (imagem de um texto padrão; qualquer papel do módulo baixa) e o PDTIC
+/// (imagem de um texto do órgão e PDF gerado; quem vê o órgão baixa).
 /// </summary>
 public class PeArquivoService : IPeArquivoService
 {
@@ -114,6 +116,22 @@ public class PeArquivoService : IPeArquivoService
     private async Task<bool> PodeBaixarAsync(PeArquivo arquivo, PeUserContext ctx)
     {
         var enviou = string.Equals(arquivo.CriadoPor.Trim(), ctx.Email.Trim(), StringComparison.OrdinalIgnoreCase);
+
+        // Documento do PDTIC (E5): imagens dos textos do modelo (qualquer papel do módulo lê o
+        // modelo) e imagens dos textos do órgão e PDFs gerados (quem vê o órgão do PDTIC)
+        if (arquivo.DonoTipo == PeDominios.DonoArquivo.DocModelo && arquivo.DonoId != null)
+            return enviou || _permissoes.PodeLerModelo(ctx);
+        if (arquivo.DonoTipo == PeDominios.DonoArquivo.Pdtic && arquivo.DonoId != null)
+        {
+            if (enviou) return true;
+            if (!_permissoes.PodeLerReferenciais(ctx)) return false;
+            var orgao = await _context.PePdtics.AsNoTracking()
+                .Where(p => p.Id == arquivo.DonoId)
+                .Select(p => (long?)p.OrgaoId)
+                .FirstOrDefaultAsync();
+            return orgao != null && _permissoes.PodeVerOrgao(ctx, orgao.Value);
+        }
+
         if (arquivo.DonoTipo != PeDominios.DonoArquivo.Registro || arquivo.DonoId == null) return enviou;
 
         var registro = await _context.PeRegistros.AsNoTracking()

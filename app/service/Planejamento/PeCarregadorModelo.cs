@@ -117,7 +117,8 @@ public sealed class PeSeedOpcao
 /// <summary>O que uma carga fez (zeros quando a versão já estava carregada).</summary>
 public sealed record PeCarregamentoResultado(
     int VersaoAnterior, int Versao, bool Executou,
-    int Niveis, int Etapas, int Passos, int Secoes, int Campos, int Opcoes, int Configuracoes, int Registros = 0);
+    int Niveis, int Etapas, int Passos, int Secoes, int Campos, int Opcoes, int Configuracoes, int Registros = 0,
+    int Documentos = 0, int Capitulos = 0, int Blocos = 0);
 
 /// <summary>
 /// Carregador do modelo inicial do módulo Governança Estratégica: a trilha da seção 7 do
@@ -126,7 +127,9 @@ public sealed record PeCarregamentoResultado(
 /// impacto), os temas das ações (os três do decreto travados) e a periodicidade padrão do
 /// monitoramento; desde a versão 2 (E3), as seções do catálogo do DF (princípios e
 /// diretrizes do ciclo) e do PETIC-DF, e os 11 princípios do art. 4º do Decreto nº
-/// 48.900/2026 como registros do sistema. O conteúdo fica em JSON embutido na aplicação.
+/// 48.900/2026 como registros do sistema; desde a versão 3 (E5), o campo do logotipo no
+/// dicionário de nomes e o modelo do documento do PDTIC (capítulos, textos padrão e blocos de
+/// dados, em documento-inicial.json). O conteúdo fica em JSON embutido na aplicação.
 /// <list type="bullet">
 /// <item>Idempotente: se a versão gravada em pe_configuracao (seed_modelo_versao) já é a do
 /// JSON, não faz nada; senão insere só o que falta, achando cada item pela chave (nível
@@ -148,6 +151,9 @@ public sealed class PeCarregadorModelo
 
     /// <summary>Versão do modelo inicial que trouxe as seções do DF e do PETIC-DF e os princípios (E3).</summary>
     public const int VersaoDosReferenciais = 2;
+
+    /// <summary>Versão do modelo inicial que trouxe o modelo do documento do PDTIC e o logotipo (E5).</summary>
+    public const int VersaoDoDocumento = 3;
 
     // Trava do carregador no PostgreSQL: segura até o fim da transação
     private const string SqlTrava = "SELECT pg_advisory_xact_lock(4890020260924)";
@@ -343,7 +349,11 @@ public sealed class PeCarregadorModelo
 
     public Task<PeCarregamentoResultado> CarregarAsync(CancellationToken ct = default) => CarregarAsync(LerSeed(), ct);
 
-    public async Task<PeCarregamentoResultado> CarregarAsync(PeSeedModelo seed, CancellationToken ct = default)
+    public Task<PeCarregamentoResultado> CarregarAsync(PeSeedModelo seed, CancellationToken ct = default) =>
+        CarregarAsync(seed, null, ct);
+
+    /// <summary>A carga com o modelo do documento dado (nulo = o embutido na aplicação).</summary>
+    public async Task<PeCarregamentoResultado> CarregarAsync(PeSeedModelo seed, PeSeedDocumentos? documentos, CancellationToken ct = default)
     {
         ValidarSeed(seed);
 
@@ -647,6 +657,13 @@ public sealed class PeCarregadorModelo
             }
         }
 
+        // Modelo do documento do PDTIC (versão 3, E5): o que falta, achado pelo tipo do modelo e
+        // pela chave do capítulo; os blocos entram com o capítulo novo (capítulo que já existe não
+        // é tocado, nem os blocos dele)
+        var (nDocumentos, nCapitulos, nBlocos) = seed.Versao >= VersaoDoDocumento
+            ? await CarregarDocumentosAsync(documentos ?? PeDocSeed.Ler(), passos, secoes, campos, opcoes, agora, ct)
+            : (0, 0, 0);
+
         // A versão carregada
         if (registroVersao == null)
         {
@@ -669,7 +686,121 @@ public sealed class PeCarregadorModelo
         if (transacao != null) await transacao.CommitAsync(ct);
 
         return new PeCarregamentoResultado(versaoAnterior, seed.Versao, true, nNiveis, nEtapas, nPassos, nSecoes, nCampos, nOpcoes, nConfig,
-            nRegistros);
+            nRegistros, nDocumentos, nCapitulos, nBlocos);
+    }
+
+    /// <summary>
+    /// Acrescenta o modelo do documento (se o tipo ainda não tem modelo) e os capítulos que
+    /// faltam, com os blocos. O config de cada bloco passa pelo PeDocConfig com as seções e os
+    /// campos em volta (os que acabaram de entrar também); erro = modelo inicial inválido e
+    /// nada é gravado.
+    /// </summary>
+    private async Task<(int Documentos, int Capitulos, int Blocos)> CarregarDocumentosAsync(PeSeedDocumentos documentos,
+        List<PePasso> passos, List<PeSecao> secoes, List<PeCampo> campos, List<PeOpcao> opcoes, DateTime agora, CancellationToken ct)
+    {
+        PeDocSeed.Validar(documentos, passos.Where(p => p.ExcluidoEm == null).Select(p => p.Chave).ToHashSet());
+
+        bool DaSecao(PeCampo c, PeSecao s) => c.Secao == s || (s.Id != 0 && c.SecaoId == s.Id);
+        var contexto = new PeDocConfig.Contexto
+        {
+            CamposDaSecao = chave =>
+            {
+                var secao = secoes.FirstOrDefault(s => s.Chave == chave && s.Escopo == PeDominios.Escopo.Pdtic && s.ExcluidoEm == null);
+                return secao == null
+                    ? null
+                    : campos.Where(c => c.ExcluidoEm == null && DaSecao(c, secao)).Select(c => (c.Chave, c.Tipo)).ToList();
+            },
+            Temas = () =>
+            {
+                var acoes = secoes.FirstOrDefault(s => s.Chave == PeDominios.TemaDecreto.SecaoAcoes);
+                var tema = acoes == null ? null : campos.FirstOrDefault(c => c.Chave == PeDominios.TemaDecreto.CampoTema && DaSecao(c, acoes));
+                return tema == null
+                    ? Array.Empty<string>()
+                    : opcoes.Where(o => o.Campo == tema || (tema.Id != 0 && o.CampoId == tema.Id)).Select(o => o.Valor).ToList();
+            }
+        };
+
+        var modelos = await _context.PeDocModelos.ToListAsync(ct);
+        var capitulos = await _context.PeDocCapitulos.ToListAsync(ct);
+        int nDocumentos = 0, nCapitulos = 0, nBlocos = 0;
+
+        foreach (var sm in documentos.Modelos)
+        {
+            var modelo = modelos.FirstOrDefault(m => m.Tipo == sm.Tipo && m.Ativo) ?? modelos.FirstOrDefault(m => m.Tipo == sm.Tipo);
+            var modeloNovo = modelo == null;
+            if (modelo == null)
+            {
+                modelo = new PeDocModelo { Tipo = sm.Tipo, Nome = sm.Nome, Ativo = true, CriadoEm = agora, CriadoPor = Autor };
+                _context.PeDocModelos.Add(modelo);
+                modelos.Add(modelo);
+                nDocumentos++;
+            }
+            var doModelo = capitulos.Where(c => c.Modelo == modelo || (modelo.Id != 0 && c.ModeloId == modelo.Id)).ToList();
+
+            void Carregar(PeSeedDocCapitulo sc, PeDocCapitulo? pai, int posicao, bool paiNovo)
+            {
+                var capitulo = doModelo.FirstOrDefault(c => c.Chave == sc.Chave);
+                var novo = capitulo == null;
+                if (capitulo == null)
+                {
+                    // No modelo novo, a ordem do JSON; num modelo que já existe, depois dos irmãos
+                    var irmaos = doModelo.Where(c => pai == null
+                        ? c.Pai == null && c.PaiId == null
+                        : c.Pai == pai || (pai.Id != 0 && c.PaiId == pai.Id));
+                    capitulo = new PeDocCapitulo
+                    {
+                        Modelo = modelo,
+                        Pai = pai,
+                        Chave = sc.Chave,
+                        Titulo = sc.Titulo,
+                        Numerado = sc.Numerado,
+                        Obrigatorio = sc.Obrigatorio || sc.Travado,
+                        Travado = sc.Travado,
+                        IncisoDecreto = sc.Inciso,
+                        PassoChave = sc.Passo,
+                        Ordem = paiNovo ? posicao : irmaos.Select(c => c.Ordem).DefaultIfEmpty(0).Max() + 1,
+                        Sistema = true,
+                        CriadoEm = agora,
+                        CriadoPor = Autor
+                    };
+                    foreach (var (sb, ib) in sc.Blocos.Select((b, i) => (b, i)))
+                    {
+                        PeDocConfig.Resultado config;
+                        try
+                        {
+                            config = PeDocConfig.Normalizar(sb.Tipo, sb.Config(), contexto);
+                        }
+                        catch (ApiException ex)
+                        {
+                            throw new InvalidOperationException(
+                                $"Modelo inicial do documento inválido: bloco {ib + 1} do capítulo \"{sc.Chave}\": {ex.Error.Message}");
+                        }
+                        if (config.Imagens.Count > 0)
+                            throw new InvalidOperationException($"Modelo inicial do documento inválido: o capítulo \"{sc.Chave}\" traz imagem.");
+                        capitulo.Blocos.Add(new PeDocBloco
+                        {
+                            Tipo = sb.Tipo,
+                            Config = config.Json,
+                            Ordem = ib + 1,
+                            Sistema = true,
+                            CriadoEm = agora,
+                            CriadoPor = Autor
+                        });
+                        nBlocos++;
+                    }
+                    _context.PeDocCapitulos.Add(capitulo);
+                    doModelo.Add(capitulo);
+                    capitulos.Add(capitulo);
+                    nCapitulos++;
+                }
+                foreach (var (sub, i) in sc.Subcapitulos.Select((s, i) => (s, i)))
+                    Carregar(sub, capitulo, i + 1, novo);
+            }
+
+            foreach (var (sc, i) in sm.Capitulos.Select((c, i) => (c, i)))
+                Carregar(sc, null, i + 1, modeloNovo);
+        }
+        return (nDocumentos, nCapitulos, nBlocos);
     }
 
     /// <summary>

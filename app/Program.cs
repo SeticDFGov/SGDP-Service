@@ -159,6 +159,10 @@ builder.Services.AddScoped<IPePlanilhaService, service.Planejamento.PePlanilhaSe
 // (só leitura) e os comentários
 builder.Services.AddScoped<IPePdticService, service.Planejamento.PePdticService>();
 builder.Services.AddScoped<IPeComentarioService, service.Planejamento.PeComentarioService>();
+// Documento do PDTIC (E5): a prévia resolvida, a cópia do órgão, o PDF com as versões e o
+// modelo do documento do administrador
+builder.Services.AddScoped<IPeDocumentoService, service.Planejamento.PeDocumentoService>();
+builder.Services.AddScoped<IPeDocModeloService, service.Planejamento.PeDocModeloService>();
 // Modelo inicial (trilha e campos do PDTIC, e os referenciais do DF e do PETIC-DF, com os
 // princípios do art. 4º): carregado ao subir, fora das requisições.
 // Sem as tabelas (intervalo entre o PR e a migration do merge) só registra no log e

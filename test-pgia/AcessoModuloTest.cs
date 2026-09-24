@@ -467,6 +467,7 @@ public class AcessoModuloTest : PgiaTestBase
             [typeof(PeDeliberacoesController)] = ModulosSgdp.PoliticaPlanejamento,
             [typeof(PeArquivosController)] = ModulosSgdp.PoliticaPlanejamento,
             [typeof(PePdticController)] = ModulosSgdp.PoliticaPlanejamento,
+            [typeof(PeDocumentoController)] = ModulosSgdp.PoliticaPlanejamento,
             [typeof(PgiaAdminController)] = "role:admin",
             [typeof(CtrAdminController)] = "role:admin",
             [typeof(AcessoController)] = "role:admin",
@@ -847,8 +848,8 @@ public class AcessoModuloTest : PgiaTestBase
         var opcoes = new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options;
         using var contexto = new ContextoSemTabelasPe(opcoes);
 
-        // A simulação vale: ler a tabela do papel (E1), as do modelo (E2), as dos registros (E3)
-        // e as do PDTIC (E4) lança
+        // A simulação vale: ler a tabela do papel (E1), as do modelo (E2), as dos registros (E3),
+        // as do PDTIC (E4) e as do documento (E5) lança
         await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PePapeisUsuario.AnyAsync());
         await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PeNiveis.AnyAsync());
         await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PeOrgaosConfig.AnyAsync());
@@ -856,6 +857,8 @@ public class AcessoModuloTest : PgiaTestBase
         await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PePetics.AnyAsync());
         await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PePdtics.AnyAsync());
         await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PeComentarios.AnyAsync());
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PeDocModelos.AnyAsync());
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PeDocVersoes.AnyAsync());
 
         var sgdi = new User { KeycloakId = "kc-sgdi", Nome = "Sofia da SGDI", Email = "sofia@sgdi.df.gov.br", PapelPgia = PapeisPgia.Sgdi };
         var comum = new User { KeycloakId = "kc-comum", Nome = "Carlos Comum", Email = "carlos@df.gov.br" };

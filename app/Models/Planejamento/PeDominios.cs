@@ -336,14 +336,20 @@ public static class PeDominios
     }
 
     /// <summary>
-    /// Dono de um arquivo (pe_arquivo.dono_tipo): o registro cujo campo aponta para ele.
-    /// Nulo = recém-enviado, ainda sem dono (só quem enviou vê).
+    /// Dono de um arquivo (pe_arquivo.dono_tipo): o registro cujo campo aponta para ele; desde a
+    /// E5, o PDTIC (as imagens dos textos que o órgão editou no documento e os PDFs gerados) e o
+    /// modelo do documento (as imagens dos textos padrão, que todo papel do módulo lê). Nulo =
+    /// recém-enviado, ainda sem dono (só quem enviou vê).
     /// </summary>
     public static class DonoArquivo
     {
         public const string Registro = "registro";
+        // Imagens dos textos do órgão no documento e as versões geradas em PDF (dono_id = id do PDTIC)
+        public const string Pdtic = "pdtic";
+        // Imagens dos textos padrão do modelo do documento (dono_id = id do modelo)
+        public const string DocModelo = "doc_modelo";
 
-        public static readonly string[] Todos = { Registro };
+        public static readonly string[] Todos = { Registro, Pdtic, DocModelo };
     }
 
     /// <summary>Largura da coluna do campo nas tabelas.</summary>
@@ -399,8 +405,12 @@ public static class PeDominios
         public const string OrgaoNivel = "orgao_nivel";
         // Ajustes de um órgão (entidade_id = id do órgão)
         public const string OrgaoAjuste = "orgao_ajuste";
+        // Modelo do documento (E5): capítulo e bloco
+        public const string DocCapitulo = "doc_capitulo";
+        public const string DocBloco = "doc_bloco";
 
-        public static readonly string[] Todas = { Nivel, Etapa, Passo, Secao, Campo, Opcao, OrgaoNivel, OrgaoAjuste };
+        public static readonly string[] Todas =
+            { Nivel, Etapa, Passo, Secao, Campo, Opcao, OrgaoNivel, OrgaoAjuste, DocCapitulo, DocBloco };
     }
 
     /// <summary>O que aconteceu com o item (pe_modelo_historico.acao).</summary>
@@ -417,5 +427,109 @@ public static class PeDominios
         public const string Remocao = "remocao";
 
         public static readonly string[] Todas = { Criacao, Alteracao, Situacao, Ordem, Exclusao, Remocao };
+    }
+
+    // ── Documento do PDTIC (E5) ────────────────────────────────────────────────
+
+    /// <summary>Tipo do modelo de documento (pe_doc_modelo.tipo). A E7 acrescenta ra e rr.</summary>
+    public static class TipoDocumento
+    {
+        public const string Pdtic = "pdtic";
+
+        public static readonly string[] Todos = { Pdtic };
+
+        /// <summary>O título do documento, como sai na capa e na prévia.</summary>
+        public static string Titulo(string tipo) => tipo switch
+        {
+            Pdtic => "Plano Diretor de Tecnologia da Informação e Comunicação",
+            _ => tipo
+        };
+    }
+
+    /// <summary>
+    /// Tipo de um bloco do capítulo (pe_doc_bloco.tipo): o texto rico (editável pelo órgão), a
+    /// tabela de uma seção, a lista das ações de um tema, a matriz SWOT, o fluxo (desenhado a
+    /// partir da E6) e a quebra de página.
+    /// </summary>
+    public static class TipoBloco
+    {
+        public const string Texto = "texto";
+        public const string TabelaSecao = "tabela_secao";
+        public const string ListaTema = "lista_tema";
+        public const string MatrizSwot = "matriz_swot";
+        public const string Fluxo = "fluxo";
+        public const string QuebraPagina = "quebra_pagina";
+
+        public static readonly string[] Todos = { Texto, TabelaSecao, ListaTema, MatrizSwot, Fluxo, QuebraPagina };
+    }
+
+    /// <summary>
+    /// Situação de uma versão gerada do documento (pe_doc_versao.situacao). A E5 gera minutas;
+    /// a E7 congela a enviada ao CGTIC e a marca como aprovada e publicada.
+    /// </summary>
+    public static class SituacaoVersaoDoc
+    {
+        public const string Minuta = "minuta";
+        public const string Enviada = "enviada";
+        public const string Aprovada = "aprovada";
+        public const string Publicada = "publicada";
+
+        public static readonly string[] Todas = { Minuta, Enviada, Aprovada, Publicada };
+
+        public static string Rotulo(string situacao) => situacao switch
+        {
+            Minuta => "Minuta",
+            Enviada => "Enviada ao CGTIC",
+            Aprovada => "Aprovada",
+            Publicada => "Publicada",
+            _ => situacao
+        };
+    }
+
+    /// <summary>
+    /// Capítulos do modelo com desenho próprio no PDF: a capa, a folha de rosto, o histórico de
+    /// versões e o sumário (os elementos pré-textuais do Anexo X do guia) e os anexos, que
+    /// começam numa página nova. São capítulos do sistema: a chave não muda.
+    /// </summary>
+    public static class CapituloEspecial
+    {
+        public const string Capa = "capa";
+        public const string FolhaRosto = "folha_rosto";
+        public const string Historico = "historico_versoes";
+        public const string Sumario = "sumario";
+        public const string Anexos = "anexos";
+
+        public static readonly string[] PreTextuais = { Capa, FolhaRosto, Historico, Sumario };
+
+        public static bool EhPreTextual(string chave) => PreTextuais.Contains(chave);
+    }
+
+    /// <summary>
+    /// O dicionário de nomes do órgão (seção nomes do passo 1.2), fonte dos marcadores
+    /// {nomes.*} do documento e do logotipo da capa (campo de arquivo, desde a E5).
+    /// </summary>
+    public static class DicionarioNomes
+    {
+        public const string Secao = "nomes";
+        public const string Comite = "comite";
+        public const string Equipe = "equipe_elaboracao";
+        public const string EquipeAcompanhamento = "equipe_acompanhamento";
+        public const string AutoridadeCargo = "autoridade_cargo";
+        public const string AutoridadeNome = "autoridade_nome";
+        public const string UnidadeTic = "unidade_tic";
+        public const string SiglaOrgao = "sigla_orgao";
+        public const string Logotipo = "logotipo";
+    }
+
+    /// <summary>As quatro seções da análise SWOT (passo 2.5) e o campo do texto de cada item.</summary>
+    public static class SecoesSwot
+    {
+        public const string Forcas = "swot_forcas";
+        public const string Fraquezas = "swot_fraquezas";
+        public const string Oportunidades = "swot_oportunidades";
+        public const string Ameacas = "swot_ameacas";
+        public const string CampoTexto = "descricao";
+
+        public static readonly string[] Todas = { Forcas, Fraquezas, Oportunidades, Ameacas };
     }
 }

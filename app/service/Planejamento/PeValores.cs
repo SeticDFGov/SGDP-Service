@@ -235,7 +235,12 @@ public static class PeValores
                 var numero = PeRegistroDados.Numero(valor);
                 if (numero == null) return null;
                 var unidade = Texto(campo.Config, "unidade");
-                var formatado = PeFormato.Numero(numero.Value, Inteiro(campo.Config, "casas"));
+                var casas = Inteiro(campo.Config, "casas");
+                // Inteiro com máximo de até 9999 (o ano de uma ação ou de uma contratação): sem o
+                // ponto de milhar ("2026", não "2.026")
+                var formatado = casas == 0 && Decimal(campo.Config, "max") is decimal maximo && maximo <= 9999
+                    ? numero.Value.ToString("0", CultureInfo.InvariantCulture)
+                    : PeFormato.Numero(numero.Value, casas);
                 return unidade == null ? formatado : $"{formatado} {unidade}";
             }
             case PeDominios.TipoCampo.Moeda:

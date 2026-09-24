@@ -92,6 +92,13 @@ namespace Models
         public DbSet<PePdtic> PePdtics { get; set; }
         public DbSet<PePdticPasso> PePdticPassos { get; set; }
         public DbSet<PeComentario> PeComentarios { get; set; }
+        // Documento do PDTIC (E5): modelo da SGDI, cópia do órgão e versões geradas em PDF
+        public DbSet<PeDocModelo> PeDocModelos { get; set; }
+        public DbSet<PeDocCapitulo> PeDocCapitulos { get; set; }
+        public DbSet<PeDocBloco> PeDocBlocos { get; set; }
+        public DbSet<PeDocOrgao> PeDocOrgaos { get; set; }
+        public DbSet<PeDocOrgaoBloco> PeDocOrgaoBlocos { get; set; }
+        public DbSet<PeDocVersao> PeDocVersoes { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

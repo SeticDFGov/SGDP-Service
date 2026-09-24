@@ -13,8 +13,9 @@ namespace Controllers.Planejamento;
 /// <list type="bullet">
 /// <item>ApiException: pelo código (404 para "não encontrado", 403 para permissão, 409 para
 /// travado, do sistema, chave repetida, nível inativo, em uso, apagado, modelo
-/// indisponível, conflito, registro ligado ou do sistema, versão fechada ou já enviada e
-/// deliberação decidida; 400 para o resto). A validação de registro (PeValidacaoException)
+/// indisponível, conflito, registro ligado ou do sistema, versão fechada ou já enviada,
+/// deliberação decidida, capítulo obrigatório que o órgão tenta esconder e PDF que não pôde
+/// ser montado; 400 para o resto). A validação de registro (PeValidacaoException)
 /// leva também Campos, com a mensagem de cada campo;</item>
 /// <item>tabela ou coluna pe_ que ainda não existe (o PR publica o código antes da
 /// migration, que só roda no merge; desde a E4, a coluna pdtic_id de pe_registro): 409
@@ -55,7 +56,8 @@ internal static class PeRespostas
                 or ErrorCode.AcessoUsuarioNaoEncontrado or ErrorCode.PeRegistroNaoEncontrado or ErrorCode.PeSecaoIndisponivel
                 or ErrorCode.PePeticNaoEncontrado or ErrorCode.PeDeliberacaoNaoEncontrada or ErrorCode.PeArquivoNaoEncontrado
                 or ErrorCode.PeCatalogoNaoEncontrado or ErrorCode.PePdticNaoEncontrado or ErrorCode.PePassoIndisponivel
-                or ErrorCode.PeComentarioNaoEncontrado => StatusCodes.Status404NotFound,
+                or ErrorCode.PeComentarioNaoEncontrado or ErrorCode.PeDocCapituloNaoEncontrado or ErrorCode.PeDocBlocoNaoEncontrado
+                or ErrorCode.PeDocVersaoNaoEncontrada => StatusCodes.Status404NotFound,
             ErrorCode.PeSemPermissao => StatusCodes.Status403Forbidden,
             ErrorCode.PeAutoRebaixamento or ErrorCode.PeItemTravado or ErrorCode.PeItemDoSistema or ErrorCode.PeChaveDuplicada
                 or ErrorCode.PeNivelInativo or ErrorCode.PeUltimoNivelAtivo or ErrorCode.PeItemExcluido or ErrorCode.PeItemEmUso
@@ -63,7 +65,8 @@ internal static class PeRespostas
                 or ErrorCode.PeRegistroLigado or ErrorCode.PeFormularioJaPreenchido or ErrorCode.PeVersaoFechada
                 or ErrorCode.PeVersaoEmAndamento or ErrorCode.PeDeliberacaoJaDecidida
                 or ErrorCode.PeVersaoJaEnviada or ErrorCode.PePdticJaExiste or ErrorCode.PePdticFechado
-                or ErrorCode.PeNaoSeAplicaRecusado or ErrorCode.PeComentarioResolvido => StatusCodes.Status409Conflict,
+                or ErrorCode.PeNaoSeAplicaRecusado or ErrorCode.PeComentarioResolvido
+                or ErrorCode.PeDocCapituloObrigatorio or ErrorCode.PeDocGeracaoFalhou => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
         // Validação de registro: a mensagem de cada campo, pela chave

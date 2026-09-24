@@ -73,6 +73,7 @@ public static class PeModelConfiguration
         modelBuilder.ApplyPeModeloConfiguration();
         modelBuilder.ApplyPeReferenciaisConfiguration();
         modelBuilder.ApplyPePdticConfiguration();
+        modelBuilder.ApplyPeDocumentoConfiguration();
     }
 
     // ── Modelo configurável e níveis de maturidade (E2) ──────────────────────
@@ -821,4 +822,189 @@ public static class PeModelConfiguration
 
     private static string ForaDaLista(string coluna, IEnumerable<string> valores) =>
         $"{coluna} NOT IN ({string.Join(",", valores.Select(v => $"'{v.Replace("'", "''")}'"))})";
+
+    // ── Documento do PDTIC (E5) ───────────────────────────────────────────────
+
+    private static void ApplyPeDocumentoConfiguration(this ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PeDocModelo>(entity =>
+        {
+            entity.ToTable("pe_doc_modelo", t =>
+                t.HasCheckConstraint("ck_pe_doc_modelo_tipo", EmLista("tipo", PeDominios.TipoDocumento.Todos)));
+
+            entity.HasKey(m => m.Id).HasName("pk_pe_doc_modelo");
+            entity.Property(m => m.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(m => m.Tipo).HasColumnName("tipo").HasMaxLength(10).IsRequired();
+            entity.Property(m => m.Nome).HasColumnName("nome").HasMaxLength(200).IsRequired();
+            entity.Property(m => m.Ativo).HasColumnName("ativo");
+            Auditoria(entity);
+
+            // Um modelo ativo por tipo
+            entity.HasIndex(m => m.Tipo).IsUnique().HasFilter("ativo").HasDatabaseName("ux_pe_doc_modelo_ativo");
+        });
+
+        modelBuilder.Entity<PeDocCapitulo>(entity =>
+        {
+            entity.ToTable("pe_doc_capitulo", t =>
+            {
+                t.HasCheckConstraint("ck_pe_doc_capitulo_chave", $"chave ~ '{ChaveComSublinhado}'");
+                t.HasCheckConstraint("ck_pe_doc_capitulo_inciso", $"inciso_decreto IS NULL OR inciso_decreto ~ '{Incisos}'");
+                // Os nove conteúdos do art. 12, § 2º, são sempre obrigatórios
+                t.HasCheckConstraint("ck_pe_doc_capitulo_travado", "NOT travado OR obrigatorio");
+                t.HasCheckConstraint("ck_pe_doc_capitulo_pai", "pai_id IS NULL OR pai_id <> id");
+            });
+
+            entity.HasKey(c => c.Id).HasName("pk_pe_doc_capitulo");
+            entity.Property(c => c.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(c => c.ModeloId).HasColumnName("modelo_id");
+            entity.Property(c => c.PaiId).HasColumnName("pai_id");
+            entity.Property(c => c.Chave).HasColumnName("chave").HasMaxLength(60).IsRequired();
+            entity.Property(c => c.Titulo).HasColumnName("titulo").HasMaxLength(200).IsRequired();
+            entity.Property(c => c.Numerado).HasColumnName("numerado");
+            entity.Property(c => c.Ordem).HasColumnName("ordem");
+            entity.Property(c => c.Obrigatorio).HasColumnName("obrigatorio");
+            entity.Property(c => c.Travado).HasColumnName("travado");
+            entity.Property(c => c.IncisoDecreto).HasColumnName("inciso_decreto").HasMaxLength(40);
+            entity.Property(c => c.PassoChave).HasColumnName("passo_chave").HasMaxLength(100);
+            entity.Property(c => c.Sistema).HasColumnName("sistema");
+            entity.Property(c => c.ExcluidoEm).HasColumnName("excluido_em");
+            Auditoria(entity);
+
+            // A chave é única no modelo, inclusive entre os apagados (a cópia do órgão fica guardada)
+            entity.HasIndex(c => new { c.ModeloId, c.Chave }).IsUnique().HasDatabaseName("ux_pe_doc_capitulo_chave");
+            entity.HasIndex(c => c.PaiId).HasDatabaseName("ix_pe_doc_capitulo_pai");
+
+            entity.HasOne(c => c.Modelo)
+                .WithMany(m => m.Capitulos)
+                .HasForeignKey(c => c.ModeloId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_doc_capitulo_modelo");
+
+            entity.HasOne(c => c.Pai)
+                .WithMany()
+                .HasForeignKey(c => c.PaiId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_doc_capitulo_pai");
+        });
+
+        modelBuilder.Entity<PeDocBloco>(entity =>
+        {
+            entity.ToTable("pe_doc_bloco", t =>
+                t.HasCheckConstraint("ck_pe_doc_bloco_tipo", EmLista("tipo", PeDominios.TipoBloco.Todos)));
+
+            entity.HasKey(b => b.Id).HasName("pk_pe_doc_bloco");
+            entity.Property(b => b.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(b => b.CapituloId).HasColumnName("capitulo_id");
+            entity.Property(b => b.Ordem).HasColumnName("ordem");
+            entity.Property(b => b.Tipo).HasColumnName("tipo").HasMaxLength(20).IsRequired();
+            entity.Property(b => b.Config).HasColumnName("config").HasColumnType("jsonb").IsRequired();
+            entity.Property(b => b.Sistema).HasColumnName("sistema");
+            entity.Property(b => b.ExcluidoEm).HasColumnName("excluido_em");
+            Auditoria(entity);
+
+            entity.HasIndex(b => new { b.CapituloId, b.Ordem }).HasDatabaseName("ix_pe_doc_bloco_capitulo");
+
+            // Capítulo não é apagado de verdade (exclusão lógica)
+            entity.HasOne(b => b.Capitulo)
+                .WithMany(c => c.Blocos)
+                .HasForeignKey(b => b.CapituloId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_doc_bloco_capitulo");
+        });
+
+        modelBuilder.Entity<PeDocOrgao>(entity =>
+        {
+            entity.ToTable("pe_doc_orgao");
+
+            entity.HasKey(o => o.Id).HasName("pk_pe_doc_orgao");
+            entity.Property(o => o.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(o => o.PdticId).HasColumnName("pdtic_id");
+            entity.Property(o => o.CapituloId).HasColumnName("capitulo_id");
+            entity.Property(o => o.Oculto).HasColumnName("oculto");
+            entity.Property(o => o.TituloProprio).HasColumnName("titulo_proprio").HasMaxLength(200);
+            Auditoria(entity);
+
+            entity.HasIndex(o => new { o.PdticId, o.CapituloId }).IsUnique().HasDatabaseName("ux_pe_doc_orgao");
+            entity.HasIndex(o => o.CapituloId).HasDatabaseName("ix_pe_doc_orgao_capitulo");
+
+            entity.HasOne(o => o.Pdtic)
+                .WithMany()
+                .HasForeignKey(o => o.PdticId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_doc_orgao_pdtic");
+
+            entity.HasOne(o => o.Capitulo)
+                .WithMany()
+                .HasForeignKey(o => o.CapituloId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_doc_orgao_capitulo");
+        });
+
+        modelBuilder.Entity<PeDocOrgaoBloco>(entity =>
+        {
+            entity.ToTable("pe_doc_orgao_bloco");
+
+            entity.HasKey(o => o.Id).HasName("pk_pe_doc_orgao_bloco");
+            entity.Property(o => o.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(o => o.PdticId).HasColumnName("pdtic_id");
+            entity.Property(o => o.BlocoId).HasColumnName("bloco_id");
+            entity.Property(o => o.Texto).HasColumnName("texto").HasColumnType("jsonb").IsRequired();
+            entity.Property(o => o.ModeloHash).HasColumnName("modelo_hash").HasMaxLength(64).IsRequired();
+            entity.Property(o => o.EditadoEm).HasColumnName("editado_em");
+            entity.Property(o => o.EditadoPor).HasColumnName("editado_por").HasMaxLength(200).IsRequired();
+
+            entity.HasIndex(o => new { o.PdticId, o.BlocoId }).IsUnique().HasDatabaseName("ux_pe_doc_orgao_bloco");
+            entity.HasIndex(o => o.BlocoId).HasDatabaseName("ix_pe_doc_orgao_bloco_bloco");
+
+            entity.HasOne(o => o.Pdtic)
+                .WithMany()
+                .HasForeignKey(o => o.PdticId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_doc_orgao_bloco_pdtic");
+
+            entity.HasOne(o => o.Bloco)
+                .WithMany()
+                .HasForeignKey(o => o.BlocoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_doc_orgao_bloco_bloco");
+        });
+
+        modelBuilder.Entity<PeDocVersao>(entity =>
+        {
+            entity.ToTable("pe_doc_versao", t =>
+            {
+                t.HasCheckConstraint("ck_pe_doc_versao_situacao", EmLista("situacao", PeDominios.SituacaoVersaoDoc.Todas));
+                t.HasCheckConstraint("ck_pe_doc_versao_numero", "numero >= 1");
+                t.HasCheckConstraint("ck_pe_doc_versao_paginas", "paginas >= 1");
+            });
+
+            entity.HasKey(v => v.Id).HasName("pk_pe_doc_versao");
+            entity.Property(v => v.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(v => v.PdticId).HasColumnName("pdtic_id");
+            entity.Property(v => v.Numero).HasColumnName("numero");
+            entity.Property(v => v.Situacao).HasColumnName("situacao").HasMaxLength(20).IsRequired();
+            entity.Property(v => v.ArquivoId).HasColumnName("arquivo_id");
+            entity.Property(v => v.Hash).HasColumnName("hash").HasMaxLength(64).IsRequired();
+            entity.Property(v => v.Paginas).HasColumnName("paginas");
+            entity.Property(v => v.GeradoEm).HasColumnName("gerado_em");
+            entity.Property(v => v.GeradoPor).HasColumnName("gerado_por").HasMaxLength(200).IsRequired();
+
+            // Número sequencial no PDTIC: duas gerações ao mesmo tempo não dão o mesmo número
+            entity.HasIndex(v => new { v.PdticId, v.Numero }).IsUnique().HasDatabaseName("ux_pe_doc_versao_numero");
+            entity.HasIndex(v => v.ArquivoId).HasDatabaseName("ix_pe_doc_versao_arquivo");
+
+            entity.HasOne(v => v.Pdtic)
+                .WithMany()
+                .HasForeignKey(v => v.PdticId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_doc_versao_pdtic");
+
+            // O PDF não é apagado enquanto a versão existir
+            entity.HasOne(v => v.Arquivo)
+                .WithMany()
+                .HasForeignKey(v => v.ArquivoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_doc_versao_arquivo");
+        });
+    }
 }

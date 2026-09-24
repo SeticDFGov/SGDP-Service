@@ -58,6 +58,13 @@ public interface IPeRegistroService
     /// chama: quem chama já conferiu.
     /// </summary>
     Task<Dictionary<long, List<PeRegistroResponse>>> ExportarDosPdticsAsync(long secaoId, IReadOnlyList<(long PdticId, PeSecaoDoDono Secao)> pdtics);
+
+    /// <summary>
+    /// Os registros de várias seções do dono de uma vez (o documento do PDTIC, E5), cada seção
+    /// com todos os campos visíveis como colunas e os registros com os rótulos. Não confere quem
+    /// chama: quem chama já conferiu.
+    /// </summary>
+    Task<List<PeSecaoExportada>> ExportarAsync(PeDono dono, IReadOnlyList<PeSecaoDoDono> secoes);
 }
 
 /// <summary>

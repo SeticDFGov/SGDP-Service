@@ -145,4 +145,13 @@ public enum ErrorCode
     PeComentarioNaoEncontrado = 1055,   // 404
     PeComentarioInvalido = 1056,        // 400: texto vazio ou longo, resposta a uma resposta, passo diferente do comentário
     PeComentarioResolvido = 1057,       // 409: comentário resolvido não recebe resposta
+    // Documento do PDTIC (E5): faixa 1070 a 1089
+    PeDocCapituloNaoEncontrado = 1070,  // 404: capítulo inexistente, apagado ou fora do documento do órgão
+    PeDocBlocoNaoEncontrado = 1071,     // 404: bloco inexistente, apagado ou fora do documento do órgão
+    PeDocCapituloObrigatorio = 1072,    // 409: capítulo travado (art. 12, § 2º) ou obrigatório não se esconde
+    PeDocBlocoNaoEditavel = 1073,       // 400: só o bloco de texto recebe o texto do órgão
+    PeDocTextoInvalido = 1074,          // 400: texto rico fora da lista, grande demais ou com imagem que não serve
+    PeDocConfigInvalida = 1075,         // 400: config do bloco não serve para o tipo
+    PeDocVersaoNaoEncontrada = 1076,    // 404: versão gerada inexistente
+    PeDocGeracaoFalhou = 1077,          // 409: o PDF não pôde ser montado (conteúdo que não cabe na página)
 }

@@ -1,5 +1,5 @@
 {
-  "versao": 2,
+  "versao": 3,
   "niveis": [
     {
       "codigo": "basico",
@@ -143,6 +143,16 @@
                   "tipo": "texto_curto",
                   "niveis": "opcional",
                   "ajuda": "Deixe em branco para usar a sigla do cadastro."
+                },
+                {
+                  "chave": "logotipo",
+                  "rotulo": "Logotipo do órgão",
+                  "tipo": "arquivo",
+                  "config": {"tipos": ["png", "jpg"], "maxMb": 5},
+                  "niveis": "opcional",
+                  "noDocumento": false,
+                  "naPlanilha": false,
+                  "ajuda": "Imagem PNG ou JPEG de até 5 MB. Ela vai na capa do documento do PDTIC."
                 }
               ]
             }

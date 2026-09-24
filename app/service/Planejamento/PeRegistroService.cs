@@ -256,6 +256,40 @@ public class PeRegistroService : IPeRegistroService
         });
     }
 
+    public async Task<List<PeSecaoExportada>> ExportarAsync(PeDono dono, IReadOnlyList<PeSecaoDoDono> secoes)
+    {
+        var ids = secoes.Select(s => s.Secao.Id).Distinct().ToList();
+        var registros = ids.Count == 0
+            ? new List<PeRegistro>()
+            : await RegistrosDo(dono).AsNoTracking()
+                .Where(r => ids.Contains(r.SecaoId))
+                .OrderBy(r => r.Ordem).ThenBy(r => r.Id)
+                .ToListAsync();
+
+        // Poucas consultas para todas as seções: ligações, resumos dos ligados e sistemas do PGIA
+        var idsRegistros = registros.Select(r => r.Id).ToList();
+        var comLigacao = secoes.Any(s => s.Visiveis.Any(v => PeRegistroDados.EhLigacaoPorVinculo(v.Campo)));
+        var ligacoes = comLigacao && idsRegistros.Count > 0
+            ? await _context.PeVinculos.AsNoTracking().Where(v => idsRegistros.Contains(v.RegistroOrigemId)).ToListAsync()
+            : new List<PeVinculo>();
+        var destinos = await ResumosAsync(ligacoes.Select(v => v.RegistroDestinoId));
+        var porOrigem = ligacoes.ToLookup(v => v.RegistroOrigemId);
+        var camposPgia = secoes.SelectMany(s => s.Visiveis)
+            .Where(v => PeRegistroDados.EhLigacaoPgia(v.Campo))
+            .Select(v => v.Campo.Chave)
+            .Distinct()
+            .ToList();
+        var sistemas = await SistemasPgiaAsync(camposPgia, registros);
+
+        var porSecao = registros.ToLookup(r => r.SecaoId);
+        return secoes.Select(secao => new PeSecaoExportada
+        {
+            Modelo = secao,
+            Colunas = secao.Visiveis.ToList(),
+            Registros = porSecao[secao.Secao.Id].Select(r => Resposta(secao, r, porOrigem[r.Id], destinos, sistemas)).ToList()
+        }).ToList();
+    }
+
     // ── Escrita ─────────────────────────────────────────────────────────────
 
     public async Task<PeRegistroResponse> CriarAsync(PeDono dono, string secaoChave, PeRegistroSalvarDTO dto, PeUserContext ctx)
