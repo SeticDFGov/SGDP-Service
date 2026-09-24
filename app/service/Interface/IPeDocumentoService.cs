@@ -26,6 +26,12 @@ public interface IPeDocumentoService
     /// <summary>Gera o PDF e guarda uma versão minuta; devolve a versão.</summary>
     Task<PeDocVersaoResponse> GerarPdfAsync(long pdticId, PeUserContext ctx);
 
+    /// <summary>
+    /// Gera o PDF com a situação dada e deixa a versão no contexto, sem gravar (E7: a versão
+    /// "enviada" entra na mesma gravação do envio ao CGTIC e da deliberação). Não confere quem chama.
+    /// </summary>
+    Task<(Models.Planejamento.PeDocVersao Versao, long Tamanho)> GerarVersaoAsync(Models.Planejamento.PePdtic pdtic, PeUserContext ctx, string situacao);
+
     Task<List<PeDocVersaoResponse>> VersoesAsync(long pdticId, PeUserContext ctx);
 
     Task<PeDocArquivo> ArquivoDaVersaoAsync(long pdticId, int numero, PeUserContext ctx);

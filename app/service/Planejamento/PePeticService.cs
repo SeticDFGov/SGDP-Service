@@ -273,8 +273,29 @@ public class PePeticService : IPePeticService
     {
         var ids = idsPetic.ToList();
         if (ids.Count == 0) return new Dictionary<long, PeDeliberacao>();
+        // Só as colunas que a deliberação do PETIC-DF usa, sem a do PDF enviado (doc_versao_id, da
+        // E7, só do PDTIC): assim a lista, a versão e a criação do PETIC-DF não dependem dela no
+        // intervalo do deploy (código novo antes da migration), e criar um rascunho nesse intervalo
+        // não grava para depois responder 409
         var todas = await _context.PeDeliberacoes.AsNoTracking()
             .Where(d => d.ObjetoTipo == PeDominios.ObjetoDeliberacao.Petic && ids.Contains(d.ObjetoId))
+            .Select(d => new PeDeliberacao
+            {
+                Id = d.Id,
+                ObjetoTipo = d.ObjetoTipo,
+                ObjetoId = d.ObjetoId,
+                VersaoObjeto = d.VersaoObjeto,
+                EnviadoEm = d.EnviadoEm,
+                EnviadoPor = d.EnviadoPor,
+                Situacao = d.Situacao,
+                DecididoEm = d.DecididoEm,
+                DecididoPor = d.DecididoPor,
+                AtoTipo = d.AtoTipo,
+                AtoNumero = d.AtoNumero,
+                AtoData = d.AtoData,
+                Sei = d.Sei,
+                Observacao = d.Observacao
+            })
             .ToListAsync();
         return todas.GroupBy(d => d.ObjetoId).ToDictionary(g => g.Key, g => g.OrderByDescending(d => d.Id).First());
     }
@@ -299,9 +320,12 @@ public class PePeticService : IPePeticService
 /// <summary>
 /// Deliberações do CGTIC (Secretaria Executiva). Decidir é uma vez só: a situação da
 /// deliberação é token de concorrência, e duas decisões ao mesmo tempo não passam as duas.
-/// Aprovar marca a versão vigente anterior como substituída numa gravação e aprova a nova
-/// na seguinte, dentro da mesma transação (o índice único de "aprovado" não admite duas
-/// vigentes nem por um instante).
+/// PETIC-DF: aprovar marca a versão vigente anterior como substituída numa gravação e aprova
+/// a nova na seguinte, dentro da mesma transação (o índice único de "aprovado" não admite
+/// duas vigentes nem por um instante). PDTIC (E7): aprovar põe o PDTIC em "aprovado" (com a
+/// data), marca a versão do documento enviada como aprovada e, na revisão, a versão vigente
+/// do órgão como substituída; devolver põe o PDTIC em "devolvido" (volta a ser editável). O
+/// item do PDTIC na fila traz "PDTIC SES 1.0", o órgão e o PDF enviado (Documento).
 /// </summary>
 public partial class PeDeliberacaoService : IPeDeliberacaoService
 {
@@ -352,7 +376,7 @@ public partial class PeDeliberacaoService : IPeDeliberacaoService
             .Take(pageSize)
             .ToListAsync();
 
-        return new PagedResponse<PeDeliberacaoResponse>(linhas.Select(Resposta).ToList(), total, page, pageSize);
+        return new PagedResponse<PeDeliberacaoResponse>(await RespostasAsync(_context, linhas), total, page, pageSize);
     }
 
     public async Task<PeDeliberacaoResponse> DecidirAsync(long id, PeDecidirDTO dto, PeUserContext ctx)
@@ -385,8 +409,11 @@ public partial class PeDeliberacaoService : IPeDeliberacaoService
             case PeDominios.ObjetoDeliberacao.Petic:
                 await AplicarAoPeticAsync(deliberacao, decisao, ctx, agora);
                 break;
+            case PeDominios.ObjetoDeliberacao.Pdtic:
+                await AplicarAoPdticAsync(deliberacao, decisao, ctx, agora);
+                break;
             default:
-                throw Invalida("A deliberação sobre o PDTIC chega numa próxima entrega.");
+                throw Invalida("Esta deliberação é de um objeto que o módulo não conhece.");
         }
 
         deliberacao.Situacao = decisao;
@@ -402,7 +429,47 @@ public partial class PeDeliberacaoService : IPeDeliberacaoService
         await _context.SaveChangesAsync();
         if (transacao != null) await transacao.CommitAsync();
 
-        return Resposta(deliberacao);
+        return (await RespostasAsync(_context, new[] { deliberacao }))[0];
+    }
+
+    /// <summary>
+    /// A decisão sobre um PDTIC (E7): aprovado põe o PDTIC em "aprovado" (aprovado_em), a versão
+    /// do documento enviada em "aprovada" e, quando é uma revisão, a versão vigente do órgão em
+    /// "substituída" (a anterior segue em acompanhamento até aqui); devolvido volta o PDTIC a
+    /// ser editável ("devolvido"; a versão enviada fica como estava).
+    /// </summary>
+    private async Task AplicarAoPdticAsync(PeDeliberacao deliberacao, string decisao, PeUserContext ctx, DateTime agora)
+    {
+        var pdtic = await _context.PePdtics.FirstOrDefaultAsync(p => p.Id == deliberacao.ObjetoId)
+            ?? throw new ApiException(ErrorCode.PePdticNaoEncontrado, "O PDTIC desta deliberação não existe mais.");
+        if (pdtic.Situacao != PeDominios.SituacaoPdtic.EmAprovacao)
+            throw new ApiException(ErrorCode.PeConflitoGravacao, "O PDTIC não está mais aguardando a deliberação. Atualize a tela.");
+
+        if (decisao == PeDominios.SituacaoDeliberacao.Aprovado)
+        {
+            // A vigente do órgão (a versão que a revisão revê) sai quando a nova é aprovada
+            var vigentes = await _context.PePdtics
+                .Where(p => p.OrgaoId == pdtic.OrgaoId && p.Id != pdtic.Id && PeDominios.SituacaoPdtic.Vigentes.Contains(p.Situacao))
+                .ToListAsync();
+            foreach (var anterior in vigentes)
+            {
+                anterior.Situacao = PeDominios.SituacaoPdtic.Substituido;
+                anterior.AlteradoEm = agora;
+                anterior.AlteradoPor = ctx.Email;
+            }
+
+            pdtic.Situacao = PeDominios.SituacaoPdtic.Aprovado;
+            pdtic.AprovadoEm = agora;
+            if (deliberacao.DocVersaoId is long versaoId
+                && await _context.PeDocVersoes.FirstOrDefaultAsync(v => v.Id == versaoId) is { } versao)
+                versao.Situacao = PeDominios.SituacaoVersaoDoc.Aprovada;
+        }
+        else
+        {
+            pdtic.Situacao = PeDominios.SituacaoPdtic.Devolvido;
+        }
+        pdtic.AlteradoEm = agora;
+        pdtic.AlteradoPor = ctx.Email;
     }
 
     private async Task AplicarAoPeticAsync(PeDeliberacao deliberacao, string decisao, PeUserContext ctx, DateTime agora)
@@ -435,6 +502,55 @@ public partial class PeDeliberacaoService : IPeDeliberacaoService
         }
         petic.AlteradoEm = agora;
         petic.AlteradoPor = ctx.Email;
+    }
+
+    /// <summary>
+    /// As respostas de uma lista de deliberações, com o órgão e o PDF enviado de cada PDTIC
+    /// (duas consultas para a lista inteira, não uma por item).
+    /// </summary>
+    internal static async Task<List<PeDeliberacaoResponse>> RespostasAsync(AppDbContext context, IReadOnlyList<PeDeliberacao> deliberacoes)
+    {
+        var pdtics = deliberacoes.Where(d => d.ObjetoTipo == PeDominios.ObjetoDeliberacao.Pdtic).Select(d => d.ObjetoId).Distinct().ToList();
+        var orgaos = pdtics.Count == 0
+            ? new Dictionary<long, (string Sigla, string Nome)>()
+            : (await (from p in context.PePdtics.AsNoTracking()
+                      join o in context.PgiaOrgaos.AsNoTracking() on p.OrgaoId equals o.Id
+                      where pdtics.Contains(p.Id)
+                      select new { p.Id, o.Sigla, o.Nome })
+                .ToListAsync())
+                .ToDictionary(x => x.Id, x => (x.Sigla, x.Nome));
+        var idsVersoes = deliberacoes.Where(d => d.DocVersaoId != null).Select(d => d.DocVersaoId!.Value).Distinct().ToList();
+        var versoes = idsVersoes.Count == 0
+            ? new Dictionary<long, PeDeliberacaoDocumentoResponse>()
+            : await context.PeDocVersoes.AsNoTracking()
+                .Where(v => idsVersoes.Contains(v.Id))
+                .ToDictionaryAsync(v => v.Id, v => new PeDeliberacaoDocumentoResponse { PdticId = v.PdticId, Numero = v.Numero });
+
+        return deliberacoes.Select(d =>
+        {
+            var resposta = Resposta(d);
+            if (d.ObjetoTipo != PeDominios.ObjetoDeliberacao.Pdtic) return resposta;
+            if (orgaos.TryGetValue(d.ObjetoId, out var orgao))
+            {
+                resposta.OrgaoSigla = orgao.Sigla;
+                resposta.OrgaoNome = orgao.Nome;
+                resposta.Titulo = $"PDTIC {orgao.Sigla} {d.VersaoObjeto}";
+            }
+            resposta.Documento = d.DocVersaoId is long versao ? versoes.GetValueOrDefault(versao) : null;
+            return resposta;
+        }).ToList();
+    }
+
+    /// <summary>A deliberação mais recente de cada PDTIC (pelo id), já com o órgão e o PDF enviado.</summary>
+    internal static async Task<Dictionary<long, PeDeliberacaoResponse>> UltimasDosPdticsAsync(AppDbContext context, IReadOnlyCollection<long> pdticIds)
+    {
+        if (pdticIds.Count == 0) return new Dictionary<long, PeDeliberacaoResponse>();
+        var ids = pdticIds.Distinct().ToList();
+        var todas = await context.PeDeliberacoes.AsNoTracking()
+            .Where(d => d.ObjetoTipo == PeDominios.ObjetoDeliberacao.Pdtic && ids.Contains(d.ObjetoId))
+            .ToListAsync();
+        var ultimas = todas.GroupBy(d => d.ObjetoId).Select(g => g.OrderByDescending(d => d.Id).First()).ToList();
+        return (await RespostasAsync(context, ultimas)).ToDictionary(r => r.ObjetoId);
     }
 
     internal static PeDeliberacaoResponse Resposta(PeDeliberacao d) => new()

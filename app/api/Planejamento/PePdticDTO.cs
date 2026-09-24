@@ -4,7 +4,11 @@ namespace api.Planejamento;
 
 /// <summary>
 /// O PDTIC de um órgão numa versão, com o nível de maturidade de hoje do órgão e se quem
-/// chama pode editar (equipe do órgão, ou admin geral, com o PDTIC em elaboração ou devolvido).
+/// chama pode editar a elaboração (equipe do órgão, ou admin geral, com o PDTIC em elaboração
+/// ou devolvido: as etapas 1 a 3, o documento e os fluxos). Para os outros passos (a
+/// publicação e as etapas 4 a 7), vale o PodeEditar de cada passo em GET pdtic/{id}/situacao.
+/// Desde a E7, as datas do caminho da aprovação, a deliberação mais recente do CGTIC (com o
+/// PDF enviado) e, na revisão, a versão revista.
 /// </summary>
 public class PePdticResponse
 {
@@ -35,11 +39,111 @@ public class PePdticResponse
 
     public string? NivelNome { get; set; }
 
+    // A elaboração (etapas 1 a 3, documento e fluxos) está aberta para quem chama
     public bool PodeEditar { get; set; }
 
     public DateTime CriadoEm { get; set; }
 
     public string CriadoPor { get; set; } = string.Empty;
+
+    // ── Caminho da aprovação (E7) ──
+
+    // O último envio ao CGTIC
+    public DateTime? EnviadoEm { get; set; }
+
+    public DateTime? AprovadoEm { get; set; }
+
+    public DateTime? PublicadoEm { get; set; }
+
+    public DateTime? EncerradoEm { get; set; }
+
+    public string? EncerramentoMotivo { get; set; }
+
+    // A deliberação mais recente do CGTIC sobre esta versão (a forma da fila, com o Documento), ou nulo
+    public PeDeliberacaoResponse? Deliberacao { get; set; }
+
+    // Na revisão (versão 1.1 aberta a partir da vigente 1.0): a versão revista; nulo fora dela
+    public PePdticRevisaoResponse? Revisao { get; set; }
+}
+
+/// <summary>A versão que a revisão reviu (a vigente quando a revisão foi aberta).</summary>
+public class PePdticRevisaoResponse
+{
+    public long AnteriorId { get; set; }
+
+    public string AnteriorVersao { get; set; } = string.Empty;
+
+    // A mais que o contrato: a justificativa de quem abriu a revisão sem a decisão do comitê (Básico)
+    public string? Justificativa { get; set; }
+}
+
+/// <summary>GET pdtic/{id}/envio: a prévia do envio ao CGTIC (o que falta, passo a passo).</summary>
+public class PeEnvioResponse
+{
+    public bool PodeEnviar { get; set; }
+
+    public List<PePendenciaResponse> Pendencias { get; set; } = new();
+
+    // A mais que o contrato: por que não pode enviar quando a lista não explica (a situação ou o papel), ou nulo
+    public string? Motivo { get; set; }
+}
+
+/// <summary>Um passo que falta para o envio: o passo da trilha (id, número e título) e o que fazer nele.</summary>
+public class PePendenciaResponse
+{
+    public long PassoId { get; set; }
+
+    public string PassoNumero { get; set; } = string.Empty;
+
+    public string PassoTitulo { get; set; } = string.Empty;
+
+    public string Motivo { get; set; } = string.Empty;
+}
+
+/// <summary>POST pdtic/{id}/encerrar: { Motivo } (obrigatório quando o administrador encerra pela vigência vencida).</summary>
+public class PeEncerrarDTO
+{
+    public string? Motivo { get; set; }
+}
+
+/// <summary>POST pdtic/{id}/revisao: { Justificativa } (obrigatória quando o passo 6.3 não está na trilha do órgão).</summary>
+public class PeRevisaoDTO
+{
+    public string? Justificativa { get; set; }
+}
+
+/// <summary>
+/// POST pdtic/registrar-externo: o PDTIC aprovado fora do sistema. Datas em "aaaa-mm-dd";
+/// ArquivoId é o PDF enviado antes por POST arquivos; AprovacaoInstancia "cgtic" ou "outra".
+/// Erros de campo em Campos, pelo nome da propriedade ("VigenciaFim").
+/// </summary>
+public class PeRegistroExternoDTO
+{
+    // Nulo para a equipe do órgão (o próprio); o órgão escolhido pelo admin geral
+    public long? OrgaoId { get; set; }
+
+    // "1.0", "2.1"...
+    public string? Versao { get; set; }
+
+    public string? VigenciaInicio { get; set; }
+
+    public string? VigenciaFim { get; set; }
+
+    public long? ArquivoId { get; set; }
+
+    public string? AprovacaoInstancia { get; set; }
+
+    public string? AprovacaoData { get; set; }
+
+    public string? AprovacaoAtoTipo { get; set; }
+
+    public string? AprovacaoAtoNumero { get; set; }
+
+    public string? AprovacaoSei { get; set; }
+
+    public string? PublicacaoData { get; set; }
+
+    public string? PublicacaoEndereco { get; set; }
 }
 
 /// <summary>
@@ -69,7 +173,9 @@ public class PePdticConsulta
 /// <summary>GET pdtic/{id}/situacao: a situação de cada passo visível e o próximo passo recomendado.</summary>
 public class PePdticSituacaoResponse
 {
-    // Número ("2.3") do primeiro passo pendente ou em atenção, na ordem da trilha; nulo quando não há
+    // Número ("2.3") do passo recomendado: o primeiro atrasado, senão o primeiro em atenção,
+    // senão o primeiro pendente, na ordem da trilha (aguardando e externo nunca); na revisão
+    // recém-aberta, o primeiro passo da etapa 2; nulo quando não há ou o PDTIC encerrou
     public string? ProximoPasso { get; set; }
 
     public List<PePassoSituacaoResponse> Passos { get; set; } = new();
@@ -83,14 +189,20 @@ public class PePassoSituacaoResponse
 
     public string Numero { get; set; } = string.Empty;
 
-    // feito, pendente, atencao, nao_se_aplica ou continuo
+    // feito, pendente, atencao, nao_se_aplica, continuo, aguardando, atrasado ou externo
     public string Situacao { get; set; } = string.Empty;
+
+    // Por que o passo está aguardando, atrasado ou externo (texto pronto); nulo nos outros
+    public string? Motivo { get; set; }
+
+    // Quem chama edita este passo agora (a equipe do órgão, pela situação do PDTIC e pela etapa)
+    public bool PodeEditar { get; set; }
 
     public PeNaoSeAplicaResponse? NaoSeAplica { get; set; }
 
     public int ComentariosAbertos { get; set; }
 
-    // Avisos do guia, em linguagem simples (não bloqueiam)
+    // Avisos do guia e do caminho da aprovação, em linguagem simples (não bloqueiam)
     public List<string> Avisos { get; set; } = new();
 }
 

@@ -94,8 +94,9 @@ public enum ErrorCode
     PedidoAcessoJaDecidido = 904,
     PedidoAcessoForaDoEscopo = 905,
 
-    // Módulo Governança Estratégica (planejamento): faixa 1000 a 1099, respondida como
-    // { Code, Message } com 400, 403, 404 ou 409 (padrão do AcessoController)
+    // Módulo Governança Estratégica (planejamento): faixa 1000 a 1159 (a 1000 a 1099 acabou na
+    // E6; a E7 usa 1100 a 1139), respondida como { Code, Message } com 400, 403, 404 ou 409
+    // (padrão do AcessoController)
     PeUsuarioNaoEncontrado = 1000,  // 404
     PePapelInvalido = 1001,         // 400
     PeSemPermissao = 1002,          // 403
@@ -159,4 +160,13 @@ public enum ErrorCode
     PeFluxoInvalido = 1091,             // 400: a definição não passa na validação; o corpo traz Erros [texto]
     PeCronogramaPreenchido = 1092,      // 409: a seção do cronograma já tem linhas (a sugestão só entra nela vazia)
     PeCronogramaSemTarefas = 1093,      // 409: os fluxos da elaboração não têm tarefa para sugerir
+    // Aprovação, publicação e acompanhamento (E7): faixa 1100 a 1139 (rodada A: 1100 a 1119; rodada B: 1120 a 1139)
+    PePdticComPendencias = 1100,        // 400: envio ao CGTIC com pendências; o corpo traz Pendencias [{ PassoId, PassoNumero, PassoTitulo, Motivo }]
+    PePdticSituacaoInvalida = 1101,     // 409: a transição não vale na situação do PDTIC (enviar fora da elaboração, publicar fora de aprovado, revisar fora da vigente)
+    PePublicacaoIncompleta = 1102,      // 400: publicar sem a data ou o endereço da seção publicacao; o corpo traz Campos
+    PeEncerramentoRecusado = 1103,      // 409: a equipe sem a aprovação da autoridade máxima (7.4) ou o administrador com a vigência ainda correndo
+    PeRevisaoEmAndamento = 1104,        // 409: o órgão já tem uma versão em elaboração (a revisão espera ela terminar)
+    PeRevisaoRecusada = 1105,           // 409: o passo 6.3 está ligado e a avaliação do comitê não decidiu "revisar"
+    PeRegistroExternoInvalido = 1106,   // 400: dados do PDTIC aprovado fora do sistema; o corpo traz Campos (pelo nome do campo do corpo)
+    PeVersaoPdticDuplicada = 1107,      // 409: o órgão já tem um PDTIC com esta versão
 }

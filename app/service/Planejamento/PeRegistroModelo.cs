@@ -74,20 +74,40 @@ public sealed class PeSecaoDoDono
 
 /// <summary>
 /// Erro de validação de um registro: 400 PeRegistroInvalido com { Code, Message, Campos },
-/// uma mensagem em linguagem simples por chave de campo.
+/// uma mensagem em linguagem simples por chave de campo. Desde a E7, também a publicação sem
+/// a data ou o endereço (PePublicacaoIncompleta) e o registro do PDTIC aprovado fora do
+/// sistema (PeRegistroExternoInvalido), com o código próprio.
 /// </summary>
 public sealed class PeValidacaoException : ApiException
 {
     public IReadOnlyDictionary<string, string> Campos { get; }
 
-    public PeValidacaoException(IReadOnlyDictionary<string, string> campos, string? mensagem = null)
-        : base(ErrorCode.PeRegistroInvalido, mensagem ?? MensagemPadrao(campos))
+    public PeValidacaoException(IReadOnlyDictionary<string, string> campos, string? mensagem = null,
+        ErrorCode codigo = ErrorCode.PeRegistroInvalido)
+        : base(codigo, mensagem ?? MensagemPadrao(campos))
     {
         Campos = campos;
     }
 
     private static string MensagemPadrao(IReadOnlyDictionary<string, string> campos) =>
         campos.Count == 1 ? "Confira o campo destacado." : "Confira os campos destacados.";
+}
+
+/// <summary>
+/// Envio ao CGTIC com pendências (E7): 400 PePdticComPendencias com { Code, Message,
+/// Pendencias }, a mesma lista da prévia (GET pdtic/{id}/envio).
+/// </summary>
+public sealed class PePendenciasException : ApiException
+{
+    public IReadOnlyList<api.Planejamento.PePendenciaResponse> Pendencias { get; }
+
+    public PePendenciasException(IReadOnlyList<api.Planejamento.PePendenciaResponse> pendencias)
+        : base(ErrorCode.PePdticComPendencias, pendencias.Count == 1
+            ? "Falta um passo para enviar o PDTIC ao CGTIC. Confira a lista."
+            : $"Faltam {pendencias.Count} passos para enviar o PDTIC ao CGTIC. Confira a lista.")
+    {
+        Pendencias = pendencias;
+    }
 }
 
 /// <summary>Leitura dos valores guardados no jsonb dos registros.</summary>

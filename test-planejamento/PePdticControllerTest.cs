@@ -146,7 +146,7 @@ public class PePdticControllerTest : PePdticTestBase
     public async Task SemCadastro_404_ComCorpo()
     {
         var principal = PrincipalDe("kc-ninguem", "ninguem@df.gov.br", app.Auth.Perfis.Basico);
-        var controlador = new Controllers.Planejamento.PePdticController(Pdtics, Comentarios, Planilhas, Permissoes)
+        var controlador = new Controllers.Planejamento.PePdticController(Pdtics, Comentarios, Planilhas, Permissoes, Aprovacao)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = principal } }
         };

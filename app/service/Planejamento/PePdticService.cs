@@ -1,6 +1,8 @@
+using System.Globalization;
 using api.Common;
 using api.Planejamento;
 using app.Auth;
+using demanda_service.Helpers;
 using Microsoft.EntityFrameworkCore;
 using Models;
 using Models.Pgia;
@@ -10,20 +12,45 @@ using service.Interface;
 namespace service.Planejamento;
 
 /// <summary>
-/// O PDTIC de cada órgão (E4): abrir (um atual por órgão), ler, listar os atuais (papéis
-/// globais), a situação de cada passo da trilha com os avisos do guia, o "não se aplica",
-/// a conferência dos temas das ações (incisos V, VI e IX) e os sistemas de IA do PGIA
-/// (inciso VIII, só leitura). Os registros das seções ficam no motor (PeRegistroService,
-/// dono PDTIC); os comentários, no PeComentarioService.
+/// A situação dos passos com o que o envio ao CGTIC usa a mais (E7): o que falta em cada passo
+/// pendente ou em atenção, em linguagem simples, e a trilha e a análise usadas no cálculo.
+/// </summary>
+public sealed class PeSituacaoDetalhada
+{
+    public required PePdticSituacaoResponse Resposta { get; init; }
+
+    // Passo (id) → o que falta nele (passos pendentes e em atenção)
+    public required Dictionary<long, string> OQueFalta { get; init; }
+
+    public required PeTrilhaOrgao Trilha { get; init; }
+
+    public required PeAnaliseDono Analise { get; init; }
+}
+
+/// <summary>
+/// O PDTIC de cada órgão (E4 e E7): abrir (um ciclo por vez), ler, listar os atuais (papéis
+/// globais), as versões do órgão, a situação de cada passo da trilha com os avisos do guia, o
+/// "não se aplica", a conferência dos temas das ações (incisos V, VI e IX) e os sistemas de IA
+/// do PGIA (inciso VIII, só leitura). Os registros das seções ficam no motor
+/// (PeRegistroService, dono PDTIC); os comentários, no PeComentarioService; o caminho da
+/// aprovação (enviar, publicar, encerrar, revisar e registrar fora do sistema), no
+/// PePdticAprovacaoService.
 /// <list type="bullet">
-/// <item>Situação do passo: "atencao" quando há comentário aberto; "nao_se_aplica" quando o
-/// órgão marcou (e a marca ainda vale: passo opcional, que aceita, não travado); "feito" ou
-/// "pendente" nos passos de dados (todas as seções com os obrigatórios preenchidos, e a
-/// seção obrigatória com pelo menos um registro) e no de conferência de temas (cada tema
-/// com ação ou com justificativa); "continuo" nos tipos das próximas entregas.</item>
-/// <item>Próximo passo: o primeiro pendente ou em atenção, na ordem da trilha.</item>
+/// <item>Situação do passo, nesta ordem: "atencao" quando há comentário aberto; "nao_se_aplica"
+/// quando o órgão marcou (e a marca ainda vale); "externo" nas etapas 1 a 3 do PDTIC
+/// registrado fora do sistema (menos 3.3 e 3.9); "aguardando" nas etapas 4 a 7 antes da
+/// publicação; senão, pelo tipo: dados e conferência de temas (feito ou pendente pelos
+/// obrigatórios), documento (feito com um PDF gerado), aprovação (feito com a decisão
+/// tomada; devolvido pende com aviso), envio (feito depois do envio), deliberação (aguardando
+/// o CGTIC, atenção na devolução, feito depois da aprovação), publicação (aguardando a
+/// aprovação, pendente em aprovado, feito depois da publicação) e monitoramento (contínuo até
+/// a rodada B).</item>
+/// <item>Próximo passo: o primeiro atrasado, senão o primeiro em atenção, senão o primeiro
+/// pendente, na ordem da trilha; na revisão que ninguém mexeu ainda, o primeiro passo da etapa
+/// 2; encerrado e substituído não recomendam nada.</item>
 /// <item>Avisos (não bloqueiam): fraqueza da SWOT sem necessidade ligada e ameaça sem risco
-/// ligado (no passo da SWOT) e equipe de elaboração só de TIC (no passo da equipe).</item>
+/// ligado (no passo da SWOT), equipe de elaboração só de TIC (no passo da equipe), decisão
+/// "devolvido" nos passos de aprovação e a devolução do CGTIC (no passo da deliberação).</item>
 /// </list>
 /// </summary>
 public class PePdticService : IPePdticService
@@ -31,6 +58,11 @@ public class PePdticService : IPePdticService
     private const int TamanhoPaginaPadrao = 20;
     private const int TamanhoPaginaMaximo = 100;
     private const int MaximoJustificativa = 1000;
+
+    public const string MotivoExterno = "Feito fora do sistema";
+    public const string MotivoAntesDaPublicacao = "Disponível depois da publicação do PDTIC";
+    public const string MotivoAntesDaAprovacao = "Disponível depois da aprovação do CGTIC";
+    public const string AvisoDevolvido = "Devolvido: ajuste e registre a nova decisão.";
 
     private readonly AppDbContext _context;
     private readonly IPeRegistroService _registros;
@@ -48,34 +80,36 @@ public class PePdticService : IPePdticService
     public async Task<PePdticResponse?> AtualAsync(long? orgaoId, PeUserContext ctx)
     {
         var alvo = OrgaoAlvo(orgaoId, ctx);
-        var pdtic = await _context.PePdtics.AsNoTracking()
+        var atuais = await _context.PePdtics.AsNoTracking()
             .Where(p => p.OrgaoId == alvo && !PeDominios.SituacaoPdtic.Encerradas.Contains(p.Situacao))
             .OrderByDescending(p => p.Id)
-            .FirstOrDefaultAsync();
+            .ToListAsync();
+        // A versão em elaboração (a revisão, quando há uma), senão a vigente
+        var pdtic = atuais.FirstOrDefault(p => PeDominios.SituacaoPdtic.DaElaboracao.Contains(p.Situacao)) ?? atuais.FirstOrDefault();
         return pdtic == null ? null : await RespostaAsync(pdtic, ctx);
+    }
+
+    public async Task<List<PePdticResponse>> VersoesAsync(long? orgaoId, PeUserContext ctx)
+    {
+        var alvo = OrgaoAlvo(orgaoId, ctx);
+        var pdtics = await _context.PePdtics.AsNoTracking()
+            .Where(p => p.OrgaoId == alvo)
+            .OrderByDescending(p => p.Id)
+            .ToListAsync();
+        if (pdtics.Count == 0) return new List<PePdticResponse>();
+        var orgao = await _context.PgiaOrgaos.AsNoTracking().FirstAsync(o => o.Id == alvo);
+        return await RespostasAsync(pdtics.Select(p => (Pdtic: p, Orgao: orgao)).ToList(), ctx);
     }
 
     public async Task<PePdticResponse> ObterAsync(long id, PeUserContext ctx) =>
         await RespostaAsync(await LerAsync(_context, _permissoes, id, ctx), ctx);
 
+    public async Task<PePdticResponse> ResponderAsync(long id, PeUserContext ctx) =>
+        await RespostaAsync(await _context.PePdtics.AsNoTracking().FirstAsync(p => p.Id == id), ctx);
+
     public async Task<PePdticResponse> AbrirAsync(PePdticCriarDTO dto, PeUserContext ctx)
     {
-        long orgaoId;
-        if (ctx.EhAdminGeral)
-        {
-            orgaoId = dto.OrgaoId ?? ctx.OrgaoId
-                ?? throw new ApiException(ErrorCode.PeOrgaoObrigatorio, "Escolha o órgão do PDTIC.");
-        }
-        else if (ctx.Papel == PapeisPlanejamento.Orgao)
-        {
-            orgaoId = ctx.OrgaoId ?? throw SemOrgao();
-            if (dto.OrgaoId != null && dto.OrgaoId != orgaoId)
-                throw new ApiException(ErrorCode.PeSemPermissao, "Você só abre o PDTIC do seu próprio órgão.");
-        }
-        else
-        {
-            throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do órgão abre o PDTIC.");
-        }
+        var orgaoId = OrgaoParaCriar(dto.OrgaoId, ctx, "Só a equipe do órgão abre o PDTIC.", "Você só abre o PDTIC do seu próprio órgão.");
 
         var orgao = await _context.PgiaOrgaos.AsNoTracking().FirstOrDefaultAsync(o => o.Id == orgaoId && o.Ativo)
             ?? throw new ApiException(ErrorCode.PeOrgaoNaoEncontrado, "Órgão não encontrado ou desativado.");
@@ -84,10 +118,8 @@ public class PePdticService : IPePdticService
             .Where(p => p.OrgaoId == orgaoId)
             .OrderByDescending(p => p.Id)
             .ToListAsync();
-        var atual = anteriores.FirstOrDefault(p => !PeDominios.SituacaoPdtic.Encerradas.Contains(p.Situacao));
-        if (atual != null)
-            throw new ApiException(ErrorCode.PePdticJaExiste,
-                $"O órgão já tem um PDTIC em andamento (versão {atual.Versao}, {PeDominios.SituacaoPdtic.Rotulo(atual.Situacao).ToLowerInvariant()}). Continue por ele.");
+        if (anteriores.FirstOrDefault(p => !PeDominios.SituacaoPdtic.Encerradas.Contains(p.Situacao)) is { } atual)
+            throw JaTemAtual(atual);
 
         var agora = DateTime.UtcNow;
         var pdtic = new PePdtic
@@ -103,6 +135,27 @@ public class PePdticService : IPePdticService
         await _context.SaveChangesAsync();
         return await RespostaAsync(pdtic, ctx);
     }
+
+    /// <summary>
+    /// O órgão de um PDTIC novo (abrir ou registrar fora do sistema): a equipe do órgão, o
+    /// próprio; o admin geral, o informado (ou o dele). Os outros papéis recebem 403.
+    /// </summary>
+    internal static long OrgaoParaCriar(long? informado, PeUserContext ctx, string soAEquipe, string soOProprio)
+    {
+        if (ctx.EhAdminGeral)
+            return informado ?? ctx.OrgaoId ?? throw new ApiException(ErrorCode.PeOrgaoObrigatorio, "Escolha o órgão do PDTIC.");
+        if (ctx.Papel != PapeisPlanejamento.Orgao) throw new ApiException(ErrorCode.PeSemPermissao, soAEquipe);
+        var proprio = ctx.OrgaoId ?? throw SemOrgao();
+        if (informado != null && informado != proprio) throw new ApiException(ErrorCode.PeSemPermissao, soOProprio);
+        return proprio;
+    }
+
+    /// <summary>409 de quem tenta abrir (ou registrar) um PDTIC com outro em andamento no órgão.</summary>
+    internal static ApiException JaTemAtual(PePdtic atual) => new(ErrorCode.PePdticJaExiste,
+        PeDominios.SituacaoPdtic.Vigentes.Contains(atual.Situacao)
+            ? $"O órgão já tem o PDTIC {atual.Versao} {PeDominios.SituacaoPdtic.Rotulo(atual.Situacao).ToLowerInvariant()}. "
+              + "Para mudar o plano, abra uma revisão; um PDTIC novo só depois de encerrar este."
+            : $"O órgão já tem um PDTIC em andamento (versão {atual.Versao}, {PeDominios.SituacaoPdtic.Rotulo(atual.Situacao).ToLowerInvariant()}). Continue por ele.");
 
     public async Task<PagedResponse<PePdticResponse>> ListarAsync(PePdticConsulta consulta, PeUserContext ctx)
     {
@@ -137,10 +190,9 @@ public class PePdticService : IPePdticService
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
-        var niveis = await PeTrilhaOrgao.NiveisDosOrgaosAsync(_context, linhas.Select(l => l.Orgao.Id));
 
         return new PagedResponse<PePdticResponse>(
-            linhas.Select(l => Resposta(l.Pdtic, l.Orgao, niveis.GetValueOrDefault(l.Orgao.Id), ctx)).ToList(), total, page, pageSize);
+            await RespostasAsync(linhas.Select(l => (l.Pdtic, l.Orgao)).ToList(), ctx), total, page, pageSize);
     }
 
     // ── Situação dos passos ─────────────────────────────────────────────────
@@ -148,13 +200,23 @@ public class PePdticService : IPePdticService
     public async Task<PePdticSituacaoResponse> SituacaoAsync(long id, PeUserContext ctx)
     {
         var pdtic = await LerAsync(_context, _permissoes, id, ctx);
-        var trilha = await PeTrilhaOrgao.CarregarAsync(_context, pdtic.OrgaoId, soAtivo: false);
-        return await CalcularSituacaoAsync(pdtic, trilha);
+        var trilha = await PeTrilhaOrgao.DoPdticAsync(_context, pdtic);
+        return (await DetalharSituacaoAsync(pdtic, trilha, ctx)).Resposta;
     }
 
-    /// <summary>A situação de cada passo visível da trilha do órgão (sem conferir quem chama).</summary>
-    public async Task<PePdticSituacaoResponse> CalcularSituacaoAsync(PePdtic pdtic, PeTrilhaOrgao trilha)
+    /// <summary>A situação de cada passo visível da trilha do órgão (sem conferir quem lê; com ctx, o PodeEditar de cada passo).</summary>
+    public async Task<PePdticSituacaoResponse> CalcularSituacaoAsync(PePdtic pdtic, PeTrilhaOrgao trilha, PeUserContext? ctx = null) =>
+        (await DetalharSituacaoAsync(pdtic, trilha, ctx)).Resposta;
+
+    public async Task<PeSituacaoDetalhada> DetalharSituacaoAsync(PePdtic pdtic, PeTrilhaOrgao trilha, PeUserContext? ctx = null)
     {
+        // As regras próprias do PDTIC (o registrado fora do sistema dispensa ligações) valem na trilha
+        if (trilha.AjustadaParaPdtic != pdtic.Id)
+        {
+            if (trilha.AjustadaParaPdtic != null || pdtic.RegistradoExternamente) trilha = await PeTrilhaOrgao.DoPdticAsync(_context, pdtic);
+            else trilha.AjustarAoPdtic(pdtic);
+        }
+
         var marcas = await _context.PePdticPassos.AsNoTracking()
             .Where(p => p.PdticId == pdtic.Id && p.NaoSeAplica)
             .ToDictionaryAsync(p => p.PassoId);
@@ -165,30 +227,69 @@ public class PePdticService : IPePdticService
             .GroupBy(p => p)
             .ToDictionary(g => g.Key, g => g.Count());
         var analise = await _registros.AnalisarAsync(PeDono.DoPdtic(pdtic.Id), trilha.SecoesMontadas());
-        var completas = analise.Secoes.ToDictionary(s => s.Secao.Secao.Id, s => s.Completa);
+        var porSecao = analise.Secoes.ToDictionary(s => s.Secao.Secao.Id);
+        var temDocumento = trilha.Passos.Any(p => p.Tipo == PeDominios.TipoPasso.Documento)
+                           && await _context.PeDocVersoes.AsNoTracking().AnyAsync(v => v.PdticId == pdtic.Id);
+        var deliberacao = pdtic.Situacao == PeDominios.SituacaoPdtic.Devolvido
+            ? await _context.PeDeliberacoes.AsNoTracking()
+                .Where(d => d.ObjetoTipo == PeDominios.ObjetoDeliberacao.Pdtic && d.ObjetoId == pdtic.Id)
+                .OrderByDescending(d => d.Id)
+                .FirstOrDefaultAsync()
+            : null;
+        var etapas = PeEdicaoPdtic.EtapasDosPassos(trilha);
+        var papelEdita = ctx != null && _permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId);
 
         // Marca que ainda vale (o passo continua opcional, aceita e não é travado)
         bool NaoSeAplica(PeTrilhaPasso passo) => marcas.ContainsKey(passo.Id) && RecusaDoNaoSeAplica(passo) == null;
 
         var avisos = Avisos(trilha, analise, NaoSeAplica);
-        var temasOk = Temas(trilha, analise).All(t => t.Acoes.Count > 0 || !string.IsNullOrWhiteSpace(t.Justificativa));
+        var temas = Temas(trilha, analise);
+        var oQueFalta = new Dictionary<long, string>();
+        // Os passos que a situação do PDTIC deixa editar agora (o próximo passo pendente sai deles)
+        var editaveis = new HashSet<long>();
 
         var passos = trilha.Passos.Select(passo =>
         {
+            var grupo = PeEdicaoPdtic.GrupoDe(etapas.GetValueOrDefault(passo.Id), passo.Tipo);
+            if (PeEdicaoPdtic.Editavel(pdtic, grupo, passo.Chave)) editaveis.Add(passo.Id);
             var comentarios = abertos.GetValueOrDefault(passo.Id);
             var marcado = NaoSeAplica(passo);
-            var situacao = comentarios > 0 ? PeDominios.SituacaoPasso.Atencao
-                : marcado ? PeDominios.SituacaoPasso.NaoSeAplica
-                : passo.Tipo switch
-                {
-                    PeDominios.TipoPasso.Dados => passo.Secoes.All(s => completas.GetValueOrDefault(s.Id, true))
-                        ? PeDominios.SituacaoPasso.Feito
-                        : PeDominios.SituacaoPasso.Pendente,
-                    PeDominios.TipoPasso.ConferenciaTemas => temasOk && passo.Secoes.All(s => completas.GetValueOrDefault(s.Id, true))
-                        ? PeDominios.SituacaoPasso.Feito
-                        : PeDominios.SituacaoPasso.Pendente,
-                    _ => PeDominios.SituacaoPasso.Continuo
-                };
+            var doPasso = avisos.GetValueOrDefault(passo.Id) ?? new List<string>();
+            string? motivo = null;
+            string? falta = null;
+            string situacao;
+
+            if (comentarios > 0)
+            {
+                situacao = PeDominios.SituacaoPasso.Atencao;
+                falta = "Há comentário aberto neste passo: responda e marque como resolvido.";
+            }
+            else if (marcado)
+            {
+                situacao = PeDominios.SituacaoPasso.NaoSeAplica;
+            }
+            else if (PeEdicaoPdtic.Externo(pdtic, grupo, passo.Chave))
+            {
+                situacao = PeDominios.SituacaoPasso.Externo;
+                motivo = MotivoExterno;
+            }
+            else if (grupo == PeEdicaoPdtic.Grupo.Acompanhamento && PeDominios.SituacaoPdtic.DaElaboracao.Contains(pdtic.Situacao))
+            {
+                situacao = PeDominios.SituacaoPasso.Aguardando;
+                motivo = MotivoAntesDaPublicacao;
+            }
+            else
+            {
+                (situacao, motivo, falta) = PeloTipo(pdtic, trilha, passo, porSecao, temas, temDocumento, deliberacao, doPasso);
+            }
+
+            // O aviso da decisão "devolvido" aparece também quando o passo está em atenção
+            if (situacao == PeDominios.SituacaoPasso.Atencao && passo.Tipo is PeDominios.TipoPasso.Aprovacao or PeDominios.TipoPasso.Envio
+                && DecisaoDevolvida(passo, porSecao) && !doPasso.Contains(AvisoDevolvido))
+                doPasso.Add(AvisoDevolvido);
+
+            if (falta != null && situacao is PeDominios.SituacaoPasso.Pendente or PeDominios.SituacaoPasso.Atencao)
+                oQueFalta[passo.Id] = falta;
             var marca = marcado ? marcas[passo.Id] : null;
             return new PePassoSituacaoResponse
             {
@@ -196,20 +297,179 @@ public class PePdticService : IPePdticService
                 Chave = passo.Chave,
                 Numero = passo.Numero,
                 Situacao = situacao,
+                Motivo = motivo,
+                PodeEditar = papelEdita && editaveis.Contains(passo.Id),
                 NaoSeAplica = marca == null
                     ? null
                     : new PeNaoSeAplicaResponse { Justificativa = marca.Justificativa ?? string.Empty, MarcadoEm = marca.MarcadoEm, MarcadoPor = marca.MarcadoPor },
                 ComentariosAbertos = comentarios,
-                Avisos = avisos.GetValueOrDefault(passo.Id) ?? new List<string>()
+                Avisos = doPasso
             };
         }).ToList();
 
-        return new PePdticSituacaoResponse
+        return new PeSituacaoDetalhada
         {
-            ProximoPasso = passos.FirstOrDefault(p => p.Situacao is PeDominios.SituacaoPasso.Pendente or PeDominios.SituacaoPasso.Atencao)?.Numero,
-            Passos = passos
+            Resposta = new PePdticSituacaoResponse { ProximoPasso = ProximoPasso(pdtic, trilha, passos, editaveis), Passos = passos },
+            OQueFalta = oQueFalta,
+            Trilha = trilha,
+            Analise = analise
         };
     }
+
+    /// <summary>
+    /// A situação pelo tipo do passo (fora da atenção, do "não se aplica", do externo e da
+    /// espera da publicação), o motivo (aguardando) e o que falta (pendente), em texto.
+    /// </summary>
+    private static (string Situacao, string? Motivo, string? Falta) PeloTipo(PePdtic pdtic, PeTrilhaOrgao trilha, PeTrilhaPasso passo,
+        IReadOnlyDictionary<long, PeSecaoAnalisada> porSecao, IReadOnlyList<PeTemaResponse> temas, bool temDocumento,
+        PeDeliberacao? deliberacao, List<string> avisos)
+    {
+        const string feito = PeDominios.SituacaoPasso.Feito;
+        const string pendente = PeDominios.SituacaoPasso.Pendente;
+        var situacaoPdtic = pdtic.Situacao;
+
+        switch (passo.Tipo)
+        {
+            case PeDominios.TipoPasso.Dados:
+            {
+                var falta = FaltaNasSecoes(passo, porSecao);
+                return falta == null ? (feito, null, null) : (pendente, null, falta);
+            }
+            case PeDominios.TipoPasso.ConferenciaTemas:
+            {
+                var semAcao = temas.Where(t => t.Acoes.Count == 0 && string.IsNullOrWhiteSpace(t.Justificativa)).Select(t => t.Rotulo).ToList();
+                var falta = FaltaNasSecoes(passo, porSecao);
+                if (semAcao.Count > 0)
+                    falta = $"Inclua uma ação com o tema ou justifique o tema sem ação: {Lista(semAcao)}." + (falta == null ? string.Empty : " " + falta);
+                return falta == null ? (feito, null, null) : (pendente, null, falta);
+            }
+            case PeDominios.TipoPasso.Documento:
+                return temDocumento ? (feito, null, null) : (pendente, null, "Gere o PDF do documento e confira a prévia.");
+            case PeDominios.TipoPasso.Aprovacao:
+            {
+                var falta = FaltaNaAprovacao(passo, porSecao, avisos);
+                return falta == null ? (feito, null, null) : (pendente, null, falta);
+            }
+            case PeDominios.TipoPasso.Envio:
+            {
+                if (DecisaoDevolvida(passo, porSecao)) avisos.Add(AvisoDevolvido);
+                var enviado = situacaoPdtic is PeDominios.SituacaoPdtic.EmAprovacao or PeDominios.SituacaoPdtic.Aprovado
+                              || PeDominios.SituacaoPdtic.Vigentes.Contains(situacaoPdtic)
+                              || (PeDominios.SituacaoPdtic.Encerradas.Contains(situacaoPdtic) && pdtic.EnviadoEm != null);
+                return enviado
+                    ? (feito, null, null)
+                    : (pendente, null, situacaoPdtic == PeDominios.SituacaoPdtic.Devolvido
+                        ? "O CGTIC devolveu o PDTIC: ajuste o que foi pedido e envie de novo."
+                        : "Registre a aprovação do SGTIC e envie o PDTIC ao CGTIC.");
+            }
+            case PeDominios.TipoPasso.Deliberacao:
+            {
+                if (pdtic.AprovadoEm != null) return (feito, null, null);
+                if (situacaoPdtic == PeDominios.SituacaoPdtic.EmAprovacao)
+                    return (PeDominios.SituacaoPasso.Aguardando, "Aguardando a deliberação do CGTIC desde " + DataBrasilia(pdtic.EnviadoEm), null);
+                if (situacaoPdtic == PeDominios.SituacaoPdtic.Devolvido)
+                {
+                    var envio = trilha.Passos.FirstOrDefault(p => p.Tipo == PeDominios.TipoPasso.Envio);
+                    var quando = deliberacao?.DecididoEm is DateTime decidido ? $" em {DataBrasilia(decidido)}" : string.Empty;
+                    var observacao = string.IsNullOrWhiteSpace(deliberacao?.Observacao) ? string.Empty : $": {deliberacao!.Observacao!.Trim()}";
+                    var reenvio = envio == null ? "envie de novo" : $"envie de novo no passo {envio.Numero}";
+                    avisos.Add($"O CGTIC devolveu o PDTIC{quando}{observacao}{(observacao.EndsWith('.') ? string.Empty : ".")} Ajuste o que foi pedido e {reenvio}.");
+                    return (PeDominios.SituacaoPasso.Atencao, null, "O CGTIC devolveu o PDTIC: veja a observação da Secretaria.");
+                }
+                return (pendente, null, "Envie o PDTIC ao CGTIC.");
+            }
+            case PeDominios.TipoPasso.Publicacao:
+            {
+                if (pdtic.PublicadoEm != null) return (feito, null, null);
+                if (situacaoPdtic == PeDominios.SituacaoPdtic.Aprovado)
+                    return (pendente, null, "Registre a data e o endereço da publicação e confirme.");
+                return (PeDominios.SituacaoPasso.Aguardando, MotivoAntesDaAprovacao, null);
+            }
+            default:
+                // Monitoramento (rodada B: por ciclo) e fluxo: contínuos
+                return (PeDominios.SituacaoPasso.Continuo, null, null);
+        }
+    }
+
+    /// <summary>O que falta nas seções visíveis do passo (a seção obrigatória sem registro e os obrigatórios vazios), ou nulo.</summary>
+    private static string? FaltaNasSecoes(PeTrilhaPasso passo, IReadOnlyDictionary<long, PeSecaoAnalisada> porSecao)
+    {
+        var faltas = new List<string>();
+        foreach (var secao in passo.Secoes)
+        {
+            if (!porSecao.TryGetValue(secao.Id, out var analisada) || analisada.Completa) continue;
+            if (analisada.FaltaRegistro)
+            {
+                faltas.Add(analisada.Secao.EhFormulario
+                    ? $"Preencha \"{analisada.Secao.Secao.Titulo}\"."
+                    : $"Inclua pelo menos um item em \"{analisada.Secao.Secao.Titulo}\".");
+                continue;
+            }
+            foreach (var (registro, campos) in analisada.Incompletos)
+                faltas.Add($"{registro.Codigo ?? analisada.Secao.Secao.Titulo}: preencha {Lista(campos.Select(c => $"\"{c.Rotulo}\"").ToList())}.");
+        }
+        if (faltas.Count == 0) return null;
+        return faltas.Count <= 2
+            ? string.Join(" ", faltas)
+            : string.Join(" ", faltas.Take(2)) + $" E mais {faltas.Count - 2} pendências neste passo.";
+    }
+
+    /// <summary>
+    /// O que falta num passo de aprovação: as seções completas e a decisão tomada (aprovado; na
+    /// avaliação do comitê, seguir ou revisar). A decisão "devolvido" pende, com o aviso.
+    /// </summary>
+    private static string? FaltaNaAprovacao(PeTrilhaPasso passo, IReadOnlyDictionary<long, PeSecaoAnalisada> porSecao, List<string> avisos)
+    {
+        var devolvido = DecisaoDevolvida(passo, porSecao);
+        if (devolvido) avisos.Add(AvisoDevolvido);
+
+        string? semDecisao = null;
+        foreach (var secao in passo.Secoes.Where(s => s.Campos.Any(c => c.Chave == PeDominios.ChavePdtic.CampoDecisao)))
+        {
+            var decisao = Decisao(porSecao.GetValueOrDefault(secao.Id));
+            if (decisao == null || !PeDominios.Decisao.Tomadas.Contains(decisao))
+                semDecisao = devolvido
+                    ? "A decisão registrada foi \"Devolvido\": ajuste o que foi pedido e registre a nova decisão."
+                    : "Registre a decisão e a data.";
+        }
+        return semDecisao ?? FaltaNasSecoes(passo, porSecao);
+    }
+
+    /// <summary>A decisão de uma seção de aprovação (o campo decisao do registro do formulário), ou nulo.</summary>
+    internal static string? Decisao(PeSecaoAnalisada? secao) =>
+        secao?.Registros.FirstOrDefault() is { } registro
+            ? PeRegistroDados.Texto(PeRegistroDados.Ler(registro.Dados)[PeDominios.ChavePdtic.CampoDecisao])
+            : null;
+
+    /// <summary>Alguma seção de decisão do passo está com "devolvido".</summary>
+    private static bool DecisaoDevolvida(PeTrilhaPasso passo, IReadOnlyDictionary<long, PeSecaoAnalisada> porSecao) =>
+        passo.Secoes.Any(s => s.Campos.Any(c => c.Chave == PeDominios.ChavePdtic.CampoDecisao)
+                              && Decisao(porSecao.GetValueOrDefault(s.Id)) == PeDominios.Decisao.Devolvido);
+
+    /// <summary>
+    /// O passo recomendado: o primeiro atrasado, senão o primeiro em atenção (responder ao
+    /// comentário ou à devolução sempre se faz), senão (na revisão que ninguém mexeu ainda) o
+    /// primeiro passo da etapa 2, senão o primeiro pendente que a situação do PDTIC deixa fazer
+    /// agora (o pendente de uma etapa fechada não é recomendado: por exemplo, um passo opcional
+    /// da elaboração depois do envio).
+    /// </summary>
+    private static string? ProximoPasso(PePdtic pdtic, PeTrilhaOrgao trilha, IReadOnlyList<PePassoSituacaoResponse> passos,
+        IReadOnlySet<long> editaveis)
+    {
+        if (PeDominios.SituacaoPdtic.Encerradas.Contains(pdtic.Situacao)) return null;
+        var atrasado = passos.FirstOrDefault(p => p.Situacao == PeDominios.SituacaoPasso.Atrasado);
+        if (atrasado != null) return atrasado.Numero;
+        var atencao = passos.FirstOrDefault(p => p.Situacao == PeDominios.SituacaoPasso.Atencao);
+        if (atencao != null) return atencao.Numero;
+        if (PeEdicaoPdtic.EhRevisao(pdtic) && pdtic.AlteradoEm == null && pdtic.Situacao == PeDominios.SituacaoPdtic.EmElaboracao
+            && trilha.Etapas.FirstOrDefault(e => e.Chave == PeDominios.EtapaPdtic.Diagnostico)?.Passos.FirstOrDefault() is { } inicio)
+            return inicio.Numero;
+        return passos.FirstOrDefault(p => p.Situacao == PeDominios.SituacaoPasso.Pendente && editaveis.Contains(p.PassoId))?.Numero;
+    }
+
+    /// <summary>A data em Brasília, dd/mm/aaaa (vazio sem data).</summary>
+    internal static string DataBrasilia(DateTime? utc) =>
+        utc is DateTime data ? DateTimeHelper.ToBrasilia(data).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) : string.Empty;
 
     /// <summary>
     /// Avisos do guia, por passo: fraqueza da SWOT sem necessidade ligada e ameaça sem risco
@@ -303,7 +563,7 @@ public class PePdticService : IPePdticService
         pdtic.AlteradoPor = ctx.Email;
         await _context.SaveChangesAsync();
 
-        return (await CalcularSituacaoAsync(pdtic, trilha)).Passos.Single(p => p.PassoId == passoId);
+        return (await CalcularSituacaoAsync(pdtic, trilha, ctx)).Passos.Single(p => p.PassoId == passoId);
     }
 
     public async Task<PePassoSituacaoResponse> DesmarcarNaoSeAplicaAsync(long id, long passoId, PeUserContext ctx)
@@ -322,7 +582,7 @@ public class PePdticService : IPePdticService
             pdtic.AlteradoPor = ctx.Email;
             await _context.SaveChangesAsync();
         }
-        return (await CalcularSituacaoAsync(pdtic, trilha)).Passos.Single(p => p.PassoId == passoId);
+        return (await CalcularSituacaoAsync(pdtic, trilha, ctx)).Passos.Single(p => p.PassoId == passoId);
     }
 
     /// <summary>
@@ -339,16 +599,18 @@ public class PePdticService : IPePdticService
         return null;
     }
 
+    /// <summary>O passo para marcar ou desfazer o "não se aplica": a equipe do órgão, com o passo editável pela situação e pela etapa.</summary>
     private async Task<(PePdtic Pdtic, PeTrilhaOrgao Trilha, PeTrilhaPasso Passo)> PassoParaMarcarAsync(long id, long passoId, PeUserContext ctx)
     {
         var pdtic = await LerAsync(_context, _permissoes, id, ctx, rastrear: true);
         if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
             throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do órgão marca um passo como \"não se aplica\".");
-        if (!PeDominios.SituacaoPdtic.Editaveis.Contains(pdtic.Situacao)) throw Fechado(pdtic);
 
-        var trilha = await PeTrilhaOrgao.CarregarAsync(_context, pdtic.OrgaoId, soAtivo: false);
+        var trilha = await PeTrilhaOrgao.DoPdticAsync(_context, pdtic);
         var passo = trilha.Passo(passoId)
             ?? throw new ApiException(ErrorCode.PePassoIndisponivel, "Este passo não está na trilha do órgão. Atualize a tela.");
+        if (PeEdicaoPdtic.Recusa(pdtic, PeEdicaoPdtic.GrupoDoPasso(trilha, passo), passo.Chave) is string fechado)
+            throw PeEdicaoPdtic.Fechado(fechado);
         return (pdtic, trilha, passo);
     }
 
@@ -451,14 +713,8 @@ public class PePdticService : IPePdticService
 
     internal static ApiException NaoEncontrado() => new(ErrorCode.PePdticNaoEncontrado, "PDTIC não encontrado. Atualize a tela.");
 
-    /// <summary>PDTIC fora de em_elaboracao e devolvido: 409 com a mensagem da situação.</summary>
-    internal static ApiException Fechado(PePdtic pdtic) => new(ErrorCode.PePdticFechado, pdtic.Situacao switch
-    {
-        PeDominios.SituacaoPdtic.EmAprovacao => "Este PDTIC foi enviado para aprovação e não muda até a decisão.",
-        PeDominios.SituacaoPdtic.Aprovado or PeDominios.SituacaoPdtic.Publicado or PeDominios.SituacaoPdtic.EmAcompanhamento =>
-            "Este PDTIC já foi aprovado e não muda mais. Para mudar, é preciso abrir uma revisão.",
-        _ => "Este PDTIC já foi encerrado e não muda mais."
-    });
+    /// <summary>A elaboração fechada (fora de em_elaboracao e devolvido): 409 com a mensagem da situação.</summary>
+    internal static ApiException Fechado(PePdtic pdtic) => PeEdicaoPdtic.ElaboracaoFechada(pdtic);
 
     private static ApiException SemOrgao() => new(ErrorCode.PeOrgaoNaoEncontrado,
         "Seu usuário ainda não está ligado a um órgão. Fale com o administrador do módulo.");
@@ -484,28 +740,57 @@ public class PePdticService : IPePdticService
     private async Task<PePdticResponse> RespostaAsync(PePdtic pdtic, PeUserContext ctx)
     {
         var orgao = await _context.PgiaOrgaos.AsNoTracking().FirstAsync(o => o.Id == pdtic.OrgaoId);
-        var niveis = await PeTrilhaOrgao.NiveisDosOrgaosAsync(_context, new[] { orgao.Id });
-        return Resposta(pdtic, orgao, niveis.GetValueOrDefault(orgao.Id), ctx);
+        return (await RespostasAsync(new List<(PePdtic, PgiaOrgao)> { (pdtic, orgao) }, ctx))[0];
     }
 
-    private PePdticResponse Resposta(PePdtic pdtic, PgiaOrgao orgao, PeNivel? nivel, PeUserContext ctx) => new()
+    /// <summary>As respostas de uma lista de PDTICs, com o nível, a deliberação mais recente e a versão revista (poucas consultas para a lista inteira).</summary>
+    private async Task<List<PePdticResponse>> RespostasAsync(IReadOnlyList<(PePdtic Pdtic, PgiaOrgao Orgao)> itens, PeUserContext ctx)
     {
-        Id = pdtic.Id,
-        OrgaoId = orgao.Id,
-        OrgaoSigla = orgao.Sigla,
-        OrgaoNome = orgao.Nome,
-        Versao = pdtic.Versao,
-        Situacao = pdtic.Situacao,
-        VigenciaInicio = pdtic.VigenciaInicio,
-        VigenciaFim = pdtic.VigenciaFim,
-        RegistradoExternamente = pdtic.RegistradoExternamente,
-        AnteriorId = pdtic.AnteriorId,
-        NivelId = nivel?.Id,
-        NivelNome = nivel?.Nome,
-        PodeEditar = _permissoes.PodeEditarPdtic(ctx, orgao.Id) && PeDominios.SituacaoPdtic.Editaveis.Contains(pdtic.Situacao),
-        CriadoEm = pdtic.CriadoEm,
-        CriadoPor = pdtic.CriadoPor
-    };
+        var niveis = await PeTrilhaOrgao.NiveisDosOrgaosAsync(_context, itens.Select(i => i.Orgao.Id));
+        var deliberacoes = await PeDeliberacaoService.UltimasDosPdticsAsync(_context, itens.Select(i => i.Pdtic.Id).ToList());
+        var idsAnteriores = itens.Where(i => PeEdicaoPdtic.EhRevisao(i.Pdtic)).Select(i => i.Pdtic.AnteriorId!.Value).Distinct().ToList();
+        var anteriores = idsAnteriores.Count == 0
+            ? new Dictionary<long, string>()
+            : await _context.PePdtics.AsNoTracking().Where(p => idsAnteriores.Contains(p.Id)).ToDictionaryAsync(p => p.Id, p => p.Versao);
+
+        return itens.Select(i =>
+        {
+            var pdtic = i.Pdtic;
+            var nivel = niveis.GetValueOrDefault(i.Orgao.Id);
+            return new PePdticResponse
+            {
+                Id = pdtic.Id,
+                OrgaoId = i.Orgao.Id,
+                OrgaoSigla = i.Orgao.Sigla,
+                OrgaoNome = i.Orgao.Nome,
+                Versao = pdtic.Versao,
+                Situacao = pdtic.Situacao,
+                VigenciaInicio = pdtic.VigenciaInicio,
+                VigenciaFim = pdtic.VigenciaFim,
+                RegistradoExternamente = pdtic.RegistradoExternamente,
+                AnteriorId = pdtic.AnteriorId,
+                NivelId = nivel?.Id,
+                NivelNome = nivel?.Nome,
+                PodeEditar = _permissoes.PodeEditarPdtic(ctx, i.Orgao.Id) && PeEdicaoPdtic.ElaboracaoAberta(pdtic),
+                CriadoEm = pdtic.CriadoEm,
+                CriadoPor = pdtic.CriadoPor,
+                EnviadoEm = pdtic.EnviadoEm,
+                AprovadoEm = pdtic.AprovadoEm,
+                PublicadoEm = pdtic.PublicadoEm,
+                EncerradoEm = pdtic.EncerradoEm,
+                EncerramentoMotivo = pdtic.EncerramentoMotivo,
+                Deliberacao = deliberacoes.GetValueOrDefault(pdtic.Id),
+                Revisao = PeEdicaoPdtic.EhRevisao(pdtic) && anteriores.TryGetValue(pdtic.AnteriorId!.Value, out var versaoAnterior)
+                    ? new PePdticRevisaoResponse
+                    {
+                        AnteriorId = pdtic.AnteriorId!.Value,
+                        AnteriorVersao = versaoAnterior,
+                        Justificativa = pdtic.RevisaoJustificativa
+                    }
+                    : null
+            };
+        }).ToList();
+    }
 }
 
 /// <summary>

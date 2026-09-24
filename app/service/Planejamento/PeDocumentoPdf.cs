@@ -382,6 +382,75 @@ public static partial class PeDocumentoPdf
     [GeneratedRegex(@"/Type\s*/Page[^s]")]
     private static partial Regex PaginaDoPdf();
 
+    // O nó raiz da árvore de páginas diz o total (/Count); os nós do meio dizem menos
+    [GeneratedRegex(@"/Type\s*/Pages\b[^>]*?/Count\s+(\d+)|/Count\s+(\d+)[^>]*?/Type\s*/Pages\b")]
+    private static partial Regex ArvoreDePaginas();
+
+    [GeneratedRegex(@"/Type\s*/ObjStm\b")]
+    private static partial Regex FluxoDeObjetos();
+
+    // Teto do que se descomprime ao contar as páginas de um PDF enviado (proteção contra arquivo-bomba)
+    private const int LimiteDescomprimido = 32 * 1024 * 1024;
+
+    /// <summary>
+    /// Páginas de um PDF qualquer (o do PDTIC aprovado fora do sistema, E7), sem biblioteca de
+    /// leitura: o maior /Count da árvore de páginas, procurado também nos fluxos de objetos
+    /// comprimidos (PDF 1.5 em diante); senão, a contagem dos objetos de página; no mínimo 1.
+    /// </summary>
+    public static int ContarPaginasDoArquivo(byte[] pdf)
+    {
+        var textos = new List<string> { System.Text.Encoding.Latin1.GetString(pdf) };
+        if (!ArvoreDePaginas().IsMatch(textos[0])) textos.AddRange(FluxosDeObjetos(pdf, textos[0]));
+
+        var total = textos
+            .SelectMany(t => ArvoreDePaginas().Matches(t))
+            .Select(m => int.TryParse(m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value, NumberStyles.None,
+                CultureInfo.InvariantCulture, out var n) ? n : 0)
+            .DefaultIfEmpty(0)
+            .Max();
+        if (total > 0) return total;
+        return Math.Max(1, textos.Sum(t => PaginaDoPdf().Matches(t).Count));
+    }
+
+    /// <summary>O conteúdo descomprimido dos fluxos de objetos (/Type /ObjStm, FlateDecode), onde o PDF 1.5 guarda a árvore de páginas.</summary>
+    private static IEnumerable<string> FluxosDeObjetos(byte[] pdf, string texto)
+    {
+        var usado = 0;
+        foreach (Match m in FluxoDeObjetos().Matches(texto))
+        {
+            var inicio = texto.IndexOf("stream", m.Index, StringComparison.Ordinal);
+            if (inicio < 0) yield break;
+            inicio += "stream".Length;
+            if (inicio < texto.Length && texto[inicio] == '\r') inicio++;
+            if (inicio < texto.Length && texto[inicio] == '\n') inicio++;
+            var fim = texto.IndexOf("endstream", inicio, StringComparison.Ordinal);
+            if (fim <= inicio) continue;
+
+            string? conteudo = null;
+            try
+            {
+                using var entrada = new MemoryStream(pdf, inicio, fim - inicio);
+                using var zlib = new System.IO.Compression.ZLibStream(entrada, System.IO.Compression.CompressionMode.Decompress);
+                using var saida = new MemoryStream();
+                var buffer = new byte[81920];
+                int lidos;
+                while ((lidos = zlib.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    usado += lidos;
+                    if (usado > LimiteDescomprimido) break;
+                    saida.Write(buffer, 0, lidos);
+                }
+                conteudo = System.Text.Encoding.Latin1.GetString(saida.ToArray());
+            }
+            catch (InvalidDataException)
+            {
+                // Fluxo que não é FlateDecode (ou corrompido): fica de fora da contagem
+            }
+            if (conteudo != null) yield return conteudo;
+            if (usado > LimiteDescomprimido) yield break;
+        }
+    }
+
     private sealed record Contexto(Entrada Entrada, Roteiro Roteiro, Func<long, PeImagemPdf?> Imagem, PeImagemPdf? Logotipo)
     {
         public PeTextoRicoPdf.Opcoes Texto(float fonte = Fonte, bool centralizar = false) => new()
@@ -549,12 +618,17 @@ public static partial class PeDocumentoPdf
         }
     }
 
-    /// <summary>O texto do bloco para o PDF: os marcadores trocados e o sem valor em branco.</summary>
-    private static JsonNode? TextoDoPdf(PeDocBlocoResponse bloco, Contexto ctx)
+    /// <summary>
+    /// O texto do bloco para o PDF: os marcadores trocados, o sem valor em branco e o que sobra
+    /// dele limpo (parênteses vazios, linhas vazias ou só com pontuação, rótulos sem valor).
+    /// </summary>
+    public static JsonNode? TextoDoPdf(PeDocBlocoResponse bloco, IReadOnlyDictionary<string, string?> marcadores)
     {
         if (bloco.TextoBruto is not JsonElement bruto || bruto.ValueKind != JsonValueKind.Object) return null;
-        return PeDocMarcadores.Resolver(JsonNode.Parse(bruto.GetRawText()), ctx.Entrada.Marcadores, emBranco: true);
+        return PeDocMarcadores.ResolverParaPdf(JsonNode.Parse(bruto.GetRawText()), marcadores);
     }
+
+    private static JsonNode? TextoDoPdf(PeDocBlocoResponse bloco, Contexto ctx) => TextoDoPdf(bloco, ctx.Entrada.Marcadores);
 
     private static void Legenda(ColumnDescriptor col, string texto) =>
         col.Item().Text(texto).FontSize(9.5f).Bold().FontColor(PeTextoRicoPdf.CorTitulo);

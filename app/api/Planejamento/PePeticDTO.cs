@@ -57,18 +57,24 @@ public class PeDeliberacaoResponse
 {
     public long Id { get; set; }
 
-    // petic (na E7, pdtic)
+    // petic ou pdtic (E7)
     public string ObjetoTipo { get; set; } = string.Empty;
 
     public long ObjetoId { get; set; }
 
     public string VersaoObjeto { get; set; } = string.Empty;
 
-    // "PETIC-DF 1.0" (na E7, "PDTIC SES 1.0")
+    // "PETIC-DF 1.0" ou "PDTIC SES 1.0"
     public string Titulo { get; set; } = string.Empty;
 
     // Sigla do órgão do PDTIC (nulo no PETIC-DF)
     public string? OrgaoSigla { get; set; }
+
+    // A mais que o contrato: o nome do órgão do PDTIC (nulo no PETIC-DF)
+    public string? OrgaoNome { get; set; }
+
+    // O PDF enviado (PDTIC): baixa em GET pdtic/{PdticId}/documento/versoes/{Numero}/arquivo; nulo no PETIC-DF
+    public PeDeliberacaoDocumentoResponse? Documento { get; set; }
 
     public DateTime EnviadoEm { get; set; }
 
@@ -90,6 +96,14 @@ public class PeDeliberacaoResponse
     public string? Sei { get; set; }
 
     public string? Observacao { get; set; }
+}
+
+/// <summary>A versão do documento enviada ao CGTIC com a deliberação do PDTIC (E7).</summary>
+public class PeDeliberacaoDocumentoResponse
+{
+    public long PdticId { get; set; }
+
+    public int Numero { get; set; }
 }
 
 /// <summary>

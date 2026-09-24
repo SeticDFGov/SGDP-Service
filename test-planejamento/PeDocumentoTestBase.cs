@@ -20,12 +20,10 @@ namespace test.planejamento;
 /// </summary>
 public abstract class PeDocumentoTestBase : PePdticTestBase
 {
-    protected readonly PeDocumentoService Documentos;
     protected readonly PeDocModeloService ModeloDoc;
 
     protected PeDocumentoTestBase()
     {
-        Documentos = new PeDocumentoService(Context, Registros, Permissoes);
         ModeloDoc = new PeDocModeloService(Context);
     }
 
@@ -272,8 +270,8 @@ public abstract class PeDocumentoTestBase : PePdticTestBase
             acao_preventiva = "Backup isolado e testes de restauração.", gatilho = "Alerta do centro de resposta a incidentes.",
             resposta = "Acionar o plano de resposta a incidentes.", responsavel = "Coordenação de Infraestrutura", proxima_revisao = "2026-09-30"
         }, new { ameaca = new[] { ameaca.Id } });
-        await IncluirNoPdticAsync(id, "responsavel_acompanhamento", new { modalidade = "equipe_propria", descricao = "Três servidores da Subsecretaria de TIC.", ato_tipo = "portaria", ato_numero = "130/2026", ato_data = "2026-04-01" });
-        await IncluirNoPdticAsync(id, "periodicidade_monitoramento", new { periodicidade = "trimestral" });
+        // As seções do plano de acompanhamento (etapa 4) só se gravam depois da publicação (E7):
+        // na minuta, o capítulo de revisão e acompanhamento sai com os quadros vazios
         await IncluirNoPdticAsync(id, "plano_trabalho", new { objetivo = "Elaborar o PDTIC 2026 a 2029.", justificativa = "O PDTIC anterior venceu.", premissas_restricoes = "Participação das áreas finalísticas." });
         await IncluirNoPdticAsync(id, "partes_interessadas", new { nome = "Gabinete da Secretária", orgao = "SES" });
         await IncluirNoPdticAsync(id, "cronograma_elaboracao", new { atividade = "Levantar as necessidades", responsavel = "Equipe de elaboração", inicio = "2026-02-15", termino = "2026-04-30" });

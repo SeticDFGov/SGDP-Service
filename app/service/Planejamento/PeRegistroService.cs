@@ -307,7 +307,7 @@ public class PeRegistroService : IPeRegistroService
     public async Task<PeRegistroResponse> CriarAsync(PeDono dono, string secaoChave, PeRegistroSalvarDTO dto, PeUserContext ctx)
     {
         var aberto = await AbrirAsync(dono, ctx, escrita: true);
-        var secao = await SecaoAsync(aberto, secaoChave);
+        var secao = await SecaoParaEscritaAsync(aberto, secaoChave);
         var doDono = RegistrosDo(dono).Where(r => r.SecaoId == secao.Secao.Id);
         if (secao.EhFormulario && await doDono.AnyAsync())
             throw new ApiException(ErrorCode.PeFormularioJaPreenchido,
@@ -333,6 +333,7 @@ public class PeRegistroService : IPeRegistroService
         Aplicar(registro, gravacao);
         Tocar(aberto, ctx, agora);
         CopiarVigencia(aberto, secao, gravacao.Dados);
+        IniciarAcompanhamento(aberto, secao, gravacao.Dados);
 
         // O id do registro sai na primeira gravação; os arquivos ganham o dono na segunda
         await using var transacao = _context.Database.IsRelational() ? await _context.Database.BeginTransactionAsync() : null;
@@ -350,7 +351,7 @@ public class PeRegistroService : IPeRegistroService
     public async Task<PeRegistroResponse> AtualizarAsync(PeDono dono, string secaoChave, long id, PeRegistroSalvarDTO dto, PeUserContext ctx)
     {
         var aberto = await AbrirAsync(dono, ctx, escrita: true);
-        var secao = await SecaoAsync(aberto, secaoChave);
+        var secao = await SecaoParaEscritaAsync(aberto, secaoChave);
         var registro = await RegistroParaEscritaAsync(dono, secao, id);
 
         var gravacao = await ValidarAsync(aberto, secao, registro, dto, ctx);
@@ -362,6 +363,7 @@ public class PeRegistroService : IPeRegistroService
         registro.AlteradoPor = ctx.Email;
         Tocar(aberto, ctx, agora);
         CopiarVigencia(aberto, secao, gravacao.Dados);
+        IniciarAcompanhamento(aberto, secao, gravacao.Dados);
         await _context.SaveChangesAsync();
 
         return await UmaRespostaAsync(secao, registro.Id);
@@ -370,7 +372,7 @@ public class PeRegistroService : IPeRegistroService
     public async Task ExcluirAsync(PeDono dono, string secaoChave, long id, PeUserContext ctx)
     {
         var aberto = await AbrirAsync(dono, ctx, escrita: true);
-        var secao = await SecaoAsync(aberto, secaoChave);
+        var secao = await SecaoParaEscritaAsync(aberto, secaoChave);
         var registro = await RegistroParaEscritaAsync(dono, secao, id);
 
         var ligadoPor = await _context.PeVinculos.AsNoTracking()
@@ -399,7 +401,7 @@ public class PeRegistroService : IPeRegistroService
         PeUserContext ctx)
     {
         var aberto = await AbrirAsync(dono, ctx, escrita: true);
-        var secao = await SecaoAsync(aberto, secaoChave);
+        var secao = await SecaoParaEscritaAsync(aberto, secaoChave);
         if (secao.EhFormulario)
             throw new ApiException(ErrorCode.PeDadosInvalidos, "A sugestão só entra numa tabela.");
         var doDono = RegistrosDo(dono).Where(r => r.SecaoId == secao.Secao.Id);
@@ -461,7 +463,7 @@ public class PeRegistroService : IPeRegistroService
     public async Task<PeRegistrosResponse> OrdenarAsync(PeDono dono, string secaoChave, PeOrdemDTO dto, PeUserContext ctx)
     {
         var aberto = await AbrirAsync(dono, ctx, escrita: true);
-        var secao = await SecaoAsync(aberto, secaoChave);
+        var secao = await SecaoParaEscritaAsync(aberto, secaoChave);
         var registros = await RegistrosDo(dono).Where(r => r.SecaoId == secao.Secao.Id).ToListAsync();
 
         var ids = dto.Ids ?? new List<long>();
@@ -578,7 +580,9 @@ public class PeRegistroService : IPeRegistroService
         }
 
         // Imagens do texto rico: PNG ou JPEG do próprio módulo, enviadas por quem grava e ainda
-        // sem dono, ou já deste registro. Ganham este registro como dono (quem vê o registro vê a imagem)
+        // sem dono, ou já deste registro. Ganham este registro como dono (quem vê o registro vê a imagem).
+        // Desde a E7, também a imagem de outra versão do PDTIC do mesmo órgão (a revisão copia os
+        // textos com as imagens da versão revista): fica com o dono que já tem
         foreach (var (campo, ids) in imagens)
             foreach (var id in ids)
             {
@@ -589,6 +593,8 @@ public class PeRegistroService : IPeRegistroService
                 else if (PeArquivoService.TipoDoArquivo(arquivo.Nome) is not ("png" or "jpg"))
                     erro = "No texto formatado entram só imagens PNG ou JPEG.";
                 else if (atual != null && arquivo.DonoTipo == PeDominios.DonoArquivo.Registro && arquivo.DonoId == atual.Id)
+                    continue;
+                else if (aberto.Pdtic != null && await DoMesmoOrgaoAsync(_context, arquivo, aberto.Pdtic.OrgaoId))
                     continue;
                 else if (arquivo.DonoTipo != null || !MesmaPessoa(arquivo.CriadoPor, ctx.Email))
                     erro = "Uma das imagens não pode ser usada aqui. Envie a imagem de novo.";
@@ -758,6 +764,40 @@ public class PeRegistroService : IPeRegistroService
     }
 
     /// <summary>
+    /// O acompanhamento começa (E7): gravar a aprovação do plano de acompanhamento (passo 4.6)
+    /// com a decisão "aprovado" num PDTIC publicado o põe em acompanhamento (a rodada B
+    /// acrescenta o outro gatilho, o primeiro ciclo de monitoramento com dado gravado). A
+    /// situação é token de concorrência: a mudança vai na mesma gravação do registro.
+    /// </summary>
+    private static void IniciarAcompanhamento(PeDonoAberto aberto, PeSecaoDoDono secao, JsonObject dados)
+    {
+        if (aberto.Pdtic is not { Situacao: PeDominios.SituacaoPdtic.Publicado } pdtic
+            || secao.Secao.Chave != PeDominios.ChavePdtic.SecaoAprovacaoPlanoAcompanhamento
+            || PeRegistroDados.Texto(dados[PeDominios.ChavePdtic.CampoDecisao]) != PeDominios.Decisao.Aprovado)
+            return;
+        pdtic.Situacao = PeDominios.SituacaoPdtic.EmAcompanhamento;
+    }
+
+    /// <summary>
+    /// O arquivo pertence a um registro ou a um PDTIC do órgão (qualquer versão): a revisão
+    /// copia os textos e os campos com as imagens e os arquivos da versão revista, que ficam
+    /// com o dono de antes e servem às duas versões.
+    /// </summary>
+    internal static async Task<bool> DoMesmoOrgaoAsync(AppDbContext context, PeArquivo arquivo, long orgaoId)
+    {
+        long? pdticDono = arquivo.DonoTipo switch
+        {
+            PeDominios.DonoArquivo.Registro when arquivo.DonoId != null => await context.PeRegistros.AsNoTracking()
+                .Where(r => r.Id == arquivo.DonoId)
+                .Select(r => r.PdticId)
+                .FirstOrDefaultAsync(),
+            PeDominios.DonoArquivo.Pdtic => arquivo.DonoId,
+            _ => null
+        };
+        return pdticDono != null && await context.PePdtics.AsNoTracking().AnyAsync(p => p.Id == pdticDono && p.OrgaoId == orgaoId);
+    }
+
+    /// <summary>
     /// No PDTIC, a vigência da seção abrangencia (passo 1.1) vai para o pe_pdtic a cada
     /// gravação (nula quando o registro é apagado). Par invertido não é copiado (a validação
     /// já recusa quando os campos aparecem).
@@ -778,7 +818,8 @@ public class PeRegistroService : IPeRegistroService
     /// Confere quem chama e o dono. PETIC-DF e catálogo do DF: ler, qualquer papel do módulo;
     /// escrever, pe_admin e admin geral, e, no PETIC-DF, só a versão em rascunho. PDTIC (E4):
     /// ler, quem vê o órgão (papéis globais, admin geral e os dois papéis do próprio órgão);
-    /// escrever, a equipe do órgão (e o admin geral), só em elaboração ou devolvido.
+    /// escrever, a equipe do órgão (e o admin geral); desde a E7, a situação é conferida na
+    /// seção, pelo passo dela (<see cref="SecaoParaEscritaAsync"/> e <see cref="PeEdicaoPdtic"/>).
     /// </summary>
     private async Task<PeDonoAberto> AbrirAsync(PeDono dono, PeUserContext ctx, bool escrita)
     {
@@ -813,26 +854,41 @@ public class PeRegistroService : IPeRegistroService
         if (!_permissoes.PodeVerOrgao(ctx, pdtic.OrgaoId))
             throw new ApiException(ErrorCode.PeSemPermissao, "Você só vê o PDTIC do seu próprio órgão.");
 
+        // O papel é conferido aqui; a situação, na seção (depende da etapa do passo dela)
         var papelEdita = _permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId);
-        var aberto = PeDominios.SituacaoPdtic.Editaveis.Contains(pdtic.Situacao);
-        if (escrita)
-        {
-            if (!papelEdita) throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do órgão edita o PDTIC.");
-            if (!aberto) throw PePdticService.Fechado(pdtic);
-        }
-        var trilha = await PeTrilhaOrgao.CarregarAsync(_context, pdtic.OrgaoId, soAtivo: false);
-        return new PeDonoAberto(dono, null, pdtic, trilha, papelEdita && aberto);
+        if (escrita && !papelEdita) throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do órgão edita o PDTIC.");
+        var trilha = await PeTrilhaOrgao.DoPdticAsync(_context, pdtic);
+        return new PeDonoAberto(dono, null, pdtic, trilha, papelEdita);
     }
 
     /// <summary>A trilha do órgão do PDTIC (sem conferir quem chama), ou nulo fora do PDTIC.</summary>
     private async Task<PeTrilhaOrgao?> TrilhaDoDonoAsync(PeDono dono)
     {
         if (!dono.EhPdtic) return null;
-        var orgaoId = await _context.PePdtics.AsNoTracking()
-            .Where(p => p.Id == dono.PdticId)
-            .Select(p => (long?)p.OrgaoId)
-            .FirstOrDefaultAsync() ?? throw PePdticService.NaoEncontrado();
-        return await PeTrilhaOrgao.CarregarAsync(_context, orgaoId, soAtivo: false);
+        var pdtic = await _context.PePdtics.AsNoTracking().FirstOrDefaultAsync(p => p.Id == dono.PdticId)
+            ?? throw PePdticService.NaoEncontrado();
+        return await PeTrilhaOrgao.DoPdticAsync(_context, pdtic);
+    }
+
+    /// <summary>
+    /// A seção para gravar: no PDTIC, só a do passo que aceita edição agora, pela situação do
+    /// PDTIC e pela etapa (<see cref="PeEdicaoPdtic"/>); senão 409 PePdticFechado com a
+    /// mensagem. Fora do PDTIC, a regra de sempre (o AbrirAsync já conferiu).
+    /// </summary>
+    private async Task<PeSecaoDoDono> SecaoParaEscritaAsync(PeDonoAberto aberto, string chave)
+    {
+        var secao = await SecaoAsync(aberto, chave);
+        if (RecusaDaSecao(aberto, secao) is string recusa) throw PeEdicaoPdtic.Fechado(recusa);
+        return secao;
+    }
+
+    /// <summary>No PDTIC, por que a seção não aceita edição agora (pelo passo dela), ou nulo; fora do PDTIC, nulo.</summary>
+    private static string? RecusaDaSecao(PeDonoAberto aberto, PeSecaoDoDono secao)
+    {
+        if (aberto.Pdtic == null || aberto.Trilha == null) return null;
+        var passo = aberto.Trilha.Secao(secao.Secao.Id)?.Passo;
+        if (passo == null) return "Esta seção não aparece no nível do órgão.";
+        return PeEdicaoPdtic.Recusa(aberto.Pdtic, PeEdicaoPdtic.GrupoDoPasso(aberto.Trilha, passo), passo.Chave);
     }
 
     /// <summary>Versão do PETIC-DF fora do rascunho: 409 com a mensagem da situação.</summary>
@@ -1092,7 +1148,8 @@ public class PeRegistroService : IPeRegistroService
                 }).ToList()
             },
             Registros = await ResponderAsync(secao, registros),
-            PodeEditar = aberto.PodeEditar
+            // No PDTIC, pela situação e pela etapa do passo da seção (E7)
+            PodeEditar = aberto.PodeEditar && RecusaDaSecao(aberto, secao) == null
         };
     }
 

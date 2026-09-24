@@ -166,6 +166,9 @@ builder.Services.AddScoped<IPeDocModeloService, service.Planejamento.PeDocModelo
 // Fluxos (E6): os fluxos do guia como modelo, a cópia do órgão, o desenho em SVG e o
 // cronograma sugerido do plano de trabalho
 builder.Services.AddScoped<IPeFluxoService, service.Planejamento.PeFluxoService>();
+// Aprovação (E7): o envio ao CGTIC, a publicação, o encerramento, a revisão e o PDTIC
+// aprovado fora do sistema (a decisão do CGTIC fica no serviço das deliberações)
+builder.Services.AddScoped<IPePdticAprovacaoService, service.Planejamento.PePdticAprovacaoService>();
 // Modelo inicial (trilha e campos do PDTIC, e os referenciais do DF e do PETIC-DF, com os
 // princípios do art. 4º): carregado ao subir, fora das requisições.
 // Sem as tabelas (intervalo entre o PR e a migration do merge) só registra no log e

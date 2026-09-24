@@ -19,6 +19,9 @@ public abstract class PePdticTestBase : PeReferenciaisTestBase
 {
     protected readonly PePdticService Pdtics;
     protected readonly PeComentarioService Comentarios;
+    // O documento (E5) e o caminho da aprovação (E7), que gera o PDF enviado ao CGTIC
+    protected readonly PeDocumentoService Documentos;
+    protected readonly PePdticAprovacaoService Aprovacao;
 
     // pe_orgao na SEEC (o outro órgão da base)
     protected readonly User UserOrgaoSeec;
@@ -27,6 +30,8 @@ public abstract class PePdticTestBase : PeReferenciaisTestBase
     {
         Pdtics = new PePdticService(Context, Registros, Permissoes);
         Comentarios = new PeComentarioService(Context, Permissoes);
+        Documentos = new PeDocumentoService(Context, Registros, Permissoes);
+        Aprovacao = new PePdticAprovacaoService(Context, Registros, Permissoes, Pdtics, Documentos);
 
         UserOrgaoSeec = NovoUser("olga@economia.df.gov.br", "Olga da Economia", Perfis.Basico, UnidadeSeec);
         DarPapel(UserOrgaoSeec, PapeisPlanejamento.Orgao);
@@ -89,7 +94,7 @@ public abstract class PePdticTestBase : PeReferenciaisTestBase
     /// <summary>Um documento do TipTap com os nós dados no topo.</summary>
     protected static object Doc(params object[] nos) => new { type = "doc", content = nos };
 
-    protected PePdticController ControladorPdtic(User user) => new(Pdtics, Comentarios, Planilhas, Permissoes)
+    protected PePdticController ControladorPdtic(User user) => new(Pdtics, Comentarios, Planilhas, Permissoes, Aprovacao)
     {
         ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = Principal(user) } }
     };

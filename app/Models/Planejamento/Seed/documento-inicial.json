@@ -42,7 +42,16 @@
               ]
             },
             {"tipo": "tabela_secao", "secao": "equipe_elaboracao", "colunas": ["nome", "papel", "cargo", "area"]},
-            {"tipo": "tabela_secao", "secao": "equipe_designacao"}
+            {"tipo": "tabela_secao", "secao": "equipe_designacao"},
+            {
+              "tipo": "texto",
+              "texto": [
+                "**Aprovação e publicação**",
+                "**Aprovação pelo comitê interno de TIC (SGTIC):** {aprovacao.sgtic.data} ({aprovacao.sgtic.ato})",
+                "**Aprovação pelo Comitê Gestor de TIC do Distrito Federal (CGTIC):** {aprovacao.cgtic.data} ({aprovacao.cgtic.ato})",
+                "**Publicação:** {publicacao.data} ({publicacao.endereco})"
+              ]
+            }
           ]
         },
         {
@@ -149,7 +158,10 @@
               ]
             },
             {"tipo": "tabela_secao", "secao": "metodologia"},
-            {"tipo": "fluxo", "fluxo": "elaboracao"}
+            {"tipo": "fluxo", "fluxo": "elaboracao"},
+            {"tipo": "fluxo", "fluxo": "preparacao"},
+            {"tipo": "fluxo", "fluxo": "diagnostico"},
+            {"tipo": "fluxo", "fluxo": "planejamento"}
           ]
         },
         {
@@ -519,7 +531,11 @@
             },
             {"tipo": "tabela_secao", "secao": "responsavel_acompanhamento"},
             {"tipo": "tabela_secao", "secao": "periodicidade_monitoramento"},
-            {"tipo": "fluxo", "fluxo": "acompanhamento"}
+            {"tipo": "fluxo", "fluxo": "acompanhamento"},
+            {"tipo": "fluxo", "fluxo": "planejamento_acompanhamento"},
+            {"tipo": "fluxo", "fluxo": "monitoramento"},
+            {"tipo": "fluxo", "fluxo": "avaliacao_intermediaria"},
+            {"tipo": "fluxo", "fluxo": "avaliacao_final"}
           ]
         },
         {

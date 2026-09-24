@@ -8,15 +8,18 @@ namespace Controllers.Planejamento;
 
 /// <summary>
 /// Respostas de erro dos controllers do módulo Governança Estratégica, sempre como
-/// { Code, Message } com 400, 403, 404 ou 409 (faixa 1000 a 1099 do ErrorCode), nunca um
+/// { Code, Message } com 400, 403, 404 ou 409 (faixa 1000 a 1159 do ErrorCode), nunca um
 /// 500 sem corpo:
 /// <list type="bullet">
 /// <item>ApiException: pelo código (404 para "não encontrado", 403 para permissão, 409 para
 /// travado, do sistema, chave repetida, nível inativo, em uso, apagado, modelo
 /// indisponível, conflito, registro ligado ou do sistema, versão fechada ou já enviada,
-/// deliberação decidida, capítulo obrigatório que o órgão tenta esconder e PDF que não pôde
-/// ser montado; 400 para o resto). A validação de registro (PeValidacaoException)
-/// leva também Campos, com a mensagem de cada campo;</item>
+/// deliberação decidida, capítulo obrigatório que o órgão tenta esconder, PDF que não pôde
+/// ser montado e, desde a E7, transição que não vale na situação do PDTIC, encerramento ou
+/// revisão recusados, versão em elaboração e versão repetida; 400 para o resto). A
+/// validação de registro, da publicação e do registro externo (PeValidacaoException)
+/// leva também Campos, com a mensagem de cada campo; o envio com pendências
+/// (PePendenciasException), a lista Pendencias;</item>
 /// <item>tabela ou coluna pe_ que ainda não existe (o PR publica o código antes da
 /// migration, que só roda no merge; desde a E4, a coluna pdtic_id de pe_registro): 409
 /// PeModeloIndisponivel, com mensagem para tentar de novo;</item>
@@ -67,12 +70,17 @@ internal static class PeRespostas
                 or ErrorCode.PeVersaoJaEnviada or ErrorCode.PePdticJaExiste or ErrorCode.PePdticFechado
                 or ErrorCode.PeNaoSeAplicaRecusado or ErrorCode.PeComentarioResolvido
                 or ErrorCode.PeDocCapituloObrigatorio or ErrorCode.PeDocGeracaoFalhou
-                or ErrorCode.PeCronogramaPreenchido or ErrorCode.PeCronogramaSemTarefas => StatusCodes.Status409Conflict,
+                or ErrorCode.PeCronogramaPreenchido or ErrorCode.PeCronogramaSemTarefas
+                or ErrorCode.PePdticSituacaoInvalida or ErrorCode.PeEncerramentoRecusado or ErrorCode.PeRevisaoEmAndamento
+                or ErrorCode.PeRevisaoRecusada or ErrorCode.PeVersaoPdticDuplicada => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
         // Validação de registro: a mensagem de cada campo, pela chave
         if (ex is PeValidacaoException validacao)
             return new ObjectResult(new { ex.Error.Code, ex.Error.Message, validacao.Campos }) { StatusCode = status };
+        // Envio ao CGTIC com pendências: os passos que faltam, em lista
+        if (ex is PePendenciasException pendencias)
+            return new ObjectResult(new { ex.Error.Code, ex.Error.Message, pendencias.Pendencias }) { StatusCode = status };
         // Validação do fluxo: os erros em linguagem simples, em lista
         if (ex is PeFluxoInvalidoException fluxo)
             return new ObjectResult(new { ex.Error.Code, ex.Error.Message, fluxo.Erros }) { StatusCode = status };

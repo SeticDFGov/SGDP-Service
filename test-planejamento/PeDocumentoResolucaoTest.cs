@@ -385,7 +385,8 @@ public class PeDocumentoResolucaoTest : PeDocumentoTestBase
         Assert.Equal("Alto Risco", linha.Celulas["classificacao"]);
         Assert.Equal(NaTrilha(await TrilhaAsync(OrgaoSes), "diagnostico.sistemas-ia")!.Numero, pgia.PassoNumero);
 
-        var fluxo = Cap(documento, "metodologia").Blocos.Single(b => b.Tipo == "fluxo").Fluxo!;
+        // O primeiro fluxo da metodologia (desde a versão 5 do modelo, seguido dos fluxos das etapas)
+        var fluxo = Cap(documento, "metodologia").Blocos.First(b => b.Tipo == "fluxo").Fluxo!;
         Assert.Equal("elaboracao", fluxo.Chave);
         Assert.Equal("Processo de elaboração do PDTIC (figura 5 do guia)", fluxo.Nome);
         // Desde a E6, o desenho do fluxo do guia (o modelo, sem cópia do órgão)

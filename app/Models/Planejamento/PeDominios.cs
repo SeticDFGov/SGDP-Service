@@ -230,8 +230,9 @@ public static class PeDominios
 
     /// <summary>
     /// Situação do PDTIC de um órgão (pe_pdtic.situacao), no ciclo da decisão 18 do plano. A
-    /// E4 abre em elaboração; as transições seguintes (envio, deliberação, publicação,
-    /// acompanhamento, encerramento, revisão) chegam na E7.
+    /// E4 abre em elaboração; a E7 faz as transições: enviar (em aprovação), a deliberação do
+    /// CGTIC (aprovado ou devolvido), publicar, o acompanhamento, encerrar e a revisão (a
+    /// versão anterior fica substituída quando a nova é aprovada).
     /// </summary>
     public static class SituacaoPdtic
     {
@@ -247,11 +248,17 @@ public static class PeDominios
         public static readonly string[] Todas =
             { EmElaboracao, EmAprovacao, Devolvido, Aprovado, Publicado, EmAcompanhamento, Encerrado, Substituido };
 
-        // Fora do "atual": o órgão pode abrir outro PDTIC (índice único parcial ux_pe_pdtic_atual)
+        // Fora do PDTIC atual do órgão: nada mais muda nelas
         public static readonly string[] Encerradas = { Encerrado, Substituido };
 
-        // A equipe do órgão edita os registros só nestas
+        // A elaboração está aberta (etapas 1 a 3, o documento e os fluxos): a equipe do órgão edita
         public static readonly string[] Editaveis = { EmElaboracao, Devolvido };
+
+        // A versão em elaboração do órgão (até a publicação): no máximo uma por órgão (ux_pe_pdtic_em_elaboracao)
+        public static readonly string[] DaElaboracao = { EmElaboracao, EmAprovacao, Devolvido, Aprovado };
+
+        // A versão vigente do órgão (publicada): no máximo uma por órgão (ux_pe_pdtic_vigente)
+        public static readonly string[] Vigentes = { Publicado, EmAcompanhamento };
 
         /// <summary>Texto para a tela e para as planilhas.</summary>
         public static string Rotulo(string situacao) => situacao switch
@@ -270,19 +277,77 @@ public static class PeDominios
 
     /// <summary>
     /// Situação de cada passo da trilha do PDTIC (GET pdtic/{id}/situacao), calculada no
-    /// servidor. "continuo" vale para os tipos de passo das próximas entregas (documento,
-    /// fluxo, aprovação, envio, deliberação, publicação e monitoramento).
+    /// servidor. Desde a E7: "aguardando" (o passo ainda não pode ser feito: as etapas 4 a 7
+    /// antes da publicação, a publicação antes da aprovação, a deliberação enquanto o CGTIC
+    /// decide), "atrasado" (ciclo vencido, rodada B) e "externo" (feito fora do sistema, no
+    /// PDTIC registrado externamente), com o Motivo em texto. "continuo" fica para o
+    /// monitoramento até a rodada B e para o tipo fluxo.
     /// </summary>
     public static class SituacaoPasso
     {
         public const string Feito = "feito";
         public const string Pendente = "pendente";
-        // Há comentário aberto no passo
+        // Há comentário aberto no passo (ou o CGTIC devolveu, no passo da deliberação)
         public const string Atencao = "atencao";
         public const string NaoSeAplica = "nao_se_aplica";
         public const string Continuo = "continuo";
+        public const string Aguardando = "aguardando";
+        public const string Atrasado = "atrasado";
+        public const string Externo = "externo";
 
-        public static readonly string[] Todas = { Feito, Pendente, Atencao, NaoSeAplica, Continuo };
+        public static readonly string[] Todas = { Feito, Pendente, Atencao, NaoSeAplica, Continuo, Aguardando, Atrasado, Externo };
+    }
+
+    /// <summary>
+    /// As etapas da trilha do PDTIC pela chave (itens do sistema: a chave não muda e o
+    /// administrador não cria etapa). As três primeiras são a elaboração (editáveis em
+    /// elaboração ou devolvido); as quatro últimas, o acompanhamento (editáveis depois da
+    /// publicação). Etapa com chave desconhecida conta como elaboração.
+    /// </summary>
+    public static class EtapaPdtic
+    {
+        public const string Preparacao = "preparacao";
+        public const string Diagnostico = "diagnostico";
+        public const string Planejamento = "planejamento";
+        public const string PlanoAcompanhamento = "plano-acompanhamento";
+        public const string Monitoramento = "monitoramento";
+        public const string AvaliacaoIntermediaria = "avaliacao-intermediaria";
+        public const string Fechamento = "fechamento";
+
+        public static readonly string[] Elaboracao = { Preparacao, Diagnostico, Planejamento };
+
+        public static readonly string[] Acompanhamento = { PlanoAcompanhamento, Monitoramento, AvaliacaoIntermediaria, Fechamento };
+
+        public static bool EhDoAcompanhamento(string? chave) => chave != null && Acompanhamento.Contains(chave);
+    }
+
+    /// <summary>
+    /// Decisão das seções de aprovação (campo "decisao" dos passos do tipo aprovação e da
+    /// aprovação do SGTIC): aprovado ou devolvido; na avaliação do comitê (6.3), seguir ou
+    /// revisar (as duas contam como decisão tomada).
+    /// </summary>
+    public static class Decisao
+    {
+        public const string Aprovado = "aprovado";
+        public const string Devolvido = "devolvido";
+        public const string Seguir = "seguir";
+        public const string Revisar = "revisar";
+
+        // O passo de aprovação fica feito com uma destas
+        public static readonly string[] Tomadas = { Aprovado, Seguir, Revisar };
+    }
+
+    /// <summary>
+    /// Quem aprovou o PDTIC registrado fora do sistema (POST pdtic/registrar-externo): o CGTIC
+    /// (vira uma deliberação aprovada, com o ato) ou outra instância (vai para a seção da
+    /// aprovação do SGTIC, com a instância "outra").
+    /// </summary>
+    public static class InstanciaAprovacaoExterna
+    {
+        public const string Cgtic = "cgtic";
+        public const string Outra = "outra";
+
+        public static readonly string[] Todas = { Cgtic, Outra };
     }
 
     /// <summary>
@@ -308,6 +373,29 @@ public static class PeDominios
         public const string SecaoAmeacas = "swot_ameacas";
         public const string SecaoRiscos = "riscos";
         public const string CampoAmeaca = "ameaca";
+
+        // Aprovação e publicação (E7): as seções formulário que a E2 semeou e os campos delas
+        public const string SecaoAprovacaoSgtic = "aprovacao_sgtic";
+        public const string SecaoPublicacao = "publicacao";
+        public const string SecaoAprovacaoPlanoAcompanhamento = "aprovacao_plano_acompanhamento";
+        public const string SecaoAvaliacaoComite = "avaliacao_comite";
+        public const string SecaoAprovacaoAutoridade = "aprovacao_resultados_autoridade";
+        public const string CampoDecisao = "decisao";
+        public const string CampoData = "data";
+        public const string CampoInstancia = "instancia";
+        public const string CampoAtoTipo = "ato_tipo";
+        public const string CampoAtoNumero = "ato_numero";
+        public const string CampoSei = "sei";
+        public const string CampoObservacao = "observacao";
+        public const string CampoEndereco = "endereco";
+        public const string InstanciaOutra = "outra";
+        public const string AtoTipoOutro = "outro";
+
+        // Passos que o PDTIC registrado fora do sistema preenche para acompanhar (3.3 e 3.9)
+        public const string PassoMetasAcoes = "planejamento.metas-acoes";
+        public const string PassoRiscos = "planejamento.riscos";
+        // A avaliação do comitê (6.3): a decisão "revisar" libera a revisão
+        public const string PassoAvaliacaoComite = "avaliacao-intermediaria.avaliacao-comite";
     }
 
     /// <summary>
@@ -467,7 +555,9 @@ public static class PeDominios
 
     /// <summary>
     /// Situação de uma versão gerada do documento (pe_doc_versao.situacao). A E5 gera minutas;
-    /// a E7 congela a enviada ao CGTIC e a marca como aprovada e publicada.
+    /// a E7 gera a enviada ao CGTIC no envio e marca a mesma versão como aprovada (decisão do
+    /// CGTIC) e depois como publicada (o PDF não muda). O PDTIC registrado fora do sistema
+    /// guarda o PDF enviado como a versão 1, já publicada.
     /// </summary>
     public static class SituacaoVersaoDoc
     {

@@ -24,7 +24,7 @@ public class PePdticSituacaoTest : PePdticTestBase
     };
 
     [Fact]
-    public async Task NovoPdtic_PendenteNosDados_ContinuoNosTiposSeguintes_EOProximoE11()
+    public async Task NovoPdtic_PendenteNosDados_AguardandoDepoisDoEnvio_EOProximoE11()
     {
         var pdtic = await AbrirSesAsync();
         var situacao = await SituacaoAsync(pdtic.Id);
@@ -41,9 +41,12 @@ public class PePdticSituacaoTest : PePdticTestBase
         // Seção opcional sem registro não pende (a das aquisições de IA; o resumo da priorização)
         Assert.Equal(PeDominios.SituacaoPasso.Feito, De("diagnostico.sistemas-ia"));
         Assert.Equal(PeDominios.SituacaoPasso.Feito, De("planejamento.priorizacao"));
-        foreach (var chave in new[] { "planejamento.documento", "planejamento.aprovacao-sgtic", "planejamento.deliberacao-cgtic",
-                     "planejamento.publicacao", "monitoramento.ciclo-monitoramento", "fechamento.aprovacao-autoridade" })
-            Assert.Equal(PeDominios.SituacaoPasso.Continuo, De(chave));
+        // Desde a E7: o documento sem PDF, o envio e a deliberação pendem; a publicação e as
+        // etapas 4 a 7 aguardam (com o motivo)
+        foreach (var chave in new[] { "planejamento.documento", "planejamento.aprovacao-sgtic", "planejamento.deliberacao-cgtic" })
+            Assert.Equal(PeDominios.SituacaoPasso.Pendente, De(chave));
+        foreach (var chave in new[] { "planejamento.publicacao", "monitoramento.ciclo-monitoramento", "fechamento.aprovacao-autoridade" })
+            Assert.Equal(PeDominios.SituacaoPasso.Aguardando, De(chave));
         Assert.All(situacao.Passos, p =>
         {
             Assert.Null(p.NaoSeAplica);

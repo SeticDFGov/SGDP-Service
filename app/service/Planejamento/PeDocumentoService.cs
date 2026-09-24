@@ -118,8 +118,12 @@ public class PeDocumentoService : IPeDocumentoService
             throw new ApiException(ErrorCode.PeDocTextoInvalido, "O texto passou do tamanho máximo ou veio num formato que não serve.");
         var rico = PeTextoRico.Validar(texto);
         if (rico.Erro != null) throw new ApiException(ErrorCode.PeDocTextoInvalido, rico.Erro);
+        // Imagens já aceitas: do modelo, deste PDTIC ou (desde a E7) de outra versão do PDTIC do
+        // órgão, que a revisão copia com os textos
+        var doOrgao = await PdticsDoOrgaoAsync(pdtic.OrgaoId);
         var arquivos = await ImagensParaOTextoAsync(rico.Imagens, ctx, a =>
-            (a.DonoTipo == PeDominios.DonoArquivo.Pdtic && a.DonoId == pdtic.Id) || a.DonoTipo == PeDominios.DonoArquivo.DocModelo);
+            (a.DonoTipo == PeDominios.DonoArquivo.Pdtic && a.DonoId != null && doOrgao.Contains(a.DonoId.Value))
+            || a.DonoTipo == PeDominios.DonoArquivo.DocModelo);
 
         var novo = rico.Documento ?? JsonNode.Parse(TextoVazio)!;
         var textoDoModelo = PeDocConfig.TextoDoBloco(PeDocConfig.Ler(bloco.Config));
@@ -244,8 +248,21 @@ public class PeDocumentoService : IPeDocumentoService
         var pdtic = await PePdticService.LerAsync(_context, _permissoes, pdticId, ctx);
         if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
             throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do órgão gera o PDF do documento.");
-        if (!PeDominios.SituacaoPdtic.Editaveis.Contains(pdtic.Situacao)) throw PePdticService.Fechado(pdtic);
+        if (!PeEdicaoPdtic.ElaboracaoAberta(pdtic)) throw PePdticService.Fechado(pdtic);
 
+        var (versao, tamanho) = await GerarVersaoAsync(pdtic, ctx, PeDominios.SituacaoVersaoDoc.Minuta);
+        await _context.SaveChangesAsync();
+        return Versao(versao, tamanho);
+    }
+
+    /// <summary>
+    /// Gera o PDF do documento e deixa a versão pronta no contexto, sem gravar (quem chama grava:
+    /// a minuta sozinha; a versão enviada ao CGTIC, na mesma gravação do envio e da deliberação).
+    /// O PDF fica em pe_arquivo (dono o PDTIC), com o número seguinte e o hash; o rodapé diz a
+    /// situação da versão.
+    /// </summary>
+    public async Task<(PeDocVersao Versao, long Tamanho)> GerarVersaoAsync(PePdtic pdtic, PeUserContext ctx, string situacao)
+    {
         var resolvido = await ResolverAsync(pdtic, ctx);
         var anteriores = await _context.PeDocVersoes.AsNoTracking().Where(v => v.PdticId == pdtic.Id).OrderBy(v => v.Numero).ToListAsync();
         var numero = anteriores.Select(v => v.Numero).DefaultIfEmpty(0).Max() + 1;
@@ -264,7 +281,7 @@ public class PeDocumentoService : IPeDocumentoService
         var historico = anteriores
             .Where(v => v.Situacao != PeDominios.SituacaoVersaoDoc.Minuta)
             .Select(v => LinhaDoHistorico(pdtic.Versao, v.Numero, v.Situacao, DateTimeHelper.ToBrasilia(v.GeradoEm), Autor(v.GeradoPor)))
-            .Append(LinhaDoHistorico(pdtic.Versao, numero, PeDominios.SituacaoVersaoDoc.Minuta, agoraBrasilia, Autor(ctx.Email)))
+            .Append(LinhaDoHistorico(pdtic.Versao, numero, situacao, agoraBrasilia, Autor(ctx.Email)))
             .ToList();
 
         var entrada = new PeDocumentoPdf.Entrada
@@ -274,7 +291,7 @@ public class PeDocumentoService : IPeDocumentoService
             Imagens = await ImagensDoDocumentoAsync(resolvido, pdtic),
             Logotipo = resolvido.LogotipoId is long logo ? (await ImagensAsync(new[] { logo }, pdtic, soDoRegistro: true)).GetValueOrDefault(logo) : null,
             Historico = historico,
-            Rodape = $"{resolvido.Orgao.Sigla} · PDTIC versão {pdtic.Versao} · minuta nº {numero.ToString(CultureInfo.InvariantCulture)}",
+            Rodape = Rodape(resolvido.Orgao.Sigla, pdtic.Versao, numero, situacao),
             GeradoEm = agoraBrasilia
         };
 
@@ -307,7 +324,7 @@ public class PeDocumentoService : IPeDocumentoService
         {
             PdticId = pdtic.Id,
             Numero = numero,
-            Situacao = PeDominios.SituacaoVersaoDoc.Minuta,
+            Situacao = situacao,
             Arquivo = arquivo,
             Hash = hash,
             Paginas = Math.Max(1, pdf.Paginas),
@@ -315,8 +332,20 @@ public class PeDocumentoService : IPeDocumentoService
             GeradoPor = ctx.Email
         };
         _context.PeDocVersoes.Add(versao);
-        await _context.SaveChangesAsync();
-        return Versao(versao, arquivo.Tamanho);
+        return (versao, arquivo.Tamanho);
+    }
+
+    /// <summary>
+    /// O rodapé do PDF: "SES · PDTIC versão 1.0 · minuta nº 3" na minuta e "SES · PDTIC versão
+    /// 1.0 · nº 4, enviada ao CGTIC" na versão que vai ao comitê (a situação com a primeira
+    /// letra minúscula, sem mexer na sigla).
+    /// </summary>
+    public static string Rodape(string sigla, string versaoPdtic, int numero, string situacao)
+    {
+        var numeroTexto = numero.ToString(CultureInfo.InvariantCulture);
+        if (situacao == PeDominios.SituacaoVersaoDoc.Minuta) return $"{sigla} · PDTIC versão {versaoPdtic} · minuta nº {numeroTexto}";
+        var rotulo = PeDominios.SituacaoVersaoDoc.Rotulo(situacao);
+        return $"{sigla} · PDTIC versão {versaoPdtic} · nº {numeroTexto}, {char.ToLowerInvariant(rotulo[0])}{rotulo[1..]}";
     }
 
     private static PeDocumentoPdf.LinhaHistorico LinhaDoHistorico(string versaoPdtic, int numero, string situacao, DateTime quando, string autor) =>
@@ -391,8 +420,10 @@ public class PeDocumentoService : IPeDocumentoService
     }
 
     /// <summary>
-    /// O conteúdo das imagens que o documento deste PDTIC pode mostrar: do modelo, do próprio
-    /// PDTIC ou de um registro dele (texto rico e logotipo). Outra imagem fica de fora.
+    /// O conteúdo das imagens que o documento deste PDTIC pode mostrar: do modelo, do PDTIC ou
+    /// de um registro dele (texto rico e logotipo). Desde a E7, também as de outra versão do
+    /// PDTIC do mesmo órgão (a revisão copia os textos e os registros com as imagens da versão
+    /// revista). Outra imagem fica de fora.
     /// </summary>
     private async Task<Dictionary<long, byte[]>> ImagensAsync(IEnumerable<long> ids, PePdtic pdtic, bool soDoRegistro)
     {
@@ -402,17 +433,21 @@ public class PeDocumentoService : IPeDocumentoService
             .Where(a => lista.Contains(a.Id))
             .Select(a => new { a.Id, a.DonoTipo, a.DonoId, a.TipoMime })
             .ToListAsync();
+        var doOrgao = await PdticsDoOrgaoAsync(pdtic.OrgaoId);
         var idsRegistros = arquivos.Where(a => a.DonoTipo == PeDominios.DonoArquivo.Registro && a.DonoId != null).Select(a => a.DonoId!.Value).ToList();
-        var registrosDoPdtic = idsRegistros.Count == 0
+        var registrosDoOrgao = idsRegistros.Count == 0
             ? new HashSet<long>()
-            : (await _context.PeRegistros.AsNoTracking().Where(r => idsRegistros.Contains(r.Id) && r.PdticId == pdtic.Id).Select(r => r.Id).ToListAsync()).ToHashSet();
+            : (await _context.PeRegistros.AsNoTracking()
+                .Where(r => idsRegistros.Contains(r.Id) && r.PdticId != null && doOrgao.Contains(r.PdticId.Value))
+                .Select(r => r.Id)
+                .ToListAsync()).ToHashSet();
 
         var validos = arquivos
             .Where(a => a.TipoMime is "image/png" or "image/jpeg")
             .Where(a => a.DonoTipo switch
             {
-                PeDominios.DonoArquivo.Registro => a.DonoId != null && registrosDoPdtic.Contains(a.DonoId.Value),
-                PeDominios.DonoArquivo.Pdtic => !soDoRegistro && a.DonoId == pdtic.Id,
+                PeDominios.DonoArquivo.Registro => a.DonoId != null && registrosDoOrgao.Contains(a.DonoId.Value),
+                PeDominios.DonoArquivo.Pdtic => !soDoRegistro && a.DonoId != null && doOrgao.Contains(a.DonoId.Value),
                 PeDominios.DonoArquivo.DocModelo => !soDoRegistro,
                 _ => false
             })
@@ -424,6 +459,10 @@ public class PeDocumentoService : IPeDocumentoService
             .ToDictionaryAsync(c => c.Id, c => c.Conteudo);
     }
 
+    /// <summary>Os ids de todas as versões do PDTIC do órgão (a família das imagens que a revisão copia).</summary>
+    private async Task<HashSet<long>> PdticsDoOrgaoAsync(long orgaoId) =>
+        (await _context.PePdtics.AsNoTracking().Where(p => p.OrgaoId == orgaoId).Select(p => p.Id).ToListAsync()).ToHashSet();
+
     // ── Apoio da edição ─────────────────────────────────────────────────────
 
     private async Task<PePdtic> PdticParaEditarAsync(long pdticId, PeUserContext ctx)
@@ -431,7 +470,7 @@ public class PeDocumentoService : IPeDocumentoService
         var pdtic = await PePdticService.LerAsync(_context, _permissoes, pdticId, ctx, rastrear: true);
         if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
             throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do órgão edita o documento do PDTIC.");
-        if (!PeDominios.SituacaoPdtic.Editaveis.Contains(pdtic.Situacao)) throw PePdticService.Fechado(pdtic);
+        if (!PeEdicaoPdtic.ElaboracaoAberta(pdtic)) throw PePdticService.Fechado(pdtic);
         return pdtic;
     }
 
@@ -558,7 +597,7 @@ public class PeDocumentoService : IPeDocumentoService
         var base_ = await BaseAsync(pdtic);
         var trilha = base_.Trilha;
         var (dicionario, logotipo) = await DicionarioAsync(_registros, pdtic, trilha);
-        var marcadores = Marcadores(pdtic, base_.Orgao, dicionario);
+        var marcadores = Marcadores(pdtic, base_.Orgao, dicionario, await AprovacoesAsync(_context, _registros, pdtic, trilha));
 
         bool Resolve(PeDocBloco bloco) =>
             (soBloco == null || bloco.Id == soBloco) && (soCapitulo == null || bloco.CapituloId == soCapitulo);
@@ -636,7 +675,7 @@ public class PeDocumentoService : IPeDocumentoService
             OrgaoSigla = base_.Orgao.Sigla,
             OrgaoNome = base_.Orgao.Nome,
             Titulo = PeDominios.TipoDocumento.Titulo(base_.Modelo.Tipo),
-            PodeEditar = _permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId) && PeDominios.SituacaoPdtic.Editaveis.Contains(pdtic.Situacao),
+            PodeEditar = _permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId) && PeEdicaoPdtic.ElaboracaoAberta(pdtic),
             Logotipo = logotipo is long logo ? $"api/planejamento/arquivos/{logo.ToString(CultureInfo.InvariantCulture)}" : null,
             Versoes = await VersoesDoPdticAsync(pdtic.Id)
         };
@@ -712,8 +751,12 @@ public class PeDocumentoService : IPeDocumentoService
         return (valores, logotipo);
     }
 
-    /// <summary>Todos os marcadores conhecidos com o valor para o órgão (nulo = sem valor).</summary>
-    public static Dictionary<string, string?> Marcadores(PePdtic pdtic, PgiaOrgao orgao, IReadOnlyDictionary<string, string?> dicionario)
+    /// <summary>
+    /// Todos os marcadores conhecidos com o valor para o órgão (nulo = sem valor). Os de
+    /// aprovação e de publicação (E7) vêm em aprovacoes (sem ele, ficam sem valor).
+    /// </summary>
+    public static Dictionary<string, string?> Marcadores(PePdtic pdtic, PgiaOrgao orgao, IReadOnlyDictionary<string, string?> dicionario,
+        IReadOnlyDictionary<string, string?>? aprovacoes = null)
     {
         var valores = new Dictionary<string, string?>(dicionario);
         foreach (var marcador in PeDocMarcadores.Fixos) valores.TryAdd(marcador.Chave, null);
@@ -726,7 +769,65 @@ public class PeDocumentoService : IPeDocumentoService
         valores["vigencia.fim"] = pdtic.VigenciaFim is DateOnly fim ? PeFormato.Data(fim) : null;
         valores["pdtic.versao"] = pdtic.Versao;
         valores["hoje"] = PeFormato.Data(DateOnly.FromDateTime(DateTimeHelper.TodayBrasilia()));
+        foreach (var chave in PeDocMarcadores.DaAprovacao) valores[chave] = aprovacoes?.GetValueOrDefault(chave);
         return valores;
+    }
+
+    /// <summary>
+    /// Os valores dos marcadores de aprovação e de publicação (E7): a aprovação do SGTIC (a
+    /// seção do passo do envio, só com a decisão "aprovado"), a deliberação aprovada do CGTIC
+    /// (a mais recente) e a publicação (a seção do passo 3.13). O ato sai como "Ata de reunião
+    /// nº 3/2027" (o tipo e o número; um só, quando falta o outro).
+    /// </summary>
+    internal static async Task<Dictionary<string, string?>> AprovacoesAsync(AppDbContext context, IPeRegistroService registros,
+        PePdtic pdtic, PeTrilhaOrgao trilha)
+    {
+        var valores = PeDocMarcadores.DaAprovacao.ToDictionary(c => c, _ => (string?)null);
+
+        var secoes = new[] { PeDominios.ChavePdtic.SecaoAprovacaoSgtic, PeDominios.ChavePdtic.SecaoPublicacao }
+            .Select(chave => trilha.Secao(chave))
+            .Where(s => s != null)
+            .Select(s => trilha.Montar(s!.Value.Secao))
+            .ToList();
+        var exportadas = secoes.Count == 0
+            ? new Dictionary<string, PeRegistroResponse?>()
+            : (await registros.ExportarAsync(PeDono.DoPdtic(pdtic.Id), secoes))
+                .ToDictionary(s => s.Modelo.Secao.Chave, s => s.Registros.FirstOrDefault());
+        string? Rotulo(PeRegistroResponse? registro, string campo) =>
+            registro != null && registro.Rotulos.TryGetValue(campo, out var texto) && !string.IsNullOrWhiteSpace(texto) ? texto.Trim() : null;
+
+        var sgtic = exportadas.GetValueOrDefault(PeDominios.ChavePdtic.SecaoAprovacaoSgtic);
+        if (sgtic != null && sgtic.Dados.TryGetValue(PeDominios.ChavePdtic.CampoDecisao, out var decisao)
+            && decisao.ValueKind == System.Text.Json.JsonValueKind.String && decisao.GetString() == PeDominios.Decisao.Aprovado)
+        {
+            valores["aprovacao.sgtic.data"] = Rotulo(sgtic, PeDominios.ChavePdtic.CampoData);
+            valores["aprovacao.sgtic.ato"] = Ato(Rotulo(sgtic, PeDominios.ChavePdtic.CampoAtoTipo), Rotulo(sgtic, PeDominios.ChavePdtic.CampoAtoNumero));
+        }
+
+        var cgtic = await context.PeDeliberacoes.AsNoTracking()
+            .Where(d => d.ObjetoTipo == PeDominios.ObjetoDeliberacao.Pdtic && d.ObjetoId == pdtic.Id
+                        && d.Situacao == PeDominios.SituacaoDeliberacao.Aprovado)
+            .OrderByDescending(d => d.Id)
+            .FirstOrDefaultAsync();
+        if (cgtic != null)
+        {
+            valores["aprovacao.cgtic.data"] = cgtic.AtoData is DateOnly data ? PeFormato.Data(data) : null;
+            valores["aprovacao.cgtic.ato"] = Ato(cgtic.AtoTipo, cgtic.AtoNumero);
+        }
+
+        var publicacao = exportadas.GetValueOrDefault(PeDominios.ChavePdtic.SecaoPublicacao);
+        valores["publicacao.data"] = Rotulo(publicacao, PeDominios.ChavePdtic.CampoData);
+        valores["publicacao.endereco"] = Rotulo(publicacao, PeDominios.ChavePdtic.CampoEndereco);
+        return valores;
+    }
+
+    /// <summary>"Resolução nº 12/2027"; só o tipo ou "nº 12/2027" quando falta o outro; nulo sem nenhum.</summary>
+    public static string? Ato(string? tipo, string? numero)
+    {
+        var t = tipo?.Trim();
+        var n = numero?.Trim();
+        if (string.IsNullOrEmpty(n)) return string.IsNullOrEmpty(t) ? null : t;
+        return string.IsNullOrEmpty(t) ? $"nº {n}" : $"{t} nº {n}";
     }
 
     /// <summary>

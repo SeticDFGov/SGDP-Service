@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using api.Planejamento;
 using Microsoft.EntityFrameworkCore;
@@ -12,24 +11,14 @@ namespace test.planejamento;
 /// O fluxo no documento do PDTIC (E6): o bloco de fluxo da E5 passa a trazer o SVG (a cópia do
 /// órgão ou o modelo), com os nomes do dicionário e a descrição; o fluxo largo vai para a
 /// página deitada; e o PDF desenha o fluxo (o QuestPDF desenha o SVG com o texto em contorno).
-/// Com a variável PE_EXEMPLO_FLUXOS, grava o PDF de exemplo com o capítulo de metodologia
-/// (o fluxo da elaboração do modelo e, acrescentados pelo administrador, os da preparação, do
-/// diagnóstico e do planejamento).
+/// Desde a versão 5 do modelo (E7), o documento novo já traz os fluxos das etapas: na
+/// metodologia, os da elaboração, da preparação, do diagnóstico e do planejamento; na revisão
+/// e acompanhamento, o geral e os das etapas 4 a 7. Com a variável PE_EXEMPLO_FLUXOS, grava o
+/// PDF de exemplo.
 /// </summary>
 public class PeFluxoDocumentoTest : PeFluxoTestBase
 {
     private static int Deitadas(string pdf) => Regex.Matches(pdf, @"/MediaBox\s*\[0 0 842(\.\d+)? 595(\.\d+)?\]").Count;
-
-    private async Task FluxoNaMetodologiaAsync(string chave)
-    {
-        var capitulo = CapituloDoModelo("metodologia").Id;
-        await ModeloDoc.CriarBlocoAsync(new PeDocBlocoCriarDTO
-        {
-            CapituloId = capitulo,
-            Tipo = PeDominios.TipoBloco.Fluxo,
-            Config = JsonSerializer.SerializeToElement(new { Fluxo = chave })
-        }, await Admin());
-    }
 
     private static List<PeDocFluxoResponse> FluxosDe(PeDocumentoResponse documento, string capitulo) =>
         Cap(documento, capitulo).Blocos.Where(b => b.Tipo == PeDominios.TipoBloco.Fluxo).Select(b => b.Fluxo!).ToList();
@@ -39,18 +28,18 @@ public class PeFluxoDocumentoTest : PeFluxoTestBase
     {
         var pdtic = await AbrirSesAsync();
         await PreencherNomesAsync(pdtic.Id);
-        await FluxoNaMetodologiaAsync("preparacao");
 
         var documento = await DocumentoAsync(pdtic.Id);
         var fluxos = FluxosDe(documento, "metodologia");
-        Assert.Equal(new[] { "elaboracao", "preparacao" }, fluxos.Select(f => f.Chave));
+        Assert.Equal(new[] { "elaboracao", "preparacao", "diagnostico", "planejamento" }, fluxos.Select(f => f.Chave));
         Assert.All(fluxos, f => Assert.StartsWith("<svg", f.Svg));
         var preparacao = fluxos[1];
         Assert.Equal("Preparação (figura 6 do guia)", preparacao.Nome);
         Assert.False(preparacao.Personalizado);
         Assert.Equal("Raias: Subcomitê Gestor de TIC da Saúde, Equipe de Elaboração do PDTIC.", preparacao.Descricao[0]);
         Assert.Contains("2. 1.1 Definir a abrangência e o período do PDTIC (Subcomitê Gestor de TIC da Saúde).", preparacao.Descricao);
-        Assert.Equal("acompanhamento", Assert.Single(FluxosDe(documento, "revisao_acompanhamento")).Chave);
+        Assert.Equal(new[] { "acompanhamento", "planejamento_acompanhamento", "monitoramento", "avaliacao_intermediaria", "avaliacao_final" },
+            FluxosDe(documento, "revisao_acompanhamento").Select(f => f.Chave));
 
         // A cópia do órgão entra no lugar do modelo
         var definicao = DefinicaoDoModelo("preparacao");
@@ -66,7 +55,6 @@ public class PeFluxoDocumentoTest : PeFluxoTestBase
     public async Task FluxoLargo_VaiParaAPaginaDeitada()
     {
         var pdtic = await AbrirSesAsync();
-        await FluxoNaMetodologiaAsync("diagnostico");
 
         var blocos = Cap(await DocumentoAsync(pdtic.Id), "metodologia").Blocos.Where(b => b.Tipo == PeDominios.TipoBloco.Fluxo).ToList();
         var elaboracao = blocos.Single(b => b.Fluxo!.Chave == "elaboracao");
@@ -88,7 +76,7 @@ public class PeFluxoDocumentoTest : PeFluxoTestBase
         // Um modelo apagado por fora (a chave do bloco continua no documento)
         Context.PeFluxosModelo.Remove(Context.PeFluxosModelo.Single(m => m.Chave == "acompanhamento"));
         Context.SaveChanges();
-        var fluxo = Assert.Single(FluxosDe(await DocumentoAsync(pdtic.Id), "revisao_acompanhamento"));
+        var fluxo = FluxosDe(await DocumentoAsync(pdtic.Id), "revisao_acompanhamento").Single(f => f.Chave == "acompanhamento");
         Assert.Null(fluxo.Svg);
         Assert.Equal("Processo de acompanhamento do PDTIC (figura 17 do guia)", fluxo.Nome);
     }
@@ -97,7 +85,6 @@ public class PeFluxoDocumentoTest : PeFluxoTestBase
     public async Task Pdf_DesenhaOsFluxos_ComAPaginaDeitada()
     {
         var pdtic = await PdticCompletoAsync();
-        foreach (var chave in new[] { "preparacao", "diagnostico", "planejamento" }) await FluxoNaMetodologiaAsync(chave);
         var ctx = await Orgao();
 
         var versao = await Documentos.GerarPdfAsync(pdtic.Id, ctx);

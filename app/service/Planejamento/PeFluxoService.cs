@@ -227,7 +227,7 @@ public class PeFluxoService : IPeFluxoService
         var pdtic = await PePdticService.LerAsync(_context, _permissoes, pdticId, ctx);
         if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
             throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do órgão monta o cronograma do plano de trabalho.");
-        if (!PeDominios.SituacaoPdtic.Editaveis.Contains(pdtic.Situacao)) throw PePdticService.Fechado(pdtic);
+        if (!PeEdicaoPdtic.ElaboracaoAberta(pdtic)) throw PePdticService.Fechado(pdtic);
 
         var (mapa, _) = await NomesDoOrgaoAsync(pdtic);
         var modelos = await _context.PeFluxosModelo.AsNoTracking()
@@ -383,7 +383,7 @@ public class PeFluxoService : IPeFluxoService
         Definicao = PeFluxoDefinicaoLeitor.DoBanco(copia?.Definicao ?? modelo.Definicao),
         Personalizado = copia != null,
         ModeloMudou = copia != null && copia.ModeloHash != HashDoModelo(modelo),
-        PodeEditar = _permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId) && PeDominios.SituacaoPdtic.Editaveis.Contains(pdtic.Situacao),
+        PodeEditar = _permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId) && PeEdicaoPdtic.ElaboracaoAberta(pdtic),
         AlteradoEm = copia?.AlteradoEm ?? copia?.CriadoEm,
         AlteradoPor = copia?.AlteradoPor ?? copia?.CriadoPor
     };
@@ -404,7 +404,7 @@ public class PeFluxoService : IPeFluxoService
         var pdtic = await PePdticService.LerAsync(_context, _permissoes, pdticId, ctx, rastrear: true);
         if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
             throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do órgão adapta os fluxos do PDTIC.");
-        if (!PeDominios.SituacaoPdtic.Editaveis.Contains(pdtic.Situacao)) throw PePdticService.Fechado(pdtic);
+        if (!PeEdicaoPdtic.ElaboracaoAberta(pdtic)) throw PePdticService.Fechado(pdtic);
         return pdtic;
     }
 

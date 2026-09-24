@@ -130,7 +130,10 @@ public sealed record PeCarregamentoResultado(
 /// 48.900/2026 como registros do sistema; desde a versão 3 (E5), o campo do logotipo no
 /// dicionário de nomes e o modelo do documento do PDTIC (capítulos, textos padrão e blocos de
 /// dados, em documento-inicial.json); desde a versão 4 (E6), os fluxos do guia como modelo
-/// (figuras 4 a 22, em fluxos-inicial.json). O conteúdo fica em JSON embutido na aplicação.
+/// (figuras 4 a 22, em fluxos-inicial.json); na versão 5 (E7, rodada A), o documento do PDTIC
+/// ganhou a aprovação e a publicação na folha de rosto e os blocos de fluxo das etapas na
+/// metodologia e na revisão e acompanhamento (como bloco só entra com o capítulo novo, só o
+/// banco novo recebe esses blocos). O conteúdo fica em JSON embutido na aplicação.
 /// <list type="bullet">
 /// <item>Idempotente: se a versão gravada em pe_configuracao (seed_modelo_versao) já é a do
 /// JSON, não faz nada; senão insere só o que falta, achando cada item pela chave (nível
@@ -158,6 +161,12 @@ public sealed class PeCarregadorModelo
 
     /// <summary>Versão do modelo inicial que trouxe os fluxos do guia (E6).</summary>
     public const int VersaoDosFluxos = 4;
+
+    /// <summary>
+    /// Versão do modelo inicial da E7, rodada A: o documento do PDTIC com a aprovação e a
+    /// publicação na folha de rosto e os fluxos das etapas nos capítulos (só em banco novo).
+    /// </summary>
+    public const int VersaoDaAprovacao = 5;
 
     // Trava do carregador no PostgreSQL: segura até o fim da transação
     private const string SqlTrava = "SELECT pg_advisory_xact_lock(4890020260924)";

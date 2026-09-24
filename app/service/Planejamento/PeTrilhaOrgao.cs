@@ -30,6 +30,9 @@ public sealed class PeTrilhaOrgao
 
     public required List<PeTrilhaEtapa> Etapas { get; init; }
 
+    // O PDTIC cujas regras próprias já foram aplicadas nesta trilha (AjustarAoPdtic), ou nulo
+    public long? AjustadaParaPdtic { get; private set; }
+
     private Dictionary<long, PeTrilhaPasso>? _passos;
     private Dictionary<long, (PeTrilhaPasso Passo, PeTrilhaSecao Secao)>? _secoes;
 
@@ -87,6 +90,30 @@ public sealed class PeTrilhaOrgao
             .Where(s => !soNaPlanilha || s.Secao.NaPlanilha)
             .ToList();
 
+    /// <summary>
+    /// As regras que valem só para um PDTIC (E7): no registrado fora do sistema, o campo de
+    /// ligação com uma seção de passo "externo" (etapas 1 a 3, menos 3.3 e 3.9) deixa de ser
+    /// obrigatório, porque essas seções não são preenchidas (por exemplo, a meta sem a
+    /// necessidade ligada). Muda esta trilha; a trilha deve ser do órgão do PDTIC.
+    /// </summary>
+    public void AjustarAoPdtic(PePdtic pdtic)
+    {
+        AjustadaParaPdtic = pdtic.Id;
+        if (!pdtic.RegistradoExternamente) return;
+
+        var externas = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var etapa in Etapas)
+            foreach (var passo in etapa.Passos.Where(p => PeEdicaoPdtic.Externo(pdtic, PeEdicaoPdtic.GrupoDe(etapa.Chave, p.Tipo), p.Chave)))
+                foreach (var secao in passo.Secoes) externas.Add(secao.Chave);
+        if (externas.Count == 0) return;
+
+        var configs = Dados.Campos.ToDictionary(c => c.Id, c => c.Config);
+        foreach (var campo in Passos.SelectMany(p => p.Secoes).SelectMany(s => s.Campos))
+            if (campo.Tipo == PeDominios.TipoCampo.LigacaoSecao && configs.TryGetValue(campo.Id, out var config)
+                && PeConfigCampo.SecaoDaLigacao(config) is string alvo && externas.Contains(alvo))
+                campo.Obrigatorio = false;
+    }
+
     // ── Carga ───────────────────────────────────────────────────────────────
 
     /// <summary>A trilha de um órgão (ativo, ou qualquer um quando o PDTIC já existe).</summary>
@@ -96,6 +123,14 @@ public sealed class PeTrilhaOrgao
             ?? throw new ApiException(ErrorCode.PeOrgaoNaoEncontrado, "Órgão não encontrado ou desativado.");
         var dados = await PeModeloDados.CarregarAsync(context);
         return await DoOrgaoAsync(context, dados, orgao, await SemPeticVigenteAsync(context));
+    }
+
+    /// <summary>A trilha do órgão de um PDTIC, já com as regras próprias dele (<see cref="AjustarAoPdtic"/>).</summary>
+    public static async Task<PeTrilhaOrgao> DoPdticAsync(AppDbContext context, PePdtic pdtic)
+    {
+        var trilha = await CarregarAsync(context, pdtic.OrgaoId, soAtivo: false);
+        trilha.AjustarAoPdtic(pdtic);
+        return trilha;
     }
 
     /// <summary>A trilha de um órgão com o modelo já carregado (o consolidado passa por vários órgãos).</summary>

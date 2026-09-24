@@ -78,9 +78,12 @@ public class PeDocSeedTest : PeDocumentoTestBase
     [Fact]
     public void Blocos_DeDadosCertos_EmCadaCapitulo()
     {
-        Assert.Equal(new[] { "texto", "tabela_secao", "fluxo" }, BlocosDe("metodologia").Select(b => b.Tipo));
-        Assert.Equal("elaboracao", PeDocConfig.Fluxo(PeDocConfig.Ler(BlocosDe("metodologia")[2].Config)));
-        Assert.Equal("acompanhamento", PeDocConfig.Fluxo(PeDocConfig.Ler(BlocoDoModelo("revisao_acompanhamento", "fluxo").Config)));
+        // Desde a versão 5 (E7), os fluxos das etapas vêm depois do fluxo geral de cada capítulo
+        Assert.Equal(new[] { "texto", "tabela_secao", "fluxo", "fluxo", "fluxo", "fluxo" }, BlocosDe("metodologia").Select(b => b.Tipo));
+        Assert.Equal(new[] { "elaboracao", "preparacao", "diagnostico", "planejamento" },
+            BlocosDe("metodologia").Where(b => b.Tipo == "fluxo").Select(b => PeDocConfig.Fluxo(PeDocConfig.Ler(b.Config))));
+        Assert.Equal(new[] { "acompanhamento", "planejamento_acompanhamento", "monitoramento", "avaliacao_intermediaria", "avaliacao_final" },
+            BlocosDe("revisao_acompanhamento").Where(b => b.Tipo == "fluxo").Select(b => PeDocConfig.Fluxo(PeDocConfig.Ler(b.Config))));
         Assert.Equal("matriz_swot", Assert.Single(BlocosDe("diagnostico_swot"), b => b.Tipo != "texto").Tipo);
         Assert.Equal("ativos", PeDocConfig.Secao(PeDocConfig.Ler(BlocoDoModelo("ativos", "tabela_secao").Config)));
         Assert.True(PeDocConfig.PaginaDeitada(PeDocConfig.Ler(BlocoDoModelo("ativos", "tabela_secao").Config)));

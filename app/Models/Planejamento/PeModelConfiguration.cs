@@ -515,6 +515,9 @@ public static class PeModelConfiguration
                     $"situacao <> '{PeDominios.SituacaoDeliberacao.Aprovado}' OR (ato_numero IS NOT NULL AND ato_data IS NOT NULL)");
                 t.HasCheckConstraint("ck_pe_deliberacao_devolvido",
                     $"situacao <> '{PeDominios.SituacaoDeliberacao.Devolvido}' OR observacao IS NOT NULL");
+                // O PDF enviado (E7) é só do PDTIC
+                t.HasCheckConstraint("ck_pe_deliberacao_doc_versao",
+                    $"doc_versao_id IS NULL OR objeto_tipo = '{PeDominios.ObjetoDeliberacao.Pdtic}'");
             });
 
             entity.HasKey(d => d.Id).HasName("pk_pe_deliberacao");
@@ -532,6 +535,7 @@ public static class PeModelConfiguration
             entity.Property(d => d.AtoData).HasColumnName("ato_data");
             entity.Property(d => d.Sei).HasColumnName("sei").HasMaxLength(40);
             entity.Property(d => d.Observacao).HasColumnName("observacao").HasMaxLength(2000);
+            entity.Property(d => d.DocVersaoId).HasColumnName("doc_versao_id");
             Auditoria(entity);
 
             // Índices com nome no modelo: os dois primeiros têm as mesmas colunas
@@ -540,6 +544,14 @@ public static class PeModelConfiguration
             entity.HasIndex(d => new { d.ObjetoTipo, d.ObjetoId }, "ux_pe_deliberacao_aguardando").IsUnique()
                 .HasFilter($"situacao = '{PeDominios.SituacaoDeliberacao.Aguardando}'");
             entity.HasIndex(d => new { d.Situacao, d.EnviadoEm }).HasDatabaseName("ix_pe_deliberacao_situacao");
+            entity.HasIndex(d => d.DocVersaoId).HasDatabaseName("ix_pe_deliberacao_doc_versao");
+
+            // O PDF enviado ao CGTIC (E7) não é apagado enquanto a deliberação existir
+            entity.HasOne(d => d.DocVersao)
+                .WithMany()
+                .HasForeignKey(d => d.DocVersaoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_deliberacao_doc_versao");
         });
 
         modelBuilder.Entity<PeRegistro>(entity =>
@@ -709,6 +721,16 @@ public static class PeModelConfiguration
                 t.HasCheckConstraint("ck_pe_pdtic_versao", "versao ~ '^[0-9]+\\.[0-9]+$'");
                 t.HasCheckConstraint("ck_pe_pdtic_vigencia",
                     "vigencia_inicio IS NULL OR vigencia_fim IS NULL OR vigencia_fim >= vigencia_inicio");
+                // As datas do caminho da aprovação (E7) acompanham a situação
+                t.HasCheckConstraint("ck_pe_pdtic_enviado",
+                    $"situacao <> '{PeDominios.SituacaoPdtic.EmAprovacao}' OR enviado_em IS NOT NULL");
+                t.HasCheckConstraint("ck_pe_pdtic_aprovado",
+                    $"{ForaDaLista("situacao", new[] { PeDominios.SituacaoPdtic.Aprovado }.Concat(PeDominios.SituacaoPdtic.Vigentes))} OR aprovado_em IS NOT NULL");
+                t.HasCheckConstraint("ck_pe_pdtic_publicado",
+                    $"{ForaDaLista("situacao", PeDominios.SituacaoPdtic.Vigentes)} OR publicado_em IS NOT NULL");
+                t.HasCheckConstraint("ck_pe_pdtic_encerrado",
+                    $"(situacao = '{PeDominios.SituacaoPdtic.Encerrado}') = (encerrado_em IS NOT NULL) "
+                    + $"AND (encerramento_motivo IS NULL OR situacao = '{PeDominios.SituacaoPdtic.Encerrado}')");
             });
 
             entity.HasKey(p => p.Id).HasName("pk_pe_pdtic");
@@ -721,13 +743,22 @@ public static class PeModelConfiguration
             entity.Property(p => p.VigenciaFim).HasColumnName("vigencia_fim");
             entity.Property(p => p.RegistradoExternamente).HasColumnName("registrado_externamente");
             entity.Property(p => p.AnteriorId).HasColumnName("anterior_id");
+            entity.Property(p => p.EnviadoEm).HasColumnName("enviado_em");
+            entity.Property(p => p.AprovadoEm).HasColumnName("aprovado_em");
+            entity.Property(p => p.PublicadoEm).HasColumnName("publicado_em");
+            entity.Property(p => p.EncerradoEm).HasColumnName("encerrado_em");
+            entity.Property(p => p.EncerramentoMotivo).HasColumnName("encerramento_motivo").HasMaxLength(1000);
+            entity.Property(p => p.RevisaoJustificativa).HasColumnName("revisao_justificativa").HasMaxLength(1000);
             Auditoria(entity);
 
             entity.HasIndex(p => new { p.OrgaoId, p.Versao }).IsUnique().HasDatabaseName("ux_pe_pdtic_orgao_versao");
-            // Um PDTIC atual (nem encerrado nem substituído) por órgão: dois cliques em "abrir" não viram dois
-            entity.HasIndex(p => p.OrgaoId).IsUnique()
-                .HasFilter(ForaDaLista("situacao", PeDominios.SituacaoPdtic.Encerradas))
-                .HasDatabaseName("ux_pe_pdtic_atual");
+            // No máximo uma versão em elaboração (até aprovada) e uma vigente (publicada ou em
+            // acompanhamento) por órgão, ao mesmo tempo (a revisão convive com a vigente): dois
+            // cliques em "abrir" ou em "revisar" não viram duas
+            entity.HasIndex(p => p.OrgaoId, "ux_pe_pdtic_em_elaboracao").IsUnique()
+                .HasFilter(EmLista("situacao", PeDominios.SituacaoPdtic.DaElaboracao));
+            entity.HasIndex(p => p.OrgaoId, "ux_pe_pdtic_vigente").IsUnique()
+                .HasFilter(EmLista("situacao", PeDominios.SituacaoPdtic.Vigentes));
             entity.HasIndex(p => p.AnteriorId).HasDatabaseName("ix_pe_pdtic_anterior");
 
             // Órgão do PGIA não é apagado (só desativado): a FK só impede apagar por engano

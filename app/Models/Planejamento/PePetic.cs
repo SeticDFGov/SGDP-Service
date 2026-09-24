@@ -43,10 +43,10 @@ public class PePetic : IPeAuditavel
 }
 
 /// <summary>
-/// Envio de um PETIC-DF (e, na E7, de um PDTIC) ao CGTIC e a decisão que a Secretaria
+/// Envio de um PETIC-DF ou (desde a E7) de um PDTIC ao CGTIC e a decisão que a Secretaria
 /// Executiva registra: aprovado (com o ato e a data) ou devolvido (com a observação).
-/// Uma por envio; decidida não muda. O objeto não tem FK (pode ser PETIC ou PDTIC).
-/// Tabela pe_deliberacao; mapeamento em PeModelConfiguration.
+/// Uma por envio; decidida não muda. O objeto não tem FK (pode ser PETIC ou PDTIC); no PDTIC,
+/// doc_versao_id aponta o PDF enviado. Tabela pe_deliberacao; mapeamento em PeModelConfiguration.
 /// </summary>
 public class PeDeliberacao : IPeAuditavel
 {
@@ -83,6 +83,11 @@ public class PeDeliberacao : IPeAuditavel
 
     // Obrigatória na devolução: o que ajustar
     public string? Observacao { get; set; }
+
+    // PDTIC (E7): a versão do documento enviada (o PDF que a Secretaria baixa); nulo no PETIC-DF
+    public long? DocVersaoId { get; set; }
+
+    public PeDocVersao? DocVersao { get; set; }
 
     public DateTime CriadoEm { get; set; }
 

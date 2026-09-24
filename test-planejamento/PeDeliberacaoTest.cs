@@ -11,7 +11,7 @@ namespace test.planejamento;
 /// </summary>
 public class PeDeliberacaoTest : PeReferenciaisTestBase
 {
-    /// <summary>Uma deliberação de PDTIC aguardando (a E7 é que cria de verdade).</summary>
+    /// <summary>Uma deliberação de PDTIC aguardando, sem o PDTIC (o envio de verdade está no PeEnvioTest).</summary>
     private PeDeliberacao DeliberacaoDePdtic(long objetoId, DateTime enviadoEm)
     {
         var deliberacao = new PeDeliberacao
@@ -97,9 +97,9 @@ public class PeDeliberacaoTest : PeReferenciaisTestBase
         Assert.Equal(Codigo(ErrorCode.PeDeliberacaoNaoEncontrada), await ErroAsync(() =>
             Deliberacoes.DecidirAsync(999, new PeDecidirDTO { Decisao = "devolvido", Observacao = "x" }, cgtic)));
 
-        // A deliberação de PDTIC chega na E7
+        // A deliberação de PDTIC (E7) sem o PDTIC (o objeto 3 não existe): 404
         var pdtic = DeliberacaoDePdtic(3, DateTime.UtcNow);
-        Assert.Equal(Codigo(ErrorCode.PeDecisaoInvalida), await ErroAsync(() =>
+        Assert.Equal(Codigo(ErrorCode.PePdticNaoEncontrado), await ErroAsync(() =>
             Deliberacoes.DecidirAsync(pdtic.Id, new PeDecidirDTO { Decisao = "devolvido", Observacao = "x" }, cgtic)));
     }
 }

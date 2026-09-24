@@ -5,12 +5,13 @@ namespace Models.Planejamento;
 /// <summary>
 /// O PDTIC de um órgão (art. 12 do Decreto nº 48.900/2026), numa versão ("1.0"). Nasce em
 /// elaboração quando a equipe do órgão abre (ou o admin geral, para qualquer órgão) e segue o
-/// ciclo do plano (decisão 18): em aprovação, devolvido, aprovado, publicado, em
-/// acompanhamento, encerrado ou substituído (as transições depois da elaboração chegam na
-/// E7). Um PDTIC "atual" por órgão (nem substituído nem encerrado), garantido por índice
-/// único parcial. Os dados de cada seção são registros (pe_registro com pdtic_id), e a
-/// vigência é copiada do passo 1.1 (seção abrangencia) a cada gravação. Tabela pe_pdtic;
-/// mapeamento em PeModelConfiguration.
+/// ciclo do plano (decisão 18, E7): enviar ao CGTIC (em aprovação), a deliberação da
+/// Secretaria Executiva (aprovado ou devolvido), publicar, o acompanhamento, encerrar; a
+/// revisão abre a versão seguinte ("1.1") e a anterior fica substituída quando a nova é
+/// aprovada. No máximo uma versão em elaboração (até aprovada) e uma vigente (publicada ou
+/// em acompanhamento) por órgão, garantido por dois índices únicos parciais. Os dados de cada
+/// seção são registros (pe_registro com pdtic_id), e a vigência é copiada do passo 1.1 (seção
+/// abrangencia) a cada gravação. Tabela pe_pdtic; mapeamento em PeModelConfiguration.
 /// </summary>
 public class PePdtic : IPeAuditavel
 {
@@ -20,7 +21,7 @@ public class PePdtic : IPeAuditavel
 
     public PgiaOrgao? Orgao { get; set; }
 
-    // "1.0"; um novo ciclo depois de um encerrado vai para "2.0" (a revisão "1.1" é da E7)
+    // "1.0"; um novo ciclo depois de um encerrado vai para "2.0"; a revisão, para "1.1"
     public string Versao { get; set; } = "1.0";
 
     // PeDominios.SituacaoPdtic; token de concorrência (gravar e enviar ao mesmo tempo não passam os dois)
@@ -34,10 +35,26 @@ public class PePdtic : IPeAuditavel
     // PDTIC aprovado fora do sistema e só registrado para o acompanhamento (E7)
     public bool RegistradoExternamente { get; set; }
 
-    // O PDTIC anterior do órgão (a versão que este substitui ou sucede)
+    // O PDTIC anterior do órgão (a versão que este substitui ou sucede; na revisão, a vigente)
     public long? AnteriorId { get; set; }
 
     public PePdtic? Anterior { get; set; }
+
+    // O último envio ao CGTIC (o reenvio depois da devolução troca a data)
+    public DateTime? EnviadoEm { get; set; }
+
+    // A aprovação do CGTIC (no PDTIC registrado fora do sistema, a data da aprovação informada)
+    public DateTime? AprovadoEm { get; set; }
+
+    public DateTime? PublicadoEm { get; set; }
+
+    public DateTime? EncerradoEm { get; set; }
+
+    // Até 1000; obrigatório quando o administrador encerra pela vigência vencida
+    public string? EncerramentoMotivo { get; set; }
+
+    // Revisão sem a decisão "revisar" do comitê (passo 6.3 desligado): a justificativa de quem abriu
+    public string? RevisaoJustificativa { get; set; }
 
     public DateTime CriadoEm { get; set; }
 
