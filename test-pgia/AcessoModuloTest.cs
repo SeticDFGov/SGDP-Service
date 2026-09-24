@@ -462,6 +462,10 @@ public class AcessoModuloTest : PgiaTestBase
             [typeof(PePessoasController)] = ModulosSgdp.PoliticaPlanejamento,
             [typeof(PeModeloController)] = ModulosSgdp.PoliticaPlanejamento,
             [typeof(PeOrgaosController)] = ModulosSgdp.PoliticaPlanejamento,
+            [typeof(PeRegistrosController)] = ModulosSgdp.PoliticaPlanejamento,
+            [typeof(PePeticController)] = ModulosSgdp.PoliticaPlanejamento,
+            [typeof(PeDeliberacoesController)] = ModulosSgdp.PoliticaPlanejamento,
+            [typeof(PeArquivosController)] = ModulosSgdp.PoliticaPlanejamento,
             [typeof(PgiaAdminController)] = "role:admin",
             [typeof(CtrAdminController)] = "role:admin",
             [typeof(AcessoController)] = "role:admin",
@@ -842,10 +846,12 @@ public class AcessoModuloTest : PgiaTestBase
         var opcoes = new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options;
         using var contexto = new ContextoSemTabelasPe(opcoes);
 
-        // A simulação vale: ler a tabela do papel (E1) e as do modelo (E2) lança
+        // A simulação vale: ler a tabela do papel (E1), as do modelo (E2) e as dos registros (E3) lança
         await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PePapeisUsuario.AnyAsync());
         await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PeNiveis.AnyAsync());
         await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PeOrgaosConfig.AnyAsync());
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PeRegistros.AnyAsync());
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(() => contexto.PePetics.AnyAsync());
 
         var sgdi = new User { KeycloakId = "kc-sgdi", Nome = "Sofia da SGDI", Email = "sofia@sgdi.df.gov.br", PapelPgia = PapeisPgia.Sgdi };
         var comum = new User { KeycloakId = "kc-comum", Nome = "Carlos Comum", Email = "carlos@df.gov.br" };

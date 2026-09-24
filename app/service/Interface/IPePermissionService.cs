@@ -39,6 +39,28 @@ public interface IPePermissionService
     /// <summary>Vê um órgão: papéis globais e admin geral (todos) ou papel de órgão no próprio.</summary>
     bool PodeVerOrgao(PeUserContext ctx, long orgaoId);
 
+    /// <summary>Lê o PETIC-DF, os princípios, as diretrizes do ciclo e os catálogos: qualquer papel e o admin geral.</summary>
+    bool PodeLerReferenciais(PeUserContext ctx);
+
+    /// <summary>
+    /// Vê uma versão do PETIC-DF: papéis globais e admin geral, todas; papéis de órgão, só as
+    /// aprovadas (a vigente e as substituídas). Rascunho e versão em deliberação não aparecem
+    /// para o órgão (nem na lista, nem nos registros, planilhas e anexos).
+    /// </summary>
+    bool PodeVerVersaoPetic(PeUserContext ctx, string situacao);
+
+    /// <summary>Edita o PETIC-DF (rascunho), o catálogo do DF e envia ao CGTIC: pe_admin e admin geral.</summary>
+    bool PodeEditarReferenciais(PeUserContext ctx);
+
+    /// <summary>Vê a fila de deliberações do CGTIC: papéis globais e admin geral.</summary>
+    bool PodeVerDeliberacoes(PeUserContext ctx);
+
+    /// <summary>Registra a decisão do CGTIC (Secretaria Executiva): pe_cgtic e admin geral.</summary>
+    bool PodeDecidirDeliberacao(PeUserContext ctx);
+
+    /// <summary>Envia arquivo (anexo de um campo): quem edita alguma coisa no módulo (pe_admin, pe_cgtic, pe_orgao e admin geral).</summary>
+    bool PodeEnviarArquivo(PeUserContext ctx);
+
     /// <summary>
     /// Órgão ativo de cada unidade, em lote (uma consulta): mesma resolução do
     /// PgiaPermissionService (Users.Unidade para o pgia_orgao ativo daquela unidade).

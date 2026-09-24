@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using api.Contratacoes;
+using demanda_service.Helpers;
 using Models.Contratacoes;
 
 namespace service.Contratacoes;
@@ -177,8 +178,9 @@ public static class CtrCsv
     // Fim da frase, para procurar a data no MESMO período em que a restituição é dita
     private static readonly char[] FimDeFrase = { '.', ';', '\n', '\r' };
 
-    // Caracteres que fazem uma célula virar fórmula no Excel/Sheets (CSV injection)
-    private static readonly char[] IniciamFormula = { '=', '+', '-', '@', '\t', '\r' };
+    // Caracteres que fazem uma célula virar fórmula no Excel/Sheets (CSV injection): os
+    // mesmos do escritor comum, que protege na escrita o que a leitura desfaz
+    private static readonly char[] IniciamFormula = CsvEscritor.IniciamFormula;
 
     // Valor estimado: "1.234.567" é milhar brasileiro (grupos de três depois do primeiro);
     // "1234.5", com um ponto só e fora desse desenho, é ponto decimal
@@ -836,8 +838,10 @@ public static class CtrCsv
     /// </summary>
     public static byte[] Escrever(IEnumerable<CtrProcessoResponse> processos)
     {
-        var sb = new StringBuilder();
-        sb.Append(string.Join(";", Cabecalho)).Append("\r\n");
+        // Escritor comum (UTF-8 com BOM, ";", CRLF). O cabeçalho sai igual ao de antes:
+        // nenhum nome de coluna tem ";", aspas ou quebra de linha
+        var csv = new CsvEscritor();
+        csv.Linha(Cabecalho);
 
         foreach (var p in processos)
         {
@@ -883,11 +887,10 @@ public static class CtrCsv
                 (SimNao(p.UsaGdfnet), false)
             };
 
-            sb.Append(string.Join(";", celulas.Select(c => Escapar(c.Valor, c.TextoLivre)))).Append("\r\n");
+            csv.Linha(celulas);
         }
 
-        // BOM explícito: é ele que faz o Excel abrir o arquivo em UTF-8
-        return Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+        return csv.ParaBytes();
     }
 
     private static string Data(DateOnly? data) => data?.ToString("dd/MM/yyyy") ?? string.Empty;
@@ -906,18 +909,4 @@ public static class CtrCsv
         p.CriteriosCriticidade != null && p.CriteriosCriticidade.TryGetValue(codigo, out var resposta)
             ? resposta
             : string.Empty;
-
-    private static string Escapar(string valor, bool textoLivre = false)
-    {
-        // CSV injection: célula de texto livre começando com =, +, -, @ (ou TAB/CR)
-        // vira fórmula ao abrir no Excel/Sheets. O apóstrofo à frente a mantém texto
-        // e a importação o remove de volta, para o round-trip ficar fiel.
-        if (textoLivre && valor.Length > 0 && IniciamFormula.Contains(valor[0]))
-            valor = "'" + valor;
-
-        if (valor.Contains(';') || valor.Contains('"') || valor.Contains('\n') || valor.Contains('\r'))
-            return "\"" + valor.Replace("\"", "\"\"") + "\"";
-
-        return valor;
-    }
 }

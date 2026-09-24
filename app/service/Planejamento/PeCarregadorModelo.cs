@@ -11,7 +11,10 @@ namespace service.Planejamento;
 /// O modelo inicial em JSON: níveis, configurações gerais e as etapas com passos,
 /// seções, campos e opções. A ordem de cada lista é a ordem do item. "niveis" de passo e
 /// de seção é um texto (a mesma situação em todos os níveis) ou um objeto com a situação
-/// de cada nível pelo código; no campo, sem "niveis", vale a situação da seção.
+/// de cada nível pelo código; no campo, sem "niveis", vale a situação da seção. As seções
+/// fora do PDTIC (escopos df e petic, desde a versão 2) não têm passo nem nível: usam
+/// "situacao" (a geral; no campo, sem ela, vale a da seção) e podem trazer registros do
+/// sistema (só no catálogo do DF: os princípios do art. 4º).
 /// </summary>
 public sealed class PeSeedModelo
 {
@@ -22,6 +25,8 @@ public sealed class PeSeedModelo
     public Dictionary<string, JsonElement> Configuracoes { get; set; } = new();
 
     public List<PeSeedEtapa> Etapas { get; set; } = new();
+
+    public List<PeSeedSecao> SecoesForaDoPdtic { get; set; } = new();
 }
 
 public sealed class PeSeedNivel
@@ -57,6 +62,8 @@ public sealed class PeSeedPasso
 
 public sealed class PeSeedSecao
 {
+    // Só nas seções fora do PDTIC: df ou petic
+    public string? Escopo { get; set; }
     public string Chave { get; set; } = string.Empty;
     public string Titulo { get; set; } = string.Empty;
     public string? Ajuda { get; set; }
@@ -67,7 +74,18 @@ public sealed class PeSeedSecao
     public bool NoDocumento { get; set; } = true;
     public bool NaPlanilha { get; set; } = true;
     public JsonElement Niveis { get; set; }
+    // Situação geral (só fora do PDTIC)
+    public string? Situacao { get; set; }
     public List<PeSeedCampo> Campos { get; set; } = new();
+    // Registros do sistema (só no catálogo do DF)
+    public List<PeSeedRegistro> Registros { get; set; } = new();
+}
+
+/// <summary>Registro do sistema semeado com a seção (não se edita nem se apaga).</summary>
+public sealed class PeSeedRegistro
+{
+    public string Codigo { get; set; } = string.Empty;
+    public Dictionary<string, JsonElement> Dados { get; set; } = new();
 }
 
 public sealed class PeSeedCampo
@@ -83,6 +101,8 @@ public sealed class PeSeedCampo
     public bool NoDocumento { get; set; } = true;
     public bool NaPlanilha { get; set; } = true;
     public JsonElement? Niveis { get; set; }
+    // Situação geral (só fora do PDTIC; sem ela, vale a da seção)
+    public string? Situacao { get; set; }
     public List<PeSeedOpcao> Opcoes { get; set; } = new();
 }
 
@@ -97,14 +117,16 @@ public sealed class PeSeedOpcao
 /// <summary>O que uma carga fez (zeros quando a versão já estava carregada).</summary>
 public sealed record PeCarregamentoResultado(
     int VersaoAnterior, int Versao, bool Executou,
-    int Niveis, int Etapas, int Passos, int Secoes, int Campos, int Opcoes, int Configuracoes);
+    int Niveis, int Etapas, int Passos, int Secoes, int Campos, int Opcoes, int Configuracoes, int Registros = 0);
 
 /// <summary>
 /// Carregador do modelo inicial do módulo Governança Estratégica: a trilha da seção 7 do
 /// plano (7 etapas e os passos com a situação em cada nível) e os campos da seção 8, com
 /// o cálculo da prioridade (GUT, produto) e do nível de risco (matriz probabilidade x
 /// impacto), os temas das ações (os três do decreto travados) e a periodicidade padrão do
-/// monitoramento. O conteúdo fica em JSON embutido na aplicação.
+/// monitoramento; desde a versão 2 (E3), as seções do catálogo do DF (princípios e
+/// diretrizes do ciclo) e do PETIC-DF, e os 11 princípios do art. 4º do Decreto nº
+/// 48.900/2026 como registros do sistema. O conteúdo fica em JSON embutido na aplicação.
 /// <list type="bullet">
 /// <item>Idempotente: se a versão gravada em pe_configuracao (seed_modelo_versao) já é a do
 /// JSON, não faz nada; senão insere só o que falta, achando cada item pela chave (nível
@@ -123,6 +145,9 @@ public sealed class PeCarregadorModelo
 {
     public const string Autor = "carregador-modelo";
     public const string Recurso = "Planejamento.modelo-inicial.json";
+
+    /// <summary>Versão do modelo inicial que trouxe as seções do DF e do PETIC-DF e os princípios (E3).</summary>
+    public const int VersaoDosReferenciais = 2;
 
     // Trava do carregador no PostgreSQL: segura até o fim da transação
     private const string SqlTrava = "SELECT pg_advisory_xact_lock(4890020260924)";
@@ -208,31 +233,83 @@ public sealed class PeCarregadorModelo
                     var campos = new HashSet<string>();
                     foreach (var campo in secao.Campos)
                     {
-                        if (!campos.Add(campo.Chave) || !PeChaves.ChaveValida(campo.Chave, PeChaves.MaximoCampo))
-                            Falha($"campo \"{secao.Chave}.{campo.Chave}\" repetido ou fora do formato.");
-                        if (!PeDominios.TipoCampo.Todos.Contains(campo.Tipo)) Falha($"tipo do campo \"{secao.Chave}.{campo.Chave}\".");
-                        if (campo.Largura != null && !PeDominios.Largura.Todas.Contains(campo.Largura))
-                            Falha($"largura do campo \"{secao.Chave}.{campo.Chave}\".");
+                        ValidarCampo(secao, campo, campos, Falha);
                         var sitCampo = Situacoes(campo.Niveis, codigos, sitSecao, $"campo {secao.Chave}.{campo.Chave}");
                         if ((campo.Travado || (campo.Principal && secao.Travada)) && sitCampo.ContainsValue(PeDominios.Situacao.Desligado))
                             Falha($"campo travado \"{secao.Chave}.{campo.Chave}\" desligado.");
-
-                        var valores = new HashSet<string>();
-                        foreach (var opcao in campo.Opcoes)
-                        {
-                            if (!valores.Add(opcao.Valor) || !PeChaves.ValorValido(opcao.Valor))
-                                Falha($"opção \"{opcao.Valor}\" do campo \"{secao.Chave}.{campo.Chave}\" repetida ou fora do formato.");
-                            if (opcao.Cor != null && !PeDominios.Cor.Todas.Contains(opcao.Cor))
-                                Falha($"cor da opção \"{opcao.Valor}\" do campo \"{secao.Chave}.{campo.Chave}\".");
-                        }
-                        var aceitaOpcoes = PeDominios.TipoCampo.TemOpcoes(campo.Tipo) || campo.Tipo == PeDominios.TipoCampo.Calculado;
-                        if (campo.Opcoes.Count > 0 && !aceitaOpcoes) Falha($"o campo \"{secao.Chave}.{campo.Chave}\" não aceita opções.");
-                        if (PeDominios.TipoCampo.TemOpcoes(campo.Tipo) && campo.Opcoes.Count == 0)
-                            Falha($"a lista \"{secao.Chave}.{campo.Chave}\" não tem opções.");
                     }
+                    if (secao.Registros.Count > 0) Falha($"a seção \"{secao.Chave}\" é do PDTIC e não traz registros.");
                 }
             }
         }
+
+        // Seções fora do PDTIC (escopos df e petic): situação geral, sem passo, nível ou trava
+        foreach (var secao in seed.SecoesForaDoPdtic)
+        {
+            if (!secoes.Add(secao.Chave) || !PeChaves.ChaveValida(secao.Chave, PeChaves.MaximoSecao))
+                Falha($"seção \"{secao.Chave}\" repetida ou fora do formato.");
+            if (secao.Escopo is not (PeDominios.Escopo.Petic or PeDominios.Escopo.Df))
+                Falha($"escopo da seção \"{secao.Chave}\" (petic ou df).");
+            if (!PeDominios.TipoSecao.Todos.Contains(secao.Tipo)) Falha($"tipo da seção \"{secao.Chave}\".");
+            if (secao.Travada || secao.Inciso != null || secao.Niveis.ValueKind is not (JsonValueKind.Undefined or JsonValueKind.Null))
+                Falha($"a seção \"{secao.Chave}\" é fora do PDTIC: sem trava, inciso nem níveis.");
+            if (secao.Situacao == null || !PeDominios.Situacao.Todas.Contains(secao.Situacao))
+                Falha($"situação da seção \"{secao.Chave}\".");
+            if (secao.Prefixo != null && !System.Text.RegularExpressions.Regex.IsMatch(secao.Prefixo, "^[A-Z][A-Z0-9]{0,4}$"))
+                Falha($"prefixo da seção \"{secao.Chave}\".");
+            if (secao.Campos.Count(c => c.Principal) != 1) Falha($"a seção \"{secao.Chave}\" precisa de exatamente um campo principal.");
+
+            var campos = new HashSet<string>();
+            foreach (var campo in secao.Campos)
+            {
+                ValidarCampo(secao, campo, campos, Falha);
+                var situacao = campo.Situacao ?? secao.Situacao;
+                if (campo.Travado || campo.Niveis is { ValueKind: not (JsonValueKind.Undefined or JsonValueKind.Null) }
+                    || !PeDominios.Situacao.Todas.Contains(situacao!))
+                    Falha($"campo \"{secao.Chave}.{campo.Chave}\": fora do PDTIC vale só a situação (sem trava nem níveis).");
+            }
+
+            if (secao.Registros.Count == 0) continue;
+            if (secao.Escopo != PeDominios.Escopo.Df || secao.Tipo != PeDominios.TipoSecao.Tabela || secao.Prefixo == null)
+                Falha($"só tabela do catálogo do DF, com prefixo, traz registros do sistema (seção \"{secao.Chave}\").");
+            var codigosRegistro = new HashSet<string>();
+            foreach (var registro in secao.Registros)
+            {
+                if (!codigosRegistro.Add(registro.Codigo)
+                    || !System.Text.RegularExpressions.Regex.IsMatch(registro.Codigo, $"^{secao.Prefixo}[0-9]{{2,}}$"))
+                    Falha($"código \"{registro.Codigo}\" da seção \"{secao.Chave}\" repetido ou fora do formato.");
+                foreach (var chave in registro.Dados.Keys)
+                {
+                    var campo = secao.Campos.FirstOrDefault(c => c.Chave == chave);
+                    if (campo == null || campo.Tipo is PeDominios.TipoCampo.LigacaoSecao or PeDominios.TipoCampo.LigacaoCatalogo
+                            or PeDominios.TipoCampo.Calculado or PeDominios.TipoCampo.Arquivo)
+                        Falha($"registro \"{registro.Codigo}\": o campo \"{chave}\" não existe ou não aceita valor semeado.");
+                }
+            }
+        }
+    }
+
+    /// <summary>Chave, tipo, largura e opções de um campo do JSON.</summary>
+    private static void ValidarCampo(PeSeedSecao secao, PeSeedCampo campo, HashSet<string> chaves, Action<string> falha)
+    {
+        if (!chaves.Add(campo.Chave) || !PeChaves.ChaveValida(campo.Chave, PeChaves.MaximoCampo))
+            falha($"campo \"{secao.Chave}.{campo.Chave}\" repetido ou fora do formato.");
+        if (!PeDominios.TipoCampo.Todos.Contains(campo.Tipo)) falha($"tipo do campo \"{secao.Chave}.{campo.Chave}\".");
+        if (campo.Largura != null && !PeDominios.Largura.Todas.Contains(campo.Largura))
+            falha($"largura do campo \"{secao.Chave}.{campo.Chave}\".");
+
+        var valores = new HashSet<string>();
+        foreach (var opcao in campo.Opcoes)
+        {
+            if (!valores.Add(opcao.Valor) || !PeChaves.ValorValido(opcao.Valor))
+                falha($"opção \"{opcao.Valor}\" do campo \"{secao.Chave}.{campo.Chave}\" repetida ou fora do formato.");
+            if (opcao.Cor != null && !PeDominios.Cor.Todas.Contains(opcao.Cor))
+                falha($"cor da opção \"{opcao.Valor}\" do campo \"{secao.Chave}.{campo.Chave}\".");
+        }
+        var aceitaOpcoes = PeDominios.TipoCampo.TemOpcoes(campo.Tipo) || campo.Tipo == PeDominios.TipoCampo.Calculado;
+        if (campo.Opcoes.Count > 0 && !aceitaOpcoes) falha($"o campo \"{secao.Chave}.{campo.Chave}\" não aceita opções.");
+        if (PeDominios.TipoCampo.TemOpcoes(campo.Tipo) && campo.Opcoes.Count == 0)
+            falha($"a lista \"{secao.Chave}.{campo.Chave}\" não tem opções.");
     }
 
     /// <summary>
@@ -404,57 +481,95 @@ public sealed class PeCarregadorModelo
                         nSecoes++;
                     }
 
-                    foreach (var (sc, ic) in ss.Campos.Select((c, i) => (c, i)))
-                    {
-                        var campo = campos.FirstOrDefault(c => c.Chave == sc.Chave && (c.Secao == secao || (secao.Id != 0 && c.SecaoId == secao.Id)));
-                        if (campo == null)
-                        {
-                            campo = new PeCampo
-                            {
-                                Secao = secao,
-                                Chave = sc.Chave,
-                                Rotulo = sc.Rotulo,
-                                Ajuda = sc.Ajuda,
-                                Tipo = sc.Tipo,
-                                Principal = sc.Principal,
-                                Travado = sc.Travado,
-                                Ordem = ic + 1,
-                                NoDocumento = sc.NoDocumento,
-                                NaPlanilha = sc.NaPlanilha,
-                                Largura = sc.Largura,
-                                Sistema = true,
-                                CriadoEm = agora,
-                                CriadoPor = Autor
-                            };
-                            foreach (var (codigo, situacao) in Situacoes(sc.Niveis, codigos, sitSecao, $"{ss.Chave}.{sc.Chave}"))
-                                campo.Niveis.Add(new PeCampoNivel { Nivel = nivelPorCodigo[codigo], Situacao = situacao });
-                            campos.Add(campo);
-                            _context.PeCampos.Add(campo);
-                            novosCampos.Add((campo, sc));
-                            nCampos++;
-                        }
+                    CamposEOpcoes(ss, secao, sitSecao);
+                }
+            }
+        }
 
-                        foreach (var (so, io) in sc.Opcoes.Select((o, i) => (o, i)))
-                        {
-                            if (opcoes.Any(o => o.Valor == so.Valor && (o.Campo == campo || (campo.Id != 0 && o.CampoId == campo.Id)))) continue;
-                            var opcao = new PeOpcao
-                            {
-                                Campo = campo,
-                                Valor = so.Valor,
-                                Rotulo = so.Rotulo,
-                                Cor = so.Cor,
-                                Travada = so.Travada,
-                                Ordem = io + 1,
-                                Ativa = true,
-                                Sistema = true,
-                                CriadoEm = agora,
-                                CriadoPor = Autor
-                            };
-                            opcoes.Add(opcao);
-                            _context.PeOpcoes.Add(opcao);
-                            nOpcoes++;
-                        }
-                    }
+        // Seções fora do PDTIC (catálogo do DF e PETIC-DF): sem passo nem nível, com a situação geral
+        foreach (var ss in seed.SecoesForaDoPdtic)
+        {
+            var secao = secoes.FirstOrDefault(s => s.Chave == ss.Chave);
+            if (secao == null)
+            {
+                secao = new PeSecao
+                {
+                    Escopo = ss.Escopo!,
+                    Chave = ss.Chave,
+                    Titulo = ss.Titulo,
+                    Ajuda = ss.Ajuda,
+                    Tipo = ss.Tipo,
+                    PrefixoCodigo = ss.Prefixo,
+                    Ordem = seed.SecoesForaDoPdtic.Where(s => s.Escopo == ss.Escopo).ToList().IndexOf(ss) + 1,
+                    NoDocumento = ss.NoDocumento,
+                    NaPlanilha = ss.NaPlanilha,
+                    SituacaoGeral = ss.Situacao,
+                    Sistema = true,
+                    CriadoEm = agora,
+                    CriadoPor = Autor
+                };
+                secoes.Add(secao);
+                _context.PeSecoes.Add(secao);
+                nSecoes++;
+            }
+            CamposEOpcoes(ss, secao, null);
+        }
+
+        // Campos (e as opções deles) que faltam numa seção. Com a situação de cada nível no
+        // PDTIC; fora dele, com a situação geral (a do campo ou a da seção)
+        void CamposEOpcoes(PeSeedSecao ss, PeSecao secao, Dictionary<string, string>? sitSecao)
+        {
+            foreach (var (sc, ic) in ss.Campos.Select((c, i) => (c, i)))
+            {
+                var campo = campos.FirstOrDefault(c => c.Chave == sc.Chave && (c.Secao == secao || (secao.Id != 0 && c.SecaoId == secao.Id)));
+                if (campo == null)
+                {
+                    campo = new PeCampo
+                    {
+                        Secao = secao,
+                        Chave = sc.Chave,
+                        Rotulo = sc.Rotulo,
+                        Ajuda = sc.Ajuda,
+                        Tipo = sc.Tipo,
+                        Principal = sc.Principal,
+                        Travado = sc.Travado,
+                        Ordem = ic + 1,
+                        NoDocumento = sc.NoDocumento,
+                        NaPlanilha = sc.NaPlanilha,
+                        Largura = sc.Largura,
+                        SituacaoGeral = sitSecao == null ? sc.Situacao ?? ss.Situacao : null,
+                        Sistema = true,
+                        CriadoEm = agora,
+                        CriadoPor = Autor
+                    };
+                    if (sitSecao != null)
+                        foreach (var (codigo, situacao) in Situacoes(sc.Niveis, codigos, sitSecao, $"{ss.Chave}.{sc.Chave}"))
+                            campo.Niveis.Add(new PeCampoNivel { Nivel = nivelPorCodigo[codigo], Situacao = situacao });
+                    campos.Add(campo);
+                    _context.PeCampos.Add(campo);
+                    novosCampos.Add((campo, sc));
+                    nCampos++;
+                }
+
+                foreach (var (so, io) in sc.Opcoes.Select((o, i) => (o, i)))
+                {
+                    if (opcoes.Any(o => o.Valor == so.Valor && (o.Campo == campo || (campo.Id != 0 && o.CampoId == campo.Id)))) continue;
+                    var opcao = new PeOpcao
+                    {
+                        Campo = campo,
+                        Valor = so.Valor,
+                        Rotulo = so.Rotulo,
+                        Cor = so.Cor,
+                        Travada = so.Travada,
+                        Ordem = io + 1,
+                        Ativa = true,
+                        Sistema = true,
+                        CriadoEm = agora,
+                        CriadoPor = Autor
+                    };
+                    opcoes.Add(opcao);
+                    _context.PeOpcoes.Add(opcao);
+                    nOpcoes++;
                 }
             }
         }
@@ -489,6 +604,49 @@ public sealed class PeCarregadorModelo
             }
         }
 
+        // Registros do sistema (os princípios do art. 4º), no catálogo do DF: os que faltam,
+        // achados pelo código; a sequência passa a começar depois do maior código semeado
+        var nRegistros = 0;
+        var comRegistros = seed.SecoesForaDoPdtic.Where(s => s.Registros.Count > 0).ToList();
+        if (comRegistros.Count > 0)
+        {
+            var existentes = await _context.PeRegistros.Where(r => r.PeticId == null)
+                .Select(r => new { r.SecaoId, r.Codigo, r.Ordem })
+                .ToListAsync(ct);
+            var sequencias = await _context.PeRegistroSequencias.Where(s => s.Dono == PeDono.Df.Chave).ToListAsync(ct);
+            foreach (var ss in comRegistros)
+            {
+                var secao = secoes.First(s => s.Chave == ss.Chave);
+                var daSecao = existentes.Where(r => secao.Id != 0 && r.SecaoId == secao.Id).ToList();
+                var ordem = daSecao.Select(r => r.Ordem).DefaultIfEmpty(0).Max();
+                var camposDaSecao = campos.Where(c => c.ExcluidoEm == null && (c.Secao == secao || (secao.Id != 0 && c.SecaoId == secao.Id))).ToList();
+                var maior = daSecao.Where(r => r.Codigo != null).Select(r => PeRegistroService.NumeroDoCodigo(r.Codigo!)).DefaultIfEmpty(0).Max();
+
+                foreach (var sr in ss.Registros)
+                {
+                    maior = Math.Max(maior, PeRegistroService.NumeroDoCodigo(sr.Codigo));
+                    if (daSecao.Any(r => r.Codigo == sr.Codigo)) continue;
+                    _context.PeRegistros.Add(new PeRegistro
+                    {
+                        Secao = secao,
+                        Codigo = sr.Codigo,
+                        Ordem = ++ordem,
+                        Dados = DadosDoRegistro(ss, sr, camposDaSecao, opcoes),
+                        Sistema = true,
+                        CriadoEm = agora,
+                        CriadoPor = Autor
+                    });
+                    nRegistros++;
+                }
+
+                var sequencia = secao.Id == 0 ? null : sequencias.FirstOrDefault(s => s.SecaoId == secao.Id);
+                if (sequencia == null)
+                    _context.PeRegistroSequencias.Add(new PeRegistroSequencia { Secao = secao, Dono = PeDono.Df.Chave, Ultimo = maior });
+                else if (sequencia.Ultimo < maior)
+                    sequencia.Ultimo = maior;
+            }
+        }
+
         // A versão carregada
         if (registroVersao == null)
         {
@@ -510,7 +668,34 @@ public sealed class PeCarregadorModelo
         await _context.SaveChangesAsync(ct);
         if (transacao != null) await transacao.CommitAsync(ct);
 
-        return new PeCarregamentoResultado(versaoAnterior, seed.Versao, true, nNiveis, nEtapas, nPassos, nSecoes, nCampos, nOpcoes, nConfig);
+        return new PeCarregamentoResultado(versaoAnterior, seed.Versao, true, nNiveis, nEtapas, nPassos, nSecoes, nCampos, nOpcoes, nConfig,
+            nRegistros);
+    }
+
+    /// <summary>
+    /// Os valores de um registro do JSON, conferidos como o motor de registros confere (tipo,
+    /// tamanho, opção) e com os obrigatórios preenchidos. Erro = modelo inicial inválido.
+    /// </summary>
+    private static string DadosDoRegistro(PeSeedSecao ss, PeSeedRegistro sr, List<PeCampo> campos, List<PeOpcao> opcoes)
+    {
+        var dados = new System.Text.Json.Nodes.JsonObject();
+        foreach (var campo in campos)
+        {
+            var situacao = campo.SituacaoGeral;
+            if (!sr.Dados.TryGetValue(campo.Chave, out var entrada))
+            {
+                if (situacao == PeDominios.Situacao.Obrigatorio && campo.Tipo != PeDominios.TipoCampo.Calculado && !PeRegistroDados.EhLigacao(campo))
+                    throw new InvalidOperationException($"Modelo inicial inválido: registro \"{sr.Codigo}\" sem o campo obrigatório \"{campo.Chave}\".");
+                continue;
+            }
+            var doCampo = opcoes.Where(o => o.Campo == campo || (campo.Id != 0 && o.CampoId == campo.Id)).ToList();
+            var resultado = PeValores.Normalizar(campo, doCampo, entrada, null);
+            if (resultado.Erro != null || resultado.ArquivoId != null)
+                throw new InvalidOperationException(
+                    $"Modelo inicial inválido: registro \"{sr.Codigo}\" da seção \"{ss.Chave}\", campo \"{campo.Chave}\": {resultado.Erro ?? "arquivo não se semeia"}");
+            if (resultado.Valor != null) dados[campo.Chave] = resultado.Valor;
+        }
+        return dados.ToJsonString(PeModeloService.JsonHistorico);
     }
 
     private static int LerVersao(string? valor)

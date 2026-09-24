@@ -80,6 +80,14 @@ namespace Models
         public DbSet<PeOrgaoAjuste> PeOrgaosAjuste { get; set; }
         public DbSet<PeConfiguracao> PeConfiguracoes { get; set; }
         public DbSet<PeModeloHistorico> PeModeloHistorico { get; set; }
+        // Referenciais e registros (E3): PETIC-DF, deliberações do CGTIC, registros e arquivos
+        public DbSet<PePetic> PePetics { get; set; }
+        public DbSet<PeDeliberacao> PeDeliberacoes { get; set; }
+        public DbSet<PeRegistro> PeRegistros { get; set; }
+        public DbSet<PeVinculo> PeVinculos { get; set; }
+        public DbSet<PeRegistroSequencia> PeRegistroSequencias { get; set; }
+        public DbSet<PeArquivo> PeArquivos { get; set; }
+        public DbSet<PeArquivoConteudo> PeArquivosConteudo { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -18,9 +18,9 @@ docker run -d --name sgdp-local-pg -e POSTGRES_USER=sgdp_user -e POSTGRES_PASSWO
 
 Usuário/senha/banco casam com `app/appsettings.Development.json` (`Host=localhost;Port=5432;Database=postgres;Username=sgdp_user;Password=sgdp_password_dev`). Alternativa: `docker compose up -d postgres` na raiz do `SGDP-Service-main` (exige `.env` copiado do `.env.example` com `POSTGRES_USER=user` e `POSTGRES_PASSWORD=password`).
 
-## 2. Migrations (cria as tabelas do SGDP, as 24 `pgia_*` com seeds, as 2 `ctr_*` e as 15 `pe_*`)
+## 2. Migrations (cria as tabelas do SGDP, as 24 `pgia_*` com seeds, as 2 `ctr_*` e as 21 `pe_*`)
 
-A última é a `20260924162542_PeModeloConfiguravel` (Governança Estratégica, E2: as 13 tabelas do modelo configurável; o modelo inicial é carregado sozinho quando a API sobe). Antes dela vem a `20260924151108_PeAcessoPapeis` (E1: `pe_papel_usuario`, `pe_papel_usuario_historico` e os CHECKs de módulo com `planejamento`). Sem elas aplicadas, a API sobe, o login e os outros módulos funcionam, mas as telas da Governança Estratégica falham (regra do deploy, ver o `CLAUDE.md`).
+A última é a `20260924174627_PeReferenciaisRegistros` (Governança Estratégica, E3: as 6 tabelas do PETIC-DF, das deliberações do CGTIC, dos registros, das ligações, da sequência dos códigos e dos arquivos; os princípios do art. 4º são carregados sozinhos quando a API sobe). Antes dela vêm a `20260924162542_PeModeloConfiguravel` (E2: as 13 tabelas do modelo configurável; o modelo inicial é carregado sozinho quando a API sobe) e a `20260924151108_PeAcessoPapeis` (E1: `pe_papel_usuario`, `pe_papel_usuario_historico` e os CHECKs de módulo com `planejamento`). Sem elas aplicadas, a API sobe, o login e os outros módulos funcionam, mas as telas da Governança Estratégica falham (regra do deploy, ver o `CLAUDE.md`).
 
 ```bash
 cd SGDP-Service-main/app
@@ -144,6 +144,20 @@ Antes, aplique a migration `20260924162542_PeModeloConfiguravel` (comando da se�
 6. **Otávio do Órgão** (equipe da SES): a trilha vem do back-end (`GET api/planejamento/modelo/trilha`). No Básico são 23 passos em 6 etapas: "Avalie no meio do caminho" não aparece, e "Feche o ciclo" vira a etapa 6. Um passo de dados mostra as seções e os campos que vai pedir. Com a SES no Avançado, são os 50 passos, com a numeração da seção 7 do plano.
 7. **Sofia da SGDI** e a Secretaria do CGTIC: leem o modelo, veem a trilha de qualquer órgão ("Ver a trilha de") e o histórico do modelo, mas não alteram nada (403). A consulta do órgão só lê a trilha do próprio órgão.
 8. **Regressão**: login, `/api/Auth/me`, "Pessoas e acessos" (E1) e os outros módulos seguem como antes.
+
+## 11. Roteiro de fumaça da Governança Estratégica (E3: referenciais, registros e planilhas)
+
+Antes, aplique a migration `20260924174627_PeReferenciaisRegistros` (comando da seção 2) e suba a API de novo. O log mostra "Governança Estratégica: modelo inicial versão 2 carregado (antes: 1). Novos: 0 níveis, 0 etapas, 0 passos, 10 seções, 33 campos, 4 opções, 0 configurações, 11 registros do sistema." (num banco novo, "antes: 0", com a trilha inteira e os 11 princípios de uma vez). Sem a migration, o carregador avisa no log e tenta de novo sozinho; os endpoints novos respondem 409 com a mensagem de atualização e o resto (E1, E2 e os outros módulos) segue normal.
+
+1. **Princípios** (`GET api/planejamento/df/secoes/principio/registros`, qualquer papel): PR01 a PR11, marcados como do sistema, com o texto literal dos incisos do art. 4º do Decreto nº 48.900/2026 e o fundamento "art. 4º, I, do Decreto nº 48.900/2026"... A administradora do módulo acrescenta um princípio (sai PR12); mudar ou apagar um dos 11 volta 409; salvar sem o fundamento volta 400 com `Campos.fundamento`. As outras personas leem com `PodeEditar: false` e recebem 403 ao gravar.
+2. **Diretrizes do ciclo** (`df/secoes/diretriz_ciclo/registros`): ano (número inteiro de 2025 a 2100), diretriz, situação da deliberação (lista) e observação; códigos DC01, DC02...
+3. **PETIC-DF** (administradora do módulo): `POST api/planejamento/petic` com título e vigência cria a versão 1.0 em rascunho (uma segunda volta 409). Inclua diretriz, objetivos (OE01, OE02), prioridade ligada aos objetivos, indicador e iniciativa ligados a um objetivo. Apagar um objetivo ligado volta 409 dizendo quem liga ("IE01 (Indicadores estratégicos, PETIC-DF 1.0)"). Apague e inclua de novo: o código apagado não volta. `POST petic/{id}/enviar` sem o mínimo volta 400 listando o que falta; completo, a versão vai para "em deliberação" e fica fechada (gravar volta 409).
+4. **Secretaria do CGTIC** (`GET api/planejamento/deliberacoes`, também lido pela SGDI e pela administradora do módulo): a deliberação "PETIC-DF 1.0" aguardando. `POST deliberacoes/{id}/decidir` com "aprovado" exige número e data do ato; com "devolvido", a observação (a versão volta a rascunho e a lista mostra a devolução). Aprovada, `GET petic/vigente` devolve a versão e `GET catalogos/petic_objetivo` lista os objetivos dela.
+5. **Nova versão**: `POST petic` de novo copia da vigente os registros, os códigos e as ligações (versão 2.0); aprovar a 2.0 deixa a 1.0 como substituída (só uma vigente). Rascunho que nunca foi enviado pode ser apagado (204); o que já foi ao CGTIC, não (409).
+6. **Órgão** (equipe ou consulta da SES): `GET petic` só mostra as versões aprovadas; rascunho e versão em deliberação dão 404, nos registros e nas planilhas também.
+7. **Planilhas**: `GET petic/{id}/planilha/petic_objetivo?formato=csv` (abre no Excel sem mojibake, `;`, texto começando com "=" vem protegido com apóstrofo), `GET petic/{id}/planilha?formato=xlsx` (uma aba por seção, cabeçalho fixo com filtro, datas e números com formato, aba Leia-me) e `GET df/planilha/diretriz_ciclo?formato=xlsx` (a situação da deliberação com lista de validação). O nome vem no Content-Disposition (`PETIC-DF_1.0_petic_objetivo_aaaa-mm-dd.csv`); a completa em CSV volta 400 com `{ Code, Message }`.
+8. **Arquivos**: `POST api/planejamento/arquivos` (multipart, campo `arquivo`) aceita PDF, PNG e JPEG (imagens até 5 MB, o resto até 25 MB) e confere o conteúdo; um .exe ou um "PDF" que não é PDF voltam 400. O arquivo só abre para quem enviou até ser usado num campo de arquivo de um registro; depois, para quem vê o registro. O download traz `X-Content-Type-Options: nosniff`.
+9. **Regressão**: login, `/api/Auth/me`, "Pessoas e acessos" (E1), o editor do modelo e a trilha (E2) e os outros módulos seguem como antes. No editor do modelo, campo com dados gravados não muda mais de chave nem de tipo (409).
 
 ## Limpeza
 

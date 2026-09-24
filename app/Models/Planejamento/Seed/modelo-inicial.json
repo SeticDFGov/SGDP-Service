@@ -1,5 +1,5 @@
 {
-  "versao": 1,
+  "versao": 2,
   "niveis": [
     {
       "codigo": "basico",
@@ -3536,6 +3536,536 @@
               ]
             }
           ]
+        }
+      ]
+    }
+  ],
+  "secoesForaDoPdtic": [
+    {
+      "escopo": "df",
+      "chave": "principio",
+      "titulo": "Princípios e diretrizes",
+      "tipo": "tabela",
+      "prefixo": "PR",
+      "situacao": "obrigatorio",
+      "ajuda": "Os princípios da Política de Governança de TIC (art. 4º do Decreto nº 48.900/2026) vêm prontos e não mudam. Acrescente outros princípios ou diretrizes, por exemplo os de resoluções do CGTIC.",
+      "campos": [
+        {
+          "chave": "texto",
+          "rotulo": "Princípio ou diretriz",
+          "tipo": "texto_longo",
+          "principal": true,
+          "largura": "larga",
+          "config": {
+            "max": 4000
+          }
+        },
+        {
+          "chave": "fundamento",
+          "rotulo": "Fundamento",
+          "tipo": "texto_curto",
+          "largura": "media",
+          "config": {
+            "max": 300
+          },
+          "ajuda": "De onde vem: o artigo do decreto, a resolução do CGTIC ou outro ato."
+        },
+        {
+          "chave": "criterio_priorizacao",
+          "rotulo": "Pode ser critério de priorização?",
+          "tipo": "sim_nao",
+          "situacao": "opcional",
+          "largura": "estreita",
+          "ajuda": "Sim quando o princípio pode servir para priorizar as necessidades nos PDTICs dos órgãos."
+        }
+      ],
+      "registros": [
+        {
+          "codigo": "PR01",
+          "dados": {
+            "texto": "Eficiência e economicidade: uso racional dos recursos de TIC, evitando redundâncias e priorizando soluções corporativas compartilhadas;",
+            "fundamento": "art. 4º, I, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR02",
+          "dados": {
+            "texto": "Alinhamento estratégico: subordinação das iniciativas de TIC às prioridades do GDF definidas no Plano Estratégico de TIC e na Estratégia de Governança Digital;",
+            "fundamento": "art. 4º, II, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR03",
+          "dados": {
+            "texto": "Centralização orientada ao valor: preferência por soluções e infraestruturas corporativas centralizadas quando gerarem ganhos de escala, segurança ou padronização;",
+            "fundamento": "art. 4º, III, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR04",
+          "dados": {
+            "texto": "Transparência e prestação de contas: publicidade dos instrumentos de planejamento, das decisões e dos resultados de governança de TIC;",
+            "fundamento": "art. 4º, IV, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR05",
+          "dados": {
+            "texto": "Segurança e resiliência: proteção dos ativos de informação e garantia de continuidade dos serviços essenciais;",
+            "fundamento": "art. 4º, V, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR06",
+          "dados": {
+            "texto": "Interoperabilidade: integração e comunicação entre sistemas, dados e plataformas, eliminando silos tecnológicos;",
+            "fundamento": "art. 4º, VI, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR07",
+          "dados": {
+            "texto": "Transformação digital orientada ao cidadão: uso da tecnologia para ampliar a qualidade, a acessibilidade e a eficiência dos serviços públicos; e",
+            "fundamento": "art. 4º, VII, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR08",
+          "dados": {
+            "texto": "Integridade pública: alinhamento das condutas dos agentes públicos a valores éticos, priorizando o interesse coletivo sobre interesses privados. É a base da boa governança, prevenindo desvios e garantindo serviços eficientes e transparentes.",
+            "fundamento": "art. 4º, VIII, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR09",
+          "dados": {
+            "texto": "Segregação de funções nas contratações: separação das atribuições entre diferentes agentes públicos, de modo a evitar conflitos de interesse, erros, fraudes e ocultação de falhas nas contratações;",
+            "fundamento": "art. 4º, IX, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR10",
+          "dados": {
+            "texto": "uso ético e responsável da Inteligência Artificial: as iniciativas de TIC que envolvam sistemas de IA observarão os princípios e as diretrizes estabelecidos na PGIA/DF; e",
+            "fundamento": "art. 4º, X, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR11",
+          "dados": {
+            "texto": "Governança de Dados orientada ao valor público: os dados gerados e tratados no âmbito das iniciativas de TIC serão geridos conforme as diretrizes da PGD/DF, assegurando qualidade, integridade e uso estratégico.",
+            "fundamento": "art. 4º, XI, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        }
+      ]
+    },
+    {
+      "escopo": "df",
+      "chave": "diretriz_ciclo",
+      "titulo": "Diretrizes do ciclo",
+      "tipo": "tabela",
+      "prefixo": "DC",
+      "situacao": "obrigatorio",
+      "ajuda": "As diretrizes e prioridades do ciclo de planejamento de TIC que a SGDI propõe para o ano seguinte e leva à deliberação do comitê antes de os órgãos elaborarem os PDTICs (art. 9º, VIII, do Decreto nº 48.899/2026).",
+      "campos": [
+        {
+          "chave": "ano",
+          "rotulo": "Ano do ciclo",
+          "tipo": "numero",
+          "largura": "estreita",
+          "config": {
+            "min": 2025,
+            "max": 2100,
+            "casas": 0
+          },
+          "ajuda": "O ano de planejamento a que a diretriz vale."
+        },
+        {
+          "chave": "texto",
+          "rotulo": "Diretriz ou prioridade",
+          "tipo": "texto_longo",
+          "principal": true,
+          "largura": "larga",
+          "config": {
+            "max": 4000
+          }
+        },
+        {
+          "chave": "situacao_deliberacao",
+          "rotulo": "Situação da deliberação",
+          "tipo": "lista",
+          "largura": "media",
+          "ajuda": "Em que pé está a deliberação do comitê sobre a diretriz.",
+          "opcoes": [
+            {
+              "valor": "proposta",
+              "rotulo": "Proposta pela SGDI",
+              "cor": "cinza"
+            },
+            {
+              "valor": "em_deliberacao",
+              "rotulo": "Em deliberação",
+              "cor": "azul"
+            },
+            {
+              "valor": "aprovada",
+              "rotulo": "Aprovada",
+              "cor": "verde"
+            },
+            {
+              "valor": "devolvida",
+              "rotulo": "Devolvida para ajuste",
+              "cor": "laranja"
+            }
+          ]
+        },
+        {
+          "chave": "observacao",
+          "rotulo": "Observação",
+          "tipo": "texto_longo",
+          "situacao": "opcional",
+          "largura": "larga"
+        }
+      ]
+    },
+    {
+      "escopo": "petic",
+      "chave": "petic_identidade",
+      "titulo": "Missão, visão e valores",
+      "tipo": "formulario",
+      "situacao": "opcional",
+      "ajuda": "A razão de ser da TIC do Distrito Federal (missão), aonde ela quer chegar (visão) e os valores que guiam o trabalho.",
+      "campos": [
+        {
+          "chave": "missao",
+          "rotulo": "Missão",
+          "tipo": "texto_longo",
+          "principal": true,
+          "situacao": "obrigatorio",
+          "config": {
+            "max": 2000
+          }
+        },
+        {
+          "chave": "visao",
+          "rotulo": "Visão",
+          "tipo": "texto_longo",
+          "situacao": "obrigatorio",
+          "config": {
+            "max": 2000
+          }
+        },
+        {
+          "chave": "valores",
+          "rotulo": "Valores",
+          "tipo": "texto_longo",
+          "situacao": "opcional",
+          "config": {
+            "max": 4000
+          }
+        }
+      ]
+    },
+    {
+      "escopo": "petic",
+      "chave": "petic_diretriz",
+      "titulo": "Diretrizes",
+      "tipo": "tabela",
+      "prefixo": "D",
+      "situacao": "obrigatorio",
+      "ajuda": "As orientações gerais do PETIC-DF (art. 11, § 1º, do Decreto nº 48.900/2026).",
+      "campos": [
+        {
+          "chave": "texto",
+          "rotulo": "Diretriz",
+          "tipo": "texto_longo",
+          "principal": true,
+          "largura": "larga",
+          "config": {
+            "max": 4000
+          }
+        },
+        {
+          "chave": "detalhamento",
+          "rotulo": "Detalhamento",
+          "tipo": "texto_longo",
+          "situacao": "opcional",
+          "largura": "larga"
+        }
+      ]
+    },
+    {
+      "escopo": "petic",
+      "chave": "petic_objetivo_programa",
+      "titulo": "Objetivos do programa",
+      "tipo": "tabela",
+      "prefixo": "OP",
+      "situacao": "opcional",
+      "ajuda": "Objetivos amplos que agrupam os objetivos estratégicos. Use só se o PETIC-DF se organizar assim.",
+      "campos": [
+        {
+          "chave": "texto",
+          "rotulo": "Objetivo do programa",
+          "tipo": "texto_longo",
+          "principal": true,
+          "situacao": "obrigatorio",
+          "largura": "larga",
+          "config": {
+            "max": 2000
+          }
+        },
+        {
+          "chave": "descricao",
+          "rotulo": "Descrição",
+          "tipo": "texto_longo",
+          "situacao": "opcional",
+          "largura": "larga"
+        }
+      ]
+    },
+    {
+      "escopo": "petic",
+      "chave": "petic_objetivo",
+      "titulo": "Objetivos estratégicos",
+      "tipo": "tabela",
+      "prefixo": "OE",
+      "situacao": "obrigatorio",
+      "ajuda": "O que a TIC do DF quer alcançar no período. Os órgãos ligam as necessidades e as metas dos PDTICs a estes objetivos.",
+      "campos": [
+        {
+          "chave": "texto",
+          "rotulo": "Objetivo estratégico",
+          "tipo": "texto_longo",
+          "principal": true,
+          "largura": "larga",
+          "config": {
+            "max": 2000
+          }
+        },
+        {
+          "chave": "objetivo_programa",
+          "rotulo": "Objetivo do programa",
+          "tipo": "ligacao_secao",
+          "situacao": "opcional",
+          "largura": "media",
+          "config": {
+            "secao": "petic_objetivo_programa",
+            "multipla": false
+          },
+          "ajuda": "O objetivo do programa a que este objetivo pertence, se houver."
+        },
+        {
+          "chave": "descricao",
+          "rotulo": "Descrição",
+          "tipo": "texto_longo",
+          "situacao": "opcional",
+          "largura": "larga"
+        }
+      ]
+    },
+    {
+      "escopo": "petic",
+      "chave": "petic_prioridade",
+      "titulo": "Prioridades",
+      "tipo": "tabela",
+      "prefixo": "P",
+      "situacao": "obrigatorio",
+      "ajuda": "O que vem primeiro no período (art. 11, § 1º, do Decreto nº 48.900/2026).",
+      "campos": [
+        {
+          "chave": "texto",
+          "rotulo": "Prioridade",
+          "tipo": "texto_longo",
+          "principal": true,
+          "largura": "larga",
+          "config": {
+            "max": 2000
+          }
+        },
+        {
+          "chave": "objetivos",
+          "rotulo": "Objetivos estratégicos ligados",
+          "tipo": "ligacao_secao",
+          "situacao": "opcional",
+          "largura": "media",
+          "config": {
+            "secao": "petic_objetivo",
+            "multipla": true
+          }
+        },
+        {
+          "chave": "detalhamento",
+          "rotulo": "Detalhamento",
+          "tipo": "texto_longo",
+          "situacao": "opcional",
+          "largura": "larga"
+        }
+      ]
+    },
+    {
+      "escopo": "petic",
+      "chave": "petic_indicador",
+      "titulo": "Indicadores estratégicos",
+      "tipo": "tabela",
+      "prefixo": "IE",
+      "situacao": "obrigatorio",
+      "ajuda": "Como medir se os objetivos estratégicos estão sendo alcançados.",
+      "campos": [
+        {
+          "chave": "nome",
+          "rotulo": "Indicador",
+          "tipo": "texto_curto",
+          "principal": true,
+          "largura": "larga",
+          "config": {
+            "max": 300
+          }
+        },
+        {
+          "chave": "objetivo",
+          "rotulo": "Objetivo estratégico",
+          "tipo": "ligacao_secao",
+          "largura": "media",
+          "config": {
+            "secao": "petic_objetivo",
+            "multipla": false
+          },
+          "ajuda": "O objetivo que o indicador mede."
+        },
+        {
+          "chave": "formula",
+          "rotulo": "Fórmula de cálculo",
+          "tipo": "texto_longo",
+          "situacao": "opcional",
+          "largura": "larga",
+          "config": {
+            "max": 2000
+          }
+        },
+        {
+          "chave": "unidade",
+          "rotulo": "Unidade de medida",
+          "tipo": "texto_curto",
+          "situacao": "opcional",
+          "largura": "estreita",
+          "config": {
+            "max": 60
+          }
+        },
+        {
+          "chave": "linha_base",
+          "rotulo": "Linha de base",
+          "tipo": "numero",
+          "situacao": "opcional",
+          "largura": "estreita",
+          "ajuda": "O valor do indicador no começo do período."
+        },
+        {
+          "chave": "meta",
+          "rotulo": "Meta",
+          "tipo": "numero",
+          "situacao": "opcional",
+          "largura": "estreita",
+          "ajuda": "O valor que se quer alcançar até o prazo."
+        },
+        {
+          "chave": "prazo",
+          "rotulo": "Prazo da meta",
+          "tipo": "data",
+          "situacao": "opcional",
+          "largura": "estreita"
+        },
+        {
+          "chave": "fonte",
+          "rotulo": "Fonte dos dados",
+          "tipo": "texto_curto",
+          "situacao": "opcional",
+          "largura": "media",
+          "config": {
+            "max": 300
+          }
+        }
+      ]
+    },
+    {
+      "escopo": "petic",
+      "chave": "petic_iniciativa",
+      "titulo": "Iniciativas",
+      "tipo": "tabela",
+      "prefixo": "IN",
+      "situacao": "obrigatorio",
+      "ajuda": "O que será feito para alcançar os objetivos estratégicos.",
+      "campos": [
+        {
+          "chave": "descricao",
+          "rotulo": "Iniciativa",
+          "tipo": "texto_longo",
+          "principal": true,
+          "largura": "larga",
+          "config": {
+            "max": 2000
+          }
+        },
+        {
+          "chave": "objetivo",
+          "rotulo": "Objetivo estratégico",
+          "tipo": "ligacao_secao",
+          "largura": "media",
+          "config": {
+            "secao": "petic_objetivo",
+            "multipla": false
+          },
+          "ajuda": "O objetivo a que a iniciativa serve."
+        },
+        {
+          "chave": "responsavel",
+          "rotulo": "Responsável",
+          "tipo": "texto_curto",
+          "situacao": "opcional",
+          "largura": "media",
+          "config": {
+            "max": 200
+          }
+        },
+        {
+          "chave": "prazo",
+          "rotulo": "Prazo",
+          "tipo": "data",
+          "situacao": "opcional",
+          "largura": "estreita"
+        }
+      ]
+    },
+    {
+      "escopo": "petic",
+      "chave": "petic_eixo",
+      "titulo": "Eixos de governo",
+      "tipo": "tabela",
+      "prefixo": "EG",
+      "situacao": "opcional",
+      "ajuda": "Os eixos do plano de governo (por exemplo, os do Plano Plurianual, PPA) a que os órgãos ligam as necessidades dos PDTICs.",
+      "campos": [
+        {
+          "chave": "nome",
+          "rotulo": "Eixo",
+          "tipo": "texto_curto",
+          "principal": true,
+          "situacao": "obrigatorio",
+          "largura": "larga",
+          "config": {
+            "max": 300
+          }
         }
       ]
     }

@@ -117,4 +117,23 @@ public enum ErrorCode
     PeItemEmUso = 1023,                 // 409: item usado por um cálculo ou por uma ligação
     PeModeloIndisponivel = 1024,        // 409: modelo ainda não carregado (migration ou carregador pendente)
     PeConflitoGravacao = 1025,          // 409: outra pessoa gravou ao mesmo tempo
+    // Referenciais, registros, deliberações e planilhas (E3): faixa 1030 a 1049
+    PeRegistroNaoEncontrado = 1030,     // 404: registro inexistente (ou de outra seção ou dono)
+    PeRegistroInvalido = 1031,          // 400: validação dos campos; o corpo traz Campos { chave: mensagem }
+    PeRegistroDoSistema = 1032,         // 409: registro do sistema (princípios do art. 4º) não se edita nem se apaga
+    PeRegistroLigado = 1033,            // 409: registro ligado por outro não é apagado (a mensagem diz quem liga)
+    PeFormularioJaPreenchido = 1034,    // 409: POST num formulário que já tem registro (use PUT)
+    PeSecaoIndisponivel = 1035,         // 404: seção inexistente, de outro escopo, apagada ou desligada
+    PePeticNaoEncontrado = 1036,        // 404: versão do PETIC-DF inexistente
+    PeVersaoFechada = 1037,             // 409: versão fora do rascunho não é editada
+    PeVersaoEmAndamento = 1038,         // 409: já há versão em rascunho ou em deliberação
+    PePeticIncompleto = 1039,           // 400: envio ao CGTIC com pendências (a mensagem lista)
+    PeDeliberacaoNaoEncontrada = 1040,  // 404
+    PeDeliberacaoJaDecidida = 1041,     // 409: deliberação decidida não muda
+    PeDecisaoInvalida = 1042,           // 400: aprovado sem ato e data, devolvido sem observação, decisão fora do domínio
+    PeArquivoInvalido = 1043,           // 400: arquivo vazio, grande demais, extensão fora da lista ou conteúdo que não bate
+    PeArquivoNaoEncontrado = 1044,      // 404
+    PeCatalogoNaoEncontrado = 1045,     // 404: catálogo fora da lista
+    PePlanilhaInvalida = 1046,          // 400: formato fora de csv e xlsx (a completa só sai em xlsx)
+    PeVersaoJaEnviada = 1047,           // 409: versão que já foi ao CGTIC não é apagada
 }

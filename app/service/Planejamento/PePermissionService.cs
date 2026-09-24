@@ -111,6 +111,26 @@ public class PePermissionService : IPePermissionService
     public bool PodeVerOrgao(PeUserContext ctx, long orgaoId) =>
         VeTodosOsOrgaos(ctx) || EhDoOrgao(ctx, orgaoId);
 
+    // ── Referenciais (E3) ───────────────────────────────────────────────────
+
+    public bool PodeLerReferenciais(PeUserContext ctx) =>
+        ctx.EhAdminGeral || PapeisPlanejamento.EhValido(ctx.Papel);
+
+    public bool PodeVerVersaoPetic(PeUserContext ctx, string situacao) =>
+        ctx.EhAdminGeral || !PapeisPlanejamento.EhDeOrgao(ctx.Papel)
+        || situacao is Models.Planejamento.PeDominios.SituacaoPetic.Aprovado or Models.Planejamento.PeDominios.SituacaoPetic.Substituido;
+
+    public bool PodeEditarReferenciais(PeUserContext ctx) =>
+        ctx.EhAdminGeral || ctx.Papel == PapeisPlanejamento.Admin;
+
+    public bool PodeVerDeliberacoes(PeUserContext ctx) => VeTodosOsOrgaos(ctx);
+
+    public bool PodeDecidirDeliberacao(PeUserContext ctx) =>
+        ctx.EhAdminGeral || ctx.Papel == PapeisPlanejamento.Cgtic;
+
+    public bool PodeEnviarArquivo(PeUserContext ctx) =>
+        ctx.EhAdminGeral || ctx.Papel is PapeisPlanejamento.Admin or PapeisPlanejamento.Cgtic or PapeisPlanejamento.Orgao;
+
     public bool EhDoOrgao(PeUserContext ctx, long orgaoId) =>
         PapeisPlanejamento.EhDeOrgao(ctx.Papel) && ctx.OrgaoId == orgaoId;
 

@@ -148,7 +148,15 @@ builder.Services.AddScoped<IPePermissionService, service.Planejamento.PePermissi
 builder.Services.AddScoped<IPePessoaService, service.Planejamento.PePessoaService>();
 builder.Services.AddScoped<IPeModeloService, service.Planejamento.PeModeloService>();
 builder.Services.AddScoped<IPeOrgaoService, service.Planejamento.PeOrgaoService>();
-// Modelo inicial (trilha e campos do PDTIC): carregado ao subir, fora das requisições.
+// Referenciais e registros (E3): motor de registros, PETIC-DF, deliberações do CGTIC,
+// anexos e planilhas
+builder.Services.AddScoped<IPeRegistroService, service.Planejamento.PeRegistroService>();
+builder.Services.AddScoped<IPePeticService, service.Planejamento.PePeticService>();
+builder.Services.AddScoped<IPeDeliberacaoService, service.Planejamento.PeDeliberacaoService>();
+builder.Services.AddScoped<IPeArquivoService, service.Planejamento.PeArquivoService>();
+builder.Services.AddScoped<IPePlanilhaService, service.Planejamento.PePlanilhaService>();
+// Modelo inicial (trilha e campos do PDTIC, e os referenciais do DF e do PETIC-DF, com os
+// princípios do art. 4º): carregado ao subir, fora das requisições.
 // Sem as tabelas (intervalo entre o PR e a migration do merge) só registra no log e
 // tenta de novo mais tarde; o boot e os outros módulos seguem normais
 builder.Services.AddScoped<service.Planejamento.PeCarregadorModelo>();

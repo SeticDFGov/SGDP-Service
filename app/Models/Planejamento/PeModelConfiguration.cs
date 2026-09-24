@@ -71,6 +71,7 @@ public static class PeModelConfiguration
         });
 
         modelBuilder.ApplyPeModeloConfiguration();
+        modelBuilder.ApplyPeReferenciaisConfiguration();
     }
 
     // ── Modelo configurável e níveis de maturidade (E2) ──────────────────────
@@ -448,6 +449,233 @@ public static class PeModelConfiguration
             // Histórico de um item e o "o que mudou" geral, do mais novo para o mais antigo
             entity.HasIndex(h => new { h.Entidade, h.EntidadeId }).HasDatabaseName("ix_pe_modelo_historico_entidade");
             entity.HasIndex(h => h.AlteradoEm).HasDatabaseName("ix_pe_modelo_historico_data");
+        });
+    }
+
+    // ── Referenciais e registros (E3) ────────────────────────────────────────
+
+    // Código do registro: prefixo da seção (letra, depois letras ou números) + números
+    private const string CodigoRegistro = "^[A-Z][A-Z0-9]*[0-9]$";
+
+    private static void ApplyPeReferenciaisConfiguration(this ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PePetic>(entity =>
+        {
+            entity.ToTable("pe_petic", t =>
+            {
+                t.HasCheckConstraint("ck_pe_petic_situacao", EmLista("situacao", PeDominios.SituacaoPetic.Todas));
+                t.HasCheckConstraint("ck_pe_petic_versao", "versao ~ '^[0-9]+\\.[0-9]+$'");
+                t.HasCheckConstraint("ck_pe_petic_vigencia",
+                    "vigencia_inicio IS NULL OR vigencia_fim IS NULL OR vigencia_fim >= vigencia_inicio");
+                // Aprovada ou substituída tem a data da aprovação; rascunho e em deliberação, não
+                t.HasCheckConstraint("ck_pe_petic_aprovado_em",
+                    $"({EmLista("situacao", new[] { PeDominios.SituacaoPetic.Aprovado, PeDominios.SituacaoPetic.Substituido })}) = (aprovado_em IS NOT NULL)");
+            });
+
+            entity.HasKey(p => p.Id).HasName("pk_pe_petic");
+            entity.Property(p => p.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(p => p.Versao).HasColumnName("versao").HasMaxLength(10).IsRequired();
+            entity.Property(p => p.Titulo).HasColumnName("titulo").HasMaxLength(200).IsRequired();
+            entity.Property(p => p.VigenciaInicio).HasColumnName("vigencia_inicio");
+            entity.Property(p => p.VigenciaFim).HasColumnName("vigencia_fim");
+            // Token de concorrência: enviar, decidir, apagar e gravar um registro da versão
+            // ao mesmo tempo não passam os dois
+            entity.Property(p => p.Situacao).HasColumnName("situacao").HasMaxLength(20).IsRequired().IsConcurrencyToken();
+            entity.Property(p => p.AnteriorId).HasColumnName("anterior_id");
+            entity.Property(p => p.AprovadoEm).HasColumnName("aprovado_em");
+            Auditoria(entity);
+
+            entity.HasIndex(p => p.Versao).IsUnique().HasDatabaseName("ux_pe_petic_versao");
+            // Uma versão em rascunho, uma em deliberação e uma aprovada (a vigente), no máximo
+            entity.HasIndex(p => p.Situacao).IsUnique()
+                .HasFilter(EmLista("situacao", PeDominios.SituacaoPetic.Unicas))
+                .HasDatabaseName("ux_pe_petic_situacao");
+            entity.HasIndex(p => p.AnteriorId).HasDatabaseName("ix_pe_petic_anterior");
+
+            entity.HasOne(p => p.Anterior)
+                .WithMany()
+                .HasForeignKey(p => p.AnteriorId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_petic_anterior");
+        });
+
+        modelBuilder.Entity<PeDeliberacao>(entity =>
+        {
+            entity.ToTable("pe_deliberacao", t =>
+            {
+                t.HasCheckConstraint("ck_pe_deliberacao_objeto", EmLista("objeto_tipo", PeDominios.ObjetoDeliberacao.Todos));
+                t.HasCheckConstraint("ck_pe_deliberacao_situacao", EmLista("situacao", PeDominios.SituacaoDeliberacao.Todas));
+                // Decidida tem data e autor; aguardando, não
+                t.HasCheckConstraint("ck_pe_deliberacao_decisao",
+                    $"(situacao = '{PeDominios.SituacaoDeliberacao.Aguardando}') = (decidido_em IS NULL) AND (decidido_em IS NULL) = (decidido_por IS NULL)");
+                t.HasCheckConstraint("ck_pe_deliberacao_aprovado",
+                    $"situacao <> '{PeDominios.SituacaoDeliberacao.Aprovado}' OR (ato_numero IS NOT NULL AND ato_data IS NOT NULL)");
+                t.HasCheckConstraint("ck_pe_deliberacao_devolvido",
+                    $"situacao <> '{PeDominios.SituacaoDeliberacao.Devolvido}' OR observacao IS NOT NULL");
+            });
+
+            entity.HasKey(d => d.Id).HasName("pk_pe_deliberacao");
+            entity.Property(d => d.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(d => d.ObjetoTipo).HasColumnName("objeto_tipo").HasMaxLength(10).IsRequired();
+            entity.Property(d => d.ObjetoId).HasColumnName("objeto_id");
+            entity.Property(d => d.VersaoObjeto).HasColumnName("versao_objeto").HasMaxLength(20).IsRequired();
+            entity.Property(d => d.EnviadoEm).HasColumnName("enviado_em");
+            entity.Property(d => d.EnviadoPor).HasColumnName("enviado_por").HasMaxLength(200).IsRequired();
+            entity.Property(d => d.Situacao).HasColumnName("situacao").HasMaxLength(20).IsRequired().IsConcurrencyToken();
+            entity.Property(d => d.DecididoEm).HasColumnName("decidido_em");
+            entity.Property(d => d.DecididoPor).HasColumnName("decidido_por").HasMaxLength(200);
+            entity.Property(d => d.AtoTipo).HasColumnName("ato_tipo").HasMaxLength(60);
+            entity.Property(d => d.AtoNumero).HasColumnName("ato_numero").HasMaxLength(60);
+            entity.Property(d => d.AtoData).HasColumnName("ato_data");
+            entity.Property(d => d.Sei).HasColumnName("sei").HasMaxLength(40);
+            entity.Property(d => d.Observacao).HasColumnName("observacao").HasMaxLength(2000);
+            Auditoria(entity);
+
+            // Índices com nome no modelo: os dois primeiros têm as mesmas colunas
+            entity.HasIndex(d => new { d.ObjetoTipo, d.ObjetoId }, "ix_pe_deliberacao_objeto");
+            // Um envio aguardando por objeto (dois cliques em "enviar" não viram dois)
+            entity.HasIndex(d => new { d.ObjetoTipo, d.ObjetoId }, "ux_pe_deliberacao_aguardando").IsUnique()
+                .HasFilter($"situacao = '{PeDominios.SituacaoDeliberacao.Aguardando}'");
+            entity.HasIndex(d => new { d.Situacao, d.EnviadoEm }).HasDatabaseName("ix_pe_deliberacao_situacao");
+        });
+
+        modelBuilder.Entity<PeRegistro>(entity =>
+        {
+            entity.ToTable("pe_registro", t =>
+                t.HasCheckConstraint("ck_pe_registro_codigo", $"codigo IS NULL OR codigo ~ '{CodigoRegistro}'"));
+
+            entity.HasKey(r => r.Id).HasName("pk_pe_registro");
+            entity.Property(r => r.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(r => r.SecaoId).HasColumnName("secao_id");
+            entity.Property(r => r.PeticId).HasColumnName("petic_id");
+            entity.Property(r => r.Codigo).HasColumnName("codigo").HasMaxLength(20);
+            entity.Property(r => r.Ordem).HasColumnName("ordem");
+            entity.Property(r => r.Dados).HasColumnName("dados").HasColumnType("jsonb").IsRequired();
+            entity.Property(r => r.Sistema).HasColumnName("sistema");
+            Auditoria(entity);
+
+            // Registros de uma seção (catálogo do DF), na ordem
+            entity.HasIndex(r => new { r.SecaoId, r.Ordem }).HasDatabaseName("ix_pe_registro_secao");
+            // Código único na seção dentro da versão do PETIC-DF (linhas sem petic_id ou sem
+            // código não entram: NULL não repete). No catálogo do DF, quem garante é a
+            // sequência (pe_registro_sequencia)
+            entity.HasIndex(r => new { r.PeticId, r.SecaoId, r.Codigo }).IsUnique()
+                .HasDatabaseName("ux_pe_registro_petic_codigo");
+
+            // Seção não é apagada de verdade (exclusão lógica)
+            entity.HasOne(r => r.Secao)
+                .WithMany()
+                .HasForeignKey(r => r.SecaoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_registro_secao");
+
+            // Apagar um rascunho de PETIC (nunca enviado) leva os registros dele
+            entity.HasOne(r => r.Petic)
+                .WithMany()
+                .HasForeignKey(r => r.PeticId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_registro_petic");
+        });
+
+        modelBuilder.Entity<PeVinculo>(entity =>
+        {
+            entity.ToTable("pe_vinculo", t =>
+                t.HasCheckConstraint("ck_pe_vinculo_origem_destino", "registro_origem_id <> registro_destino_id"));
+
+            entity.HasKey(v => v.Id).HasName("pk_pe_vinculo");
+            entity.Property(v => v.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(v => v.RegistroOrigemId).HasColumnName("registro_origem_id");
+            entity.Property(v => v.CampoId).HasColumnName("campo_id");
+            entity.Property(v => v.RegistroDestinoId).HasColumnName("registro_destino_id");
+
+            entity.HasIndex(v => new { v.RegistroOrigemId, v.CampoId, v.RegistroDestinoId }).IsUnique()
+                .HasDatabaseName("ux_pe_vinculo");
+            // Quem liga este registro (para recusar apagar o que está ligado)
+            entity.HasIndex(v => v.RegistroDestinoId).HasDatabaseName("ix_pe_vinculo_destino");
+            entity.HasIndex(v => v.CampoId).HasDatabaseName("ix_pe_vinculo_campo");
+
+            // Apagar a origem apaga as ligações dela
+            entity.HasOne(v => v.RegistroOrigem)
+                .WithMany()
+                .HasForeignKey(v => v.RegistroOrigemId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_vinculo_origem");
+
+            // O destino ligado não é apagado. NO ACTION (e não RESTRICT) recusa do mesmo jeito,
+            // mas confere no fim do comando: apagar um rascunho inteiro em cascata não falha
+            // pela ordem em que as linhas saem
+            entity.HasOne(v => v.RegistroDestino)
+                .WithMany()
+                .HasForeignKey(v => v.RegistroDestinoId)
+                .OnDelete(DeleteBehavior.NoAction)
+                .HasConstraintName("fk_pe_vinculo_destino");
+
+            entity.HasOne(v => v.Campo)
+                .WithMany()
+                .HasForeignKey(v => v.CampoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_vinculo_campo");
+        });
+
+        modelBuilder.Entity<PeRegistroSequencia>(entity =>
+        {
+            entity.ToTable("pe_registro_sequencia", t =>
+            {
+                // "df", "petic:12" (a E4 usa "pdtic:ID")
+                t.HasCheckConstraint("ck_pe_registro_sequencia_dono", "dono ~ '^[a-z]+(:[0-9]+)?$'");
+                t.HasCheckConstraint("ck_pe_registro_sequencia_ultimo", "ultimo >= 0");
+            });
+
+            entity.HasKey(s => new { s.SecaoId, s.Dono }).HasName("pk_pe_registro_sequencia");
+            entity.Property(s => s.SecaoId).HasColumnName("secao_id");
+            entity.Property(s => s.Dono).HasColumnName("dono").HasMaxLength(30);
+            // Token de concorrência: duas inclusões ao mesmo tempo não dão o mesmo código
+            entity.Property(s => s.Ultimo).HasColumnName("ultimo").IsConcurrencyToken();
+
+            entity.HasOne(s => s.Secao)
+                .WithMany()
+                .HasForeignKey(s => s.SecaoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_registro_sequencia_secao");
+        });
+
+        modelBuilder.Entity<PeArquivo>(entity =>
+        {
+            entity.ToTable("pe_arquivo", t =>
+            {
+                t.HasCheckConstraint("ck_pe_arquivo_dono_tipo",
+                    $"dono_tipo IS NULL OR {EmLista("dono_tipo", PeDominios.DonoArquivo.Todos)}");
+                t.HasCheckConstraint("ck_pe_arquivo_dono", "(dono_tipo IS NULL) = (dono_id IS NULL)");
+                t.HasCheckConstraint("ck_pe_arquivo_tamanho", "tamanho > 0");
+                // O binário mora na mesma linha (table splitting deixa a coluna anulável no
+                // banco): sempre presente e do tamanho registrado
+                t.HasCheckConstraint("ck_pe_arquivo_conteudo", "conteudo IS NOT NULL AND octet_length(conteudo) = tamanho");
+            });
+
+            entity.HasKey(a => a.Id).HasName("pk_pe_arquivo");
+            entity.Property(a => a.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(a => a.Nome).HasColumnName("nome").HasMaxLength(200).IsRequired();
+            entity.Property(a => a.TipoMime).HasColumnName("tipo_mime").HasMaxLength(100).IsRequired();
+            entity.Property(a => a.Tamanho).HasColumnName("tamanho");
+            entity.Property(a => a.Hash).HasColumnName("hash").HasMaxLength(64).IsRequired();
+            entity.Property(a => a.DonoTipo).HasColumnName("dono_tipo").HasMaxLength(20);
+            entity.Property(a => a.DonoId).HasColumnName("dono_id");
+            Auditoria(entity);
+
+            entity.HasIndex(a => new { a.DonoTipo, a.DonoId }).HasDatabaseName("ix_pe_arquivo_dono");
+        });
+
+        // O binário na mesma tabela (table splitting): só o download o seleciona
+        modelBuilder.Entity<PeArquivoConteudo>(entity =>
+        {
+            entity.ToTable("pe_arquivo");
+            entity.HasKey(c => c.Id).HasName("pk_pe_arquivo");
+            entity.Property(c => c.Id).HasColumnName("id");
+            entity.Property(c => c.Conteudo).HasColumnName("conteudo").IsRequired();
+
+            entity.HasOne(c => c.Arquivo)
+                .WithOne()
+                .HasForeignKey<PeArquivoConteudo>(c => c.Id);
         });
     }
 }

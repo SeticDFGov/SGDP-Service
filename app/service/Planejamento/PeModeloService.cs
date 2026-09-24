@@ -20,9 +20,12 @@ namespace service.Planejamento;
 /// e mudar de situação, mas não muda de tipo nem de chave e não é apagado;</item>
 /// <item>item criado pelo administrador é apagado de forma lógica (os dados ficam
 /// guardados); chave única (a do campo, dentro da seção, inclusive entre os apagados);</item>
-/// <item>opção do sistema ou em uso só é desativada; opção travada nem isso;</item>
+/// <item>opção do sistema ou em uso (na matriz do nível de risco ou guardada num registro)
+/// só é desativada; opção travada nem isso;</item>
 /// <item>campo usado num cálculo e seção alvo de uma ligação não somem nem mudam de chave
 /// ou de tipo;</item>
+/// <item>com dados gravados (E3), o campo não muda de chave nem de tipo (nem de seção ou
+/// catálogo ligado, se é ligação) e a seção com registros não muda de chave nem de tipo;</item>
 /// <item>toda mudança grava o antes e o depois em pe_modelo_historico.</item>
 /// </list>
 /// Itens criados nascem desligados em todos os níveis, menos o passo, que nasce opcional
@@ -482,6 +485,11 @@ public class PeModeloService : IPeModeloService
             var ligacoes = await LigacoesParaAsync(secao.Chave);
             if (ligacoes.Count > 0 && (mudaChave || dto.Tipo!.Trim() != PeDominios.TipoSecao.Tabela))
                 throw EmUso($"Esta seção é ligada pelo campo \"{ligacoes[0].Rotulo}\". Tire a ligação antes de mudar a chave ou o tipo.");
+            // Com registros gravados, a chave e o tipo não mudam mais (E3)
+            var registros = await _context.PeRegistros.CountAsync(r => r.SecaoId == id);
+            if (registros > 0)
+                throw EmUso($"Esta seção já tem {Registros(registros)} gravado{(registros == 1 ? "" : "s")}: a chave e o tipo não mudam mais. "
+                            + "Se precisar, crie outra seção.");
         }
         if (mudaTipo) secao.Tipo = Dominio(dto.Tipo, PeDominios.TipoSecao.Todos, "o tipo da seção (formulario ou tabela)");
         if (mudaChave)
@@ -650,7 +658,13 @@ public class PeModeloService : IPeModeloService
             var calculos = CalculosQueUsam(irmaos, campo.Chave);
             if (calculos.Count > 0)
                 throw EmUso($"Este campo entra no cálculo \"{calculos[0].Rotulo}\". Tire-o do cálculo antes de mudar a chave ou o tipo.");
+            // Com valor gravado em algum registro, a chave e o tipo não mudam mais (E3)
+            var comValor = await RegistrosComValorAsync(campo);
+            if (comValor > 0)
+                throw EmUso($"Este campo já tem dados em {Registros(comValor)}: a chave e o tipo não mudam mais. "
+                            + "Se precisar, crie outro campo.");
         }
+        var alvoAntes = AlvoDaLigacao(campo.Tipo, campo.Config);
         if (mudaTipo) Dominio(novoTipo, PeDominios.TipoCampo.Todos, "o tipo do campo");
         if (mudaChave)
         {
@@ -667,7 +681,14 @@ public class PeModeloService : IPeModeloService
         {
             JsonElement? config = dto.Informou(nameof(dto.Config)) ? dto.Config : PeModeloDados.Json(campo.Config);
             var opcoes = await _context.PeOpcoes.AsNoTracking().Where(o => o.CampoId == id).Select(o => o.Valor).ToListAsync();
-            campo.Config = PeConfigCampo.Normalizar(novoTipo, config, await ContextoConfigAsync(secao, campo.Chave, irmaos, opcoes));
+            var novoConfig = PeConfigCampo.Normalizar(novoTipo, config, await ContextoConfigAsync(secao, campo.Chave, irmaos, opcoes));
+
+            // Ligação com ligações gravadas não troca a seção nem o catálogo que liga (E3)
+            if (!mudaTipo && alvoAntes != null && AlvoDaLigacao(novoTipo, novoConfig) != alvoAntes
+                && await _context.PeVinculos.AnyAsync(v => v.CampoId == id))
+                throw EmUso("Este campo já tem ligações gravadas: a seção ou o catálogo que ele liga não muda mais. "
+                            + "Se precisar, crie outro campo.");
+            campo.Config = novoConfig;
         }
         campo.Tipo = novoTipo;
 
@@ -905,19 +926,59 @@ public class PeModeloService : IPeModeloService
     }
 
     /// <summary>
-    /// A opção está em uso quando aparece na matriz de um nível de risco da mesma seção.
-    /// A partir da E3, também quando algum registro a guarda (o motor de registros acrescenta
-    /// essa conferência aqui).
+    /// A opção está em uso quando aparece na matriz de um nível de risco da mesma seção ou
+    /// quando algum registro a guarda no campo (lista, lista múltipla ou o resultado do nível
+    /// de risco), de qualquer dono.
     /// </summary>
     private async Task<bool> OpcaoEmUsoAsync(PeOpcao opcao, PeCampo campo)
     {
         var calculos = await _context.PeCampos.AsNoTracking()
             .Where(c => c.SecaoId == campo.SecaoId && c.ExcluidoEm == null && c.Tipo == PeDominios.TipoCampo.Calculado)
             .ToListAsync();
-        return calculos.Any(c => PeConfigCampo.TipoDoCalculo(c.Config) == PeDominios.Calculo.NivelRisco
-                                 && (c.Id == campo.Id || PeConfigCampo.CamposDoCalculo(c.Config).Contains(campo.Chave))
-                                 && PeConfigCampo.ValoresDaMatriz(c.Config).Contains(opcao.Valor));
+        if (calculos.Any(c => PeConfigCampo.TipoDoCalculo(c.Config) == PeDominios.Calculo.NivelRisco
+                              && (c.Id == campo.Id || PeConfigCampo.CamposDoCalculo(c.Config).Contains(campo.Chave))
+                              && PeConfigCampo.ValoresDaMatriz(c.Config).Contains(opcao.Valor)))
+            return true;
+
+        var dados = await _context.PeRegistros.AsNoTracking()
+            .Where(r => r.SecaoId == campo.SecaoId)
+            .Select(r => r.Dados)
+            .ToListAsync();
+        return dados.Any(d =>
+        {
+            var valor = PeRegistroDados.Ler(d)[campo.Chave];
+            return campo.Tipo == PeDominios.TipoCampo.ListaMultipla
+                ? PeRegistroDados.Textos(valor).Contains(opcao.Valor)
+                : PeRegistroDados.Texto(valor) == opcao.Valor;
+        });
     }
+
+    /// <summary>
+    /// Em quantos registros (de qualquer dono) o campo tem valor: no jsonb, ou, no campo de
+    /// ligação, nas ligações gravadas.
+    /// </summary>
+    private async Task<int> RegistrosComValorAsync(PeCampo campo)
+    {
+        if (PeRegistroDados.EhLigacao(campo))
+            return await _context.PeVinculos.Where(v => v.CampoId == campo.Id)
+                .Select(v => v.RegistroOrigemId).Distinct().CountAsync();
+
+        var dados = await _context.PeRegistros.AsNoTracking()
+            .Where(r => r.SecaoId == campo.SecaoId)
+            .Select(r => r.Dados)
+            .ToListAsync();
+        return dados.Count(d => PeRegistroDados.TemValor(d, campo.Chave));
+    }
+
+    /// <summary>A seção ou o catálogo que um campo de ligação liga (nulo nos outros tipos).</summary>
+    private static string? AlvoDaLigacao(string tipo, string config) => tipo switch
+    {
+        PeDominios.TipoCampo.LigacaoSecao => "secao:" + PeConfigCampo.SecaoDaLigacao(config),
+        PeDominios.TipoCampo.LigacaoCatalogo => "catalogo:" + PeValores.Texto(config, "catalogo"),
+        _ => null
+    };
+
+    private static string Registros(int quantidade) => quantidade == 1 ? "1 registro" : $"{quantidade} registros";
 
     private async Task<PeContextoConfig> ContextoConfigAsync(PeSecao secao, string chaveDoCampo, IEnumerable<PeCampo> irmaos,
         IReadOnlyList<string> opcoesDoCampo)

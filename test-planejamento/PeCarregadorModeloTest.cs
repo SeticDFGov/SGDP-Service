@@ -94,9 +94,10 @@ public class PeCarregadorModeloTest : PeModeloTestBase
         Assert.Equal(new[] { 10, 12, 13, 6, 2, 3, 4 }, etapas.Select(e => Context.PePassos.Count(p => p.EtapaId == e.Id)));
 
         Assert.Equal(50, Context.PePassos.Count());
-        Assert.Equal(68, Context.PeSecoes.Count());
-        Assert.Equal(345, Context.PeCampos.Count());
-        Assert.Equal(262, Context.PeOpcoes.Count());
+        // Do PDTIC; as seções do DF e do PETIC-DF (versão 2) têm teste próprio no PeReferenciaisCargaTest
+        Assert.Equal(68, Context.PeSecoes.Count(s => s.Escopo == PeDominios.Escopo.Pdtic));
+        Assert.Equal(345, Context.PeCampos.Count(c => c.Secao!.Escopo == PeDominios.Escopo.Pdtic));
+        Assert.Equal(262, Context.PeOpcoes.Count(o => o.Campo!.Secao!.Escopo == PeDominios.Escopo.Pdtic));
         Assert.All(Context.PePassos.ToList(), p => Assert.True(p.Sistema));
         Assert.All(Context.PeCampos.ToList(), c => Assert.True(c.Sistema));
 
@@ -272,7 +273,7 @@ public class PeCarregadorModeloTest : PeModeloTestBase
     [Fact]
     public void Configuracoes_VersaoDoModeloEPeriodicidadeTrimestral()
     {
-        Assert.Equal("1", Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChaveVersaoModelo).Valor);
+        Assert.Equal("2", Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChaveVersaoModelo).Valor);
         Assert.Equal("\"trimestral\"",
             Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChavePeriodicidadeMonitoramento).Valor);
     }
@@ -286,7 +287,7 @@ public class PeCarregadorModeloTest : PeModeloTestBase
 
         Assert.DoesNotContain('\u2014', texto);
         Assert.DoesNotContain('\u2013', texto);
-        Assert.Equal(1, PeCarregadorModelo.LerSeed(texto).Versao);
+        Assert.Equal(2, PeCarregadorModelo.LerSeed(texto).Versao);
     }
 
     // ── Idempotência e "nunca sobrescreve" ────────────────────────────────────
@@ -297,9 +298,10 @@ public class PeCarregadorModeloTest : PeModeloTestBase
         var resultado = await new PeCarregadorModelo(Context).CarregarAsync();
 
         Assert.False(resultado.Executou);
-        Assert.Equal(1, resultado.VersaoAnterior);
+        Assert.Equal(2, resultado.VersaoAnterior);
         Assert.Equal(50, Context.PePassos.Count());
-        Assert.Equal(345, Context.PeCampos.Count());
+        // 345 do PDTIC e 33 do DF e do PETIC-DF (versão 2)
+        Assert.Equal(378, Context.PeCampos.Count());
         Assert.Equal(3, Context.PeNiveis.Count());
     }
 
@@ -316,9 +318,9 @@ public class PeCarregadorModeloTest : PeModeloTestBase
         await Modelo.AtualizarOpcaoAsync(Opcao("ativos", "tipo", "licenca").Id,
             new api.Planejamento.PeOpcaoAtualizarDTO { Ativa = false, Informados = new HashSet<string> { "Ativa" } }, EmailAdmin);
 
-        // A versão 2 do JSON traz um campo novo numa seção que já existe
+        // A versão seguinte do JSON traz um campo novo numa seção que já existe
         var seed = PeCarregadorModelo.LerSeed();
-        seed.Versao = 2;
+        seed.Versao++;
         var ativos = seed.Etapas.SelectMany(e => e.Passos).SelectMany(p => p.Secoes).Single(s => s.Chave == "ativos");
         ativos.Campos.Add(new PeSeedCampo { Chave = "fornecedor", Rotulo = "Fornecedor", Tipo = PeDominios.TipoCampo.TextoCurto });
 
@@ -328,7 +330,7 @@ public class PeCarregadorModeloTest : PeModeloTestBase
         Assert.Equal(1, resultado.Campos);
         Assert.Equal(0, resultado.Passos + resultado.Secoes + resultado.Niveis + resultado.Etapas);
         Assert.Equal("o o o", SituacoesDoCampo("ativos", "fornecedor"));
-        Assert.Equal("2", Context.PeConfiguracoes.AsNoTracking().Single(c => c.Chave == PeConfiguracao.ChaveVersaoModelo).Valor);
+        Assert.Equal(seed.Versao.ToString(), Context.PeConfiguracoes.AsNoTracking().Single(c => c.Chave == PeConfiguracao.ChaveVersaoModelo).Valor);
 
         // Nada do que o administrador mudou voltou atrás
         Assert.Equal("Defina os nomes usados pelo órgão", Passo("preparacao.nomes").Titulo);

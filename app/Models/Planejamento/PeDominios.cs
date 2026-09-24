@@ -150,6 +150,86 @@ public static class PeDominios
         public const string PgiaSistema = "pgia_sistema";
 
         public static readonly string[] Todos = { PeticObjetivo, PeticEixo, Principio, PgiaSistema };
+
+        /// <summary>
+        /// Catálogos feitos de registros (E3): a chave da seção de onde saem os itens. Os dois
+        /// do PETIC-DF leem a versão vigente; o de princípios lê o catálogo do DF. O
+        /// pgia_sistema não é feito de registros (chega com o PDTIC, na E4).
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, string> SecaoDoCatalogo = new Dictionary<string, string>
+        {
+            [PeticObjetivo] = "petic_objetivo",
+            [PeticEixo] = "petic_eixo",
+            [Principio] = "principio"
+        };
+
+        /// <summary>Catálogo que sai do PETIC-DF vigente (sem vigente, a ligação fica opcional).</summary>
+        public static bool DoPetic(string? catalogo) => catalogo is PeticObjetivo or PeticEixo;
+    }
+
+    // ── Referenciais e registros (E3) ──────────────────────────────────────────
+
+    /// <summary>
+    /// Situação de uma versão do PETIC-DF (pe_petic.situacao). Uma versão em rascunho (ou em
+    /// deliberação) por vez e uma aprovada (a vigente); aprovar uma nova marca a anterior
+    /// como substituída.
+    /// </summary>
+    public static class SituacaoPetic
+    {
+        public const string Rascunho = "rascunho";
+        public const string EmDeliberacao = "em_deliberacao";
+        public const string Aprovado = "aprovado";
+        public const string Substituido = "substituido";
+
+        public static readonly string[] Todas = { Rascunho, EmDeliberacao, Aprovado, Substituido };
+
+        // No máximo uma versão em cada uma destas (índice único parcial)
+        public static readonly string[] Unicas = { Rascunho, EmDeliberacao, Aprovado };
+    }
+
+    /// <summary>O que o CGTIC delibera (pe_deliberacao.objeto_tipo). O PDTIC chega na E7.</summary>
+    public static class ObjetoDeliberacao
+    {
+        public const string Petic = "petic";
+        public const string Pdtic = "pdtic";
+
+        public static readonly string[] Todos = { Petic, Pdtic };
+    }
+
+    /// <summary>Situação de uma deliberação do CGTIC (pe_deliberacao.situacao).</summary>
+    public static class SituacaoDeliberacao
+    {
+        public const string Aguardando = "aguardando";
+        public const string Aprovado = "aprovado";
+        public const string Devolvido = "devolvido";
+
+        public static readonly string[] Todas = { Aguardando, Aprovado, Devolvido };
+
+        // O que a Secretaria do CGTIC registra
+        public static readonly string[] Decisoes = { Aprovado, Devolvido };
+    }
+
+    /// <summary>
+    /// Dono dos registros: o catálogo do DF (escopo df, sem dono) ou uma versão do PETIC-DF
+    /// (escopo petic). A E4 acrescenta o PDTIC de cada órgão.
+    /// </summary>
+    public static class DonoRegistro
+    {
+        public const string Df = "df";
+        public const string Petic = "petic";
+
+        public static readonly string[] Todos = { Df, Petic };
+    }
+
+    /// <summary>
+    /// Dono de um arquivo (pe_arquivo.dono_tipo): o registro cujo campo aponta para ele.
+    /// Nulo = recém-enviado, ainda sem dono (só quem enviou vê).
+    /// </summary>
+    public static class DonoArquivo
+    {
+        public const string Registro = "registro";
+
+        public static readonly string[] Todos = { Registro };
     }
 
     /// <summary>Largura da coluna do campo nas tabelas.</summary>

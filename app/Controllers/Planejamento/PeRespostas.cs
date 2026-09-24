@@ -13,7 +13,9 @@ namespace Controllers.Planejamento;
 /// <list type="bullet">
 /// <item>ApiException: pelo código (404 para "não encontrado", 403 para permissão, 409 para
 /// travado, do sistema, chave repetida, nível inativo, em uso, apagado, modelo
-/// indisponível e conflito; 400 para o resto);</item>
+/// indisponível, conflito, registro ligado ou do sistema, versão fechada ou já enviada e
+/// deliberação decidida; 400 para o resto). A validação de registro (PeValidacaoException)
+/// leva também Campos, com a mensagem de cada campo;</item>
 /// <item>tabela pe_ que ainda não existe (o PR publica o código antes da migration, que só
 /// roda no merge): 409 PeModeloIndisponivel, com mensagem para tentar de novo;</item>
 /// <item>DbUpdateException (duas pessoas gravando o mesmo item ao mesmo tempo): 409
@@ -49,13 +51,21 @@ internal static class PeRespostas
         var status = (ErrorCode)ex.Error.Code switch
         {
             ErrorCode.PeUsuarioNaoEncontrado or ErrorCode.PeItemNaoEncontrado or ErrorCode.PeOrgaoNaoEncontrado
-                or ErrorCode.AcessoUsuarioNaoEncontrado => StatusCodes.Status404NotFound,
+                or ErrorCode.AcessoUsuarioNaoEncontrado or ErrorCode.PeRegistroNaoEncontrado or ErrorCode.PeSecaoIndisponivel
+                or ErrorCode.PePeticNaoEncontrado or ErrorCode.PeDeliberacaoNaoEncontrada or ErrorCode.PeArquivoNaoEncontrado
+                or ErrorCode.PeCatalogoNaoEncontrado => StatusCodes.Status404NotFound,
             ErrorCode.PeSemPermissao => StatusCodes.Status403Forbidden,
             ErrorCode.PeAutoRebaixamento or ErrorCode.PeItemTravado or ErrorCode.PeItemDoSistema or ErrorCode.PeChaveDuplicada
                 or ErrorCode.PeNivelInativo or ErrorCode.PeUltimoNivelAtivo or ErrorCode.PeItemExcluido or ErrorCode.PeItemEmUso
-                or ErrorCode.PeModeloIndisponivel or ErrorCode.PeConflitoGravacao => StatusCodes.Status409Conflict,
+                or ErrorCode.PeModeloIndisponivel or ErrorCode.PeConflitoGravacao or ErrorCode.PeRegistroDoSistema
+                or ErrorCode.PeRegistroLigado or ErrorCode.PeFormularioJaPreenchido or ErrorCode.PeVersaoFechada
+                or ErrorCode.PeVersaoEmAndamento or ErrorCode.PeDeliberacaoJaDecidida
+                or ErrorCode.PeVersaoJaEnviada => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
+        // Validação de registro: a mensagem de cada campo, pela chave
+        if (ex is PeValidacaoException validacao)
+            return new ObjectResult(new { ex.Error.Code, ex.Error.Message, validacao.Campos }) { StatusCode = status };
         return new ObjectResult(new { ex.Error.Code, ex.Error.Message }) { StatusCode = status };
     }
 

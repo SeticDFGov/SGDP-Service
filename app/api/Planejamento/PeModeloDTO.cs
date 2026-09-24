@@ -357,6 +357,7 @@ public abstract class PeCorpoParcial
     {
         if (corpo.ValueKind != JsonValueKind.Object)
             throw new ApiException(ErrorCode.PeDadosInvalidos, "Envie os dados como um objeto JSON.");
+        PeCorpo.ConferirTexto(corpo);
 
         T? dto;
         try

@@ -632,7 +632,11 @@ public class PeModeloServiceTest : PeModeloTestBase
 
         Assert.Equal(3, modelo.Niveis.Count);
         Assert.Equal(7, modelo.Etapas.Count);
-        Assert.Empty(modelo.SecoesForaDoPdtic);
+        // Desde a versão 2 do modelo inicial (E3): as 2 seções do catálogo do DF e as 8 do PETIC-DF
+        Assert.Equal(new[] { "principio", "diretriz_ciclo", "petic_identidade", "petic_diretriz", "petic_objetivo_programa",
+                "petic_objetivo", "petic_prioridade", "petic_indicador", "petic_iniciativa", "petic_eixo" },
+            modelo.SecoesForaDoPdtic.Select(s => s.Chave));
+        Assert.All(modelo.SecoesForaDoPdtic, s => Assert.Empty(s.Niveis));
         var passo = modelo.Etapas[0].Passos[0];
         Assert.Equal(3, passo.Niveis.Count);
         Assert.All(passo.Niveis.Keys, k => Assert.True(long.TryParse(k, out _)));

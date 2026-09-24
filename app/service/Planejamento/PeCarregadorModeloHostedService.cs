@@ -59,9 +59,10 @@ public sealed class PeCarregadorModeloHostedService : BackgroundService
             if (resultado.Executou)
                 _logger.LogInformation(
                     "Governança Estratégica: modelo inicial versão {Versao} carregado (antes: {Anterior}). Novos: {Niveis} níveis, "
-                    + "{Etapas} etapas, {Passos} passos, {Secoes} seções, {Campos} campos, {Opcoes} opções, {Configuracoes} configurações.",
+                    + "{Etapas} etapas, {Passos} passos, {Secoes} seções, {Campos} campos, {Opcoes} opções, {Configuracoes} configurações, "
+                    + "{Registros} registros do sistema.",
                     resultado.Versao, resultado.VersaoAnterior, resultado.Niveis, resultado.Etapas, resultado.Passos,
-                    resultado.Secoes, resultado.Campos, resultado.Opcoes, resultado.Configuracoes);
+                    resultado.Secoes, resultado.Campos, resultado.Opcoes, resultado.Configuracoes, resultado.Registros);
             return true;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -70,8 +71,9 @@ public sealed class PeCarregadorModeloHostedService : BackgroundService
         }
         catch (Exception ex) when (PeBanco.TabelaAusente(ex))
         {
+            // Nada foi gravado (uma transação só): a versão anterior do modelo continua valendo
             _logger.LogWarning(
-                "Governança Estratégica: as tabelas do modelo ainda não existem (migration PeModeloConfiguravel pendente). "
+                "Governança Estratégica: as tabelas do módulo ainda não existem (migration pendente). "
                 + "O carregador tenta de novo mais tarde; o resto da API segue normal.");
             return false;
         }
