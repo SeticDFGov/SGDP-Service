@@ -68,6 +68,20 @@ public class PePdticResponse
     public PePdticRevisaoResponse? Revisao { get; set; }
 }
 
+/// <summary>
+/// Um item da lista dos PDTICs dos órgãos (GET pdtic, F3): o PDTIC com o nível que aquela versão
+/// alcançou, pela régua do nível alcançado (a mesma da situação, da conformidade e do painel),
+/// nos dois modos dos níveis. Os dois campos vêm nulos quando a versão não alcança nível nenhum
+/// e no PDTIC registrado fora do sistema (que não é calculado). Só a lista os traz: as respostas
+/// de um PDTIC continuam com o nível do órgão (NivelId e NivelNome).
+/// </summary>
+public class PePdticListaItemResponse : PePdticResponse
+{
+    public long? NivelAlcancadoId { get; set; }
+
+    public string? NivelAlcancadoNome { get; set; }
+}
+
 /// <summary>A versão que a revisão reviu (a vigente quando a revisão foi aberta).</summary>
 public class PePdticRevisaoResponse
 {

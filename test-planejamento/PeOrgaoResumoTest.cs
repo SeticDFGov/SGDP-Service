@@ -40,9 +40,12 @@ public class PeOrgaoResumoTest : PePaineisTestBase
         Assert.Equal((pdtic.Id, "em_elaboracao"), (resumo.Pdtic!.Id, resumo.Pdtic.Situacao));
         Assert.Single(resumo.Versoes);
 
-        // Básico: 6 etapas; a etapa 1 feita (a equipe como "não se aplica"); a 2 com os ativos em atenção
+        // Básico: 6 etapas; a etapa 1 com os 6 obrigatórios feitos (F3: a equipe, opcional pelo ajuste e
+        // marcada como "não se aplica", fica fora da conta dos obrigatórios e dos opcionais feitos); a
+        // 2 com os ativos em atenção
         Assert.Equal(new[] { 1, 2, 3, 4, 5, 6 }, resumo.Andamento.Select(e => e.Etapa));
-        Assert.Equal(("Prepare o PDTIC", 7, 7), (resumo.Andamento[0].Titulo, resumo.Andamento[0].Feitos, resumo.Andamento[0].Total));
+        Assert.Equal(("Prepare o PDTIC", 6, 6, 0), (resumo.Andamento[0].Titulo, resumo.Andamento[0].Feitos, resumo.Andamento[0].Total,
+            resumo.Andamento[0].OpcionaisFeitos));
         Assert.Equal((3, 4), (resumo.Andamento[1].Feitos, resumo.Andamento[1].Total));
         // Etapa 3: o envio e a deliberação pendentes; a publicação aguardando a aprovação
         Assert.Equal((5, 8, 0, 1), (resumo.Andamento[2].Feitos, resumo.Andamento[2].Total, resumo.Andamento[2].Atrasados, resumo.Andamento[2].Aguardando));

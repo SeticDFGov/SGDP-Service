@@ -621,11 +621,17 @@ public class PeOrgaoAndamentoResponse
 
     public string Titulo { get; set; } = string.Empty;
 
-    // Feitos, feitos fora do sistema e "não se aplica"
+    // Desde a F3, só os passos obrigatórios para o órgão, sem os contínuos (como o andamento da
+    // visão geral), nos dois modos: os feitos, os feitos fora do sistema e os "não se aplica"
     public int Feitos { get; set; }
 
+    // Os passos obrigatórios da etapa, sem os contínuos (F3)
     public int Total { get; set; }
 
+    // F3: os passos opcionais da etapa feitos (no sistema ou fora dele), sem os contínuos
+    public int OpcionaisFeitos { get; set; }
+
+    // Atrasados, Aguardando e Validados contam todos os passos da etapa
     public int Atrasados { get; set; }
 
     public int Aguardando { get; set; }

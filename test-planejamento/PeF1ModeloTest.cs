@@ -231,7 +231,9 @@ public class PeF1ModeloTest : PeReferenciaisTestBase
     {
         var passo = Passo("monitoramento.ciclo-monitoramento");
         Assert.Equal("Atualize a situação das ações no ciclo", passo.Titulo);
-        Assert.StartsWith("A cada ciclo, atualize a situação de cada ação. Conforme o nível do órgão", passo.OQueFazer);
+        // F3: na linguagem das formas, que vale nos dois modos dos níveis
+        Assert.StartsWith("A cada ciclo, atualize a situação de cada ação. Na forma do nível Básico, o mínimo do decreto, basta a situação;",
+            passo.OQueFazer);
         // A observação da grade continua opcional no Básico
         Assert.Equal("p p p", SituacoesDoCampo("monitoramento_acoes", "observacao"));
     }

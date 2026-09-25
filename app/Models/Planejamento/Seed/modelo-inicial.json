@@ -272,7 +272,7 @@
               "titulo": "Equipe de elaboração",
               "tipo": "tabela",
               "niveis": "obrigatorio",
-              "ajuda": "O guia pede uma equipe que não seja só de TIC: pessoas das áreas finalísticas ajudam a entender o negócio. No nível Básico, basta a lista de nomes.",
+              "ajuda": "O guia pede uma equipe que não seja só de TIC: pessoas das áreas finalísticas ajudam a entender o negócio. Na forma do nível Básico, o mínimo do decreto, basta a lista de nomes.",
               "campos": [
                 {"chave": "nome", "rotulo": "Nome", "tipo": "texto_curto", "principal": true, "largura": "larga"},
                 {
@@ -371,7 +371,7 @@
               "titulo": "Metodologia de elaboração",
               "tipo": "formulario",
               "niveis": "obrigatorio",
-              "ajuda": "Diga qual metodologia o órgão segue. No nível Básico, use o guia como está.",
+              "ajuda": "Diga qual metodologia o órgão segue. Na forma do nível Básico, o mínimo do decreto, use o guia como está.",
               "campos": [
                 {
                   "chave": "metodologia_adotada",
@@ -497,7 +497,7 @@
                   "principal": true,
                   "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
                   "config": {"catalogo": "petic_objetivo", "multipla": true},
-                  "ajuda": "Obrigatório nos níveis Intermediário e Avançado, quando há PETIC-DF vigente."
+                  "ajuda": "Obrigatório nas formas dos níveis Intermediário e Avançado, quando há PETIC-DF vigente."
                 }
               ]
             },
@@ -978,7 +978,7 @@
               "travada": true,
               "inciso": "II",
               "niveis": "obrigatorio",
-              "ajuda": "O inventário das soluções e dos ativos de TIC é um dos nove conteúdos mínimos do PDTIC (art. 12, § 2º, II). No nível Básico, bastam o nome, o tipo e a situação.",
+              "ajuda": "O inventário das soluções e dos ativos de TIC é um dos nove conteúdos mínimos do PDTIC (art. 12, § 2º, II). Na forma do nível Básico, o mínimo do decreto, bastam o nome, o tipo e a situação.",
               "campos": [
                 {"chave": "nome", "rotulo": "Nome", "tipo": "texto_curto", "principal": true, "largura": "larga"},
                 {
@@ -1293,7 +1293,7 @@
               "travada": true,
               "inciso": "III",
               "niveis": "obrigatorio",
-              "ajuda": "As necessidades de infraestrutura, sistemas e serviços são um dos nove conteúdos mínimos do PDTIC (art. 12, § 2º, III). O modelo está no Anexo VI do guia. No nível Básico, bastam a descrição, o tipo, o objetivo do PETIC-DF e a prioridade alta, média ou baixa.",
+              "ajuda": "As necessidades de infraestrutura, sistemas e serviços são um dos nove conteúdos mínimos do PDTIC (art. 12, § 2º, III). O modelo está no Anexo VI do guia. Na forma do nível Básico, o mínimo do decreto, bastam a descrição, o tipo, o objetivo do PETIC-DF e a prioridade alta, média ou baixa.",
               "campos": [
                 {"chave": "descricao", "rotulo": "Necessidade", "tipo": "texto_longo", "principal": true, "largura": "larga"},
                 {
@@ -1366,7 +1366,7 @@
                   "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
                   "largura": "media",
                   "config": {"catalogo": "petic_objetivo", "multipla": false},
-                  "ajuda": "Obrigatório nos níveis Intermediário e Avançado, quando há PETIC-DF vigente."
+                  "ajuda": "Obrigatório nas formas dos níveis Intermediário e Avançado, quando há PETIC-DF vigente."
                 },
                 {
                   "chave": "eixo",
@@ -1389,7 +1389,7 @@
                   "tipo": "lista",
                   "niveis": {"basico": "obrigatorio", "intermediario": "desligado", "avancado": "desligado"},
                   "largura": "estreita",
-                  "ajuda": "No nível Básico, diga só se a prioridade é alta, média ou baixa.",
+                  "ajuda": "Na forma do nível Básico, diga só se a prioridade é alta, média ou baixa.",
                   "opcoes": [
                     {"valor": "alta", "rotulo": "Alta", "cor": "vermelho"},
                     {"valor": "media", "rotulo": "Média", "cor": "amarelo"},
@@ -1801,7 +1801,7 @@
               "travada": true,
               "inciso": "V,VI,IX",
               "niveis": "obrigatorio",
-              "ajuda": "As ações que levam às metas, cada uma com o tema. Os temas de segurança da informação, de transformação digital e de governança de dados cobrem os incisos V, VI e IX do art. 12, § 2º. No nível Básico, bastam a descrição, o tema, o responsável, o prazo e a situação.",
+              "ajuda": "As ações que levam às metas, cada uma com o tema. Os temas de segurança da informação, de transformação digital e de governança de dados cobrem os incisos V, VI e IX do art. 12, § 2º. Na forma do nível Básico, o mínimo do decreto, bastam a descrição, o tema, o responsável, o prazo e a situação.",
               "campos": [
                 {"chave": "descricao", "rotulo": "Ação", "tipo": "texto_longo", "principal": true, "largura": "larga"},
                 {
@@ -2204,7 +2204,7 @@
               "tipo": "tabela",
               "prefixo": "R",
               "niveis": "obrigatorio",
-              "ajuda": "Os riscos das metas e das ações, com a análise e a resposta planejada. As ameaças da SWOT entram aqui. O modelo está no Anexo IX do guia. No nível Básico, bastam a descrição, o nível, a ação e o responsável.",
+              "ajuda": "Os riscos das metas e das ações, com a análise e a resposta planejada. As ameaças da SWOT entram aqui. O modelo está no Anexo IX do guia. Na forma do nível Básico, o mínimo do decreto, bastam a descrição, o nível, a ação e o responsável.",
               "campos": [
                 {"chave": "descricao", "rotulo": "Risco", "tipo": "texto_longo", "principal": true, "largura": "larga"},
                 {
@@ -2299,7 +2299,7 @@
                   "tipo": "lista",
                   "niveis": {"basico": "obrigatorio", "intermediario": "desligado", "avancado": "desligado"},
                   "largura": "estreita",
-                  "ajuda": "No nível Básico, diga só se o risco é baixo, médio ou alto.",
+                  "ajuda": "Na forma do nível Básico, diga só se o risco é baixo, médio ou alto.",
                   "opcoes": [
                     {"valor": "baixo", "rotulo": "Baixo", "cor": "verde"},
                     {"valor": "medio", "rotulo": "Médio", "cor": "amarelo"},
@@ -2888,7 +2888,7 @@
           "referenciaGuia": "5.1",
           "aceitaNaoSeAplica": false,
           "niveis": "obrigatorio",
-          "oQueFazer": "A cada ciclo, atualize a situação de cada ação. Conforme o nível do órgão, o passo pede também a execução, o valor dos indicadores e os riscos que ocorreram.",
+          "oQueFazer": "A cada ciclo, atualize a situação de cada ação. Na forma do nível Básico, o mínimo do decreto, basta a situação; nas formas dos outros níveis, o passo pede também a execução, o valor dos indicadores e os riscos que ocorreram.",
           "antes": {
             "titulo": ["Atualize a situação das ações e registre as medições e os riscos que ocorreram"],
             "oQueFazer": ["A cada ciclo, atualize a situação e a execução de cada ação, registre o valor dos indicadores e os riscos que ocorreram."]
@@ -2900,7 +2900,7 @@
               "titulo": "Situação das ações no ciclo",
               "tipo": "tabela",
               "niveis": "obrigatorio",
-              "ajuda": "Registre todas as ações, inclusive as que estão em dia. No nível Básico, basta a situação.",
+              "ajuda": "Registre todas as ações, inclusive as que estão em dia. Na forma do nível Básico, o mínimo do decreto, basta a situação.",
               "campos": [
                 {
                   "chave": "acao",

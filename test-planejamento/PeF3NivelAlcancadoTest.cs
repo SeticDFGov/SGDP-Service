@@ -12,9 +12,9 @@ namespace test.planejamento;
 /// F3, parte C5: o nível que o PDTIC alcançou, pela régua dos níveis (a trilha de cada nível ativo
 /// sem os ajustes do órgão), nos dois modos. Contam os passos das etapas 1 a 3 da elaboração dos
 /// tipos dados, conferência dos temas e aprovação; o PDTIC atende a um nível quando todo passo que
-/// conta e é obrigatório nele está feito; o alcançado é o mais alto atendido com os de antes; o
-/// próximo vem com o que falta (e, no modo livre, a forma a usar). O PDTIC registrado fora do
-/// sistema não é calculado.
+/// conta e é obrigatório nele está completo (com ou sem comentário aberto); o alcançado é o mais
+/// alto atendido; o próximo vem com o que falta (e, no modo livre, a forma a usar). O PDTIC
+/// registrado fora do sistema não é calculado.
 /// </summary>
 public class PeF3NivelAlcancadoTest : PePaineisTestBase
 {
@@ -93,7 +93,7 @@ public class PeF3NivelAlcancadoTest : PePaineisTestBase
     }
 
     [Fact]
-    public async Task ARegua_NaoUsaOsAjustesDoOrgao_EOComentarioAbertoPrende()
+    public async Task ARegua_NaoUsaOsAjustesDoOrgao_NemOComentarioAberto()
     {
         var pdtic = await ProntoParaEnviarAsync();
         Assert.Equal("Básico", (await NivelAsync(pdtic.Id)).AlcancadoNome);
@@ -108,13 +108,18 @@ public class PeF3NivelAlcancadoTest : PePaineisTestBase
         await AjustarPassosAsync(OrgaoSes);
         await IncluirNoPdticAsync(pdtic.Id, "equipe_elaboracao", new { nome = "Ana Souza" });
 
-        // O comentário aberto num passo que conta: o passo não está feito (a mesma análise da situação)
+        // O comentário aberto num passo que conta não tira o nível: a régua mede o conteúdo. A
+        // situação do passo continua "atencao" no passo a passo e no próximo passo
         var comentario = await Comentarios.CriarAsync(pdtic.Id,
             new PeComentarioCriarDTO { PassoId = Passo("diagnostico.ativos").Id, Texto = "Faltou o sistema de RH." }, await Sgdi());
-        nivel = await NivelAsync(pdtic.Id);
-        Assert.Null(nivel.AlcancadoId);
-        var ativos = Assert.Single(nivel.Faltam, f => f.PassoId == Passo("diagnostico.ativos").Id);
-        Assert.Equal(PePdticService.FaltaComentarioAberto, ativos.Motivo);
+        var situacao = await SituacaoAsync(pdtic.Id);
+        var ativos = situacao.Passos.Single(p => p.PassoId == Passo("diagnostico.ativos").Id);
+        Assert.Equal(PeDominios.SituacaoPasso.Atencao, ativos.Situacao);
+        Assert.Equal(ativos.Numero, situacao.ProximoPasso);
+        Assert.Equal("Básico", situacao.Nivel.AlcancadoNome);
+        Assert.DoesNotContain(situacao.Nivel.Faltam, f => f.Motivo == PePdticService.FaltaComentarioAberto);
+        // Para o Intermediário, os ativos faltam pelo conteúdo (os campos que ele pede a mais), não pelo comentário
+        Assert.StartsWith("AT01: preencha", Assert.Single(situacao.Nivel.Faltam, f => f.PassoId == Passo("diagnostico.ativos").Id).Motivo);
 
         await Comentarios.ResolverAsync(comentario.Id, await Orgao());
         Assert.Equal("Básico", (await NivelAsync(pdtic.Id)).AlcancadoNome);

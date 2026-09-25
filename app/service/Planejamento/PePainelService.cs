@@ -869,13 +869,19 @@ public class PePainelService : IPePainelService
             resposta.Andamento = trilha.Etapas.Select(e =>
             {
                 var passos = e.Passos.Select(p => porId.GetValueOrDefault(p.Id)).Where(p => p != null).Select(p => p!).ToList();
+                // F3: como o andamento da visão geral, sem os contínuos: Feitos e Total só dos
+                // obrigatórios; dos opcionais, os feitos (no sistema ou fora dele)
+                var contam = passos.Where(p => p.Situacao != PeDominios.SituacaoPasso.Continuo).ToList();
+                var obrigatorios = contam.Where(p => p.Obrigatorio).ToList();
                 return new PeOrgaoAndamentoResponse
                 {
                     Etapa = e.Numero,
                     Titulo = e.Titulo,
-                    Feitos = passos.Count(p => p.Situacao is PeDominios.SituacaoPasso.Feito or PeDominios.SituacaoPasso.Externo
+                    Feitos = obrigatorios.Count(p => p.Situacao is PeDominios.SituacaoPasso.Feito or PeDominios.SituacaoPasso.Externo
                         or PeDominios.SituacaoPasso.NaoSeAplica),
-                    Total = passos.Count,
+                    Total = obrigatorios.Count,
+                    OpcionaisFeitos = contam.Count(p => !p.Obrigatorio
+                        && p.Situacao is PeDominios.SituacaoPasso.Feito or PeDominios.SituacaoPasso.Externo),
                     Atrasados = passos.Count(p => p.Situacao == PeDominios.SituacaoPasso.Atrasado),
                     Aguardando = passos.Count(p => p.Situacao == PeDominios.SituacaoPasso.Aguardando),
                     Validados = passos.Count(p => p.Validacao != null)

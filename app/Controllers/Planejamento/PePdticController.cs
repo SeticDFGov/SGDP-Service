@@ -81,7 +81,10 @@ public class PePdticController : ControllerBase
     public Task<IActionResult> Obter(long id) =>
         Executar(async ctx => Ok(await _pdtics.ObterAsync(id, ctx)));
 
-    /// <summary>Os PDTICs atuais de todos os órgãos (papéis globais e admin geral): ?Situacao=&amp;Filtro=&amp;Page=&amp;PageSize=.</summary>
+    /// <summary>
+    /// Os PDTICs atuais de todos os órgãos (papéis globais e admin geral): ?Situacao=&amp;Filtro=&amp;Page=&amp;PageSize=.
+    /// Cada item com NivelAlcancadoId e NivelAlcancadoNome (F3).
+    /// </summary>
     [HttpGet("pdtic")]
     public Task<IActionResult> Listar([FromQuery] PePdticConsulta consulta) =>
         Executar(async ctx => Ok(await _pdtics.ListarAsync(consulta, ctx)));

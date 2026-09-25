@@ -36,8 +36,9 @@ public interface IPePdticService
     /// <summary>
     /// Os PDTICs de todos os órgãos (papéis globais e admin geral), por sigla: sem filtro de
     /// situação, os atuais; com ele, os daquela situação, inclusive encerrado e substituído (F2).
+    /// Cada item com o nível que aquela versão alcançou (F3), calculado para a página inteira.
     /// </summary>
-    Task<PagedResponse<PePdticResponse>> ListarAsync(PePdticConsulta consulta, PeUserContext ctx);
+    Task<PagedResponse<PePdticListaItemResponse>> ListarAsync(PePdticConsulta consulta, PeUserContext ctx);
 
     Task<PePdticSituacaoResponse> SituacaoAsync(long id, PeUserContext ctx);
 

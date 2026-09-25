@@ -60,9 +60,10 @@ public sealed class PeReguaNivel
 /// <item>Um passo atende a um nível quando está completo na forma desse nível ou numa forma mais
 /// completa: a de um nível ativo acima dele em que o passo está ligado (a forma mais completa
 /// substitui a mais simples; no modelo inicial, as notas GUT do 2.9 no lugar da prioridade simples
-/// do Básico). O passo com comentário aberto não atende a nível nenhum (é a mesma análise da
-/// situação); o "não se aplica" não vale num passo obrigatório; o PDTIC registrado fora do
-/// sistema não é calculado.</item>
+/// do Básico). O comentário aberto da SGDI não muda a régua: o passo conta pelo que os dados
+/// dele têm, com ou sem comentário (a situação do passo continua "atencao" no passo a passo e no
+/// próximo passo; só a régua mede o conteúdo). O "não se aplica" não vale num passo obrigatório;
+/// o PDTIC registrado fora do sistema não é calculado.</item>
 /// <item>O PDTIC atende a um nível quando todo passo que conta e é obrigatório nele atende a ele; o
 /// nível alcançado é o mais alto que o PDTIC atende. Com a substituição, atender a um nível já
 /// cobre os de baixo nos passos em comum: exigir também os de baixo só mudaria o resultado num
@@ -76,7 +77,8 @@ public sealed class PeReguaNivel
 /// forma do nível X neste passo.".</item>
 /// </list>
 /// Não lê o banco: tudo sai da <see cref="PeLeituraDaSituacao"/> e do modelo (a régua é montada uma
-/// vez por leitura do modelo). O painel e a conformidade calculam aqui o nível de todos os órgãos.
+/// vez por leitura do modelo). O painel, a conformidade e a lista dos PDTICs calculam aqui o nível
+/// de todos os órgãos (<see cref="Alcancado"/>, quando basta o nível).
 /// </summary>
 public static class PeNivelAlcancado
 {
@@ -100,11 +102,7 @@ public static class PeNivelAlcancado
         var regua = dados.Regua(leitura.SemPeticVigente);
         if (regua.Count == 0) return resposta;
         var formas = new FormasNaRegua(pdtic.Id, regua, leitura);
-
-        // O mais alto que o PDTIC atende (de cima para baixo: o primeiro atendido é o alcançado)
-        var alcancado = -1;
-        for (var i = regua.Count - 1; i >= 0 && alcancado < 0; i--)
-            if (formas.Atende(i)) alcancado = i;
+        var alcancado = IndiceAlcancado(regua, formas);
 
         if (alcancado >= 0)
         {
@@ -135,14 +133,36 @@ public static class PeNivelAlcancado
     }
 
     /// <summary>
-    /// O motivo de um passo que não atende ao próximo nível: o comentário aberto; senão o que falta
-    /// na forma em uso no órgão, quando ela é igual ou mais completa que a do próximo nível; senão o
-    /// que falta na forma do próximo nível, com a nota da forma (<see cref="NotaDaForma"/>).
+    /// Só o nível que o PDTIC alcançou, pela mesma régua (sem o próximo nem o que falta): nulo sem
+    /// nível alcançado e no PDTIC registrado fora do sistema. Não precisa da trilha do órgão (a
+    /// régua é a mesma para todos os órgãos): a lista dos PDTICs usa com uma leitura da situação
+    /// para a página inteira.
+    /// </summary>
+    public static PeNivel? Alcancado(PePdtic pdtic, PeModeloDados dados, PeLeituraDaSituacao leitura)
+    {
+        if (pdtic.RegistradoExternamente) return null;
+        var regua = dados.Regua(leitura.SemPeticVigente);
+        var indice = IndiceAlcancado(regua, new FormasNaRegua(pdtic.Id, regua, leitura));
+        return indice < 0 ? null : regua[indice].Nivel;
+    }
+
+    /// <summary>A posição na régua do mais alto nível que o PDTIC atende (de cima para baixo: o primeiro atendido), ou -1.</summary>
+    private static int IndiceAlcancado(IReadOnlyList<PeReguaNivel> regua, FormasNaRegua formas)
+    {
+        for (var i = regua.Count - 1; i >= 0; i--)
+            if (formas.Atende(i)) return i;
+        return -1;
+    }
+
+    /// <summary>
+    /// O motivo de um passo que não atende ao próximo nível: o que falta na forma em uso no órgão,
+    /// quando ela é igual ou mais completa que a do próximo nível; senão o que falta na forma do
+    /// próximo nível, com a nota da forma (<see cref="NotaDaForma"/>). O comentário aberto não é
+    /// motivo: a régua mede o conteúdo.
     /// </summary>
     private static string Motivo(PeTrilhaOrgao trilha, IReadOnlyList<PeReguaNivel> regua, FormasNaRegua formas, int proximo, long passoId,
         PeTrilhaPasso? doOrgao)
     {
-        if (formas.ComentarioAberto(passoId)) return PePdticService.FaltaComentarioAberto;
         var emUso = NivelDaFormaEmUso(trilha, regua, doOrgao);
         if (emUso >= proximo && regua[emUso].Ligados.ContainsKey(passoId) && formas.Falta(emUso, passoId) is { } daFormaEmUso)
             return daFormaEmUso;
@@ -181,14 +201,14 @@ public static class PeNivelAlcancado
 
     /// <summary>
     /// As formas dos passos na régua, para um PDTIC: a análise dos registros na forma de cada nível
-    /// (feita uma vez, quando o nível é usado) e o que falta em cada passo em cada forma.
+    /// (feita uma vez, quando o nível é usado) e o que falta em cada passo em cada forma. Os
+    /// comentários abertos não entram (a régua mede o conteúdo).
     /// </summary>
     private sealed class FormasNaRegua
     {
         private readonly long _pdticId;
         private readonly IReadOnlyList<PeReguaNivel> _regua;
         private readonly PeLeituraDaSituacao _leitura;
-        private readonly IReadOnlyDictionary<long, int> _abertos;
         private readonly PeAnaliseDono?[] _analises;
         private readonly Dictionary<long, PeSecaoAnalisada>?[] _porSecao;
         private readonly List<PeTemaResponse>?[] _temas;
@@ -199,24 +219,20 @@ public static class PeNivelAlcancado
             _pdticId = pdticId;
             _regua = regua;
             _leitura = leitura;
-            _abertos = leitura.Abertos(pdticId);
             _analises = new PeAnaliseDono?[regua.Count];
             _porSecao = new Dictionary<long, PeSecaoAnalisada>?[regua.Count];
             _temas = new List<PeTemaResponse>?[regua.Count];
         }
 
-        public bool ComentarioAberto(long passoId) => _abertos.GetValueOrDefault(passoId) > 0;
-
         /// <summary>O PDTIC atende ao nível: todo passo que conta e é obrigatório nele atende a ele.</summary>
         public bool Atende(int nivel) => _regua[nivel].Obrigatorios.All(p => PassoAtende(nivel, p.Id));
 
         /// <summary>
-        /// O passo atende ao nível: sem comentário aberto e completo na forma do nível ou numa forma
-        /// mais completa (a de um nível ativo acima dele em que o passo está ligado).
+        /// O passo atende ao nível: completo na forma do nível ou numa forma mais completa (a de um
+        /// nível ativo acima dele em que o passo está ligado), com ou sem comentário aberto.
         /// </summary>
         public bool PassoAtende(int nivel, long passoId)
         {
-            if (ComentarioAberto(passoId)) return false;
             for (var acima = nivel; acima < _regua.Count; acima++)
                 if (_regua[acima].Ligados.ContainsKey(passoId) && Falta(acima, passoId) == null)
                     return true;

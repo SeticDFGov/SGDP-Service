@@ -107,7 +107,7 @@ public class PePdticService : IPePdticService
             .ToListAsync();
         if (pdtics.Count == 0) return new List<PePdticResponse>();
         var orgao = await _context.PgiaOrgaos.AsNoTracking().FirstAsync(o => o.Id == alvo);
-        return await RespostasAsync(pdtics.Select(p => (Pdtic: p, Orgao: orgao)).ToList(), ctx);
+        return await RespostasAsync<PePdticResponse>(pdtics.Select(p => (Pdtic: p, Orgao: orgao)).ToList(), ctx);
     }
 
     public async Task<PePdticResponse> ObterAsync(long id, PeUserContext ctx) =>
@@ -172,7 +172,7 @@ public class PePdticService : IPePdticService
               + "Para mudar o plano, abra uma revisão; um PDTIC novo só depois de encerrar este."
             : $"O órgão já tem um PDTIC em andamento (versão {atual.Versao}, {PeDominios.SituacaoPdtic.RotuloMinusculo(atual.Situacao)}). Continue por ele.");
 
-    public async Task<PagedResponse<PePdticResponse>> ListarAsync(PePdticConsulta consulta, PeUserContext ctx)
+    public async Task<PagedResponse<PePdticListaItemResponse>> ListarAsync(PePdticConsulta consulta, PeUserContext ctx)
     {
         if (!_permissoes.PodeVerConsolidado(ctx))
             throw new ApiException(ErrorCode.PeSemPermissao, "A lista dos PDTICs de todos os órgãos é da SGDI, da Secretaria do CGTIC e do administrador do módulo.");
@@ -211,8 +211,30 @@ public class PePdticService : IPePdticService
             .Take(pageSize)
             .ToListAsync();
 
-        return new PagedResponse<PePdticResponse>(
-            await RespostasAsync(linhas.Select(l => (l.Pdtic, l.Orgao)).ToList(), ctx), total, page, pageSize);
+        var itens = await RespostasAsync<PePdticListaItemResponse>(linhas.Select(l => (l.Pdtic, l.Orgao)).ToList(), ctx);
+        await PreencherNiveisAlcancadosAsync(itens, linhas.Select(l => l.Pdtic).ToList());
+        return new PagedResponse<PePdticListaItemResponse>(itens, total, page, pageSize);
+    }
+
+    /// <summary>
+    /// O nível que cada PDTIC da página alcançou (F3), pela régua do nível alcançado, nos dois modos:
+    /// uma leitura do modelo e uma da situação para a página inteira (o lote dos painéis), sem
+    /// consulta por item. Fica nulo sem nível alcançado e no PDTIC registrado fora do sistema (que não
+    /// é calculado nem entra na leitura).
+    /// </summary>
+    private async Task PreencherNiveisAlcancadosAsync(List<PePdticListaItemResponse> itens, IReadOnlyList<PePdtic> pdtics)
+    {
+        var calculados = pdtics.Where(p => !p.RegistradoExternamente).ToDictionary(p => p.Id);
+        if (calculados.Count == 0) return;
+        var dados = await PeModeloDados.CarregarAsync(_context);
+        var leitura = await PeLeituraDaSituacao.CarregarAsync(_context, calculados.Keys.ToList(), dados.Acompanhamento.Ativo);
+        foreach (var item in itens)
+        {
+            if (!calculados.TryGetValue(item.Id, out var pdtic) || PeNivelAlcancado.Alcancado(pdtic, dados, leitura) is not { } nivel)
+                continue;
+            item.NivelAlcancadoId = nivel.Id;
+            item.NivelAlcancadoNome = nivel.Nome;
+        }
     }
 
     // ── Situação dos passos ─────────────────────────────────────────────────
@@ -559,7 +581,13 @@ public class PePdticService : IPePdticService
         return falta;
     }
 
-    /// <summary>O que falta nas seções visíveis do passo (a seção obrigatória sem registro e os obrigatórios vazios), ou nulo.</summary>
+    /// <summary>
+    /// O que falta nas seções visíveis do passo (a seção obrigatória sem registro e os obrigatórios
+    /// vazios), ou nulo. É o texto do envio ao CGTIC, da situação e do nível alcançado. Cada registro
+    /// com código tem a sua frase; as linhas sem código (o cronograma da elaboração, por exemplo)
+    /// com os mesmos campos vazios viram uma frase só, com quantas são ("Cronograma da elaboração:
+    /// preencha "Início" e "Término" em 16 linhas."), na posição da primeira.
+    /// </summary>
     internal static string? FaltaNasSecoes(PeTrilhaPasso passo, IReadOnlyDictionary<long, PeSecaoAnalisada> porSecao)
     {
         var faltas = new List<string>();
@@ -573,8 +601,18 @@ public class PePdticService : IPePdticService
                     : $"Inclua pelo menos um item em \"{analisada.Secao.Secao.Titulo}\".");
                 continue;
             }
+            var daSecao = new List<(string Quem, string Campos, bool SemCodigo, int Linhas)>();
             foreach (var (registro, campos) in analisada.Incompletos)
-                faltas.Add($"{registro.Codigo ?? analisada.Secao.Secao.Titulo}: preencha {Lista(campos.Select(c => $"\"{c.Rotulo}\"").ToList())}.");
+            {
+                var vazios = Lista(campos.Select(c => $"\"{c.Rotulo}\"").ToList());
+                var igual = registro.Codigo == null ? daSecao.FindIndex(f => f.SemCodigo && f.Campos == vazios) : -1;
+                if (igual >= 0)
+                    daSecao[igual] = daSecao[igual] with { Linhas = daSecao[igual].Linhas + 1 };
+                else
+                    daSecao.Add((registro.Codigo ?? analisada.Secao.Secao.Titulo, vazios, registro.Codigo == null, 1));
+            }
+            faltas.AddRange(daSecao.Select(f =>
+                $"{f.Quem}: preencha {f.Campos}{(f.Linhas > 1 ? $" em {f.Linhas.ToString(CultureInfo.InvariantCulture)} linhas" : string.Empty)}."));
         }
         if (faltas.Count == 0) return null;
         return faltas.Count <= 2
@@ -1008,11 +1046,15 @@ public class PePdticService : IPePdticService
     private async Task<PePdticResponse> RespostaAsync(PePdtic pdtic, PeUserContext ctx)
     {
         var orgao = await _context.PgiaOrgaos.AsNoTracking().FirstAsync(o => o.Id == pdtic.OrgaoId);
-        return (await RespostasAsync(new List<(PePdtic, PgiaOrgao)> { (pdtic, orgao) }, ctx))[0];
+        return (await RespostasAsync<PePdticResponse>(new List<(PePdtic, PgiaOrgao)> { (pdtic, orgao) }, ctx))[0];
     }
 
-    /// <summary>As respostas de uma lista de PDTICs, com o nível, a deliberação mais recente e a versão revista (poucas consultas para a lista inteira).</summary>
-    private async Task<List<PePdticResponse>> RespostasAsync(IReadOnlyList<(PePdtic Pdtic, PgiaOrgao Orgao)> itens, PeUserContext ctx)
+    /// <summary>
+    /// As respostas de uma lista de PDTICs, com o nível, a deliberação mais recente e a versão revista
+    /// (poucas consultas para a lista inteira), na forma pedida (a da lista tem o nível alcançado).
+    /// </summary>
+    private async Task<List<T>> RespostasAsync<T>(IReadOnlyList<(PePdtic Pdtic, PgiaOrgao Orgao)> itens, PeUserContext ctx)
+        where T : PePdticResponse, new()
     {
         var niveis = await PeTrilhaOrgao.NiveisDosOrgaosAsync(_context, itens.Select(i => i.Orgao.Id));
         var deliberacoes = await PeDeliberacaoService.UltimasDosPdticsAsync(_context, itens.Select(i => i.Pdtic.Id).ToList());
@@ -1026,7 +1068,7 @@ public class PePdticService : IPePdticService
         {
             var pdtic = i.Pdtic;
             var nivel = niveis.GetValueOrDefault(i.Orgao.Id);
-            return new PePdticResponse
+            return new T
             {
                 Id = pdtic.Id,
                 OrgaoId = i.Orgao.Id,
