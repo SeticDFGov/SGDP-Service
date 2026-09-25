@@ -13,9 +13,10 @@ namespace Controllers.Planejamento;
 /// Fluxos (E6): os fluxos do guia como modelo (o administrador do módulo edita; todo papel lê),
 /// a cópia que o órgão adapta no PDTIC (a equipe do órgão edita, com o PDTIC em elaboração ou
 /// devolvido), o desenho automático em SVG (image/svg+xml) e o cronograma sugerido do plano de
-/// trabalho. Definição inválida: 400 { Code, Message, Erros }. Sem as tabelas pe_fluxo (o PR
-/// publica o código antes da migration) ou antes de o carregador trazer os fluxos: 409 com
-/// corpo. Erros como { Code, Message } (<see cref="PeRespostas"/>).
+/// trabalho. Desde a E9, a geometria do mesmo desenho (JSON), de onde o SVG sai, para o editor
+/// visual. Definição inválida: 400 { Code, Message, Erros } (na geometria, só a ilegível). Sem
+/// as tabelas pe_fluxo (o PR publica o código antes da migration) ou antes de o carregador
+/// trazer os fluxos: 409 com corpo. Erros como { Code, Message } (<see cref="PeRespostas"/>).
 /// </summary>
 [ApiController]
 [Authorize(Policy = ModulosSgdp.PoliticaPlanejamento)]
@@ -48,6 +49,11 @@ public class PeFluxosController : ControllerBase
     public Task<IActionResult> SvgDoModelo(string chave) =>
         Executar(async ctx => Svg(await _fluxos.SvgDoModeloAsync(chave, ctx)));
 
+    /// <summary>A geometria do desenho do modelo (E9), com os nomes padrão: a mesma de onde sai o SVG.</summary>
+    [HttpGet("modelo/fluxos/{chave}/geometria")]
+    public Task<IActionResult> GeometriaDoModelo(string chave) =>
+        Executar(async ctx => Ok(await _fluxos.GeometriaDoModeloAsync(chave, ctx)));
+
     // ── Cópia do órgão ──────────────────────────────────────────────────────
 
     /// <summary>Os fluxos do PDTIC: [ { Chave, Nome, FiguraGuia, Personalizado, ModeloMudou, AlteradoEm, AlteradoPor } ].</summary>
@@ -75,12 +81,26 @@ public class PeFluxosController : ControllerBase
     public Task<IActionResult> SvgDoPdtic(long id, string chave) =>
         Executar(async ctx => Svg(await _fluxos.SvgAsync(id, chave, ctx)));
 
+    /// <summary>A geometria do desenho do fluxo do PDTIC (E9), com os nomes do órgão: a mesma de onde sai o SVG.</summary>
+    [HttpGet("pdtic/{id:long}/fluxos/{chave}/geometria")]
+    public Task<IActionResult> GeometriaDoPdtic(long id, string chave) =>
+        Executar(async ctx => Ok(await _fluxos.GeometriaDoPdticAsync(id, chave, ctx)));
+
     // ── Editor ──────────────────────────────────────────────────────────────
 
     /// <summary>O desenho de uma definição ainda não gravada ({ Definicao, PdticId, Nome }), conferida antes.</summary>
     [HttpPost("fluxos/desenho")]
     public Task<IActionResult> Desenho([FromBody] JsonElement corpo) =>
         Executar(async ctx => Svg(await _fluxos.DesenhoAsync(PeFluxoDesenhoDTO.Ler(corpo), ctx)));
+
+    /// <summary>
+    /// A geometria de uma definição ainda não gravada ({ Definicao, PdticId, Nome }), a cada
+    /// mudança do editor visual (E9): a definição incompleta também é desenhada, com os problemas
+    /// em Erros; 400 { Code, Message, Erros } só para a ilegível. Não grava nada.
+    /// </summary>
+    [HttpPost("fluxos/geometria")]
+    public Task<IActionResult> Geometria([FromBody] JsonElement corpo) =>
+        Executar(async ctx => Ok(await _fluxos.GeometriaAsync(PeFluxoDesenhoDTO.Ler(corpo), ctx)));
 
     /// <summary>Confere uma definição sem gravar ({ Definicao }): { Valida, Erros, Definicao com os números }.</summary>
     [HttpPost("fluxos/validacao")]

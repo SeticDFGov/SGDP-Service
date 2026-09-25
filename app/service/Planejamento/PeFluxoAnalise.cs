@@ -20,7 +20,11 @@ namespace service.Planejamento;
 /// para baixo, faixa), com o prefixo do fluxo ("2.9", "2.10", "2.11").</item>
 /// </list>
 /// Tolera definição inválida (elemento sem raia vai para a primeira; ligação para o que não
-/// existe é ignorada): o desenho de uma definição guardada nunca quebra.
+/// existe é ignorada): o desenho de uma definição guardada nunca quebra, e o editor visual (E9)
+/// desenha também a definição incompleta. O elemento solto (sem nenhuma ligação que valha, de
+/// entrada ou de saída, como o bloco que acabou de entrar) vai para o fim da raia dele: as
+/// colunas depois da última do fluxo, um por coluna, na ordem da definição. Uma definição
+/// válida não tem elemento solto, então o desenho dela não muda.
 /// </summary>
 public sealed class PeFluxoAnalise
 {
@@ -43,6 +47,9 @@ public sealed class PeFluxoAnalise
 
     public required HashSet<PeFluxoLigacao> Retornos { get; init; }
 
+    // Os elementos sem nenhuma ligação (de entrada ou de saída): ficam no fim da raia
+    public required HashSet<string> Soltos { get; init; }
+
     public required Dictionary<string, List<PeFluxoLigacao>> Saidas { get; init; }
 
     public required Dictionary<string, List<PeFluxoLigacao>> Entradas { get; init; }
@@ -56,7 +63,7 @@ public sealed class PeFluxoAnalise
 
     public int Camadas => Camada.Count == 0 ? 0 : Camada.Values.Max() + 1;
 
-    public int RaiaDe(PeFluxoElemento e) => IndiceRaia.TryGetValue(e.RaiaId, out var i) ? i : 0;
+    public int RaiaDe(PeFluxoElemento e) => IndiceRaia.TryGetValue(e.RaiaId ?? string.Empty, out var i) ? i : 0;
 
     public bool EhRetorno(PeFluxoLigacao l) => Retornos.Contains(l);
 
@@ -79,7 +86,7 @@ public sealed class PeFluxoAnalise
 
     public static PeFluxoAnalise Analisar(PeFluxoDefinicao definicao)
     {
-        var raias = (definicao.Raias ?? new List<PeFluxoRaia>()).ToList();
+        var raias = (definicao.Raias ?? new List<PeFluxoRaia>()).Where(r => r is not null).ToList();
         var indiceRaia = new Dictionary<string, int>();
         for (var i = 0; i < raias.Count; i++) indiceRaia.TryAdd(raias[i].Id ?? string.Empty, i);
 
@@ -87,14 +94,14 @@ public sealed class PeFluxoAnalise
         var porId = new Dictionary<string, PeFluxoElemento>();
         foreach (var e in definicao.Elementos ?? new List<PeFluxoElemento>())
         {
-            if (string.IsNullOrEmpty(e.Id) || porId.ContainsKey(e.Id)) continue;
+            if (e is null || string.IsNullOrEmpty(e.Id) || porId.ContainsKey(e.Id)) continue;
             porId[e.Id] = e;
             elementos.Add(e);
         }
         var indice = elementos.Select((e, i) => (e.Id, i)).ToDictionary(x => x.Id, x => x.i);
 
         var ligacoes = (definicao.Ligacoes ?? new List<PeFluxoLigacao>())
-            .Where(l => l.De != null && l.Para != null && l.De != l.Para && porId.ContainsKey(l.De) && porId.ContainsKey(l.Para))
+            .Where(l => l is not null && l.De != null && l.Para != null && l.De != l.Para && porId.ContainsKey(l.De) && porId.ContainsKey(l.Para))
             .ToList();
         var saidas = elementos.ToDictionary(e => e.Id, _ => new List<PeFluxoLigacao>());
         var entradas = elementos.ToDictionary(e => e.Id, _ => new List<PeFluxoLigacao>());
@@ -105,7 +112,9 @@ public sealed class PeFluxoAnalise
         }
 
         var retornos = AcharRetornos(elementos, saidas, entradas);
+        var soltos = elementos.Where(e => saidas[e.Id].Count == 0 && entradas[e.Id].Count == 0).Select(e => e.Id).ToHashSet();
         var camada = CalcularCamadas(elementos, saidas, entradas, retornos, indice);
+        NoFimDaRaia(elementos, soltos, camada, e => indiceRaia.TryGetValue(e.RaiaId ?? string.Empty, out var i) ? i : 0);
 
         var analise = new PeFluxoAnalise
         {
@@ -117,6 +126,7 @@ public sealed class PeFluxoAnalise
             IndiceElemento = indice,
             Ligacoes = ligacoes,
             Retornos = retornos,
+            Soltos = soltos,
             Saidas = saidas,
             Entradas = entradas,
             Camada = camada,
@@ -211,6 +221,26 @@ public sealed class PeFluxoAnalise
             if (seguintes.Count > 0) camada[e.Id] = Math.Max(0, seguintes.Min() - 1);
         }
         return camada;
+    }
+
+    /// <summary>
+    /// Os elementos soltos vão para o fim da raia: as colunas depois da última coluna dos
+    /// elementos ligados, um por coluna em cada raia, na ordem da definição (o bloco que acabou
+    /// de entrar fica na ponta da direita).
+    /// </summary>
+    private static void NoFimDaRaia(List<PeFluxoElemento> elementos, HashSet<string> soltos, Dictionary<string, int> camada,
+        Func<PeFluxoElemento, int> raiaDe)
+    {
+        if (soltos.Count == 0) return;
+        var ultima = elementos.Where(e => !soltos.Contains(e.Id)).Select(e => camada[e.Id]).DefaultIfEmpty(-1).Max();
+        var usadas = new Dictionary<int, int>();
+        foreach (var e in elementos.Where(e => soltos.Contains(e.Id)))
+        {
+            var raia = raiaDe(e);
+            var antes = usadas.GetValueOrDefault(raia);
+            camada[e.Id] = ultima + 1 + antes;
+            usadas[raia] = antes + 1;
+        }
     }
 
     /// <summary>

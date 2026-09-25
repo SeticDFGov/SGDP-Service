@@ -288,6 +288,35 @@ public class PeFluxoDefinicaoTest
     }
 
     [Fact]
+    public void Ilegiveis_SoForaDoContratoOuAlemDosLimites()
+    {
+        // Estado de edição (bloco sem nome e sem ligação, raia que sumiu, ligação para o que não
+        // existe): erros, mas legível (a geometria da E9 desenha)
+        var edicao = Ler(Def(
+            new[] { E("i", "inicio"), E("a", "tarefa", "A"), E("b", "tarefa", ""), E("c", "tarefa", "C", "r9"), E("f", "fim") },
+            new[] { L("l1", "i", "a"), L("l2", "a", "f"), L("l3", "a", "sumiu"), L("l4", "a", "a") }));
+        Assert.NotEmpty(edicao.Erros);
+        Assert.Empty(edicao.Ilegiveis);
+        Assert.True(edicao.Legivel);
+        Assert.False(edicao.Valida);
+
+        // Fora do contrato ou além dos limites: ilegível, com os mesmos textos da validação
+        var fora = Ler(Def(
+            new object[] { E("i", "inicio"), E("i", "tarefa", "Repetido"), E("x", "evento", "Coisa"), E("n", "tarefa", new string('n', 201)), 7 },
+            new object[] { L("l1", "i", "x", new string('r', 61)), "ligação" }));
+        Assert.False(fora.Legivel);
+        Assert.Contains("O id \"i\" aparece mais de uma vez. Cada raia, passo e ligação precisa de um id próprio.", fora.Ilegiveis);
+        Assert.Contains(fora.Ilegiveis, e => e.StartsWith("O passo \"Coisa\": o tipo \"evento\" não existe."));
+        Assert.Contains(fora.Ilegiveis, e => e.EndsWith("o nome passa de 200 caracteres."));
+        Assert.Contains("O passo 5 precisa ser um objeto com Id, Tipo, RaiaId e Nome.", fora.Ilegiveis);
+        Assert.Contains(fora.Ilegiveis, e => e.Contains("da ligação 1 passa de 60 caracteres"));
+        Assert.Contains("A ligação 2 precisa ser um objeto com Id, De e Para.", fora.Ilegiveis);
+        Assert.All(fora.Ilegiveis, e => Assert.Contains(e, fora.Erros));
+        Assert.Contains("Envie a definição do fluxo como um objeto com Raias, Elementos e Ligacoes.", PeFluxoDefinicaoLeitor.Ler(null).Ilegiveis);
+        Assert.Contains("Raias precisa ser uma lista.", PeFluxoDefinicaoLeitor.Ler(J(new { Raias = 1, Elementos = Array.Empty<object>(), Ligacoes = Array.Empty<object>() })).Ilegiveis);
+    }
+
+    [Fact]
     public void LerValida_LancaComOsErros()
     {
         var ex = Assert.Throws<PeFluxoInvalidoException>(() => PeFluxoDefinicaoLeitor.LerValida(J(Def(new[] { E("i", "inicio") }, Array.Empty<object>()))));

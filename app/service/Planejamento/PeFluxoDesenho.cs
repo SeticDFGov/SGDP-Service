@@ -1,13 +1,13 @@
-using System.Globalization;
-using System.Security;
-using System.Text;
 using api.Planejamento;
 using Models.Planejamento;
 
 namespace service.Planejamento;
 
 /// <summary>
-/// O desenho automático de um fluxo no padrão BPMN das figuras do guia, em SVG (E6):
+/// O desenho automático de um fluxo no padrão BPMN das figuras do guia (E6), com uma fonte só
+/// desde a E9: o layout abaixo produz a geometria (<see cref="Geometria"/>, a mesma que o
+/// editor visual recebe) e o SVG da prévia e do PDF é escrito a partir dela
+/// (<see cref="PeFluxoSvg"/>), então a tela e o PDF não divergem:
 /// <list type="bullet">
 /// <item>raias em faixas horizontais, com o nome na vertical à esquerda (e, com duas raias ou
 /// mais, o nome do fluxo numa faixa a mais, como o "pool" do guia);</item>
@@ -23,7 +23,10 @@ namespace service.Planejamento;
 /// <item>artefatos como documento com a ponta dobrada embaixo da tarefa, ligados por linha
 /// pontilhada, com o nome embaixo;</item>
 /// <item>texto quebrado em linhas pela largura real da fonte, sem sair da caixa, e desenhado
-/// como contorno (<see cref="PeFluxoFonte"/>): o mesmo SVG sai igual no navegador e no PDF.</item>
+/// como contorno (<see cref="PeFluxoFonte"/>): o mesmo SVG sai igual no navegador e no PDF;</item>
+/// <item>definição incompleta (durante a edição): tudo é posicionado; o elemento sem nenhuma
+/// ligação vai para o fim da raia dele (<see cref="PeFluxoAnalise.Soltos"/>) e a ligação para
+/// o que não existe fica de fora.</item>
 /// </list>
 /// Os marcadores do dicionário de nomes ("{nomes.comite}") são trocados antes de medir. O SVG
 /// traz &lt;title&gt; e &lt;desc&gt; (a descrição em lista numerada) para leitores de tela.
@@ -51,7 +54,6 @@ public sealed class PeFluxoDesenho
     private const double LinhaArtefato = 11;
     private const double DocLargura = 22;
     private const double DocAltura = 28;
-    private const double DocDobra = 7;
     private const double ConectorArtefato = 16;
     private const double GapColuna = 30;
     private const double InicioConteudo = 18;
@@ -67,12 +69,10 @@ public sealed class PeFluxoDesenho
     private const double AlturaMinimaRaia = 90;
     private const double AlturaMaiuscula = 0.72;
 
-    // Cores (fundo e borda da tarefa por prefixo, como as cores dos subprocessos no guia)
+    // Cores dos textos e (fundo e borda) da tarefa por prefixo, como as cores dos subprocessos
+    // no guia; as outras cores do desenho são estilo do SVG (PeFluxoSvg)
     private const string CorTexto = "#1F2937";
-    private const string CorLinha = "#374151";
-    private const string CorBorda = "#6B7280";
-    private const string CorFaixaPool = "#ECEEF2";
-    private const string CorFaixaRaia = "#F5F6F8";
+    private const string CorRotuloLigacao = "#111827";
 
     private static readonly Dictionary<string, (string Fundo, string Borda)> Paleta = new()
     {
@@ -93,7 +93,16 @@ public sealed class PeFluxoDesenho
 
     public double Altura { get; private set; }
 
-    public string Svg { get; private set; } = string.Empty;
+    /// <summary>
+    /// A geometria do desenho (E9): o que o editor visual recebe e de onde o SVG sai. Erros fica
+    /// vazio aqui (quem lê a definição preenche).
+    /// </summary>
+    public PeFluxoGeometria Geometria { get; private set; } = new();
+
+    private string? _svg;
+
+    /// <summary>O SVG, escrito a partir da <see cref="Geometria"/> (só quando é pedido).</summary>
+    public string Svg => _svg ??= PeFluxoSvg.Escrever(Geometria, _regular, _negrito);
 
     /// <summary>A descrição do fluxo em lista numerada (texto alternativo do desenho).</summary>
     public List<string> Descricao { get; } = new();
@@ -144,7 +153,9 @@ public sealed class PeFluxoDesenho
         public required PeFluxoLigacao Ligacao { get; init; }
         public required bool Retorno { get; init; }
         public required List<Ponto> Pontos { get; init; }
+        // O retângulo branco atrás do rótulo e onde o texto começa (x à esquerda, y na linha de base)
         public Retangulo? Rotulo { get; set; }
+        public Ponto? RotuloEm { get; set; }
         public int Colisoes { get; set; }
         // O que a rota escolhida atravessa (vazio no desenho bom)
         public List<string> Atingidos { get; init; } = new();
@@ -153,7 +164,9 @@ public sealed class PeFluxoDesenho
     public sealed class Artefato
     {
         public required string DonoId { get; init; }
+        public required int Indice { get; init; }
         public required string Nome { get; init; }
+        public required IReadOnlyList<string> Linhas { get; init; }
         public required Retangulo Documento { get; init; }
         public required Retangulo Rotulo { get; init; }
         public required List<Ponto> Conector { get; init; }
@@ -218,6 +231,28 @@ public sealed class PeFluxoDesenho
     private double[] _colLargura = Array.Empty<double>();
     private double[] _gap = Array.Empty<double>();
     private readonly List<double> _corredores = new();
+    // O esforço da busca das rotas (cada rota gerada e cada conferência com um obstáculo ou
+    // com um trecho já desenhado): passado o limite, a busca fica econômica (Economico)
+    private long _esforco;
+
+    /// <summary>
+    /// O limite do esforço da busca das rotas. Os fluxos do guia gastam uma fração pequena dele
+    /// (há teste); só um desenho enorme, perto dos limites da definição (120 passos e 240
+    /// ligações, com ligações que atravessam dezenas de colunas), chega nele. Daí em diante, cada
+    /// ligação só tenta o vão e o corredor mais perto de cada ponta, sem pesar a sobreposição
+    /// com as outras linhas: o desenho sai em tempo curto (a geometria é pedida a cada mudança
+    /// do editor), talvez com uma linha passando por uma caixa ou por cima de outra. É uma
+    /// contagem, não um relógio: a mesma definição sai sempre igual.
+    /// </summary>
+    public const long EsforcoMaximo = 4_000_000;
+
+    // O custo de gerar e simplificar uma rota, em conferências
+    private const long EsforcoPorRota = 50;
+
+    private bool Economico => _esforco > EsforcoMaximo;
+
+    /// <summary>O esforço que a busca das rotas gastou neste desenho (para conferir a folga até o limite).</summary>
+    public long EsforcoDasRotas => _esforco;
     private readonly Dictionary<int, double> _canalBase = new();
     private double _alturaTarefa;
     private double _larguraFaixaRaia;
@@ -255,6 +290,21 @@ public sealed class PeFluxoDesenho
     {
         // Cópia com os nomes resolvidos e os números de hoje
         var definicao = PeFluxoDefinicaoLeitor.Copiar(original);
+        // A definição lida com erros (na edição) pode ter buracos: nada nulo daqui em diante
+        definicao.Raias ??= new List<PeFluxoRaia>();
+        definicao.Elementos ??= new List<PeFluxoElemento>();
+        definicao.Ligacoes ??= new List<PeFluxoLigacao>();
+        definicao.Raias.RemoveAll(r => r is null);
+        definicao.Elementos.RemoveAll(e => e is null);
+        definicao.Ligacoes.RemoveAll(l => l is null);
+        foreach (var r in definicao.Raias) r.Id ??= string.Empty;
+        foreach (var e in definicao.Elementos)
+        {
+            e.Id ??= string.Empty;
+            e.Tipo ??= string.Empty;
+            e.RaiaId ??= string.Empty;
+        }
+        var nomesOriginais = definicao.Raias.Select(r => r.Nome ?? string.Empty).ToList();
         foreach (var r in definicao.Raias) r.Nome = PeFluxoDefinicaoLeitor.Limpar(ResolverNome(r.Nome, nomes));
         foreach (var e in definicao.Elementos)
         {
@@ -279,7 +329,7 @@ public sealed class PeFluxoDesenho
         RotulosDasLigacoes();
         Faixas();
         Descrever();
-        Svg = EscreverSvg();
+        Geometria = MontarGeometria(nomesOriginais);
     }
 
     // ── Texto ───────────────────────────────────────────────────────────────
@@ -801,7 +851,7 @@ public sealed class PeFluxoDesenho
             var alturaRotulo = linhas.Count * LinhaArtefato;
             var rotulo = new Retangulo(x, doc.Base + 3, largura, alturaRotulo);
             Bloco(linhas, dx, doc.Base + 3, FonteArtefato, LinhaArtefato, false, $"artefato:{e.Id}:{i}");
-            Artefatos.Add(new Artefato { DonoId = e.Id, Nome = nome, Documento = doc, Rotulo = rotulo, Conector = conector });
+            Artefatos.Add(new Artefato { DonoId = e.Id, Indice = i, Nome = nome, Linhas = linhas, Documento = doc, Rotulo = rotulo, Conector = conector });
             _obstaculos.Add((doc.Inflar(2), $"documento {e.Id}:{i}"));
             _obstaculos.Add((new Retangulo(x, caixa.Area.Base + 2, largura, doc.Base - caixa.Area.Base), $"conector {e.Id}:{i}"));
             x += largura + 6;
@@ -866,42 +916,66 @@ public sealed class PeFluxoDesenho
         var b = PontoDa(para, pe);
         var gaps = Enumerable.Range(de.Camada, Math.Max(0, para.Camada - de.Camada)).Select(GapX).ToList();
         if (gaps.Count == 0) gaps.Add((a.X + b.X) / 2);
-        var candidatos = new List<List<Ponto>>();
+        IReadOnlyList<double> corredores = _corredores;
+        if (Economico)
+        {
+            // Desenho grande demais (o esforço passou do limite): só o vão perto de quem sai e o
+            // perto de quem chega, e o corredor mais perto de cada ponta
+            gaps = PertoDasPontas(gaps, 1);
+            corredores = PertoDe(_corredores, a.Y, b.Y, 1);
+        }
         var saiNaVertical = ps is Porta.Cima or Porta.Baixo;
         var entraNaVertical = pe is Porta.Cima or Porta.Baixo;
+        return Melhor(Candidatos(), l);
 
-        if (!saiNaVertical && !entraNaVertical)
+        // As rotas na ordem de preferência (feitas uma a uma: a busca para no limite do esforço)
+        IEnumerable<List<Ponto>> Candidatos()
         {
-            if (Math.Abs(a.Y - b.Y) < 0.5) candidatos.Add(new List<Ponto> { a, b });
-            foreach (var gx in gaps.AsEnumerable().Reverse())
-                candidatos.Add(new List<Ponto> { a, new(gx, a.Y), new(gx, b.Y), b });
-            foreach (var g1 in gaps)
-                foreach (var g2 in gaps.Where(g => g > g1))
-                    foreach (var yc in _corredores)
-                        candidatos.Add(new List<Ponto> { a, new(g1, a.Y), new(g1, yc), new(g2, yc), new(g2, b.Y), b });
+            if (!saiNaVertical && !entraNaVertical)
+            {
+                if (Math.Abs(a.Y - b.Y) < 0.5) yield return new List<Ponto> { a, b };
+                foreach (var gx in gaps.AsEnumerable().Reverse())
+                    yield return new List<Ponto> { a, new(gx, a.Y), new(gx, b.Y), b };
+                foreach (var g1 in gaps)
+                    foreach (var g2 in gaps.Where(g => g > g1))
+                        foreach (var yc in corredores)
+                            yield return new List<Ponto> { a, new(g1, a.Y), new(g1, yc), new(g2, yc), new(g2, b.Y), b };
+            }
+            else if (saiNaVertical && !entraNaVertical)
+            {
+                yield return new List<Ponto> { a, new(a.X, b.Y), b };
+                foreach (var gx in gaps.AsEnumerable().Reverse())
+                    foreach (var yc in corredores.Where(y => ps == Porta.Cima ? y < a.Y : y > a.Y))
+                        yield return new List<Ponto> { a, new(a.X, yc), new(gx, yc), new(gx, b.Y), b };
+            }
+            else if (!saiNaVertical && entraNaVertical)
+            {
+                yield return new List<Ponto> { a, new(b.X, a.Y), b };
+                foreach (var gx in gaps)
+                    foreach (var yc in corredores.Where(y => pe == Porta.Cima ? y < b.Y : y > b.Y))
+                        yield return new List<Ponto> { a, new(gx, a.Y), new(gx, yc), new(b.X, yc), b };
+            }
+            else
+            {
+                var meio = (a.Y + b.Y) / 2;
+                yield return new List<Ponto> { a, new(a.X, meio), new(b.X, meio), b };
+                foreach (var yc in corredores)
+                    yield return new List<Ponto> { a, new(a.X, yc), new(b.X, yc), b };
+            }
         }
-        else if (saiNaVertical && !entraNaVertical)
-        {
-            candidatos.Add(new List<Ponto> { a, new(a.X, b.Y), b });
-            foreach (var gx in gaps.AsEnumerable().Reverse())
-                foreach (var yc in _corredores.Where(y => ps == Porta.Cima ? y < a.Y : y > a.Y))
-                    candidatos.Add(new List<Ponto> { a, new(a.X, yc), new(gx, yc), new(gx, b.Y), b });
-        }
-        else if (!saiNaVertical && entraNaVertical)
-        {
-            candidatos.Add(new List<Ponto> { a, new(b.X, a.Y), b });
-            foreach (var gx in gaps)
-                foreach (var yc in _corredores.Where(y => pe == Porta.Cima ? y < b.Y : y > b.Y))
-                    candidatos.Add(new List<Ponto> { a, new(gx, a.Y), new(gx, yc), new(b.X, yc), b });
-        }
-        else
-        {
-            var meio = (a.Y + b.Y) / 2;
-            candidatos.Add(new List<Ponto> { a, new(a.X, meio), new(b.X, meio), b });
-            foreach (var yc in _corredores)
-                candidatos.Add(new List<Ponto> { a, new(a.X, yc), new(b.X, yc), b });
-        }
-        return Melhor(candidatos, l);
+    }
+
+    /// <summary>Os primeiros e os últimos vãos (na ordem): perto de quem sai e de quem chega.</summary>
+    private static List<double> PertoDasPontas(List<double> gaps, int quantos) =>
+        gaps.Count <= 2 * quantos ? gaps : gaps.Take(quantos).Concat(gaps.Skip(gaps.Count - quantos)).ToList();
+
+    /// <summary>Os corredores mais perto de cada uma das duas alturas, na ordem original.</summary>
+    private static List<double> PertoDe(List<double> corredores, double y1, double y2, int quantos)
+    {
+        var escolhidos = corredores.OrderBy(c => Math.Abs(c - y1)).Take(quantos)
+            .Concat(corredores.OrderBy(c => Math.Abs(c - y2)).Take(quantos))
+            .ToHashSet();
+        return corredores.Where(escolhidos.Contains).Distinct().ToList();
     }
 
     private (List<Ponto> Pontos, List<string> Atingidos) RotaDeRetorno(PeFluxoLigacao l)
@@ -942,24 +1016,41 @@ public sealed class PeFluxoDesenho
         return Melhor(candidatos, l);
     }
 
-    /// <summary>A rota com menos batidas em caixas, depois com menos sobreposição, curvas e comprimento.</summary>
-    private (List<Ponto> Pontos, List<string> Atingidos) Melhor(List<List<Ponto>> candidatos, PeFluxoLigacao l)
+    /// <summary>
+    /// A rota com menos batidas em caixas, depois com menos sobreposição, curvas e comprimento.
+    /// A rota cujo custo sem olhar os obstáculos (curvas e comprimento) já não ganha da melhor
+    /// nem é conferida (o resultado é o mesmo: o custo inteiro só pode ser maior). Passado o
+    /// limite do esforço, fica a melhor achada até ali, e as ligações seguintes não pesam a
+    /// sobreposição com as outras linhas.
+    /// </summary>
+    private (List<Ponto> Pontos, List<string> Atingidos) Melhor(IEnumerable<List<Ponto>> candidatos, PeFluxoLigacao l)
     {
         var de = _caixa[l.De].Area;
         var para = _caixa[l.Para].Area;
         List<Ponto>? melhor = null;
+        List<Ponto>? primeiro = null;
         var menor = double.MaxValue;
         var atingidosDaMelhor = new List<string>();
+        var normal = !Economico;
+        var segmentos = normal ? _segmentos : new List<(Ponto A, Ponto B, PeFluxoLigacao Dona)>();
         foreach (var c in candidatos)
         {
+            // O esforço passou do limite no meio desta ligação: fica a melhor achada até aqui
+            if (normal && melhor != null && Economico) break;
+            primeiro ??= c;
+            _esforco += EsforcoPorRota;
             var pontos = Simplificar(c);
+            double comprimento = 0;
+            for (var i = 0; i + 1 < pontos.Count; i++)
+                comprimento += Math.Abs(pontos[i].X - pontos[i + 1].X) + Math.Abs(pontos[i].Y - pontos[i + 1].Y);
+            if ((pontos.Count - 2) * 30 + comprimento * 0.05 >= menor) continue;
+
             var atingidos = new List<string>();
-            double sobreposicao = 0, cruzamentos = 0, comprimento = 0;
+            double sobreposicao = 0, cruzamentos = 0;
             for (var i = 0; i + 1 < pontos.Count; i++)
             {
                 var p = pontos[i];
                 var q = pontos[i + 1];
-                comprimento += Math.Abs(p.X - q.X) + Math.Abs(p.Y - q.Y);
                 foreach (var (o, nome) in _obstaculos)
                 {
                     if (o.Equals(de) || o.Equals(para)) continue;
@@ -968,13 +1059,14 @@ public sealed class PeFluxoDesenho
                 // Atravessar a própria caixa de origem ou de destino (fora das pontas) também conta
                 if (i > 0 && Bate(p, q, de.Inflar(-2))) atingidos.Add("origem");
                 if (i + 2 < pontos.Count && Bate(p, q, para.Inflar(-2))) atingidos.Add("destino");
-                foreach (var (s1, s2, dona) in _segmentos)
+                foreach (var (s1, s2, dona) in segmentos)
                 {
                     if (dona.Para == l.Para || dona.De == l.De) continue;
                     sobreposicao += Sobreposicao(p, q, s1, s2);
                     if (Cruza(p, q, s1, s2)) cruzamentos++;
                 }
             }
+            _esforco += (long)(pontos.Count - 1) * (_obstaculos.Count + segmentos.Count);
             var custo = atingidos.Count * 10000 + sobreposicao * 40 + cruzamentos * 6 + (pontos.Count - 2) * 30 + comprimento * 0.05;
             if (custo < menor)
             {
@@ -983,7 +1075,7 @@ public sealed class PeFluxoDesenho
                 atingidosDaMelhor = atingidos;
             }
         }
-        return (melhor ?? candidatos[0], atingidosDaMelhor);
+        return (melhor ?? primeiro ?? new List<Ponto>(), atingidosDaMelhor);
     }
 
     private static bool Bate(Ponto p, Ponto q, Retangulo r)
@@ -1059,7 +1151,8 @@ public sealed class PeFluxoDesenho
             }
             ocupados.Add(area);
             linha.Rotulo = area;
-            Escrever(texto, x, baseY, FonteRotulo, false, $"ligacao:{linha.Ligacao.Id}", "#111827");
+            linha.RotuloEm = new Ponto(x, baseY);
+            Escrever(texto, x, baseY, FonteRotulo, false, $"ligacao:{linha.Ligacao.Id}", CorRotuloLigacao);
         }
     }
 
@@ -1142,221 +1235,146 @@ public sealed class PeFluxoDesenho
         if (raias.Count > 0) Descricao.Insert(0, $"Raias: {string.Join(", ", raias)}.");
     }
 
-    // ── 10. SVG ──────────────────────────────────────────────────────────────
+    // ── 10. Geometria (o que o editor visual recebe e de onde o SVG sai) ──────
 
-    private static string N(double v) => Math.Round(v, 1).ToString("0.#", CultureInfo.InvariantCulture);
+    private static PeFluxoGeometriaPonto PontoDaGeometria(Ponto p) => new() { X = p.X, Y = p.Y };
 
-    private static string Esc(string texto) => SecurityElement.Escape(texto) ?? string.Empty;
+    private static PeFluxoGeometriaArea AreaDaGeometria(Retangulo r) => new() { X = r.X, Y = r.Y, Largura = r.L, Altura = r.A };
 
-    private string EscreverSvg()
+    /// <summary>Onde fica o nome do elemento (nulo sem nome).</summary>
+    private static string? PosicaoDoNome(PeFluxoElemento e, Medidas m)
     {
-        var sb = new StringBuilder();
-        var titulo = Titulo.Length > 0 ? Titulo : "Fluxo";
-        sb.Append("<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"")
-            .Append($" viewBox=\"0 0 {N(Largura)} {N(Altura)}\" width=\"{N(Largura)}\" height=\"{N(Altura)}\"")
-            .Append($" role=\"img\" aria-label=\"{Esc(titulo)}\">");
-        sb.Append("<title>").Append(Esc(titulo)).Append("</title>");
-        sb.Append("<desc>").Append(Esc(string.Join(" ", Descricao))).Append("</desc>");
-
-        // Os glifos usados (uma vez cada)
-        var usados = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        if (_regular != null)
-            foreach (var t in Textos)
-            {
-                var fonte = t.Negrito ? _negrito! : _regular;
-                var prefixo = t.Negrito ? "b" : "r";
-                foreach (var c in t.Conteudo)
-                {
-                    var g = fonte.Glifo(c);
-                    var id = $"pe-g{prefixo}{g}";
-                    if (usados.ContainsKey(id)) continue;
-                    usados[id] = fonte.Caminho(g);
-                }
-            }
-        if (usados.Count > 0)
+        if (m.Nome.Count == 0) return null;
+        if (PeDominios.TipoElementoFluxo.EhAtividade(e.Tipo)) return "dentro";
+        if (!PeDominios.TipoElementoFluxo.EhPorta(e.Tipo)) return "abaixo";
+        return m.PosicaoNome switch
         {
-            sb.Append("<defs>");
-            foreach (var (id, d) in usados.Where(x => x.Value.Length > 0)) sb.Append($"<path id=\"{id}\" d=\"{d}\"/>");
-            sb.Append("</defs>");
-        }
+            PosicaoNome.Direita => "direita",
+            PosicaoNome.Abaixo => "abaixo",
+            _ => "acima"
+        };
+    }
 
-        sb.Append($"<rect x=\"0\" y=\"0\" width=\"{N(Largura)}\" height=\"{N(Altura)}\" fill=\"#FFFFFF\"/>");
+    /// <summary>
+    /// A geometria do desenho: as mesmas medidas (sem arredondar) que o SVG usa, na ordem em que
+    /// ele desenha. O SVG (<see cref="PeFluxoSvg"/>) lê só daqui.
+    /// </summary>
+    private PeFluxoGeometria MontarGeometria(IReadOnlyList<string> nomesOriginais)
+    {
+        var g = new PeFluxoGeometria
+        {
+            Largura = Largura,
+            Altura = Altura,
+            Titulo = Titulo,
+            Cor = new PeFluxoGeometriaCor { Fundo = _cor.Fundo, Borda = _cor.Borda },
+            Descricao = Descricao.ToList()
+        };
 
-        // Raias e faixas
-        var topo = Margem;
-        var baseTotal = Altura - Margem;
-        var esquerda = Margem;
-        var direita = Largura - Margem;
-        sb.Append("<g stroke=\"").Append(CorBorda).Append("\" stroke-width=\"1\">");
+        // A faixa do fluxo ocupa a altura toda, dentro da margem
         if (_larguraFaixaPool > 0)
-            sb.Append($"<rect x=\"{N(esquerda)}\" y=\"{N(topo)}\" width=\"{N(_larguraFaixaPool)}\" height=\"{N(baseTotal - topo)}\" fill=\"{CorFaixaPool}\"/>");
-        foreach (var r in Raias)
         {
-            sb.Append($"<rect x=\"{N(r.Faixa.X)}\" y=\"{N(r.Faixa.Y)}\" width=\"{N(r.Faixa.L)}\" height=\"{N(r.Faixa.A)}\" fill=\"{CorFaixaRaia}\"/>");
-            sb.Append($"<rect x=\"{N(r.Area.X)}\" y=\"{N(r.Area.Y)}\" width=\"{N(r.Area.L)}\" height=\"{N(r.Area.A)}\" fill=\"none\"/>");
+            var baseTotal = Altura - Margem;
+            g.FaixaTitulo = new PeFluxoGeometriaFaixa
+            {
+                X = Margem,
+                Y = Margem,
+                Largura = _larguraFaixaPool,
+                Altura = baseTotal - Margem,
+                Linhas = _linhasPool.ToList()
+            };
         }
-        sb.Append($"<rect x=\"{N(esquerda)}\" y=\"{N(topo)}\" width=\"{N(direita - esquerda)}\" height=\"{N(baseTotal - topo)}\" fill=\"none\" stroke-width=\"1.2\"/>");
-        sb.Append("</g>");
 
-        // Ligações (linhas e setas)
-        sb.Append($"<g fill=\"none\" stroke=\"{CorLinha}\" stroke-width=\"1.3\" stroke-linejoin=\"round\">");
+        for (var r = 0; r < Raias.Count; r++)
+        {
+            var raia = Raias[r];
+            g.Raias.Add(new PeFluxoGeometriaRaia
+            {
+                Id = raia.Raia.Id,
+                Nome = raia.Raia.Nome,
+                NomeOriginal = r < nomesOriginais.Count ? nomesOriginais[r] : string.Empty,
+                Y = raia.Area.Y,
+                Altura = raia.Area.A,
+                LarguraCabecalho = raia.Faixa.L,
+                X = raia.Area.X,
+                Largura = raia.Area.L,
+                Linhas = _linhasRaia[r].ToList()
+            });
+        }
+
+        foreach (var c in Caixas)
+        {
+            var e = c.Elemento;
+            var m = _m[e.Id];
+            g.Elementos.Add(new PeFluxoGeometriaElemento
+            {
+                Id = e.Id,
+                Tipo = e.Tipo,
+                RaiaId = _a.Raias[c.Raia].Id,
+                Camada = c.Camada,
+                X = c.Area.X,
+                Y = c.Area.Y,
+                Largura = c.Area.L,
+                Altura = c.Area.A,
+                Numero = e.Numero,
+                Nome = e.Nome,
+                Linhas = m.Nome.ToList(),
+                Solto = _a.Soltos.Contains(e.Id),
+                Faixa = c.Faixa,
+                PosicaoNome = PosicaoDoNome(e, m)
+            });
+        }
+
         foreach (var l in Linhas)
         {
-            if (l.Pontos.Count < 2) continue;
-            var d = new StringBuilder();
-            d.Append('M').Append(N(l.Pontos[0].X)).Append(' ').Append(N(l.Pontos[0].Y));
-            for (var i = 1; i < l.Pontos.Count; i++)
+            g.Ligacoes.Add(new PeFluxoGeometriaLigacao
             {
-                // A linha para dentro da seta (a ponta fica fina)
-                var p = l.Pontos[i];
-                if (i == l.Pontos.Count - 1)
-                {
-                    var anterior = l.Pontos[i - 1];
-                    var dx = p.X - anterior.X;
-                    var dy = p.Y - anterior.Y;
-                    var tamanho = Math.Sqrt(dx * dx + dy * dy);
-                    if (tamanho > 5) p = new Ponto(p.X - dx / tamanho * 4, p.Y - dy / tamanho * 4);
-                }
-                d.Append('L').Append(N(p.X)).Append(' ').Append(N(p.Y));
-            }
-            sb.Append($"<path d=\"{d}\"/>");
+                Id = l.Ligacao.Id,
+                De = l.Ligacao.De,
+                Para = l.Ligacao.Para,
+                Rotulo = l.Ligacao.Rotulo,
+                Retorno = l.Retorno,
+                Pontos = l.Pontos.Select(PontoDaGeometria).ToList(),
+                RotuloX = l.RotuloEm?.X,
+                RotuloY = l.RotuloEm?.Y,
+                RotuloArea = l.Rotulo is { } area ? AreaDaGeometria(area) : null
+            });
         }
-        sb.Append("</g>");
-        sb.Append($"<g fill=\"{CorLinha}\">");
-        foreach (var l in Linhas.Where(l => l.Pontos.Count >= 2)) sb.Append(Seta(l.Pontos[^2], l.Pontos[^1], 7.5, 3.6));
-        sb.Append("</g>");
 
-        // Artefatos: conector pontilhado e documento com a ponta dobrada
-        if (Artefatos.Count > 0)
+        foreach (var a in Artefatos)
         {
-            sb.Append($"<g fill=\"none\" stroke=\"{CorBorda}\" stroke-width=\"1.1\" stroke-dasharray=\"1.2 2.6\" stroke-linecap=\"round\">");
-            foreach (var a in Artefatos)
-                sb.Append("<path d=\"M").Append(string.Join(" L", a.Conector.Select(p => $"{N(p.X)} {N(p.Y)}"))).Append("\"/>");
-            sb.Append("</g>");
-            sb.Append($"<g fill=\"none\" stroke=\"{CorBorda}\" stroke-width=\"1.1\">");
-            foreach (var a in Artefatos)
+            g.Artefatos.Add(new PeFluxoGeometriaArtefato
             {
-                var p = a.Conector[^1];
-                sb.Append($"<path d=\"M{N(p.X - 3.2)} {N(p.Y - 4.5)}L{N(p.X)} {N(p.Y)}L{N(p.X + 3.2)} {N(p.Y - 4.5)}\"/>");
-            }
-            sb.Append("</g>");
-            foreach (var a in Artefatos)
-            {
-                var d = a.Documento;
-                sb.Append($"<path d=\"M{N(d.X)} {N(d.Y)}L{N(d.Direita - DocDobra)} {N(d.Y)}L{N(d.Direita)} {N(d.Y + DocDobra)}L{N(d.Direita)} {N(d.Base)}L{N(d.X)} {N(d.Base)}Z\" fill=\"#F3F4F6\" stroke=\"{CorBorda}\" stroke-width=\"1\"/>");
-                sb.Append($"<path d=\"M{N(d.Direita - DocDobra)} {N(d.Y)}L{N(d.Direita - DocDobra)} {N(d.Y + DocDobra)}L{N(d.Direita)} {N(d.Y + DocDobra)}\" fill=\"#E5E7EB\" stroke=\"{CorBorda}\" stroke-width=\"1\"/>");
-            }
+                ElementoId = a.DonoId,
+                Indice = a.Indice,
+                Nome = a.Nome,
+                X = a.Documento.X,
+                Y = a.Documento.Y,
+                Largura = a.Documento.L,
+                Altura = a.Documento.A,
+                Linhas = a.Linhas.ToList(),
+                Rotulo = AreaDaGeometria(a.Rotulo),
+                Conector = a.Conector.Select(PontoDaGeometria).ToList()
+            });
         }
 
-        // Elementos
-        foreach (var c in Caixas) sb.Append(Forma(c));
-
-        // Fundo branco dos rótulos das ligações (a linha passa por baixo)
-        foreach (var l in Linhas.Where(l => l.Rotulo != null))
+        foreach (var t in Textos)
         {
-            var r = l.Rotulo!.Value;
-            sb.Append($"<rect x=\"{N(r.X)}\" y=\"{N(r.Y)}\" width=\"{N(r.L)}\" height=\"{N(r.A)}\" fill=\"#FFFFFF\" fill-opacity=\"0.9\"/>");
+            g.Textos.Add(new PeFluxoGeometriaTexto
+            {
+                Texto = t.Conteudo,
+                X = t.X,
+                Y = t.Y,
+                Tamanho = t.Tamanho,
+                Negrito = t.Negrito,
+                Vertical = t.Vertical,
+                Cor = t.Cor,
+                Largura = t.Largura,
+                Dono = t.Dono
+            });
         }
 
-        // Textos
-        foreach (var t in Textos) sb.Append(TextoSvg(t));
-
-        sb.Append("</svg>");
-        return sb.ToString();
-    }
-
-    private static string Seta(Ponto de, Ponto para, double comprimento, double meia)
-    {
-        var dx = para.X - de.X;
-        var dy = para.Y - de.Y;
-        var tamanho = Math.Sqrt(dx * dx + dy * dy);
-        if (tamanho < 0.01) return string.Empty;
-        var ux = dx / tamanho;
-        var uy = dy / tamanho;
-        var bx = para.X - ux * comprimento;
-        var by = para.Y - uy * comprimento;
-        return $"<path d=\"M{N(para.X)} {N(para.Y)}L{N(bx - uy * meia)} {N(by + ux * meia)}L{N(bx + uy * meia)} {N(by - ux * meia)}Z\"/>";
-    }
-
-    private string Forma(Caixa c)
-    {
-        var e = c.Elemento;
-        var a = c.Area;
-        switch (e.Tipo)
-        {
-            case PeDominios.TipoElementoFluxo.Tarefa:
-            case PeDominios.TipoElementoFluxo.Subprocesso:
-            {
-                var sb = new StringBuilder();
-                sb.Append($"<rect x=\"{N(a.X)}\" y=\"{N(a.Y)}\" width=\"{N(a.L)}\" height=\"{N(a.A)}\" rx=\"9\" ry=\"9\" fill=\"{_cor.Fundo}\" stroke=\"{_cor.Borda}\" stroke-width=\"1.4\"/>");
-                if (e.Tipo == PeDominios.TipoElementoFluxo.Subprocesso)
-                {
-                    var q = 11.0;
-                    var x = c.Cx - q / 2;
-                    var y = a.Base - q - 3;
-                    sb.Append($"<rect x=\"{N(x)}\" y=\"{N(y)}\" width=\"{N(q)}\" height=\"{N(q)}\" fill=\"#FFFFFF\" stroke=\"{_cor.Borda}\" stroke-width=\"1.1\"/>");
-                    sb.Append($"<path d=\"M{N(c.Cx)} {N(y + 2.4)}L{N(c.Cx)} {N(y + q - 2.4)}M{N(x + 2.4)} {N(y + q / 2)}L{N(x + q - 2.4)} {N(y + q / 2)}\" stroke=\"{_cor.Borda}\" stroke-width=\"1.5\"/>");
-                }
-                return sb.ToString();
-            }
-            case PeDominios.TipoElementoFluxo.Inicio:
-                return $"<circle cx=\"{N(c.Cx)}\" cy=\"{N(c.Cy)}\" r=\"{N(RaioEvento)}\" fill=\"#DCF3D2\" stroke=\"#3C9A32\" stroke-width=\"2\"/>";
-            case PeDominios.TipoElementoFluxo.Fim:
-                return $"<circle cx=\"{N(c.Cx)}\" cy=\"{N(c.Cy)}\" r=\"{N(RaioEvento - 1)}\" fill=\"#F9D6D4\" stroke=\"#B42318\" stroke-width=\"3.4\"/>";
-            case PeDominios.TipoElementoFluxo.Ligacao:
-            {
-                // Evento de enlace: círculo duplo com a seta (cheia quando o fluxo segue em outro)
-                var segue = _a.Entradas[e.Id].Count > 0;
-                var sb = new StringBuilder();
-                sb.Append($"<circle cx=\"{N(c.Cx)}\" cy=\"{N(c.Cy)}\" r=\"{N(RaioEvento)}\" fill=\"#FFFBEA\" stroke=\"#8A6D1D\" stroke-width=\"1.3\"/>");
-                sb.Append($"<circle cx=\"{N(c.Cx)}\" cy=\"{N(c.Cy)}\" r=\"{N(RaioEvento - 3)}\" fill=\"none\" stroke=\"#8A6D1D\" stroke-width=\"1.1\"/>");
-                double x = c.Cx, y = c.Cy;
-                sb.Append($"<path d=\"M{N(x - 6)} {N(y - 2.6)}L{N(x + 0.5)} {N(y - 2.6)}L{N(x + 0.5)} {N(y - 6)}L{N(x + 6.5)} {N(y)}L{N(x + 0.5)} {N(y + 6)}L{N(x + 0.5)} {N(y + 2.6)}L{N(x - 6)} {N(y + 2.6)}Z\"")
-                    .Append(segue ? " fill=\"#8A6D1D\" stroke=\"none\"/>" : " fill=\"#FFFFFF\" stroke=\"#8A6D1D\" stroke-width=\"1.1\"/>");
-                return sb.ToString();
-            }
-            default:
-            {
-                var sb = new StringBuilder();
-                sb.Append($"<path d=\"M{N(c.Cx)} {N(a.Y)}L{N(a.Direita)} {N(c.Cy)}L{N(c.Cx)} {N(a.Base)}L{N(a.X)} {N(c.Cy)}Z\" fill=\"#FFF6C7\" stroke=\"#9A7B12\" stroke-width=\"1.4\"/>");
-                var m = 7.5;
-                sb.Append(e.Tipo == PeDominios.TipoElementoFluxo.Paralelo
-                    ? $"<path d=\"M{N(c.Cx)} {N(c.Cy - m - 1)}L{N(c.Cx)} {N(c.Cy + m + 1)}M{N(c.Cx - m - 1)} {N(c.Cy)}L{N(c.Cx + m + 1)} {N(c.Cy)}\" stroke=\"#7A5F0C\" stroke-width=\"2.8\" fill=\"none\"/>"
-                    : $"<path d=\"M{N(c.Cx - m)} {N(c.Cy - m)}L{N(c.Cx + m)} {N(c.Cy + m)}M{N(c.Cx + m)} {N(c.Cy - m)}L{N(c.Cx - m)} {N(c.Cy + m)}\" stroke=\"#7A5F0C\" stroke-width=\"2.6\" fill=\"none\"/>");
-                return sb.ToString();
-            }
-        }
-    }
-
-    private string TextoSvg(Texto t)
-    {
-        var fonte = t.Negrito ? _negrito : _regular;
-        if (fonte == null)
-        {
-            // Sem a fonte: texto comum (o navegador desenha)
-            var peso = t.Negrito ? " font-weight=\"bold\"" : string.Empty;
-            var transformacao = t.Vertical ? $" transform=\"rotate(-90 {N(t.X)} {N(t.Y)})\"" : string.Empty;
-            return $"<text x=\"{N(t.X)}\" y=\"{N(t.Y)}\" font-family=\"Lato, 'Helvetica Neue', Arial, sans-serif\" font-size=\"{N(t.Tamanho)}\"{peso} fill=\"{t.Cor}\"{transformacao}>{Esc(t.Conteudo)}</text>";
-        }
-        var escala = (t.Tamanho / fonte.UnidadesPorEm).ToString("0.######", CultureInfo.InvariantCulture);
-        var sb = new StringBuilder();
-        sb.Append($"<g fill=\"{t.Cor}\" transform=\"translate({N(t.X)} {N(t.Y)})")
-            .Append(t.Vertical ? " rotate(-90)" : string.Empty)
-            .Append($" scale({escala})\">");
-        var prefixo = t.Negrito ? "b" : "r";
-        long avanco = 0;
-        foreach (var c in t.Conteudo)
-        {
-            var g = fonte.Glifo(c);
-            if (fonte.Caminho(g).Length > 0)
-            {
-                sb.Append($"<use xlink:href=\"#pe-g{prefixo}{g}\"");
-                if (avanco != 0) sb.Append($" x=\"{avanco.ToString(CultureInfo.InvariantCulture)}\"");
-                sb.Append("/>");
-            }
-            avanco += fonte.Avanco(g);
-        }
-        sb.Append("</g>");
-        return sb.ToString();
+        // Os números na ordem de leitura do desenho
+        foreach (var e in _a.OrdemDeLeitura.Where(e => e.Numero != null)) g.Numeros[e.Id] = e.Numero!;
+        return g;
     }
 }

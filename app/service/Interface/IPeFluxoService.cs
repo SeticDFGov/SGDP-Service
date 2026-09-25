@@ -7,8 +7,9 @@ namespace service.Interface;
 /// Os fluxos do módulo Governança Estratégica (E6): os fluxos do guia como modelo (o
 /// administrador do módulo edita), a cópia que o órgão adapta no PDTIC dele (só existe quando
 /// ele muda alguma coisa), o desenho automático em SVG (com os nomes do dicionário do órgão) e o
-/// cronograma sugerido do plano de trabalho. Autorização aqui, pelo IPePermissionService; erros
-/// como ApiException (1090 a 1099 e os anteriores do módulo).
+/// cronograma sugerido do plano de trabalho. Desde a E9, a geometria do mesmo desenho (de onde o
+/// SVG sai) para o editor visual. Autorização aqui, pelo IPePermissionService; erros como
+/// ApiException (1090 a 1099 e os anteriores do módulo).
 /// </summary>
 public interface IPeFluxoService
 {
@@ -44,6 +45,19 @@ public interface IPeFluxoService
 
     /// <summary>Os nomes do dicionário que raias e passos podem usar (com os do órgão, quando há o PDTIC).</summary>
     Task<List<PeFluxoNomeResponse>> NomesAsync(long? pdticId, PeUserContext ctx);
+
+    /// <summary>
+    /// A geometria do desenho automático de uma definição ainda não gravada (E9, o editor
+    /// visual): desenha também a definição incompleta, com os problemas em Erros; 400 só para a
+    /// definição ilegível. Mesma permissão da prévia em SVG.
+    /// </summary>
+    Task<PeFluxoGeometria> GeometriaAsync(PeFluxoDesenhoDTO dto, PeUserContext ctx);
+
+    /// <summary>A geometria do modelo, com os nomes padrão (a mesma de onde sai o SVG do modelo).</summary>
+    Task<PeFluxoGeometria> GeometriaDoModeloAsync(string chave, PeUserContext ctx);
+
+    /// <summary>A geometria do fluxo do PDTIC (a cópia do órgão ou o modelo), com os nomes do dicionário do órgão.</summary>
+    Task<PeFluxoGeometria> GeometriaDoPdticAsync(long pdticId, string chave, PeUserContext ctx);
 
     /// <summary>
     /// Cria o cronograma sugerido do plano de trabalho (uma linha por tarefa dos fluxos de

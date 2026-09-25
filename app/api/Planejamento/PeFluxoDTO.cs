@@ -202,7 +202,11 @@ public class PeFluxoSalvarDTO
     }
 }
 
-/// <summary>{ Definicao, PdticId, Nome } do POST api/planejamento/fluxos/desenho (e da validação).</summary>
+/// <summary>
+/// { Definicao, PdticId, Nome } do POST api/planejamento/fluxos/desenho (e da validação e, desde
+/// a E9, da geometria). O Nome é o título do desenho: com duas raias ou mais, ele abre a faixa do
+/// fluxo à esquerda, como no SVG gravado e no PDF.
+/// </summary>
 public class PeFluxoDesenhoDTO
 {
     public JsonElement? Definicao { get; set; }

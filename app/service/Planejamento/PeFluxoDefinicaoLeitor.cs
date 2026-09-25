@@ -42,6 +42,14 @@ public sealed class PeFluxoInvalidoException : ApiException
 /// </list>
 /// A saída é a definição normalizada: textos sem espaço sobrando, raias na ordem (Ordem 1, 2,
 /// 3...), rótulo vazio como nulo e os números calculados (<see cref="PeFluxoAnalise"/>).
+/// <para>
+/// Desde a E9, cada problema que torna a definição ilegível (JSON fora do contrato: o que não é
+/// objeto, lista ou texto onde devia ser, id que falta, que não serve ou que se repete, tipo que
+/// não existe; ou limite estourado: quantidade de raias, passos, ligações e artefatos e tamanho
+/// dos textos) vai também para <see cref="Resultado.Ilegiveis"/>. A geometria do editor visual
+/// só recusa (400) essas; as outras (bloco sem ligação, decisão com uma saída, ligação para o
+/// que não existe, nome em branco) ela desenha e lista em Erros. Os textos são os mesmos.
+/// </para>
 /// </summary>
 public static partial class PeFluxoDefinicaoLeitor
 {
@@ -73,22 +81,35 @@ public static partial class PeFluxoDefinicaoLeitor
     [GeneratedRegex("\\s+")]
     private static partial Regex Espacos();
 
-    /// <summary>A definição lida (mesmo com erros, o que deu para ler) e os erros em linguagem simples.</summary>
+    /// <summary>
+    /// A definição lida (mesmo com erros, o que deu para ler) e os erros em linguagem simples.
+    /// Ilegiveis: a parte dos erros que impede desenhar a definição (fora do contrato ou além dos
+    /// limites); vazia quando dá para desenhar.
+    /// </summary>
     public sealed record Resultado(PeFluxoDefinicao? Definicao, List<string> Erros)
     {
+        public List<string> Ilegiveis { get; init; } = new();
+
         public bool Valida => Definicao != null && Erros.Count == 0;
+
+        public bool Legivel => Definicao != null && Ilegiveis.Count == 0;
     }
 
     /// <summary>Lê e confere; válida, sai numerada.</summary>
     public static Resultado Ler(JsonElement? json)
     {
         var erros = new List<string>();
-        var definicao = Estrutura(json, erros);
+        var ilegiveis = new List<string>();
+        var definicao = Estrutura(json, erros, ilegiveis);
         if (definicao != null && erros.Count == 0) Grafo(definicao, erros);
-        if (erros.Count > MaximoErros) erros = erros.Take(MaximoErros).Append($"E mais {erros.Count - MaximoErros} problemas.").ToList();
+        if (erros.Count > MaximoErros) erros = Cortar(erros);
+        if (ilegiveis.Count > MaximoErros) ilegiveis = Cortar(ilegiveis);
         if (definicao != null && erros.Count == 0) PeFluxoAnalise.Numerar(definicao);
-        return new Resultado(definicao, erros);
+        return new Resultado(definicao, erros) { Ilegiveis = ilegiveis };
     }
+
+    private static List<string> Cortar(List<string> erros) =>
+        erros.Take(MaximoErros).Append($"E mais {erros.Count - MaximoErros} problemas.").ToList();
 
     /// <summary>Lê, confere e numera; com erro, lança <see cref="PeFluxoInvalidoException"/> (400).</summary>
     public static PeFluxoDefinicao LerValida(JsonElement? json)
@@ -139,11 +160,18 @@ public static partial class PeFluxoDefinicaoLeitor
 
     // ── Estrutura ───────────────────────────────────────────────────────────
 
-    private static PeFluxoDefinicao? Estrutura(JsonElement? json, List<string> erros)
+    private static PeFluxoDefinicao? Estrutura(JsonElement? json, List<string> erros, List<string> ilegiveis)
     {
+        // O problema que impede desenhar: vai para as duas listas
+        void Ilegivel(string mensagem)
+        {
+            erros.Add(mensagem);
+            ilegiveis.Add(mensagem);
+        }
+
         if (json is not { ValueKind: JsonValueKind.Object } raiz)
         {
-            erros.Add("Envie a definição do fluxo como um objeto com Raias, Elementos e Ligacoes.");
+            Ilegivel("Envie a definição do fluxo como um objeto com Raias, Elementos e Ligacoes.");
             return null;
         }
 
@@ -166,11 +194,11 @@ public static partial class PeFluxoDefinicaoLeitor
         }
 
         // Raias
-        var raias = Lista(raiz, "Raias", "Raias", erros);
+        var raias = Lista(raiz, "Raias", "Raias", erros, ilegiveis);
         if (raias != null)
         {
             if (raias.Count == 0) erros.Add("Inclua pelo menos uma raia (quem faz os passos).");
-            if (raias.Count > MaximoRaias) erros.Add($"O fluxo aceita até {MaximoRaias} raias.");
+            if (raias.Count > MaximoRaias) Ilegivel($"O fluxo aceita até {MaximoRaias} raias.");
             var posicao = 0;
             var lidas = new List<(PeFluxoRaia Raia, int Ordem, int Posicao)>();
             foreach (var item in raias.Take(MaximoRaias))
@@ -178,13 +206,13 @@ public static partial class PeFluxoDefinicaoLeitor
                 posicao++;
                 if (item.ValueKind != JsonValueKind.Object)
                 {
-                    erros.Add($"A raia {posicao} precisa ser um objeto com Id, Nome e Ordem.");
+                    Ilegivel($"A raia {posicao} precisa ser um objeto com Id, Nome e Ordem.");
                     continue;
                 }
-                var raia = new PeFluxoRaia { Id = Id(item, $"a raia {posicao}", ids, erros) ?? string.Empty };
+                var raia = new PeFluxoRaia { Id = Id(item, $"a raia {posicao}", ids, erros, ilegiveis) ?? string.Empty };
                 raia.Nome = Limpar(TextoOuNulo(item, "Nome"));
                 if (raia.Nome.Length == 0) erros.Add($"Dê um nome à raia {posicao}.");
-                else if (raia.Nome.Length > MaximoNomeRaia) erros.Add($"O nome da raia \"{Curto(raia.Nome)}\" passa de {MaximoNomeRaia} caracteres.");
+                else if (raia.Nome.Length > MaximoNomeRaia) Ilegivel($"O nome da raia \"{Curto(raia.Nome)}\" passa de {MaximoNomeRaia} caracteres.");
                 var ordem = Propriedade(item, "Ordem") is { ValueKind: JsonValueKind.Number } o && o.TryGetInt32(out var n) ? n : posicao;
                 lidas.Add((raia, ordem, posicao));
             }
@@ -197,17 +225,17 @@ public static partial class PeFluxoDefinicaoLeitor
         }
 
         // Elementos
-        var elementos = Lista(raiz, "Elementos", "Elementos", erros);
+        var elementos = Lista(raiz, "Elementos", "Elementos", erros, ilegiveis);
         if (elementos != null)
         {
-            if (elementos.Count > MaximoElementos) erros.Add($"O fluxo aceita até {MaximoElementos} passos.");
+            if (elementos.Count > MaximoElementos) Ilegivel($"O fluxo aceita até {MaximoElementos} passos.");
             var posicao = 0;
             foreach (var item in elementos.Take(MaximoElementos))
             {
                 posicao++;
                 if (item.ValueKind != JsonValueKind.Object)
                 {
-                    erros.Add($"O passo {posicao} precisa ser um objeto com Id, Tipo, RaiaId e Nome.");
+                    Ilegivel($"O passo {posicao} precisa ser um objeto com Id, Tipo, RaiaId e Nome.");
                     continue;
                 }
                 var elemento = new PeFluxoElemento
@@ -217,17 +245,17 @@ public static partial class PeFluxoDefinicaoLeitor
                     RaiaId = Limpar(TextoOuNulo(item, "RaiaId"))
                 };
                 var quem = Quem(elemento, posicao);
-                elemento.Id = Id(item, quem, ids, erros) ?? string.Empty;
+                elemento.Id = Id(item, quem, ids, erros, ilegiveis) ?? string.Empty;
 
                 if (!PeDominios.TipoElementoFluxo.Todos.Contains(elemento.Tipo))
-                    erros.Add(Maiuscula($"{quem}: o tipo \"{Curto(elemento.Tipo)}\" não existe. Use início, fim, ligação com outro fluxo, tarefa, subprocesso, decisão ou paralelo (inicio, fim, ligacao, tarefa, subprocesso, decisao, paralelo)."));
+                    Ilegivel(Maiuscula($"{quem}: o tipo \"{Curto(elemento.Tipo)}\" não existe. Use início, fim, ligação com outro fluxo, tarefa, subprocesso, decisão ou paralelo (inicio, fim, ligacao, tarefa, subprocesso, decisao, paralelo)."));
                 if (elemento.RaiaId.Length == 0)
                     erros.Add(Maiuscula($"{quem}: escolha a raia."));
                 else if (definicao.Raias.All(r => r.Id != elemento.RaiaId))
                     erros.Add(Maiuscula($"{quem}: a raia escolhida não existe."));
 
                 if (elemento.Nome.Length > MaximoNome)
-                    erros.Add(Maiuscula($"{quem}: o nome passa de {MaximoNome} caracteres."));
+                    Ilegivel(Maiuscula($"{quem}: o nome passa de {MaximoNome} caracteres."));
                 else if (elemento.Nome.Length == 0 && (PeDominios.TipoElementoFluxo.EhAtividade(elemento.Tipo) || elemento.Tipo == PeDominios.TipoElementoFluxo.Ligacao))
                     erros.Add(elemento.Tipo == PeDominios.TipoElementoFluxo.Ligacao
                         ? $"Dê um nome à ligação com outro fluxo (o passo {posicao}), dizendo de onde o fluxo vem ou para onde segue."
@@ -237,7 +265,7 @@ public static partial class PeFluxoDefinicaoLeitor
                 if (artefatos is { ValueKind: not JsonValueKind.Null })
                 {
                     if (artefatos.Value.ValueKind != JsonValueKind.Array)
-                        erros.Add(Maiuscula($"{quem}: os artefatos vêm numa lista de nomes."));
+                        Ilegivel(Maiuscula($"{quem}: os artefatos vêm numa lista de nomes."));
                     else
                     {
                         foreach (var a in artefatos.Value.EnumerateArray())
@@ -249,13 +277,13 @@ public static partial class PeFluxoDefinicaoLeitor
                                 continue;
                             }
                             if (nome.Length > MaximoArtefato)
-                                erros.Add(Maiuscula($"{quem}: o artefato \"{Curto(nome)}\" passa de {MaximoArtefato} caracteres."));
+                                Ilegivel(Maiuscula($"{quem}: o artefato \"{Curto(nome)}\" passa de {MaximoArtefato} caracteres."));
                             elemento.Artefatos.Add(nome);
                         }
                         if (elemento.Artefatos.Count > 0 && !PeDominios.TipoElementoFluxo.EhAtividade(elemento.Tipo))
                             erros.Add(Maiuscula($"{quem}: só tarefas e subprocessos têm artefatos."));
                         if (elemento.Artefatos.Count > MaximoArtefatos)
-                            erros.Add(Maiuscula($"{quem}: tem artefatos demais (até {MaximoArtefatos})."));
+                            Ilegivel(Maiuscula($"{quem}: tem artefatos demais (até {MaximoArtefatos})."));
                     }
                 }
                 definicao.Elementos.Add(elemento);
@@ -263,10 +291,10 @@ public static partial class PeFluxoDefinicaoLeitor
         }
 
         // Ligações
-        var ligacoes = Lista(raiz, "Ligacoes", "Ligacoes", erros);
+        var ligacoes = Lista(raiz, "Ligacoes", "Ligacoes", erros, ilegiveis);
         if (ligacoes != null)
         {
-            if (ligacoes.Count > MaximoLigacoes) erros.Add($"O fluxo aceita até {MaximoLigacoes} ligações.");
+            if (ligacoes.Count > MaximoLigacoes) Ilegivel($"O fluxo aceita até {MaximoLigacoes} ligações.");
             var porId = definicao.Elementos.Where(e => e.Id.Length > 0).GroupBy(e => e.Id).ToDictionary(g => g.Key, g => g.First());
             var pares = new HashSet<(string, string)>();
             var posicao = 0;
@@ -275,7 +303,7 @@ public static partial class PeFluxoDefinicaoLeitor
                 posicao++;
                 if (item.ValueKind != JsonValueKind.Object)
                 {
-                    erros.Add($"A ligação {posicao} precisa ser um objeto com Id, De e Para.");
+                    Ilegivel($"A ligação {posicao} precisa ser um objeto com Id, De e Para.");
                     continue;
                 }
                 var ligacao = new PeFluxoLigacao
@@ -285,7 +313,7 @@ public static partial class PeFluxoDefinicaoLeitor
                 };
                 var rotulo = Limpar(TextoOuNulo(item, "Rotulo"));
                 ligacao.Rotulo = rotulo.Length == 0 ? null : rotulo;
-                ligacao.Id = Id(item, $"a ligação {posicao}", ids, erros) ?? string.Empty;
+                ligacao.Id = Id(item, $"a ligação {posicao}", ids, erros, ilegiveis) ?? string.Empty;
 
                 if (ligacao.De.Length == 0 || ligacao.Para.Length == 0)
                 {
@@ -306,7 +334,7 @@ public static partial class PeFluxoDefinicaoLeitor
                     }
                 }
                 if (ligacao.Rotulo is { Length: > MaximoRotulo })
-                    erros.Add($"O rótulo \"{Curto(ligacao.Rotulo)}\" da ligação {posicao} passa de {MaximoRotulo} caracteres.");
+                    Ilegivel($"O rótulo \"{Curto(ligacao.Rotulo)}\" da ligação {posicao} passa de {MaximoRotulo} caracteres.");
                 definicao.Ligacoes.Add(ligacao);
             }
         }
@@ -453,24 +481,33 @@ public static partial class PeFluxoDefinicaoLeitor
     private static string? TextoOuNulo(JsonElement objeto, string nome) =>
         Propriedade(objeto, nome) is { ValueKind: JsonValueKind.String } v ? v.GetString() : null;
 
-    private static List<JsonElement>? Lista(JsonElement raiz, string nome, string rotulo, List<string> erros)
+    private static List<JsonElement>? Lista(JsonElement raiz, string nome, string rotulo, List<string> erros, List<string> ilegiveis)
     {
+        List<JsonElement>? Recusar(string mensagem)
+        {
+            erros.Add(mensagem);
+            ilegiveis.Add(mensagem);
+            return null;
+        }
+
         var valor = Propriedade(raiz, nome);
         if (valor == null || valor.Value.ValueKind == JsonValueKind.Null)
-        {
-            erros.Add($"Falta a lista {rotulo} na definição do fluxo.");
-            return null;
-        }
+            return Recusar($"Falta a lista {rotulo} na definição do fluxo.");
         if (valor.Value.ValueKind != JsonValueKind.Array)
-        {
-            erros.Add($"{rotulo} precisa ser uma lista.");
-            return null;
-        }
+            return Recusar($"{rotulo} precisa ser uma lista.");
         return valor.Value.EnumerateArray().ToList();
     }
 
-    private static string? Id(JsonElement item, string quem, HashSet<string> ids, List<string> erros)
+    /// <summary>O id do item; o que falta, não serve ou se repete deixa a definição ilegível.</summary>
+    private static string? Id(JsonElement item, string quem, HashSet<string> ids, List<string> erros, List<string> ilegiveis)
     {
+        string? Recusar(string mensagem)
+        {
+            erros.Add(mensagem);
+            ilegiveis.Add(mensagem);
+            return null;
+        }
+
         var bruto = Propriedade(item, "Id");
         var id = bruto switch
         {
@@ -479,20 +516,11 @@ public static partial class PeFluxoDefinicaoLeitor
             _ => null
         };
         if (string.IsNullOrEmpty(id))
-        {
-            erros.Add(Maiuscula($"{quem}: falta o id."));
-            return null;
-        }
+            return Recusar(Maiuscula($"{quem}: falta o id."));
         if (id.Length > MaximoId || !IdValido().IsMatch(id))
-        {
-            erros.Add(Maiuscula($"{quem}: o id \"{Curto(id)}\" não serve. Use até {MaximoId} letras, números, hífen ou sublinhado."));
-            return null;
-        }
+            return Recusar(Maiuscula($"{quem}: o id \"{Curto(id)}\" não serve. Use até {MaximoId} letras, números, hífen ou sublinhado."));
         if (!ids.Add(id))
-        {
-            erros.Add($"O id \"{id}\" aparece mais de uma vez. Cada raia, passo e ligação precisa de um id próprio.");
-            return null;
-        }
+            return Recusar($"O id \"{id}\" aparece mais de uma vez. Cada raia, passo e ligação precisa de um id próprio.");
         return id;
     }
 

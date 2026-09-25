@@ -22,6 +22,11 @@ namespace service.Planejamento;
 /// modelo mudar depois que o órgão gravou, ModeloMudou avisa.</item>
 /// <item>Desenho: <see cref="PeFluxoDesenho"/>, com os nomes do dicionário do órgão (ou os
 /// padrão, no modelo).</item>
+/// <item>Geometria (E9): o mesmo desenho como dados, para o editor visual. O SVG e a geometria
+/// de um fluxo saem da mesma chamada do layout (o SVG é escrito a partir da geometria), então
+/// a tela e o PDF não divergem. A geometria de uma definição ainda não gravada não recusa a
+/// definição incompleta: desenha o que dá e devolve os problemas em Erros (400 só quando a
+/// definição é ilegível).</item>
 /// <item>Cronograma sugerido: as tarefas dos fluxos de preparação, diagnóstico e planejamento
 /// viram as linhas do cronograma do plano de trabalho (atividade, responsável pela raia e
 /// predecessora), só no cronograma vazio.</item>
@@ -32,6 +37,11 @@ namespace service.Planejamento;
 public class PeFluxoService : IPeFluxoService
 {
     public const string TipoSvg = "image/svg+xml";
+
+    /// <summary>O nome do fluxo (e o título do desenho) tem até 200 caracteres.</summary>
+    public const int MaximoNomeFluxo = 200;
+
+    private const string NomeLongo = "O nome do fluxo passa de 200 caracteres.";
 
     private readonly AppDbContext _context;
     private readonly IPeRegistroService _registros;
@@ -84,12 +94,23 @@ public class PeFluxoService : IPeFluxoService
         return Modelo(modelo);
     }
 
-    public async Task<string> SvgDoModeloAsync(string chave, PeUserContext ctx)
+    public async Task<string> SvgDoModeloAsync(string chave, PeUserContext ctx) =>
+        (await DesenhoDoModeloAsync(chave, ctx)).Desenho.Svg;
+
+    public async Task<PeFluxoGeometria> GeometriaDoModeloAsync(string chave, PeUserContext ctx)
+    {
+        var (desenho, definicao) = await DesenhoDoModeloAsync(chave, ctx);
+        return ComOsErrosDaGuardada(desenho.Geometria, definicao);
+    }
+
+    /// <summary>O desenho do modelo com os nomes padrão (a fonte do SVG e da geometria).</summary>
+    private async Task<(PeFluxoDesenho Desenho, string Definicao)> DesenhoDoModeloAsync(string chave, PeUserContext ctx)
     {
         if (!_permissoes.PodeLerModelo(ctx)) throw SemPapel();
         var modelo = await ModeloAsync(_context, chave);
         var campos = await CamposDoDicionarioAsync(_context);
-        return PeFluxoDesenho.Desenhar(PeFluxoDefinicaoLeitor.DoBanco(modelo.Definicao), modelo.Nome, PeFluxoNomes.Mapa(null, campos)).Svg;
+        var desenho = PeFluxoDesenho.Desenhar(PeFluxoDefinicaoLeitor.DoBanco(modelo.Definicao), modelo.Nome, PeFluxoNomes.Mapa(null, campos));
+        return (desenho, modelo.Definicao);
     }
 
     // ── Cópia do órgão ──────────────────────────────────────────────────────
@@ -175,14 +196,28 @@ public class PeFluxoService : IPeFluxoService
         return await ObterDepoisDeGravarAsync(pdtic.Id, modelo, ctx);
     }
 
-    public async Task<string> SvgAsync(long pdticId, string chave, PeUserContext ctx)
+    public async Task<string> SvgAsync(long pdticId, string chave, PeUserContext ctx) =>
+        (await DesenhoDoPdticAsync(pdticId, chave, ctx)).Desenho.Svg;
+
+    public async Task<PeFluxoGeometria> GeometriaDoPdticAsync(long pdticId, string chave, PeUserContext ctx)
+    {
+        var (desenho, definicao) = await DesenhoDoPdticAsync(pdticId, chave, ctx);
+        return ComOsErrosDaGuardada(desenho.Geometria, definicao);
+    }
+
+    /// <summary>
+    /// O desenho do fluxo do PDTIC (a cópia do órgão ou, sem ela, o modelo), com os nomes do
+    /// dicionário do órgão: a fonte do SVG e da geometria.
+    /// </summary>
+    private async Task<(PeFluxoDesenho Desenho, string Definicao)> DesenhoDoPdticAsync(long pdticId, string chave, PeUserContext ctx)
     {
         var pdtic = await PePdticService.LerAsync(_context, _permissoes, pdticId, ctx);
         var modelo = await ModeloAsync(_context, chave);
         var copia = await _context.PeFluxos.AsNoTracking().FirstOrDefaultAsync(f => f.PdticId == pdtic.Id && f.ModeloId == modelo.Id);
         var (mapa, _) = await NomesDoOrgaoAsync(pdtic);
-        var definicao = PeFluxoDefinicaoLeitor.DoBanco(copia?.Definicao ?? modelo.Definicao);
-        return PeFluxoDesenho.Desenhar(definicao, copia?.Nome ?? modelo.Nome, mapa).Svg;
+        var guardada = copia?.Definicao ?? modelo.Definicao;
+        var desenho = PeFluxoDesenho.Desenhar(PeFluxoDefinicaoLeitor.DoBanco(guardada), copia?.Nome ?? modelo.Nome, mapa);
+        return (desenho, guardada);
     }
 
     // ── Prévia do editor ────────────────────────────────────────────────────
@@ -191,8 +226,30 @@ public class PeFluxoService : IPeFluxoService
     {
         if (!_permissoes.PodeLerModelo(ctx)) throw SemPapel();
         var definicao = PeFluxoDefinicaoLeitor.LerValida(dto.Definicao);
+        var titulo = TituloDaPrevia(dto.Nome);
         var mapa = await MapaAsync(dto.PdticId, ctx);
-        return PeFluxoDesenho.Desenhar(definicao, dto.Nome, mapa).Svg;
+        return PeFluxoDesenho.Desenhar(definicao, titulo, mapa).Svg;
+    }
+
+    /// <summary>
+    /// A geometria de uma definição ainda não gravada (o editor visual pede a cada mudança). Não
+    /// recusa a definição incompleta: o layout posiciona tudo (o elemento solto vai para o fim da
+    /// raia dele, a ligação para o que não existe fica de fora) e os problemas vêm em Erros, com
+    /// os textos da validação da E6. 400 só para a definição ilegível (fora do contrato ou além
+    /// dos limites). Não grava nada.
+    /// </summary>
+    public async Task<PeFluxoGeometria> GeometriaAsync(PeFluxoDesenhoDTO dto, PeUserContext ctx)
+    {
+        if (!_permissoes.PodeLerModelo(ctx)) throw SemPapel();
+        var lida = PeFluxoDefinicaoLeitor.Ler(dto.Definicao);
+        var ilegiveis = lida.Ilegiveis.ToList();
+        if (NomeDaPreviaLongo(dto.Nome)) ilegiveis.Add(NomeLongo);
+        if (ilegiveis.Count > 0 || lida.Definicao == null)
+            throw new PeFluxoInvalidoException(ilegiveis.Count > 0 ? ilegiveis : new List<string> { "Envie a definição do fluxo." });
+        var mapa = await MapaAsync(dto.PdticId, ctx);
+        var geometria = PeFluxoDesenho.Desenhar(lida.Definicao, dto.Nome, mapa).Geometria;
+        geometria.Erros = lida.Erros;
+        return geometria;
     }
 
     public Task<PeFluxoValidacaoResponse> ValidarAsync(PeFluxoDesenhoDTO dto, PeUserContext ctx)
@@ -447,8 +504,36 @@ public class PeFluxoService : IPeFluxoService
         if (informado == null) return atual;
         var nome = PeFluxoDefinicaoLeitor.Limpar(informado);
         if (nome.Length == 0) return doModelo;
-        if (nome.Length > 200) throw new PeFluxoInvalidoException(new[] { "O nome do fluxo passa de 200 caracteres." });
+        if (nome.Length > MaximoNomeFluxo) throw new PeFluxoInvalidoException(new[] { NomeLongo });
         return nome;
+    }
+
+    private static bool NomeDaPreviaLongo(string? nome) =>
+        nome != null && PeFluxoDefinicaoLeitor.Limpar(nome).Length > MaximoNomeFluxo;
+
+    /// <summary>
+    /// O nome do fluxo na prévia (o título do desenho), como veio; com mais de 200 caracteres,
+    /// 400 (o nome gigante travaria a quebra das linhas).
+    /// </summary>
+    private static string? TituloDaPrevia(string? nome) =>
+        NomeDaPreviaLongo(nome) ? throw new PeFluxoInvalidoException(new[] { NomeLongo }) : nome;
+
+    /// <summary>
+    /// A geometria de uma definição guardada, com os problemas dela pela validação de hoje
+    /// (vazio: ela foi conferida quando foi gravada).
+    /// </summary>
+    private static PeFluxoGeometria ComOsErrosDaGuardada(PeFluxoGeometria geometria, string? definicao)
+    {
+        try
+        {
+            using var documento = JsonDocument.Parse(string.IsNullOrWhiteSpace(definicao) ? "null" : definicao);
+            geometria.Erros = PeFluxoDefinicaoLeitor.Ler(documento.RootElement).Erros;
+        }
+        catch (JsonException)
+        {
+            geometria.Erros = PeFluxoDefinicaoLeitor.Ler(null).Erros;
+        }
+        return geometria;
     }
 
     private async Task<Dictionary<string, string?>> MapaAsync(long? pdticId, PeUserContext ctx)
