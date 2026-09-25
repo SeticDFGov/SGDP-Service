@@ -75,13 +75,28 @@ public sealed class PeFluxoAnalise
     public static void Numerar(PeFluxoDefinicao definicao)
     {
         foreach (var e in definicao.Elementos) e.Numero = null;
-        var prefixo = definicao.PrefixoNumeracao;
-        if (string.IsNullOrWhiteSpace(prefixo)) return;
+        if (string.IsNullOrWhiteSpace(definicao.PrefixoNumeracao)) return;
 
         var analise = Analisar(definicao);
+        var numeros = Numeros(analise, definicao.PrefixoNumeracao);
+        foreach (var e in analise.OrdemDeLeitura)
+            if (numeros.TryGetValue(e.Id, out var numero)) e.Numero = numero;
+    }
+
+    /// <summary>
+    /// O número de cada tarefa e subprocesso, pelo id, na ordem de leitura do desenho, com o
+    /// prefixo ("2.9"); vazio sem prefixo. É a conta do <see cref="Numerar"/>, sem mexer na
+    /// definição: as mensagens da validação citam o número que o desenho mostra, também na
+    /// definição com erros (F1, achado D11).
+    /// </summary>
+    public static Dictionary<string, string> Numeros(PeFluxoAnalise analise, string? prefixo)
+    {
+        var numeros = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace(prefixo)) return numeros;
         var n = 0;
         foreach (var e in analise.OrdemDeLeitura.Where(e => PeDominios.TipoElementoFluxo.EhAtividade(e.Tipo)))
-            e.Numero = $"{prefixo}.{(++n).ToString(CultureInfo.InvariantCulture)}";
+            numeros[e.Id] = $"{prefixo}.{(++n).ToString(CultureInfo.InvariantCulture)}";
+        return numeros;
     }
 
     public static PeFluxoAnalise Analisar(PeFluxoDefinicao definicao)

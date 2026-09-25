@@ -267,8 +267,9 @@ public class PeFluxoGeometriaTest : PeFluxoTestBase
         Assert.Equal("9.3", novo.Numero);
         Assert.Equal("9.3", g.Numeros["novo"]);
         Assert.All(g.Elementos.Where(e => e.Id != "novo"), e => Assert.False(e.Solto));
-        Assert.Contains("A tarefa \"Nova tarefa\" não tem de onde vir: diga o que vem antes dela.", g.Erros);
-        Assert.Contains("A tarefa \"Nova tarefa\" não leva a lugar nenhum: diga o que vem depois.", g.Erros);
+        // A mensagem cita o número que o desenho mostra (F1, D11)
+        Assert.Contains("A tarefa 9.3 \"Nova tarefa\" não tem de onde vir: diga o que vem antes dela.", g.Erros);
+        Assert.Contains("A tarefa 9.3 \"Nova tarefa\" não leva a lugar nenhum: diga o que vem depois.", g.Erros);
         Assert.Equal(PeFluxoDefinicaoLeitor.Ler(ComoJson(definicao)).Erros, g.Erros);
 
         // O resto do desenho fica onde estava
@@ -335,8 +336,8 @@ public class PeFluxoGeometriaTest : PeFluxoTestBase
         var g = await GeometriaAsync(definicao);
 
         Assert.DoesNotContain(g.Ligacoes, l => l.Id is "l6" or "l7");
-        Assert.Contains("A ligação 6 vai para um passo que não existe.", g.Erros);
-        Assert.Contains("A tarefa \"Primeira tarefa\": uma ligação não pode sair e voltar para o mesmo passo.", g.Erros);
+        Assert.Contains("A ligação que sai de 9.1 vai para um passo que não existe: apague essa ligação.", g.Erros);
+        Assert.Contains("A tarefa 9.1 \"Primeira tarefa\": uma ligação não pode sair e voltar para o mesmo passo.", g.Erros);
         // Tirando os erros, o desenho é o mesmo de sem essas ligações
         var sem = await GeometriaAsync(Simples());
         g.Erros = new List<string>();
@@ -351,8 +352,8 @@ public class PeFluxoGeometriaTest : PeFluxoTestBase
         definicao.Elementos.Single(e => e.Id == "a").RaiaId = "r9";
         var g = await GeometriaAsync(definicao);
 
-        Assert.Contains("Dê um nome ao passo 3 (tarefa).", g.Erros);
-        Assert.Contains("A tarefa \"Primeira tarefa\": a raia escolhida não existe.", g.Erros);
+        Assert.Contains("Dê um nome à tarefa 9.2.", g.Erros);
+        Assert.Contains("A tarefa 9.1 \"Primeira tarefa\": a raia escolhida não existe.", g.Erros);
         // Sem raia que exista, o elemento vai para a primeira
         Assert.Equal("r1", Em(g, "a").RaiaId);
         var b = Em(g, "b");
@@ -399,15 +400,15 @@ public class PeFluxoGeometriaTest : PeFluxoTestBase
         yield return new object[] { "lista", "[1]", "Envie a definição do fluxo como um objeto com Raias, Elementos e Ligacoes." };
         yield return new object[] { "raias", JsonSerializer.Serialize(new { Raias = "x", Elementos = Array.Empty<object>(), Ligacoes = Array.Empty<object>() }), "Raias precisa ser uma lista." };
         yield return new object[] { "sem elementos", JsonSerializer.Serialize(new { Raias = new[] { R() }, Ligacoes = Array.Empty<object>() }), "Falta a lista Elementos na definição do fluxo." };
-        yield return new object[] { "elemento", JsonSerializer.Serialize(D(new object[] { 7 })), "O passo 1 precisa ser um objeto com Id, Tipo, RaiaId e Nome." };
-        yield return new object[] { "ligação", JsonSerializer.Serialize(D(new[] { T("a") }, new object[] { "x" })), "A ligação 1 precisa ser um objeto com Id, De e Para." };
-        yield return new object[] { "sem id", JsonSerializer.Serialize(D(new[] { T("") })), "A tarefa \"Tarefa\": falta o id." };
-        yield return new object[] { "id repetido", JsonSerializer.Serialize(D(new[] { T("r1") })), "O id \"r1\" aparece mais de uma vez. Cada raia, passo e ligação precisa de um id próprio." };
-        yield return new object[] { "id que não serve", JsonSerializer.Serialize(D(new[] { T("a b") })), "A tarefa \"Tarefa\": o id \"a b\" não serve. Use até 40 letras, números, hífen ou sublinhado." };
+        yield return new object[] { "elemento", JsonSerializer.Serialize(D(new object[] { 7 })), "O item 1 da lista de passos precisa ser um objeto com Id, Tipo, RaiaId e Nome." };
+        yield return new object[] { "ligação", JsonSerializer.Serialize(D(new[] { T("a") }, new object[] { "x" })), "O item 1 da lista de ligações precisa ser um objeto com Id, De e Para." };
+        yield return new object[] { "sem id", JsonSerializer.Serialize(D(new[] { T("") })), "A tarefa \"Tarefa\": falta o identificador interno (Id)." };
+        yield return new object[] { "id repetido", JsonSerializer.Serialize(D(new[] { T("r1") })), "A raia \"Equipe\" e a tarefa \"Tarefa\" têm o mesmo identificador interno (Id). Cada raia, passo e ligação precisa de um identificador próprio." };
+        yield return new object[] { "id que não serve", JsonSerializer.Serialize(D(new[] { T("a b") })), "A tarefa \"Tarefa\": o identificador interno (Id) não serve. Use até 40 letras, números, hífen ou sublinhado." };
         yield return new object[] { "tipo", JsonSerializer.Serialize(D(new[] { T("a", "Coisa", "evento") })), "O passo \"Coisa\": o tipo \"evento\" não existe." };
         yield return new object[] { "nome longo", JsonSerializer.Serialize(D(new[] { T("a", new string('n', 201)) })), "o nome passa de 200 caracteres." };
         yield return new object[] { "raia longa", JsonSerializer.Serialize(D(new[] { T("a") }, raias: new[] { R("r1", new string('r', 121)) })), "passa de 120 caracteres." };
-        yield return new object[] { "rótulo longo", JsonSerializer.Serialize(D(new[] { T("a"), T("b") }, new[] { L("l1", "a", "b", new string('s', 61)) })), "da ligação 1 passa de 60 caracteres." };
+        yield return new object[] { "rótulo longo", JsonSerializer.Serialize(D(new[] { T("a"), T("b") }, new[] { L("l1", "a", "b", new string('s', 61)) })), "\" da ligação da tarefa \"Tarefa\" para a tarefa \"Tarefa\" passa de 60 caracteres." };
         yield return new object[] { "artefatos demais", JsonSerializer.Serialize(D(new[] { T("a", "Muitos", artefatos: new[] { "1", "2", "3", "4", "5", "6", "7" }) })), "A tarefa \"Muitos\": tem artefatos demais (até 6)." };
         yield return new object[] { "artefato longo", JsonSerializer.Serialize(D(new[] { T("a", artefatos: new[] { new string('d', 121) }) })), "passa de 120 caracteres." };
         yield return new object[] { "artefatos sem lista", JsonSerializer.Serialize(D(new[] { T("a", artefatos: "Ata") })), "A tarefa \"Tarefa\": os artefatos vêm numa lista de nomes." };

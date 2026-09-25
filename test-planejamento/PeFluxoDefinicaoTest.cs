@@ -123,16 +123,20 @@ public class PeFluxoDefinicaoTest
         var erros = Erros(Def(
             new[] { E("r1", "inicio"), E("a b", "tarefa", "X"), E("f", "fim") },
             new[] { L("l1", "r1", "f"), new { Id = "", De = "r1", Para = "f", Rotulo = (string?)null } }));
-        Assert.Contains("O id \"r1\" aparece mais de uma vez. Cada raia, passo e ligação precisa de um id próprio.", erros);
-        Assert.Contains(erros, e => e.Contains("o id \"a b\" não serve"));
-        Assert.Contains("A ligação 2: falta o id.", erros);
+        // Desde a F1 (D11), sem o id: os itens como o desenho os mostra
+        Assert.Contains("A raia \"Equipe\" e o início têm o mesmo identificador interno (Id). Cada raia, passo e ligação precisa de um identificador próprio.", erros);
+        Assert.Contains("A tarefa \"X\": o identificador interno (Id) não serve. Use até 40 letras, números, hífen ou sublinhado.", erros);
+        Assert.Contains("A ligação que chega ao fim: falta o identificador interno (Id).", erros);
+        // As duas ligações do início repetido (que perdeu o id) dão a mesma mensagem: uma vez só
+        Assert.Single(erros, e => e == "A ligação que chega ao fim vem de um passo que não existe: apague essa ligação.");
+        Assert.DoesNotContain(erros, e => e.Contains("\"r1\"") || e.Contains("\"a b\""));
     }
 
     [Fact]
     public void Raias_ComNome()
     {
         var erros = Erros(Def(new[] { E("i", "inicio") }, Array.Empty<object>(), new[] { Raia("r1", "  ") }));
-        Assert.Contains("Dê um nome à raia 1.", erros);
+        Assert.Contains("Dê um nome à 1ª raia (de cima para baixo).", erros);
         var longa = Erros(Def(new[] { E("i", "inicio") }, Array.Empty<object>(), new[] { Raia("r1", new string('a', 121)) }));
         Assert.Contains(longa, e => e.Contains("passa de 120 caracteres"));
     }
@@ -151,14 +155,16 @@ public class PeFluxoDefinicaoTest
             },
             Array.Empty<object>()));
 
+        // Os passos soltos ficam no fim da raia, na ordem da lista: as tarefas e o subprocesso
+        // recebem 1.1 a 1.4, como no desenho (F1, D11: o número, não a posição na lista)
         Assert.Contains(erros, e => e.StartsWith("O passo \"Coisa\": o tipo \"evento\" não existe."));
-        Assert.Contains("Dê um nome ao passo 3 (tarefa).", erros);
-        Assert.Contains("O subprocesso \"Sub\": a raia escolhida não existe.", erros);
-        Assert.Contains(erros, e => e.StartsWith("Dê um nome à ligação com outro fluxo (o passo 5)"));
+        Assert.Contains("Dê um nome à tarefa 1.1.", erros);
+        Assert.Contains("O subprocesso 1.2 \"Sub\": a raia escolhida não existe.", erros);
+        Assert.Contains("Dê um nome à ligação com outro fluxo na raia \"Equipe\", dizendo de onde o fluxo vem ou para onde segue.", erros);
         Assert.Contains("A decisão \"Ok?\": só tarefas e subprocessos têm artefatos.", erros);
-        Assert.Contains("A tarefa \"Muitos\": tem artefatos demais (até 6).", erros);
-        Assert.Contains("A tarefa \"Sem raia\": escolha a raia.", erros);
-        Assert.Contains("A tarefa \"Sem raia\": dê um nome a cada artefato.", erros);
+        Assert.Contains("A tarefa 1.3 \"Muitos\": tem artefatos demais (até 6).", erros);
+        Assert.Contains("A tarefa 1.4 \"Sem raia\": escolha a raia.", erros);
+        Assert.Contains("A tarefa 1.4 \"Sem raia\": dê um nome a cada artefato.", erros);
     }
 
     [Fact]
@@ -172,12 +178,13 @@ public class PeFluxoDefinicaoTest
                 L("l6", "nada", "a"), new { Id = "l7", De = "", Para = "a", Rotulo = (string?)null }, L("l8", "i", "f", new string('r', 61))
             }));
 
-        Assert.Contains("Há duas ligações da tarefa \"A\" para o fim. Deixe só uma.", erros);
-        Assert.Contains("A tarefa \"A\": uma ligação não pode sair e voltar para o mesmo passo.", erros);
-        Assert.Contains("A ligação 5 vai para um passo que não existe.", erros);
-        Assert.Contains("A ligação 6 sai de um passo que não existe.", erros);
-        Assert.Contains("A ligação 7 precisa dizer de onde sai (De) e para onde vai (Para).", erros);
-        Assert.Contains(erros, e => e.Contains("da ligação 8 passa de 60 caracteres"));
+        Assert.Contains("Há duas ligações da tarefa 1.1 \"A\" para o fim. Deixe só uma.", erros);
+        Assert.Contains("A tarefa 1.1 \"A\": uma ligação não pode sair e voltar para o mesmo passo.", erros);
+        // A ligação pelas pontas que existem (não pela posição na lista)
+        Assert.Contains("A ligação que sai de 1.1 vai para um passo que não existe: apague essa ligação.", erros);
+        Assert.Contains("A ligação que chega a 1.1 vem de um passo que não existe: apague essa ligação.", erros);
+        Assert.Contains("A ligação que chega a 1.1 não diz de onde sai.", erros);
+        Assert.Contains(erros, e => e.StartsWith("O rótulo \"rrr") && e.EndsWith("\" da ligação do início para o fim passa de 60 caracteres."));
     }
 
     [Fact]
@@ -214,8 +221,8 @@ public class PeFluxoDefinicaoTest
         var erros = Erros(Def(
             new[] { E("i", "inicio"), E("a", "tarefa", "A"), E("s", "subprocesso", "Solto"), E("b", "tarefa", "Sem saída"), E("f", "fim") },
             new[] { L("l1", "i", "a"), L("l2", "a", "f"), L("l3", "a", "b"), L("l4", "s", "f") }));
-        Assert.Contains("O subprocesso \"Solto\" não tem de onde vir: diga o que vem antes dele.", erros);
-        Assert.Contains("A tarefa \"Sem saída\" não leva a lugar nenhum: diga o que vem depois.", erros);
+        Assert.Contains("O subprocesso 1.2 \"Solto\" não tem de onde vir: diga o que vem antes dele.", erros);
+        Assert.Contains("A tarefa 1.3 \"Sem saída\" não leva a lugar nenhum: diga o que vem depois.", erros);
     }
 
     [Fact]
@@ -229,7 +236,8 @@ public class PeFluxoDefinicaoTest
         var semRotulo = Erros(Def(
             new[] { E("i", "inicio"), E("d", "decisao"), E("a", "tarefa", "A"), E("f", "fim") },
             new[] { L("l1", "i", "d"), L("l2", "d", "f", "Sim"), L("l3", "d", "a"), L("l4", "a", "f") }));
-        Assert.Contains("A decisão d: dê um rótulo a cada saída (por exemplo, Sim e Não).", semRotulo);
+        // A decisão sem pergunta, pelo vizinho no desenho (não pelo id)
+        Assert.Contains("A decisão sem pergunta, depois do início: dê um rótulo a cada saída (por exemplo, Sim e Não).", semRotulo);
 
         var repetido = Erros(Def(
             new[] { E("i", "inicio"), E("d", "decisao", "Ok?"), E("a", "tarefa", "A"), E("f", "fim") },
@@ -243,7 +251,7 @@ public class PeFluxoDefinicaoTest
         var erros = Erros(Def(
             new[] { E("i", "inicio"), E("p", "paralelo"), E("f", "fim") },
             new[] { L("l1", "i", "p"), L("l2", "p", "f") }));
-        Assert.Contains("O paralelo p precisa abrir caminhos (duas saídas ou mais) ou juntar caminhos (duas entradas ou mais).", erros);
+        Assert.Contains("O paralelo sem nome, depois do início, precisa abrir caminhos (duas saídas ou mais) ou juntar caminhos (duas entradas ou mais).", erros);
     }
 
     [Fact]
@@ -269,13 +277,14 @@ public class PeFluxoDefinicaoTest
         var solto = Erros(Def(
             new[] { E("i", "inicio"), E("a", "tarefa", "A"), E("f", "fim"), E("x", "tarefa", "Ilha 1"), E("y", "tarefa", "Ilha 2") },
             new[] { L("l1", "i", "a"), L("l2", "a", "f"), L("l3", "x", "y"), L("l4", "y", "x") }));
-        Assert.Contains("A tarefa \"Ilha 1\" não é alcançada a partir do início: ligue-a ao caminho do fluxo.", solto);
+        // A ilha começa na primeira coluna do desenho, embaixo do início: ganha o 1.1
+        Assert.Contains("A tarefa 1.1 \"Ilha 1\" não é alcançada a partir do início: ligue-a ao caminho do fluxo.", solto);
 
         // Um laço de onde não se sai
         var semSaida = Erros(Def(
             new[] { E("i", "inicio"), E("a", "tarefa", "A"), E("b", "tarefa", "B"), E("c", "tarefa", "C"), E("d", "decisao", "Segue?"), E("f", "fim") },
             new[] { L("l1", "i", "a"), L("l2", "a", "d"), L("l3", "d", "f", "Sim"), L("l4", "d", "b", "Não"), L("l5", "b", "c"), L("l6", "c", "b") }));
-        Assert.Contains("A tarefa \"B\" não leva a nenhum fim: todo caminho precisa terminar num fim.", semSaida);
+        Assert.Contains("A tarefa 1.2 \"B\" não leva a nenhum fim: todo caminho precisa terminar num fim.", semSaida);
     }
 
     [Fact]
@@ -305,12 +314,13 @@ public class PeFluxoDefinicaoTest
             new object[] { E("i", "inicio"), E("i", "tarefa", "Repetido"), E("x", "evento", "Coisa"), E("n", "tarefa", new string('n', 201)), 7 },
             new object[] { L("l1", "i", "x", new string('r', 61)), "ligação" }));
         Assert.False(fora.Legivel);
-        Assert.Contains("O id \"i\" aparece mais de uma vez. Cada raia, passo e ligação precisa de um id próprio.", fora.Ilegiveis);
+        Assert.Contains("O início e a tarefa \"Repetido\" têm o mesmo identificador interno (Id). Cada raia, passo e ligação precisa de um identificador próprio.", fora.Ilegiveis);
         Assert.Contains(fora.Ilegiveis, e => e.StartsWith("O passo \"Coisa\": o tipo \"evento\" não existe."));
         Assert.Contains(fora.Ilegiveis, e => e.EndsWith("o nome passa de 200 caracteres."));
-        Assert.Contains("O passo 5 precisa ser um objeto com Id, Tipo, RaiaId e Nome.", fora.Ilegiveis);
-        Assert.Contains(fora.Ilegiveis, e => e.Contains("da ligação 1 passa de 60 caracteres"));
-        Assert.Contains("A ligação 2 precisa ser um objeto com Id, De e Para.", fora.Ilegiveis);
+        // O item que não é objeto só tem a posição na lista (é erro de quem monta o JSON, não da tela)
+        Assert.Contains("O item 5 da lista de passos precisa ser um objeto com Id, Tipo, RaiaId e Nome.", fora.Ilegiveis);
+        Assert.Contains(fora.Ilegiveis, e => e.EndsWith("\" da ligação do início para o passo \"Coisa\" passa de 60 caracteres."));
+        Assert.Contains("O item 2 da lista de ligações precisa ser um objeto com Id, De e Para.", fora.Ilegiveis);
         Assert.All(fora.Ilegiveis, e => Assert.Contains(e, fora.Erros));
         Assert.Contains("Envie a definição do fluxo como um objeto com Raias, Elementos e Ligacoes.", PeFluxoDefinicaoLeitor.Ler(null).Ilegiveis);
         Assert.Contains("Raias precisa ser uma lista.", PeFluxoDefinicaoLeitor.Ler(J(new { Raias = 1, Elementos = Array.Empty<object>(), Ligacoes = Array.Empty<object>() })).Ilegiveis);

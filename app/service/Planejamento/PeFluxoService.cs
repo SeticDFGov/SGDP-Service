@@ -70,7 +70,7 @@ public class PeFluxoService : IPeFluxoService
         if (!_permissoes.PodeConfigurarModelo(ctx))
             throw new ApiException(ErrorCode.PeSemPermissao, "Só o administrador do módulo altera os fluxos do guia.");
         var modelo = await ModeloAsync(_context, chave, rastrear: true);
-        var definicao = PeFluxoDefinicaoLeitor.LerValida(dto.Definicao);
+        var definicao = await LerValidaAsync(dto.Definicao, async () => PeFluxoNomes.Mapa(null, await CamposDoDicionarioAsync(_context)));
         var nome = NomeInformado(dto.Nome, modelo.Nome, modelo.Nome);
         var json = PeFluxoDefinicaoLeitor.ParaJson(definicao);
         if (nome == modelo.Nome && Canonico(json) == Canonico(modelo.Definicao))
@@ -154,7 +154,7 @@ public class PeFluxoService : IPeFluxoService
     {
         var pdtic = await PdticParaEditarAsync(pdticId, ctx);
         var modelo = await ModeloAsync(_context, chave);
-        var definicao = PeFluxoDefinicaoLeitor.LerValida(dto.Definicao);
+        var definicao = await LerValidaAsync(dto.Definicao, async () => (await NomesDoOrgaoAsync(pdtic)).Mapa);
         var copia = await _context.PeFluxos.FirstOrDefaultAsync(f => f.PdticId == pdtic.Id && f.ModeloId == modelo.Id);
         var nome = NomeInformado(dto.Nome, copia?.Nome ?? modelo.Nome, modelo.Nome);
         var json = PeFluxoDefinicaoLeitor.ParaJson(definicao);
@@ -252,7 +252,8 @@ public class PeFluxoService : IPeFluxoService
             throw new PeFluxoInvalidoException(ilegiveis.Count > 0 ? ilegiveis : new List<string> { "Envie a definição do fluxo." });
         var mapa = await MapaAsync(dto.PdticId, ctx);
         var geometria = PeFluxoDesenho.Desenhar(lida.Definicao, dto.Nome, mapa).Geometria;
-        geometria.Erros = lida.Erros;
+        // Os problemas com os nomes do desenho (o marcador sai como o desenho mostra; F1, D11)
+        geometria.Erros = lida.Erros.Count == 0 ? lida.Erros : PeFluxoDefinicaoLeitor.Ler(dto.Definicao, mapa).Erros;
         return geometria;
     }
 
@@ -543,6 +544,18 @@ public class PeFluxoService : IPeFluxoService
             geometria.Erros = PeFluxoDefinicaoLeitor.Ler(null).Erros;
         }
         return geometria;
+    }
+
+    /// <summary>
+    /// A definição válida; com problema, 400 com as mensagens nos nomes que o desenho mostra (o
+    /// dicionário do órgão ou os nomes padrão; F1, D11). Os nomes só são lidos quando há problema.
+    /// </summary>
+    private static async Task<PeFluxoDefinicao> LerValidaAsync(JsonElement? json, Func<Task<Dictionary<string, string?>>> nomes)
+    {
+        var lida = PeFluxoDefinicaoLeitor.Ler(json);
+        if (lida.Valida) return lida.Definicao!;
+        var erros = lida.Erros.Count > 0 ? PeFluxoDefinicaoLeitor.Ler(json, await nomes()).Erros : lida.Erros;
+        throw new PeFluxoInvalidoException(erros.Count > 0 ? erros : new List<string> { "Envie a definição do fluxo." });
     }
 
     private async Task<Dictionary<string, string?>> MapaAsync(long? pdticId, PeUserContext ctx)
