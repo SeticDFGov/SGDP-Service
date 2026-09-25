@@ -35,6 +35,9 @@ public class CtrProcessoService : ICtrProcessoService
     // Também valida o processo de comunicação do TCDF na manifestação
     internal static readonly Regex FormatoSei = new(@"^\d{5}-\d{8}/\d{4}-\d{2}$", RegexOptions.Compiled);
 
+    // Nº SEI do Formulário: texto livre, até o tamanho da coluna numero_sei_formulario
+    public const int TamanhoNumeroSeiFormulario = 25;
+
     private static readonly string[] OrdenacoesValidas =
     {
         "NumeroProcesso", "OrgaoSigla", "ChegadaSgdi", "CategoriaObjeto", "CriadoEm", "Criticidade"
@@ -301,10 +304,11 @@ public class CtrProcessoService : ICtrProcessoService
             throw new ApiException(ErrorCode.CtrProcessoDuplicado,
                 $"Já existe processo ativo com o número {p.NumeroProcesso}.");
 
-        // Opcional, mas no mesmo formato do número do processo (e com a mesma máscara na tela)
-        if (p.NumeroSeiFormulario != null && !FormatoSei.IsMatch(p.NumeroSeiFormulario))
+        // Opcional e sem formato (desde 2026-09-25): é o número de um documento dentro do processo
+        // SEI, como 213807905, e os formatos variam; só o tamanho da coluna é conferido
+        if (p.NumeroSeiFormulario is { Length: > TamanhoNumeroSeiFormulario })
             throw new ApiException(ErrorCode.CtrProcessoInvalido,
-                $"Nº SEI do Formulário fora do formato SEI (00000-00000000/AAAA-DD): {p.NumeroSeiFormulario}");
+                $"O Nº SEI do Formulário tem até {TamanhoNumeroSeiFormulario} caracteres.");
 
         if (string.IsNullOrWhiteSpace(p.OrgaoNome))
             // Neutra: vale para o órgão comunicante e para o órgão auditado da comunicação do TCDF

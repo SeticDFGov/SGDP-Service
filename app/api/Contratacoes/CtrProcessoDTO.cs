@@ -63,8 +63,9 @@ public class CtrProcessoCreateDTO
     public string NumeroProcesso { get; set; } = string.Empty;
 
     /// <summary>
-    /// Nº SEI do Formulário: opcional, no formato SEI (00000-00000000/AAAA-DD). Vazio =
-    /// não informado; na EDIÇÃO, nulo ou vazio LIMPA (o formulário manda sempre).
+    /// Nº SEI do Formulário: opcional, texto livre até 25 caracteres (o número de um documento
+    /// dentro do processo SEI, como 213807905; desde 2026-09-25 sem formato). Vazio = não
+    /// informado; na EDIÇÃO, nulo ou vazio LIMPA (o formulário manda sempre).
     /// </summary>
     [StringLength(25)]
     public string? NumeroSeiFormulario { get; set; }
