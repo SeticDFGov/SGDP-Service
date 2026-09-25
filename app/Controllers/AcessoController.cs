@@ -9,9 +9,10 @@ namespace Controllers;
 
 /// <summary>
 /// Gestão de acessos por módulo (isolamento entre módulos): quem enxerga Demandas,
-/// PGIA e Supervisão Contínua das Contratações. Restrito ao perfil admin do SGDP.
-/// O que vem do Keycloak (roles admin, gestor e "pgia" do grupo) aparece só para
-/// leitura — é gerido lá; aqui se concede e se retira o que é do sistema.
+/// PGIA, Supervisão Contínua das Contratações e Governança Estratégica. Restrito ao
+/// perfil admin do SGDP. O que vem do Keycloak (roles admin, gestor e "pgia" do grupo)
+/// aparece só para leitura, porque é gerido lá; aqui se concede e se retira o que é do
+/// sistema.
 /// </summary>
 [ApiController]
 [Authorize(Roles = "admin")]
@@ -53,7 +54,8 @@ public class AcessoController : ControllerBase
 
     /// <summary>
     /// Grava de uma vez os acessos do usuário concedidos no sistema: Demandas, PGIA
-    /// (com o papel dentro do módulo) e Supervisão Contínua das Contratações.
+    /// (com o papel dentro do módulo), Supervisão Contínua das Contratações e, quando
+    /// vierem os campos opcionais, Governança Estratégica (com o papel do módulo).
     /// </summary>
     [HttpPut("usuario/{userId:guid}")]
     public async Task<IActionResult> DefinirAcessos(Guid userId, [FromBody] AcessoUsuarioUpdateDTO dto)

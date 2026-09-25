@@ -141,6 +141,48 @@ builder.Services.AddScoped<ICtrProcessoService, service.Contratacoes.CtrProcesso
 builder.Services.AddScoped<ICtrManifestacaoService, service.Contratacoes.CtrManifestacaoService>();
 builder.Services.AddScoped<ICtrImportacaoService, service.Contratacoes.CtrImportacaoService>();
 
+// Serviços do módulo Governança Estratégica (planejamento). O cálculo do acesso de
+// cada requisição não passa por eles: nenhuma tabela pe_ é lida fora das actions do
+// módulo, das telas de acesso e da fila de pedidos (regra do deploy)
+builder.Services.AddScoped<IPePermissionService, service.Planejamento.PePermissionService>();
+builder.Services.AddScoped<IPePessoaService, service.Planejamento.PePessoaService>();
+builder.Services.AddScoped<IPeModeloService, service.Planejamento.PeModeloService>();
+builder.Services.AddScoped<IPeOrgaoService, service.Planejamento.PeOrgaoService>();
+// Referenciais e registros (E3): motor de registros, PETIC-DF, deliberações do CGTIC,
+// anexos e planilhas
+builder.Services.AddScoped<IPeRegistroService, service.Planejamento.PeRegistroService>();
+builder.Services.AddScoped<IPePeticService, service.Planejamento.PePeticService>();
+builder.Services.AddScoped<IPeDeliberacaoService, service.Planejamento.PeDeliberacaoService>();
+builder.Services.AddScoped<IPeArquivoService, service.Planejamento.PeArquivoService>();
+builder.Services.AddScoped<IPePlanilhaService, service.Planejamento.PePlanilhaService>();
+// PDTIC dos órgãos (E4): o PDTIC, a situação dos passos, o "não se aplica", os temas, o PGIA
+// (só leitura) e os comentários
+builder.Services.AddScoped<IPePdticService, service.Planejamento.PePdticService>();
+builder.Services.AddScoped<IPeComentarioService, service.Planejamento.PeComentarioService>();
+// Documento do PDTIC (E5): a prévia resolvida, a cópia do órgão, o PDF com as versões e o
+// modelo do documento do administrador
+builder.Services.AddScoped<IPeDocumentoService, service.Planejamento.PeDocumentoService>();
+builder.Services.AddScoped<IPeDocModeloService, service.Planejamento.PeDocModeloService>();
+// Fluxos (E6): os fluxos do guia como modelo, a cópia do órgão, o desenho em SVG e o
+// cronograma sugerido do plano de trabalho
+builder.Services.AddScoped<IPeFluxoService, service.Planejamento.PeFluxoService>();
+// Aprovação (E7): o envio ao CGTIC, a publicação, o encerramento, a revisão e o PDTIC
+// aprovado fora do sistema (a decisão do CGTIC fica no serviço das deliberações)
+builder.Services.AddScoped<IPePdticAprovacaoService, service.Planejamento.PePdticAprovacaoService>();
+// Acompanhamento (E7, rodada B): os ciclos de monitoramento e de avaliação, as grades das ações
+// e das medições e o painel do PDTIC (os relatórios RA e RR ficam no serviço do documento)
+builder.Services.AddScoped<IPeAcompanhamentoService, service.Planejamento.PeAcompanhamentoService>();
+// Painéis da SGDI (E8): o painel, a conformidade com a planilha, a árvore do PETIC-DF, a página do
+// órgão e a inadimplência do art. 11 do Decreto nº 48.899/2026
+builder.Services.AddScoped<IPePainelService, service.Planejamento.PePainelService>();
+builder.Services.AddScoped<IPeInadimplenciaService, service.Planejamento.PeInadimplenciaService>();
+// Modelo inicial (trilha e campos do PDTIC, e os referenciais do DF e do PETIC-DF, com os
+// princípios do art. 4º): carregado ao subir, fora das requisições.
+// Sem as tabelas (intervalo entre o PR e a migration do merge) só registra no log e
+// tenta de novo mais tarde; o boot e os outros módulos seguem normais
+builder.Services.AddScoped<service.Planejamento.PeCarregadorModelo>();
+builder.Services.AddHostedService<service.Planejamento.PeCarregadorModeloHostedService>();
+
 builder.Services.AddScoped<HttpClient>();
 
 builder.Services.AddEndpointsApiExplorer();

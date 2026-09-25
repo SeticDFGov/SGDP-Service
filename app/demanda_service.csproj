@@ -11,6 +11,8 @@
 
   <ItemGroup>
     <PackageReference Include="Azure.Identity" Version="1.13.2" />
+    <!-- XLSX das planilhas da Governança Estratégica (licença MIT); ver CLAUDE.md -->
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.5.1" />
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
     <PackageReference Include="Enums.NET" Version="5.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.13" />
@@ -35,6 +37,20 @@
 
   <ItemGroup>
     <Folder Include="service\consts\" />
+  </ItemGroup>
+
+  <!-- Governança Estratégica: modelo inicial (trilha e campos do PDTIC) embutido no
+       assembly, lido pelo PeCarregadorModelo; não vai como arquivo solto na publicação -->
+  <ItemGroup>
+    <Content Remove="Models\Planejamento\Seed\**" />
+    <None Remove="Models\Planejamento\Seed\**" />
+    <EmbeddedResource Include="Models\Planejamento\Seed\modelo-inicial.json" LogicalName="Planejamento.modelo-inicial.json" />
+    <!-- Modelo do documento do PDTIC (E5): capítulos, textos padrão e blocos de dados -->
+    <EmbeddedResource Include="Models\Planejamento\Seed\documento-inicial.json" LogicalName="Planejamento.documento-inicial.json" />
+    <!-- Fluxos do guia como modelo (E6): figuras 4 a 22, com raias, passos, decisões e artefatos -->
+    <EmbeddedResource Include="Models\Planejamento\Seed\fluxos-inicial.json" LogicalName="Planejamento.fluxos-inicial.json" />
+    <!-- Marca monocromática do GDF (a mesma da prévia no front) na faixa da capa dos PDFs (F1) -->
+    <EmbeddedResource Include="Models\Planejamento\Seed\marca-gdf.png" LogicalName="Planejamento.marca-gdf.png" />
   </ItemGroup>
 
 

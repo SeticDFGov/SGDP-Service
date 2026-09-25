@@ -68,7 +68,7 @@ namespace demanda_service.Migrations
 
                     b.ToTable("acesso_modulo", null, t =>
                         {
-                            t.HasCheckConstraint("ck_acesso_modulo_modulo", "modulo IN ('demandas','pgia','contratacoes','administracao')");
+                            t.HasCheckConstraint("ck_acesso_modulo_modulo", "modulo IN ('demandas','pgia','contratacoes','planejamento','administracao')");
 
                             t.HasCheckConstraint("ck_acesso_modulo_origem", "origem IN ('sistema','keycloak')");
                         });
@@ -143,7 +143,7 @@ namespace demanda_service.Migrations
 
                     b.ToTable("pedido_acesso", null, t =>
                         {
-                            t.HasCheckConstraint("ck_pedido_acesso_modulo", "modulo IN ('demandas','pgia','contratacoes')");
+                            t.HasCheckConstraint("ck_pedido_acesso_modulo", "modulo IN ('demandas','pgia','contratacoes','planejamento')");
 
                             t.HasCheckConstraint("ck_pedido_acesso_situacao", "situacao IN ('pendente','aprovado','recusado')");
                         });
@@ -3392,6 +3392,2692 @@ namespace demanda_service.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Models.Planejamento.PeArquivo", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<long?>("DonoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("dono_id");
+
+                    b.Property<string>("DonoTipo")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("dono_tipo");
+
+                    b.Property<string>("Hash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("hash");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("nome");
+
+                    b.Property<long>("Tamanho")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tamanho");
+
+                    b.Property<string>("TipoMime")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("tipo_mime");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_arquivo");
+
+                    b.HasIndex("DonoTipo", "DonoId")
+                        .HasDatabaseName("ix_pe_arquivo_dono");
+
+                    b.ToTable("pe_arquivo", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_arquivo_conteudo", "conteudo IS NOT NULL AND octet_length(conteudo) = tamanho");
+
+                            t.HasCheckConstraint("ck_pe_arquivo_dono", "(dono_tipo IS NULL) = (dono_id IS NULL)");
+
+                            t.HasCheckConstraint("ck_pe_arquivo_dono_tipo", "dono_tipo IS NULL OR dono_tipo IN ('registro','pdtic','doc_modelo')");
+
+                            t.HasCheckConstraint("ck_pe_arquivo_tamanho", "tamanho > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeArquivoConteudo", b =>
+                {
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    b.Property<byte[]>("Conteudo")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("conteudo");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_arquivo");
+
+                    b.ToTable("pe_arquivo", (string)null);
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeCampo", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Ajuda")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("ajuda");
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<string>("Chave")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("chave");
+
+                    b.Property<string>("Config")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("config");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<DateTime?>("ExcluidoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("excluido_em");
+
+                    b.Property<string>("Largura")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("largura");
+
+                    b.Property<bool>("NaPlanilha")
+                        .HasColumnType("boolean")
+                        .HasColumnName("na_planilha");
+
+                    b.Property<bool>("NoDocumento")
+                        .HasColumnType("boolean")
+                        .HasColumnName("no_documento");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordem");
+
+                    b.Property<bool>("Principal")
+                        .HasColumnType("boolean")
+                        .HasColumnName("principal");
+
+                    b.Property<string>("Rotulo")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("rotulo");
+
+                    b.Property<long>("SecaoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("secao_id");
+
+                    b.Property<bool>("Sistema")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sistema");
+
+                    b.Property<string>("SituacaoGeral")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("situacao_geral");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("tipo");
+
+                    b.Property<bool>("Travado")
+                        .HasColumnType("boolean")
+                        .HasColumnName("travado");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_campo");
+
+                    b.HasIndex("SecaoId", "Chave")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_campo_secao_chave");
+
+                    b.ToTable("pe_campo", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_campo_chave", "chave ~ '^[a-z][a-z0-9_]*$'");
+
+                            t.HasCheckConstraint("ck_pe_campo_largura", "largura IS NULL OR largura IN ('estreita','media','larga')");
+
+                            t.HasCheckConstraint("ck_pe_campo_situacao_geral", "situacao_geral IS NULL OR situacao_geral IN ('obrigatorio','opcional','desligado')");
+
+                            t.HasCheckConstraint("ck_pe_campo_tipo", "tipo IN ('texto_curto','texto_longo','texto_rico','numero','moeda','percentual','data','sim_nao','lista','lista_multipla','ligacao_secao','ligacao_catalogo','arquivo','calculado')");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeCampoNivel", b =>
+                {
+                    b.Property<long>("CampoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("campo_id");
+
+                    b.Property<long>("NivelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("nivel_id");
+
+                    b.Property<string>("Situacao")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("situacao");
+
+                    b.HasKey("CampoId", "NivelId")
+                        .HasName("pk_pe_campo_nivel");
+
+                    b.HasIndex("NivelId")
+                        .HasDatabaseName("ix_pe_campo_nivel_nivel");
+
+                    b.ToTable("pe_campo_nivel", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_campo_nivel_situacao", "situacao IN ('obrigatorio','opcional','desligado')");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeCiclo", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<DateTime?>("FechadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fechado_em");
+
+                    b.Property<string>("FechadoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("fechado_por");
+
+                    b.Property<DateOnly?>("Fim")
+                        .HasColumnType("date")
+                        .HasColumnName("fim");
+
+                    b.Property<DateOnly>("Inicio")
+                        .HasColumnType("date")
+                        .HasColumnName("inicio");
+
+                    b.Property<int>("Numero")
+                        .HasColumnType("integer")
+                        .HasColumnName("numero");
+
+                    b.Property<long>("PdticId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("pdtic_id");
+
+                    b.Property<DateOnly?>("Prazo")
+                        .HasColumnType("date")
+                        .HasColumnName("prazo");
+
+                    b.Property<DateTime?>("ReabertoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reaberto_em");
+
+                    b.Property<string>("ReabertoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reaberto_por");
+
+                    b.Property<string>("Rotulo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("rotulo");
+
+                    b.Property<string>("Situacao")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("situacao");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("tipo");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_ciclo");
+
+                    b.HasIndex("PdticId", "Tipo", "Numero")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_ciclo_numero");
+
+                    b.HasIndex(new[] { "PdticId" }, "ux_pe_ciclo_avaliacao_aberta")
+                        .IsUnique()
+                        .HasFilter("tipo = 'avaliacao' AND situacao = 'aberto'");
+
+                    b.ToTable("pe_ciclo", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_ciclo_fechado", "(situacao = 'fechado') = (fechado_em IS NOT NULL) AND (fechado_em IS NULL) = (fechado_por IS NULL)");
+
+                            t.HasCheckConstraint("ck_pe_ciclo_numero", "numero >= 1");
+
+                            t.HasCheckConstraint("ck_pe_ciclo_periodo", "(tipo <> 'monitoramento' OR (fim IS NOT NULL AND prazo IS NOT NULL)) AND (fim IS NULL OR fim >= inicio) AND (prazo IS NULL OR fim IS NULL OR prazo >= fim)");
+
+                            t.HasCheckConstraint("ck_pe_ciclo_reaberto", "(reaberto_em IS NULL) = (reaberto_por IS NULL)");
+
+                            t.HasCheckConstraint("ck_pe_ciclo_situacao", "situacao IN ('aberto','fechado')");
+
+                            t.HasCheckConstraint("ck_pe_ciclo_tipo", "tipo IN ('monitoramento','avaliacao')");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeComentario", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AutorEmail")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("autor_email");
+
+                    b.Property<string>("AutorNome")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("autor_nome");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<long?>("PaiId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("pai_id");
+
+                    b.Property<long>("PassoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("passo_id");
+
+                    b.Property<long>("PdticId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("pdtic_id");
+
+                    b.Property<DateTime?>("ResolvidoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolvido_em");
+
+                    b.Property<string>("ResolvidoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("resolvido_por");
+
+                    b.Property<string>("Texto")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("texto");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_comentario");
+
+                    b.HasIndex("PaiId")
+                        .HasDatabaseName("ix_pe_comentario_pai");
+
+                    b.HasIndex("PassoId")
+                        .HasDatabaseName("ix_pe_comentario_passo");
+
+                    b.HasIndex("PdticId", "PassoId")
+                        .HasDatabaseName("ix_pe_comentario_pdtic");
+
+                    b.ToTable("pe_comentario", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_comentario_resolvido", "(resolvido_em IS NULL) = (resolvido_por IS NULL)");
+
+                            t.HasCheckConstraint("ck_pe_comentario_resposta", "pai_id IS NULL OR resolvido_em IS NULL");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeConfiguracao", b =>
+                {
+                    b.Property<string>("Chave")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("chave");
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<string>("Valor")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("valor");
+
+                    b.HasKey("Chave")
+                        .HasName("pk_pe_configuracao");
+
+                    b.ToTable("pe_configuracao", (string)null);
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDeliberacao", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<DateOnly?>("AtoData")
+                        .HasColumnType("date")
+                        .HasColumnName("ato_data");
+
+                    b.Property<string>("AtoNumero")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("ato_numero");
+
+                    b.Property<string>("AtoTipo")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("ato_tipo");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<DateTime?>("DecididoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decidido_em");
+
+                    b.Property<string>("DecididoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("decidido_por");
+
+                    b.Property<long?>("DocVersaoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("doc_versao_id");
+
+                    b.Property<DateTime>("EnviadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("enviado_em");
+
+                    b.Property<string>("EnviadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("enviado_por");
+
+                    b.Property<long>("ObjetoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("objeto_id");
+
+                    b.Property<string>("ObjetoTipo")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("objeto_tipo");
+
+                    b.Property<string>("Observacao")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("observacao");
+
+                    b.Property<string>("Sei")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("sei");
+
+                    b.Property<string>("Situacao")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("situacao");
+
+                    b.Property<string>("VersaoObjeto")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("versao_objeto");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_deliberacao");
+
+                    b.HasIndex("DocVersaoId")
+                        .HasDatabaseName("ix_pe_deliberacao_doc_versao");
+
+                    b.HasIndex("Situacao", "EnviadoEm")
+                        .HasDatabaseName("ix_pe_deliberacao_situacao");
+
+                    b.HasIndex(new[] { "ObjetoTipo", "ObjetoId" }, "ix_pe_deliberacao_objeto");
+
+                    b.HasIndex(new[] { "ObjetoTipo", "ObjetoId" }, "ux_pe_deliberacao_aguardando")
+                        .IsUnique()
+                        .HasFilter("situacao = 'aguardando'");
+
+                    b.ToTable("pe_deliberacao", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_deliberacao_aprovado", "situacao <> 'aprovado' OR (ato_numero IS NOT NULL AND ato_data IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_pe_deliberacao_decisao", "(situacao = 'aguardando') = (decidido_em IS NULL) AND (decidido_em IS NULL) = (decidido_por IS NULL)");
+
+                            t.HasCheckConstraint("ck_pe_deliberacao_devolvido", "situacao <> 'devolvido' OR observacao IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_pe_deliberacao_doc_versao", "doc_versao_id IS NULL OR objeto_tipo = 'pdtic'");
+
+                            t.HasCheckConstraint("ck_pe_deliberacao_objeto", "objeto_tipo IN ('petic','pdtic')");
+
+                            t.HasCheckConstraint("ck_pe_deliberacao_situacao", "situacao IN ('aguardando','aprovado','devolvido')");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocBloco", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<long>("CapituloId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("capitulo_id");
+
+                    b.Property<string>("Config")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("config");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<DateTime?>("ExcluidoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("excluido_em");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordem");
+
+                    b.Property<bool>("Sistema")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sistema");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("tipo");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_doc_bloco");
+
+                    b.HasIndex("CapituloId", "Ordem")
+                        .HasDatabaseName("ix_pe_doc_bloco_capitulo");
+
+                    b.ToTable("pe_doc_bloco", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_doc_bloco_tipo", "tipo IN ('texto','tabela_secao','lista_tema','matriz_swot','fluxo','quebra_pagina','acoes_por_situacao','metas_por_resultado','riscos_ocorridos','medicoes')");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocCapitulo", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<string>("Chave")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("chave");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<DateTime?>("ExcluidoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("excluido_em");
+
+                    b.Property<string>("IncisoDecreto")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("inciso_decreto");
+
+                    b.Property<long>("ModeloId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modelo_id");
+
+                    b.Property<bool>("Numerado")
+                        .HasColumnType("boolean")
+                        .HasColumnName("numerado");
+
+                    b.Property<bool>("Obrigatorio")
+                        .HasColumnType("boolean")
+                        .HasColumnName("obrigatorio");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordem");
+
+                    b.Property<long?>("PaiId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("pai_id");
+
+                    b.Property<string>("PassoChave")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("passo_chave");
+
+                    b.Property<bool>("Sistema")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sistema");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("titulo");
+
+                    b.Property<bool>("Travado")
+                        .HasColumnType("boolean")
+                        .HasColumnName("travado");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_doc_capitulo");
+
+                    b.HasIndex("PaiId")
+                        .HasDatabaseName("ix_pe_doc_capitulo_pai");
+
+                    b.HasIndex("ModeloId", "Chave")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_doc_capitulo_chave");
+
+                    b.ToTable("pe_doc_capitulo", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_doc_capitulo_chave", "chave ~ '^[a-z][a-z0-9_]*$'");
+
+                            t.HasCheckConstraint("ck_pe_doc_capitulo_inciso", "inciso_decreto IS NULL OR inciso_decreto ~ '^(I|II|III|IV|V|VI|VII|VIII|IX)(,(I|II|III|IV|V|VI|VII|VIII|IX))*$'");
+
+                            t.HasCheckConstraint("ck_pe_doc_capitulo_pai", "pai_id IS NULL OR pai_id <> id");
+
+                            t.HasCheckConstraint("ck_pe_doc_capitulo_travado", "NOT travado OR obrigatorio");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocModelo", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ativo");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("nome");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("tipo");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_doc_modelo");
+
+                    b.HasIndex("Tipo")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_doc_modelo_ativo")
+                        .HasFilter("ativo");
+
+                    b.ToTable("pe_doc_modelo", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_doc_modelo_tipo", "tipo IN ('pdtic','ra','rr')");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocOrgao", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<long>("CapituloId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("capitulo_id");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<bool>("Oculto")
+                        .HasColumnType("boolean")
+                        .HasColumnName("oculto");
+
+                    b.Property<long>("PdticId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("pdtic_id");
+
+                    b.Property<string>("TituloProprio")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("titulo_proprio");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_doc_orgao");
+
+                    b.HasIndex("CapituloId")
+                        .HasDatabaseName("ix_pe_doc_orgao_capitulo");
+
+                    b.HasIndex("PdticId", "CapituloId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_doc_orgao")
+                        .HasFilter("doc_tipo <> 'ra'");
+
+                    b.ToTable("pe_doc_orgao", (string)null);
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocOrgaoBloco", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("BlocoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("bloco_id");
+
+                    b.Property<DateTime>("EditadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("editado_em");
+
+                    b.Property<string>("EditadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("editado_por");
+
+                    b.Property<string>("ModeloHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("modelo_hash");
+
+                    b.Property<long>("PdticId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("pdtic_id");
+
+                    b.Property<string>("Texto")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("texto");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_doc_orgao_bloco");
+
+                    b.HasIndex("BlocoId")
+                        .HasDatabaseName("ix_pe_doc_orgao_bloco_bloco");
+
+                    b.HasIndex("PdticId", "BlocoId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_doc_orgao_bloco")
+                        .HasFilter("doc_tipo <> 'ra'");
+
+                    b.ToTable("pe_doc_orgao_bloco", (string)null);
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocOrgaoBlocoDocumento", b =>
+                {
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    b.Property<long?>("CicloId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ciclo_id");
+
+                    b.Property<string>("DocTipo")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("pdtic")
+                        .HasColumnName("doc_tipo");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_doc_orgao_bloco");
+
+                    b.HasIndex("CicloId")
+                        .HasDatabaseName("ix_pe_doc_orgao_bloco_ciclo");
+
+                    b.ToTable("pe_doc_orgao_bloco", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_doc_orgao_bloco_documento", "doc_tipo IS NOT NULL AND doc_tipo IN ('pdtic','ra','rr') AND (doc_tipo = 'ra') = (ciclo_id IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocOrgaoDocumento", b =>
+                {
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    b.Property<long?>("CicloId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ciclo_id");
+
+                    b.Property<string>("DocTipo")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("pdtic")
+                        .HasColumnName("doc_tipo");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_doc_orgao");
+
+                    b.HasIndex("CicloId")
+                        .HasDatabaseName("ix_pe_doc_orgao_ciclo");
+
+                    b.ToTable("pe_doc_orgao", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_doc_orgao_documento", "doc_tipo IS NOT NULL AND doc_tipo IN ('pdtic','ra','rr') AND (doc_tipo = 'ra') = (ciclo_id IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocVersao", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ArquivoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("arquivo_id");
+
+                    b.Property<DateTime>("GeradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("gerado_em");
+
+                    b.Property<string>("GeradoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("gerado_por");
+
+                    b.Property<string>("Hash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("hash");
+
+                    b.Property<int>("Numero")
+                        .HasColumnType("integer")
+                        .HasColumnName("numero");
+
+                    b.Property<int>("Paginas")
+                        .HasColumnType("integer")
+                        .HasColumnName("paginas");
+
+                    b.Property<long>("PdticId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("pdtic_id");
+
+                    b.Property<string>("Situacao")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("situacao");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_doc_versao");
+
+                    b.HasIndex("ArquivoId")
+                        .HasDatabaseName("ix_pe_doc_versao_arquivo");
+
+                    b.HasIndex(new[] { "PdticId", "Numero" }, "ux_pe_doc_versao_numero")
+                        .IsUnique()
+                        .HasFilter("doc_tipo = 'pdtic'");
+
+                    b.HasIndex(new[] { "PdticId", "Numero" }, "ux_pe_doc_versao_numero_rr")
+                        .IsUnique()
+                        .HasFilter("doc_tipo = 'rr'");
+
+                    b.ToTable("pe_doc_versao", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_doc_versao_numero", "numero >= 1");
+
+                            t.HasCheckConstraint("ck_pe_doc_versao_paginas", "paginas >= 1");
+
+                            t.HasCheckConstraint("ck_pe_doc_versao_situacao", "situacao IN ('minuta','enviada','aprovada','publicada')");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocVersaoDocumento", b =>
+                {
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    b.Property<long?>("CicloId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ciclo_id");
+
+                    b.Property<string>("DocTipo")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("pdtic")
+                        .HasColumnName("doc_tipo");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_doc_versao");
+
+                    b.HasIndex("CicloId")
+                        .HasDatabaseName("ix_pe_doc_versao_ciclo");
+
+                    b.ToTable("pe_doc_versao", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_doc_versao_documento", "doc_tipo IS NOT NULL AND doc_tipo IN ('pdtic','ra','rr') AND (doc_tipo = 'ra') = (ciclo_id IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeEtapa", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<string>("Chave")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("chave");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<string>("Descricao")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("descricao");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordem");
+
+                    b.Property<string>("ReferenciaGuia")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("referencia_guia");
+
+                    b.Property<bool>("Sistema")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sistema");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("titulo");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_etapa");
+
+                    b.HasIndex("Chave")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_etapa_chave");
+
+                    b.ToTable("pe_etapa", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_etapa_chave", "chave ~ '^[a-z][a-z0-9-]*$'");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeFluxo", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<string>("Definicao")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("definicao");
+
+                    b.Property<string>("ModeloHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("modelo_hash");
+
+                    b.Property<long>("ModeloId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modelo_id");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("nome");
+
+                    b.Property<long>("PdticId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("pdtic_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_fluxo");
+
+                    b.HasIndex("ModeloId")
+                        .HasDatabaseName("ix_pe_fluxo_modelo");
+
+                    b.HasIndex("PdticId", "ModeloId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_fluxo_pdtic_modelo");
+
+                    b.ToTable("pe_fluxo", (string)null);
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeFluxoModelo", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<string>("Chave")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("chave");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<string>("Definicao")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("definicao");
+
+                    b.Property<string>("FiguraGuia")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("figura_guia");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("nome");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordem");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_fluxo_modelo");
+
+                    b.HasIndex("Chave")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_fluxo_modelo_chave");
+
+                    b.ToTable("pe_fluxo_modelo", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_fluxo_modelo_chave", "chave ~ '^[a-z][a-z0-9_]*$'");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeInadimplencia", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<DateOnly?>("ComunicadoControleEm")
+                        .HasColumnType("date")
+                        .HasColumnName("comunicado_controle_em");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<string>("Documento")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("documento");
+
+                    b.Property<string>("Justificativa")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("justificativa");
+
+                    b.Property<string>("Motivo")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("motivo");
+
+                    b.Property<string>("NotaMotivacao")
+                        .HasMaxLength(10000)
+                        .HasColumnType("character varying(10000)")
+                        .HasColumnName("nota_motivacao");
+
+                    b.Property<DateOnly>("NotificadoEm")
+                        .HasColumnType("date")
+                        .HasColumnName("notificado_em");
+
+                    b.Property<string>("Obrigacao")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("obrigacao");
+
+                    b.Property<string>("Observacao")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("observacao");
+
+                    b.Property<long>("OrgaoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("orgao_id");
+
+                    b.Property<DateOnly>("Prazo")
+                        .HasColumnType("date")
+                        .HasColumnName("prazo");
+
+                    b.Property<string>("PrazoDescumprido")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("prazo_descumprido");
+
+                    b.Property<DateTime?>("RegistradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("registrado_em");
+
+                    b.Property<string>("RegistradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("registrado_por");
+
+                    b.Property<DateOnly?>("SaneadoEm")
+                        .HasColumnType("date")
+                        .HasColumnName("saneado_em");
+
+                    b.Property<string>("Sei")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("sei");
+
+                    b.Property<string>("Situacao")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("situacao");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_inadimplencia");
+
+                    b.HasIndex("OrgaoId", "Situacao")
+                        .HasDatabaseName("ix_pe_inadimplencia_orgao");
+
+                    b.ToTable("pe_inadimplencia", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_inadimplencia_justificado", "situacao <> 'justificado' OR justificativa IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_pe_inadimplencia_motivo", "motivo IS NULL OR motivo IN ('descumprimento_prazo','omissao_reiterada','recusa_injustificada')");
+
+                            t.HasCheckConstraint("ck_pe_inadimplencia_prazo", "prazo > notificado_em");
+
+                            t.HasCheckConstraint("ck_pe_inadimplencia_registro", "(registrado_em IS NULL) = (registrado_por IS NULL) AND (registrado_em IS NULL) = (motivo IS NULL) AND (registrado_em IS NULL) = (nota_motivacao IS NULL) AND (situacao <> 'inadimplente' OR registrado_em IS NOT NULL) AND (situacao IN ('inadimplente','saneado') OR registrado_em IS NULL) AND (comunicado_controle_em IS NULL OR (registrado_em IS NOT NULL AND comunicado_controle_em >= notificado_em))");
+
+                            t.HasCheckConstraint("ck_pe_inadimplencia_saneado", "(situacao = 'saneado') = (saneado_em IS NOT NULL) AND (saneado_em IS NULL OR saneado_em >= notificado_em)");
+
+                            t.HasCheckConstraint("ck_pe_inadimplencia_situacao", "situacao IN ('notificado','justificado','inadimplente','saneado')");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeModeloHistorico", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Acao")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("acao");
+
+                    b.Property<DateTime>("AlteradoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("AlteradoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<string>("Antes")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("antes");
+
+                    b.Property<string>("Depois")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("depois");
+
+                    b.Property<string>("Entidade")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("entidade");
+
+                    b.Property<long>("EntidadeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("entidade_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_modelo_historico");
+
+                    b.HasIndex("AlteradoEm")
+                        .HasDatabaseName("ix_pe_modelo_historico_data");
+
+                    b.HasIndex("Entidade", "EntidadeId")
+                        .HasDatabaseName("ix_pe_modelo_historico_entidade");
+
+                    b.ToTable("pe_modelo_historico", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_modelo_historico_acao", "acao IN ('criacao','alteracao','situacao','ordem','exclusao','remocao')");
+
+                            t.HasCheckConstraint("ck_pe_modelo_historico_entidade", "entidade IN ('nivel','etapa','passo','secao','campo','opcao','orgao_nivel','orgao_ajuste','doc_capitulo','doc_bloco','fluxo_modelo','configuracao')");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeNivel", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ativo");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("codigo");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<string>("Descricao")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("descricao");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("nome");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordem");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_nivel");
+
+                    b.HasIndex("Codigo")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_nivel_codigo");
+
+                    b.ToTable("pe_nivel", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_nivel_codigo", "codigo ~ '^[a-z][a-z0-9_]*$'");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeOpcao", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<bool>("Ativa")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ativa");
+
+                    b.Property<long>("CampoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("campo_id");
+
+                    b.Property<string>("Cor")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("cor");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordem");
+
+                    b.Property<string>("Rotulo")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("rotulo");
+
+                    b.Property<bool>("Sistema")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sistema");
+
+                    b.Property<bool>("Travada")
+                        .HasColumnType("boolean")
+                        .HasColumnName("travada");
+
+                    b.Property<string>("Valor")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("valor");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_opcao");
+
+                    b.HasIndex("CampoId", "Valor")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_opcao_campo_valor");
+
+                    b.ToTable("pe_opcao", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_opcao_cor", "cor IS NULL OR cor IN ('verde','amarelo','laranja','vermelho','azul','roxo','cinza')");
+
+                            t.HasCheckConstraint("ck_pe_opcao_valor", "valor ~ '^[a-z0-9][a-z0-9_]*$'");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeOrgaoAjuste", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<long>("AlvoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("alvo_id");
+
+                    b.Property<string>("AlvoTipo")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("alvo_tipo");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<string>("Justificativa")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("justificativa");
+
+                    b.Property<long>("OrgaoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("orgao_id");
+
+                    b.Property<string>("Situacao")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("situacao");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_orgao_ajuste");
+
+                    b.HasIndex("OrgaoId", "AlvoTipo", "AlvoId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_orgao_ajuste_alvo");
+
+                    b.ToTable("pe_orgao_ajuste", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_orgao_ajuste_alvo", "alvo_tipo IN ('passo','secao','campo')");
+
+                            t.HasCheckConstraint("ck_pe_orgao_ajuste_situacao", "situacao IN ('obrigatorio','opcional','desligado')");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeOrgaoConfig", b =>
+                {
+                    b.Property<long>("OrgaoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("orgao_id");
+
+                    b.Property<DateTime>("DefinidoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("definido_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("DefinidoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("definido_por");
+
+                    b.Property<string>("Justificativa")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("justificativa");
+
+                    b.Property<long>("NivelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("nivel_id");
+
+                    b.HasKey("OrgaoId")
+                        .HasName("pk_pe_orgao_config");
+
+                    b.HasIndex("NivelId")
+                        .HasDatabaseName("ix_pe_orgao_config_nivel");
+
+                    b.ToTable("pe_orgao_config", (string)null);
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeOrgaoPassoDetalhe", b =>
+                {
+                    b.Property<long>("OrgaoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("orgao_id");
+
+                    b.Property<long>("PassoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("passo_id");
+
+                    b.Property<DateTime>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<long>("NivelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("nivel_id");
+
+                    b.HasKey("OrgaoId", "PassoId")
+                        .HasName("pk_pe_orgao_passo_detalhe");
+
+                    b.HasIndex("NivelId")
+                        .HasDatabaseName("ix_pe_orgao_passo_detalhe_nivel");
+
+                    b.HasIndex("PassoId")
+                        .HasDatabaseName("ix_pe_orgao_passo_detalhe_passo");
+
+                    b.ToTable("pe_orgao_passo_detalhe", (string)null);
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PePapelUsuario", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<DateTime>("ConcedidoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("concedido_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("ConcedidoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("concedido_por");
+
+                    b.Property<string>("Papel")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("papel");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_pe_papel_usuario");
+
+                    b.ToTable("pe_papel_usuario", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_papel_usuario_papel", "papel IN ('pe_admin','pe_sgdi','pe_cgtic','pe_orgao','pe_orgao_consulta')");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PePapelUsuarioHistorico", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("AlteradoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("AlteradoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<string>("Origem")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("origem");
+
+                    b.Property<string>("PapelAnterior")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("papel_anterior");
+
+                    b.Property<string>("PapelNovo")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("papel_novo");
+
+                    b.Property<long?>("PedidoAcessoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("pedido_acesso_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_papel_usuario_historico");
+
+                    b.HasIndex("UserId", "AlteradoEm")
+                        .HasDatabaseName("ix_pe_papel_usuario_historico_user");
+
+                    b.ToTable("pe_papel_usuario_historico", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_papel_usuario_historico_origem", "origem IN ('pessoas','pedido','gestao_acessos','modo_local')");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PePasso", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("AceitaNaoSeAplica")
+                        .HasColumnType("boolean")
+                        .HasColumnName("aceita_nao_se_aplica");
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<string>("BaseLegal")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("base_legal");
+
+                    b.Property<string>("Chave")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("chave");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<long>("EtapaId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("etapa_id");
+
+                    b.Property<DateTime?>("ExcluidoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("excluido_em");
+
+                    b.Property<string>("IncisoDecreto")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("inciso_decreto");
+
+                    b.Property<string>("OQueFazer")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("o_que_fazer");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordem");
+
+                    b.Property<string>("ReferenciaGuia")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("referencia_guia");
+
+                    b.Property<bool>("Sistema")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sistema");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("tipo");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("titulo");
+
+                    b.Property<bool>("Travado")
+                        .HasColumnType("boolean")
+                        .HasColumnName("travado");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_passo");
+
+                    b.HasIndex("Chave")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_passo_chave");
+
+                    b.HasIndex("EtapaId", "Ordem")
+                        .HasDatabaseName("ix_pe_passo_etapa");
+
+                    b.ToTable("pe_passo", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_passo_chave", "chave ~ '^[a-z][a-z0-9-]*\\.[a-z0-9][a-z0-9-]*$'");
+
+                            t.HasCheckConstraint("ck_pe_passo_inciso", "inciso_decreto IS NULL OR inciso_decreto ~ '^(I|II|III|IV|V|VI|VII|VIII|IX)(,(I|II|III|IV|V|VI|VII|VIII|IX))*$'");
+
+                            t.HasCheckConstraint("ck_pe_passo_tipo", "tipo IN ('dados','documento','fluxo','aprovacao','envio','deliberacao','publicacao','conferencia_temas','monitoramento')");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PePassoNivel", b =>
+                {
+                    b.Property<long>("PassoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("passo_id");
+
+                    b.Property<long>("NivelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("nivel_id");
+
+                    b.Property<string>("Situacao")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("situacao");
+
+                    b.HasKey("PassoId", "NivelId")
+                        .HasName("pk_pe_passo_nivel");
+
+                    b.HasIndex("NivelId")
+                        .HasDatabaseName("ix_pe_passo_nivel_nivel");
+
+                    b.ToTable("pe_passo_nivel", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_passo_nivel_situacao", "situacao IN ('obrigatorio','opcional','desligado')");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PePdtic", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<long?>("AnteriorId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("anterior_id");
+
+                    b.Property<DateTime?>("AprovadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("aprovado_em");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<DateTime?>("EncerradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("encerrado_em");
+
+                    b.Property<string>("EncerramentoMotivo")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("encerramento_motivo");
+
+                    b.Property<DateTime?>("EnviadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("enviado_em");
+
+                    b.Property<long>("OrgaoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("orgao_id");
+
+                    b.Property<DateTime?>("PublicadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("publicado_em");
+
+                    b.Property<bool>("RegistradoExternamente")
+                        .HasColumnType("boolean")
+                        .HasColumnName("registrado_externamente");
+
+                    b.Property<string>("RevisaoJustificativa")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("revisao_justificativa");
+
+                    b.Property<string>("Situacao")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("situacao");
+
+                    b.Property<string>("Versao")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("versao");
+
+                    b.Property<DateOnly?>("VigenciaFim")
+                        .HasColumnType("date")
+                        .HasColumnName("vigencia_fim");
+
+                    b.Property<DateOnly?>("VigenciaInicio")
+                        .HasColumnType("date")
+                        .HasColumnName("vigencia_inicio");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_pdtic");
+
+                    b.HasIndex("AnteriorId")
+                        .HasDatabaseName("ix_pe_pdtic_anterior");
+
+                    b.HasIndex("OrgaoId", "Versao")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_pdtic_orgao_versao");
+
+                    b.HasIndex(new[] { "OrgaoId" }, "ux_pe_pdtic_em_elaboracao")
+                        .IsUnique()
+                        .HasFilter("situacao IN ('em_elaboracao','em_aprovacao','devolvido','aprovado')");
+
+                    b.HasIndex(new[] { "OrgaoId" }, "ux_pe_pdtic_vigente")
+                        .IsUnique()
+                        .HasFilter("situacao IN ('publicado','em_acompanhamento')");
+
+                    b.ToTable("pe_pdtic", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_pdtic_aprovado", "situacao NOT IN ('aprovado','publicado','em_acompanhamento') OR aprovado_em IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_pe_pdtic_encerrado", "(situacao = 'encerrado') = (encerrado_em IS NOT NULL) AND (encerramento_motivo IS NULL OR situacao = 'encerrado')");
+
+                            t.HasCheckConstraint("ck_pe_pdtic_enviado", "situacao <> 'em_aprovacao' OR enviado_em IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_pe_pdtic_publicado", "situacao NOT IN ('publicado','em_acompanhamento') OR publicado_em IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_pe_pdtic_situacao", "situacao IN ('em_elaboracao','em_aprovacao','devolvido','aprovado','publicado','em_acompanhamento','encerrado','substituido')");
+
+                            t.HasCheckConstraint("ck_pe_pdtic_versao", "versao ~ '^[0-9]+\\.[0-9]+$'");
+
+                            t.HasCheckConstraint("ck_pe_pdtic_vigencia", "vigencia_inicio IS NULL OR vigencia_fim IS NULL OR vigencia_fim >= vigencia_inicio");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PePdticPasso", b =>
+                {
+                    b.Property<long>("PdticId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("pdtic_id");
+
+                    b.Property<long>("PassoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("passo_id");
+
+                    b.Property<string>("Justificativa")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("justificativa");
+
+                    b.Property<DateTime>("MarcadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("marcado_em");
+
+                    b.Property<string>("MarcadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("marcado_por");
+
+                    b.Property<bool>("NaoSeAplica")
+                        .HasColumnType("boolean")
+                        .HasColumnName("nao_se_aplica");
+
+                    b.HasKey("PdticId", "PassoId")
+                        .HasName("pk_pe_pdtic_passo");
+
+                    b.HasIndex("PassoId")
+                        .HasDatabaseName("ix_pe_pdtic_passo_passo");
+
+                    b.ToTable("pe_pdtic_passo", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_pdtic_passo_justificativa", "nao_se_aplica = (justificativa IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PePdticPassoValidacao", b =>
+                {
+                    b.Property<long>("PdticId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("pdtic_id");
+
+                    b.Property<long>("PassoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("passo_id");
+
+                    b.Property<DateTime?>("AlteradaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("validacao_alterada_em");
+
+                    b.Property<DateTime>("ValidadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("validado_em");
+
+                    b.Property<string>("ValidadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("validado_por");
+
+                    b.HasKey("PdticId", "PassoId")
+                        .HasName("pk_pe_pdtic_passo");
+
+                    b.ToTable("pe_pdtic_passo", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_pdtic_passo_validacao", "(validado_em IS NULL) = (validado_por IS NULL)");
+
+                            t.HasCheckConstraint("ck_pe_pdtic_passo_validacao_alterada", "validacao_alterada_em IS NULL OR validado_em IS NOT NULL");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PePetic", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<long?>("AnteriorId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("anterior_id");
+
+                    b.Property<DateTime?>("AprovadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("aprovado_em");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<string>("Situacao")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("situacao");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("titulo");
+
+                    b.Property<string>("Versao")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("versao");
+
+                    b.Property<DateOnly?>("VigenciaFim")
+                        .HasColumnType("date")
+                        .HasColumnName("vigencia_fim");
+
+                    b.Property<DateOnly?>("VigenciaInicio")
+                        .HasColumnType("date")
+                        .HasColumnName("vigencia_inicio");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_petic");
+
+                    b.HasIndex("AnteriorId")
+                        .HasDatabaseName("ix_pe_petic_anterior");
+
+                    b.HasIndex("Situacao")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_petic_situacao")
+                        .HasFilter("situacao IN ('rascunho','em_deliberacao','aprovado')");
+
+                    b.HasIndex("Versao")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_petic_versao");
+
+                    b.ToTable("pe_petic", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_petic_aprovado_em", "(situacao IN ('aprovado','substituido')) = (aprovado_em IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_pe_petic_situacao", "situacao IN ('rascunho','em_deliberacao','aprovado','substituido')");
+
+                            t.HasCheckConstraint("ck_pe_petic_versao", "versao ~ '^[0-9]+\\.[0-9]+$'");
+
+                            t.HasCheckConstraint("ck_pe_petic_vigencia", "vigencia_inicio IS NULL OR vigencia_fim IS NULL OR vigencia_fim >= vigencia_inicio");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeRegistro", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<string>("Codigo")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("codigo");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<string>("Dados")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("dados");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordem");
+
+                    b.Property<long?>("PdticId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("pdtic_id");
+
+                    b.Property<long?>("PeticId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("petic_id");
+
+                    b.Property<long>("SecaoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("secao_id");
+
+                    b.Property<bool>("Sistema")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sistema");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_registro");
+
+                    b.HasIndex("SecaoId", "Ordem")
+                        .HasDatabaseName("ix_pe_registro_secao");
+
+                    b.HasIndex("PdticId", "SecaoId", "Codigo")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_registro_pdtic_codigo");
+
+                    b.HasIndex("PeticId", "SecaoId", "Codigo")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_registro_petic_codigo");
+
+                    b.ToTable("pe_registro", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_registro_codigo", "codigo IS NULL OR codigo ~ '^[A-Z][A-Z0-9]*[0-9]$'");
+
+                            t.HasCheckConstraint("ck_pe_registro_dono", "petic_id IS NULL OR pdtic_id IS NULL");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeRegistroCiclo", b =>
+                {
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    b.Property<long>("CicloId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ciclo_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_registro");
+
+                    b.HasIndex("CicloId")
+                        .HasDatabaseName("ix_pe_registro_ciclo");
+
+                    b.ToTable("pe_registro", (string)null);
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeRegistroSequencia", b =>
+                {
+                    b.Property<long>("SecaoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("secao_id");
+
+                    b.Property<string>("Dono")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("dono");
+
+                    b.Property<int>("Ultimo")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("ultimo");
+
+                    b.HasKey("SecaoId", "Dono")
+                        .HasName("pk_pe_registro_sequencia");
+
+                    b.ToTable("pe_registro_sequencia", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_registro_sequencia_dono", "dono ~ '^[a-z]+(:[0-9]+)?$'");
+
+                            t.HasCheckConstraint("ck_pe_registro_sequencia_ultimo", "ultimo >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeSecao", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Ajuda")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("ajuda");
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<string>("Chave")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("chave");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<string>("Escopo")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("escopo");
+
+                    b.Property<DateTime?>("ExcluidoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("excluido_em");
+
+                    b.Property<string>("IncisoDecreto")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("inciso_decreto");
+
+                    b.Property<bool>("NaPlanilha")
+                        .HasColumnType("boolean")
+                        .HasColumnName("na_planilha");
+
+                    b.Property<bool>("NoDocumento")
+                        .HasColumnType("boolean")
+                        .HasColumnName("no_documento");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordem");
+
+                    b.Property<long?>("PassoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("passo_id");
+
+                    b.Property<string>("PrefixoCodigo")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("prefixo_codigo");
+
+                    b.Property<bool>("Sistema")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sistema");
+
+                    b.Property<string>("SituacaoGeral")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("situacao_geral");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("tipo");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("titulo");
+
+                    b.Property<bool>("Travada")
+                        .HasColumnType("boolean")
+                        .HasColumnName("travada");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_secao");
+
+                    b.HasIndex("Chave")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_secao_chave");
+
+                    b.HasIndex("PassoId", "Ordem")
+                        .HasDatabaseName("ix_pe_secao_passo");
+
+                    b.ToTable("pe_secao", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_secao_chave", "chave ~ '^[a-z][a-z0-9_]*$'");
+
+                            t.HasCheckConstraint("ck_pe_secao_escopo", "escopo IN ('pdtic','petic','df')");
+
+                            t.HasCheckConstraint("ck_pe_secao_escopo_passo", "(escopo = 'pdtic') = (passo_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_pe_secao_escopo_situacao", "(escopo = 'pdtic') = (situacao_geral IS NULL)");
+
+                            t.HasCheckConstraint("ck_pe_secao_inciso", "inciso_decreto IS NULL OR inciso_decreto ~ '^(I|II|III|IV|V|VI|VII|VIII|IX)(,(I|II|III|IV|V|VI|VII|VIII|IX))*$'");
+
+                            t.HasCheckConstraint("ck_pe_secao_situacao_geral", "situacao_geral IS NULL OR situacao_geral IN ('obrigatorio','opcional','desligado')");
+
+                            t.HasCheckConstraint("ck_pe_secao_tipo", "tipo IN ('formulario','tabela')");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeSecaoCiclo", b =>
+                {
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    b.Property<string>("PorCiclo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("por_ciclo");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_secao");
+
+                    b.ToTable("pe_secao", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_secao_por_ciclo", "por_ciclo IS NULL OR por_ciclo IN ('monitoramento','avaliacao')");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeSecaoNivel", b =>
+                {
+                    b.Property<long>("SecaoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("secao_id");
+
+                    b.Property<long>("NivelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("nivel_id");
+
+                    b.Property<string>("Situacao")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("situacao");
+
+                    b.HasKey("SecaoId", "NivelId")
+                        .HasName("pk_pe_secao_nivel");
+
+                    b.HasIndex("NivelId")
+                        .HasDatabaseName("ix_pe_secao_nivel_nivel");
+
+                    b.ToTable("pe_secao_nivel", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_secao_nivel_situacao", "situacao IN ('obrigatorio','opcional','desligado')");
+                        });
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeVinculo", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CampoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("campo_id");
+
+                    b.Property<long>("RegistroDestinoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("registro_destino_id");
+
+                    b.Property<long>("RegistroOrigemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("registro_origem_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pe_vinculo");
+
+                    b.HasIndex("CampoId")
+                        .HasDatabaseName("ix_pe_vinculo_campo");
+
+                    b.HasIndex("RegistroDestinoId")
+                        .HasDatabaseName("ix_pe_vinculo_destino");
+
+                    b.HasIndex("RegistroOrigemId", "CampoId", "RegistroDestinoId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pe_vinculo");
+
+                    b.ToTable("pe_vinculo", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pe_vinculo_origem_destino", "registro_origem_id <> registro_destino_id");
+                        });
+                });
+
             modelBuilder.Entity("app.Models.Unidade", b =>
                 {
                     b.Property<Guid>("id")
@@ -4087,6 +6773,615 @@ namespace demanda_service.Migrations
                     b.Navigation("Sistema");
                 });
 
+            modelBuilder.Entity("Models.Planejamento.PeArquivoConteudo", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeArquivo", "Arquivo")
+                        .WithOne()
+                        .HasForeignKey("Models.Planejamento.PeArquivoConteudo", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Arquivo");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeCampo", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeSecao", "Secao")
+                        .WithMany("Campos")
+                        .HasForeignKey("SecaoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_campo_secao");
+
+                    b.Navigation("Secao");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeCampoNivel", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeCampo", "Campo")
+                        .WithMany("Niveis")
+                        .HasForeignKey("CampoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_campo_nivel_campo");
+
+                    b.HasOne("Models.Planejamento.PeNivel", "Nivel")
+                        .WithMany()
+                        .HasForeignKey("NivelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_campo_nivel_nivel");
+
+                    b.Navigation("Campo");
+
+                    b.Navigation("Nivel");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeCiclo", b =>
+                {
+                    b.HasOne("Models.Planejamento.PePdtic", "Pdtic")
+                        .WithMany()
+                        .HasForeignKey("PdticId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_ciclo_pdtic");
+
+                    b.Navigation("Pdtic");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeComentario", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeComentario", "Pai")
+                        .WithMany()
+                        .HasForeignKey("PaiId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_pe_comentario_pai");
+
+                    b.HasOne("Models.Planejamento.PePasso", "Passo")
+                        .WithMany()
+                        .HasForeignKey("PassoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_comentario_passo");
+
+                    b.HasOne("Models.Planejamento.PePdtic", "Pdtic")
+                        .WithMany()
+                        .HasForeignKey("PdticId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_comentario_pdtic");
+
+                    b.Navigation("Pai");
+
+                    b.Navigation("Passo");
+
+                    b.Navigation("Pdtic");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDeliberacao", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeDocVersao", "DocVersao")
+                        .WithMany()
+                        .HasForeignKey("DocVersaoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_pe_deliberacao_doc_versao");
+
+                    b.Navigation("DocVersao");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocBloco", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeDocCapitulo", "Capitulo")
+                        .WithMany("Blocos")
+                        .HasForeignKey("CapituloId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_doc_bloco_capitulo");
+
+                    b.Navigation("Capitulo");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocCapitulo", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeDocModelo", "Modelo")
+                        .WithMany("Capitulos")
+                        .HasForeignKey("ModeloId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_doc_capitulo_modelo");
+
+                    b.HasOne("Models.Planejamento.PeDocCapitulo", "Pai")
+                        .WithMany()
+                        .HasForeignKey("PaiId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_pe_doc_capitulo_pai");
+
+                    b.Navigation("Modelo");
+
+                    b.Navigation("Pai");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocOrgao", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeDocCapitulo", "Capitulo")
+                        .WithMany()
+                        .HasForeignKey("CapituloId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_doc_orgao_capitulo");
+
+                    b.HasOne("Models.Planejamento.PePdtic", "Pdtic")
+                        .WithMany()
+                        .HasForeignKey("PdticId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_doc_orgao_pdtic");
+
+                    b.Navigation("Capitulo");
+
+                    b.Navigation("Pdtic");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocOrgaoBloco", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeDocBloco", "Bloco")
+                        .WithMany()
+                        .HasForeignKey("BlocoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_doc_orgao_bloco_bloco");
+
+                    b.HasOne("Models.Planejamento.PePdtic", "Pdtic")
+                        .WithMany()
+                        .HasForeignKey("PdticId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_doc_orgao_bloco_pdtic");
+
+                    b.Navigation("Bloco");
+
+                    b.Navigation("Pdtic");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocOrgaoBlocoDocumento", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeCiclo", "Ciclo")
+                        .WithMany()
+                        .HasForeignKey("CicloId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_pe_doc_orgao_bloco_ciclo");
+
+                    b.HasOne("Models.Planejamento.PeDocOrgaoBloco", "Linha")
+                        .WithOne()
+                        .HasForeignKey("Models.Planejamento.PeDocOrgaoBlocoDocumento", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Ciclo");
+
+                    b.Navigation("Linha");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocOrgaoDocumento", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeCiclo", "Ciclo")
+                        .WithMany()
+                        .HasForeignKey("CicloId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_pe_doc_orgao_ciclo");
+
+                    b.HasOne("Models.Planejamento.PeDocOrgao", "Linha")
+                        .WithOne()
+                        .HasForeignKey("Models.Planejamento.PeDocOrgaoDocumento", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Ciclo");
+
+                    b.Navigation("Linha");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocVersao", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeArquivo", "Arquivo")
+                        .WithMany()
+                        .HasForeignKey("ArquivoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_doc_versao_arquivo");
+
+                    b.HasOne("Models.Planejamento.PePdtic", "Pdtic")
+                        .WithMany()
+                        .HasForeignKey("PdticId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_doc_versao_pdtic");
+
+                    b.Navigation("Arquivo");
+
+                    b.Navigation("Pdtic");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocVersaoDocumento", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeCiclo", "Ciclo")
+                        .WithMany()
+                        .HasForeignKey("CicloId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_pe_doc_versao_ciclo");
+
+                    b.HasOne("Models.Planejamento.PeDocVersao", "Linha")
+                        .WithOne()
+                        .HasForeignKey("Models.Planejamento.PeDocVersaoDocumento", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Ciclo");
+
+                    b.Navigation("Linha");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeFluxo", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeFluxoModelo", "Modelo")
+                        .WithMany()
+                        .HasForeignKey("ModeloId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_fluxo_modelo");
+
+                    b.HasOne("Models.Planejamento.PePdtic", "Pdtic")
+                        .WithMany()
+                        .HasForeignKey("PdticId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_fluxo_pdtic");
+
+                    b.Navigation("Modelo");
+
+                    b.Navigation("Pdtic");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeInadimplencia", b =>
+                {
+                    b.HasOne("Models.Pgia.PgiaOrgao", "Orgao")
+                        .WithMany()
+                        .HasForeignKey("OrgaoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_inadimplencia_orgao");
+
+                    b.Navigation("Orgao");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeOpcao", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeCampo", "Campo")
+                        .WithMany("Opcoes")
+                        .HasForeignKey("CampoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_opcao_campo");
+
+                    b.Navigation("Campo");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeOrgaoAjuste", b =>
+                {
+                    b.HasOne("Models.Pgia.PgiaOrgao", "Orgao")
+                        .WithMany()
+                        .HasForeignKey("OrgaoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_orgao_ajuste_orgao");
+
+                    b.Navigation("Orgao");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeOrgaoConfig", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeNivel", "Nivel")
+                        .WithMany()
+                        .HasForeignKey("NivelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_orgao_config_nivel");
+
+                    b.HasOne("Models.Pgia.PgiaOrgao", "Orgao")
+                        .WithMany()
+                        .HasForeignKey("OrgaoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_orgao_config_orgao");
+
+                    b.Navigation("Nivel");
+
+                    b.Navigation("Orgao");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeOrgaoPassoDetalhe", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeNivel", "Nivel")
+                        .WithMany()
+                        .HasForeignKey("NivelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_orgao_passo_detalhe_nivel");
+
+                    b.HasOne("Models.Pgia.PgiaOrgao", "Orgao")
+                        .WithMany()
+                        .HasForeignKey("OrgaoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_orgao_passo_detalhe_orgao");
+
+                    b.HasOne("Models.Planejamento.PePasso", "Passo")
+                        .WithMany()
+                        .HasForeignKey("PassoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_orgao_passo_detalhe_passo");
+
+                    b.Navigation("Nivel");
+
+                    b.Navigation("Orgao");
+
+                    b.Navigation("Passo");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PePapelUsuario", b =>
+                {
+                    b.HasOne("app.Models.User", "User")
+                        .WithOne()
+                        .HasForeignKey("Models.Planejamento.PePapelUsuario", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_papel_usuario_user");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PePapelUsuarioHistorico", b =>
+                {
+                    b.HasOne("app.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_papel_usuario_historico_user");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PePasso", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeEtapa", "Etapa")
+                        .WithMany("Passos")
+                        .HasForeignKey("EtapaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_passo_etapa");
+
+                    b.Navigation("Etapa");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PePassoNivel", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeNivel", "Nivel")
+                        .WithMany()
+                        .HasForeignKey("NivelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_passo_nivel_nivel");
+
+                    b.HasOne("Models.Planejamento.PePasso", "Passo")
+                        .WithMany("Niveis")
+                        .HasForeignKey("PassoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_passo_nivel_passo");
+
+                    b.Navigation("Nivel");
+
+                    b.Navigation("Passo");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PePdtic", b =>
+                {
+                    b.HasOne("Models.Planejamento.PePdtic", "Anterior")
+                        .WithMany()
+                        .HasForeignKey("AnteriorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_pe_pdtic_anterior");
+
+                    b.HasOne("Models.Pgia.PgiaOrgao", "Orgao")
+                        .WithMany()
+                        .HasForeignKey("OrgaoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_pdtic_orgao");
+
+                    b.Navigation("Anterior");
+
+                    b.Navigation("Orgao");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PePdticPasso", b =>
+                {
+                    b.HasOne("Models.Planejamento.PePasso", "Passo")
+                        .WithMany()
+                        .HasForeignKey("PassoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_pdtic_passo_passo");
+
+                    b.HasOne("Models.Planejamento.PePdtic", "Pdtic")
+                        .WithMany()
+                        .HasForeignKey("PdticId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_pdtic_passo_pdtic");
+
+                    b.Navigation("Passo");
+
+                    b.Navigation("Pdtic");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PePdticPassoValidacao", b =>
+                {
+                    b.HasOne("Models.Planejamento.PePdticPasso", "Linha")
+                        .WithOne()
+                        .HasForeignKey("Models.Planejamento.PePdticPassoValidacao", "PdticId", "PassoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Linha");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PePetic", b =>
+                {
+                    b.HasOne("Models.Planejamento.PePetic", "Anterior")
+                        .WithMany()
+                        .HasForeignKey("AnteriorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_pe_petic_anterior");
+
+                    b.Navigation("Anterior");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeRegistro", b =>
+                {
+                    b.HasOne("Models.Planejamento.PePdtic", "Pdtic")
+                        .WithMany()
+                        .HasForeignKey("PdticId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_pe_registro_pdtic");
+
+                    b.HasOne("Models.Planejamento.PePetic", "Petic")
+                        .WithMany()
+                        .HasForeignKey("PeticId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_pe_registro_petic");
+
+                    b.HasOne("Models.Planejamento.PeSecao", "Secao")
+                        .WithMany()
+                        .HasForeignKey("SecaoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_registro_secao");
+
+                    b.Navigation("Pdtic");
+
+                    b.Navigation("Petic");
+
+                    b.Navigation("Secao");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeRegistroCiclo", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeCiclo", "Ciclo")
+                        .WithMany()
+                        .HasForeignKey("CicloId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_registro_ciclo");
+
+                    b.HasOne("Models.Planejamento.PeRegistro", "Registro")
+                        .WithOne()
+                        .HasForeignKey("Models.Planejamento.PeRegistroCiclo", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Ciclo");
+
+                    b.Navigation("Registro");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeRegistroSequencia", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeSecao", "Secao")
+                        .WithMany()
+                        .HasForeignKey("SecaoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_registro_sequencia_secao");
+
+                    b.Navigation("Secao");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeSecao", b =>
+                {
+                    b.HasOne("Models.Planejamento.PePasso", "Passo")
+                        .WithMany("Secoes")
+                        .HasForeignKey("PassoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_pe_secao_passo");
+
+                    b.Navigation("Passo");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeSecaoCiclo", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeSecao", "Secao")
+                        .WithOne()
+                        .HasForeignKey("Models.Planejamento.PeSecaoCiclo", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Secao");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeSecaoNivel", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeNivel", "Nivel")
+                        .WithMany()
+                        .HasForeignKey("NivelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_secao_nivel_nivel");
+
+                    b.HasOne("Models.Planejamento.PeSecao", "Secao")
+                        .WithMany("Niveis")
+                        .HasForeignKey("SecaoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_secao_nivel_secao");
+
+                    b.Navigation("Nivel");
+
+                    b.Navigation("Secao");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeVinculo", b =>
+                {
+                    b.HasOne("Models.Planejamento.PeCampo", "Campo")
+                        .WithMany()
+                        .HasForeignKey("CampoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_vinculo_campo");
+
+                    b.HasOne("Models.Planejamento.PeRegistro", "RegistroDestino")
+                        .WithMany()
+                        .HasForeignKey("RegistroDestinoId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_vinculo_destino");
+
+                    b.HasOne("Models.Planejamento.PeRegistro", "RegistroOrigem")
+                        .WithMany()
+                        .HasForeignKey("RegistroOrigemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pe_vinculo_origem");
+
+                    b.Navigation("Campo");
+
+                    b.Navigation("RegistroDestino");
+
+                    b.Navigation("RegistroOrigem");
+                });
+
             modelBuilder.Entity("app.Models.User", b =>
                 {
                     b.HasOne("app.Models.Unidade", "Unidade")
@@ -4111,6 +7406,42 @@ namespace demanda_service.Migrations
             modelBuilder.Entity("Models.Pgia.PgiaClassificacaoRisco", b =>
                 {
                     b.Navigation("OutrosRiscos");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeCampo", b =>
+                {
+                    b.Navigation("Niveis");
+
+                    b.Navigation("Opcoes");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocCapitulo", b =>
+                {
+                    b.Navigation("Blocos");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeDocModelo", b =>
+                {
+                    b.Navigation("Capitulos");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeEtapa", b =>
+                {
+                    b.Navigation("Passos");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PePasso", b =>
+                {
+                    b.Navigation("Niveis");
+
+                    b.Navigation("Secoes");
+                });
+
+            modelBuilder.Entity("Models.Planejamento.PeSecao", b =>
+                {
+                    b.Navigation("Campos");
+
+                    b.Navigation("Niveis");
                 });
 #pragma warning restore 612, 618
         }

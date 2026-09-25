@@ -36,7 +36,10 @@ public class MeuPedidoAcessoResponse
     public string? MotivoRecusa { get; set; }
 }
 
-/// <summary>Pedido visto por quem decide (administração e SGDI).</summary>
+/// <summary>
+/// Pedido visto por quem decide (administração, SGDI no PGIA e administrador do módulo
+/// na Governança Estratégica).
+/// </summary>
 public class PedidoAcessoResponse
 {
     public long Id { get; set; }
@@ -65,6 +68,10 @@ public class PedidoAcessoResponse
     // Papel no PGIA dado na aprovação
     public string? PapelPgia { get; set; }
 
+    // Só nos pedidos da Governança Estratégica: o papel que a pessoa tem HOJE no módulo
+    // (lido de pe_papel_usuario; pedido_acesso não guarda esse papel). Nulo nos demais
+    public string? PapelPlanejamento { get; set; }
+
     public string? MotivoRecusa { get; set; }
 }
 
@@ -89,12 +96,17 @@ public class PedidosAcessoConsulta
     public int PageSize { get; set; } = 20;
 }
 
-/// <summary>Aprovação: libera o módulo na hora.</summary>
+/// <summary>Aprovação: libera o módulo na hora (e, na Governança Estratégica, dá o papel junto).</summary>
 public class PedidoAcessoAprovarDTO
 {
     // Só no PGIA: PapeisPgia.Todos, ou nulo para a pessoa entrar como agente público (art. 13)
     [StringLength(30)]
     public string? PapelPgia { get; set; }
+
+    // Só na Governança Estratégica, e lá obrigatório: PapeisPlanejamento.Todos (o acesso
+    // ao módulo vem junto com o papel). Em pedido de outro módulo deve vir nulo
+    [StringLength(30)]
+    public string? PapelPlanejamento { get; set; }
 }
 
 /// <summary>Recusa: o motivo é obrigatório e a pessoa o lê no card do módulo.</summary>

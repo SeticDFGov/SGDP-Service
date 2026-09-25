@@ -4,6 +4,7 @@ using app.Models;
 using Models.Pgia;
 using Models.Contratacoes;
 using Models.Acesso;
+using Models.Planejamento;
 
 namespace Models
 {
@@ -61,6 +62,61 @@ namespace Models
         // Pedidos de acesso feitos no card da tela inicial: tabela pedido_acesso
         public DbSet<PedidoAcesso> PedidosAcesso { get; set; }
 
+        // Módulo Governança Estratégica: tabelas com prefixo pe_. O cálculo do acesso de
+        // cada requisição nunca lê estas tabelas (regra do deploy, ver PapeisPlanejamento)
+        public DbSet<PePapelUsuario> PePapeisUsuario { get; set; }
+        public DbSet<PePapelUsuarioHistorico> PePapeisUsuarioHistorico { get; set; }
+        // Modelo configurável e níveis de maturidade (E2)
+        public DbSet<PeNivel> PeNiveis { get; set; }
+        public DbSet<PeEtapa> PeEtapas { get; set; }
+        public DbSet<PePasso> PePassos { get; set; }
+        public DbSet<PePassoNivel> PePassosNivel { get; set; }
+        public DbSet<PeSecao> PeSecoes { get; set; }
+        public DbSet<PeSecaoNivel> PeSecoesNivel { get; set; }
+        public DbSet<PeCampo> PeCampos { get; set; }
+        public DbSet<PeCampoNivel> PeCamposNivel { get; set; }
+        public DbSet<PeOpcao> PeOpcoes { get; set; }
+        public DbSet<PeOrgaoConfig> PeOrgaosConfig { get; set; }
+        public DbSet<PeOrgaoAjuste> PeOrgaosAjuste { get; set; }
+        public DbSet<PeConfiguracao> PeConfiguracoes { get; set; }
+        public DbSet<PeModeloHistorico> PeModeloHistorico { get; set; }
+        // Referenciais e registros (E3): PETIC-DF, deliberações do CGTIC, registros e arquivos
+        public DbSet<PePetic> PePetics { get; set; }
+        public DbSet<PeDeliberacao> PeDeliberacoes { get; set; }
+        public DbSet<PeRegistro> PeRegistros { get; set; }
+        public DbSet<PeVinculo> PeVinculos { get; set; }
+        public DbSet<PeRegistroSequencia> PeRegistroSequencias { get; set; }
+        public DbSet<PeArquivo> PeArquivos { get; set; }
+        public DbSet<PeArquivoConteudo> PeArquivosConteudo { get; set; }
+        // PDTIC dos órgãos (E4): o PDTIC, o "não se aplica" de cada passo e os comentários
+        public DbSet<PePdtic> PePdtics { get; set; }
+        public DbSet<PePdticPasso> PePdticPassos { get; set; }
+        public DbSet<PeComentario> PeComentarios { get; set; }
+        // Documento do PDTIC (E5): modelo da SGDI, cópia do órgão e versões geradas em PDF
+        public DbSet<PeDocModelo> PeDocModelos { get; set; }
+        public DbSet<PeDocCapitulo> PeDocCapitulos { get; set; }
+        public DbSet<PeDocBloco> PeDocBlocos { get; set; }
+        public DbSet<PeDocOrgao> PeDocOrgaos { get; set; }
+        public DbSet<PeDocOrgaoBloco> PeDocOrgaoBlocos { get; set; }
+        public DbSet<PeDocVersao> PeDocVersoes { get; set; }
+        // Fluxos (E6): os fluxos do guia como modelo e a cópia que o órgão adaptou
+        public DbSet<PeFluxoModelo> PeFluxosModelo { get; set; }
+        public DbSet<PeFluxo> PeFluxos { get; set; }
+        // Acompanhamento (E7, rodada B): os ciclos e as colunas novas das tabelas que já existiam,
+        // em entidades à parte (table splitting), para a leitura de sempre não depender delas
+        public DbSet<PeCiclo> PeCiclos { get; set; }
+        public DbSet<PeRegistroCiclo> PeRegistrosCiclo { get; set; }
+        public DbSet<PeSecaoCiclo> PeSecoesCiclo { get; set; }
+        public DbSet<PeDocOrgaoDocumento> PeDocOrgaosDocumento { get; set; }
+        public DbSet<PeDocOrgaoBlocoDocumento> PeDocOrgaoBlocosDocumento { get; set; }
+        public DbSet<PeDocVersaoDocumento> PeDocVersoesDocumento { get; set; }
+        // Painéis da SGDI (E8): a inadimplência do art. 11 do Decreto nº 48.899/2026
+        public DbSet<PeInadimplencia> PeInadimplencias { get; set; }
+        // Retorno do dono do produto (F3): a forma de cada passo no modo livre e a validação da equipe
+        // (colunas novas de pe_pdtic_passo, table splitting)
+        public DbSet<PeOrgaoPassoDetalhe> PeOrgaosPassoDetalhe { get; set; }
+        public DbSet<PePdticPassoValidacao> PePdticPassosValidacao { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -96,6 +152,9 @@ namespace Models
 
             // Gestão de acessos por módulo: mapeamento isolado em AcessoModelConfiguration
             modelBuilder.ApplyAcessoConfiguration();
+
+            // Módulo Governança Estratégica: mapeamento isolado em PeModelConfiguration
+            modelBuilder.ApplyPeConfiguration();
         }
     }
 

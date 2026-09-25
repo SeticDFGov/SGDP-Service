@@ -97,7 +97,9 @@ public static class DateTimeHelper
     }
 
     /// <summary>
-    /// Adiciona dias úteis (segunda a sexta) a uma data
+    /// Adiciona dias úteis a uma data: pula o sábado, o domingo e os feriados
+    /// (<see cref="EhFeriado"/>). Até a E8 da Governança Estratégica contava só de segunda a
+    /// sexta, e ninguém chamava; o prazo do art. 11 do Decreto nº 48.899/2026 é o primeiro uso.
     /// </summary>
     public static DateTime AdicionarDiasUteis(DateTime data, int diasUteis)
     {
@@ -108,15 +110,66 @@ public static class DateTimeHelper
         {
             resultado = resultado.AddDays(1);
 
-            // Ignora sábado (6) e domingo (0)
-            if (resultado.DayOfWeek != DayOfWeek.Saturday &&
-                resultado.DayOfWeek != DayOfWeek.Sunday)
+            if (EhDiaUtil(resultado))
             {
                 diasAdicionados++;
             }
         }
 
         return resultado;
+    }
+
+    /// <summary>Dia útil: de segunda a sexta e fora dos feriados (<see cref="EhFeriado"/>).</summary>
+    public static bool EhDiaUtil(DateTime data) =>
+        data.DayOfWeek != DayOfWeek.Saturday && data.DayOfWeek != DayOfWeek.Sunday && !EhFeriado(data);
+
+    /// <summary>
+    /// Feriado em Brasília: os nacionais de data fixa (1º de janeiro, 21 de abril, 1º de maio,
+    /// 7 de setembro, 12 de outubro, 2 de novembro, 15 de novembro, 20 de novembro desde 2024
+    /// pela Lei nº 14.759/2023, e 25 de dezembro), a Paixão de Cristo (a sexta-feira antes da
+    /// Páscoa) e o Dia do Evangélico do DF (30 de novembro, Lei distrital nº 963/1995). O 21 de
+    /// abril é também a fundação de Brasília. Os pontos facultativos (Carnaval, Quarta-feira de
+    /// Cinzas, Corpus Christi, Dia do Servidor) não entram: dependem do decreto de cada ano.
+    /// </summary>
+    public static bool EhFeriado(DateTime data)
+    {
+        var dia = data.Date;
+        switch ((dia.Month, dia.Day))
+        {
+            case (1, 1):
+            case (4, 21):
+            case (5, 1):
+            case (9, 7):
+            case (10, 12):
+            case (11, 2):
+            case (11, 15):
+            case (11, 30):
+            case (12, 25):
+                return true;
+            case (11, 20):
+                return dia.Year >= 2024;
+        }
+        return dia == Pascoa(dia.Year).AddDays(-2);
+    }
+
+    /// <summary>O domingo de Páscoa do ano (calendário gregoriano, algoritmo de Meeus, Jones e Butcher).</summary>
+    public static DateTime Pascoa(int ano)
+    {
+        var a = ano % 19;
+        var b = ano / 100;
+        var c = ano % 100;
+        var d = b / 4;
+        var e = b % 4;
+        var f = (b + 8) / 25;
+        var g = (b - f + 1) / 3;
+        var h = (19 * a + b - d - g + 15) % 30;
+        var i = c / 4;
+        var k = c % 4;
+        var l = (32 + 2 * e + 2 * i - h - k) % 7;
+        var m = (a + 11 * h + 22 * l) / 451;
+        var mes = (h + l - 7 * m + 114) / 31;
+        var diaDoMes = (h + l - 7 * m + 114) % 31 + 1;
+        return new DateTime(ano, mes, diaDoMes);
     }
 
     /// <summary>

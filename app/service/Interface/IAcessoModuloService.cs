@@ -32,20 +32,38 @@ public interface IAcessoModuloService
 
     Task<UsuarioAcessoResponse> ObterUsuarioAsync(Guid userId);
 
-    /// <summary>Grava de uma vez os acessos concedidos no sistema e os papéis de módulo.</summary>
+    /// <summary>
+    /// Grava de uma vez os acessos concedidos no sistema e os papéis de módulo. A
+    /// Governança Estratégica (Planejamento e PapelPlanejamento) é opcional: ausente não
+    /// muda nada; true exige papel válido (o enviado ou o atual); false tira acesso e papel.
+    /// </summary>
     Task<UsuarioAcessoResponse> DefinirAcessosAsync(Guid userId, AcessoUsuarioUpdateDTO dto, string autorEmail);
 
-    /// <summary>Liga/desliga a concessão (origem sistema) de um módulo concedível.</summary>
+    /// <summary>
+    /// Liga/desliga a concessão (origem sistema) de um módulo concedível. Não vale para a
+    /// Governança Estratégica, cujo acesso anda com o papel (DefinirPapelPlanejamentoAsync).
+    /// </summary>
     Task DefinirConcessaoAsync(Guid userId, string modulo, bool ativo, string autorEmail);
 
     /// <summary>
     /// Deixa pronta, SEM gravar, a liberação de um módulo (ModulosSgdp.Liberaveis)
     /// como a tela de gestão faria: concessão do sistema para Demandas e PGIA (com o
-    /// papel, quando vier) e o papel ctr_analise para a Supervisão Contínua. Quem
-    /// chama grava junto com o que mais precisar, numa transação só (a aprovação de
-    /// um pedido grava o pedido e o acesso no mesmo SaveChanges).
+    /// papel, quando vier), o papel ctr_analise para a Supervisão Contínua e, na
+    /// Governança Estratégica, a concessão com o papel do módulo (obrigatório) e a linha
+    /// do histórico ligada ao pedido. Quem chama grava junto com o que mais precisar,
+    /// numa transação só (a aprovação de um pedido grava o pedido e o acesso no mesmo
+    /// SaveChanges).
     /// </summary>
-    Task PrepararLiberacaoAsync(Guid userId, string modulo, string? papelPgia, string autorEmail);
+    Task PrepararLiberacaoAsync(Guid userId, string modulo, string? papelPgia, string autorEmail,
+        string? papelPlanejamento, long? pedidoAcessoId);
+
+    /// <summary>
+    /// Governança Estratégica: grava o papel da pessoa no módulo (cria ou troca) junto
+    /// com a concessão do módulo, ou tira os dois com papel nulo. Toda mudança entra no
+    /// histórico com a origem informada (PeDominios.OrigemPapel); dar o papel encerra o
+    /// pedido pendente do módulo como aprovado. Uma gravação só.
+    /// </summary>
+    Task DefinirPapelPlanejamentoAsync(Guid userId, string? papel, string autorEmail, string origem);
 
     /// <summary>
     /// Encerra como aprovados os pedidos pendentes destes módulos: o acesso chegou

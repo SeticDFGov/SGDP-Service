@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Models;
 using Models.Acesso;
+using Models.Planejamento;
 using service.Interface;
 
 namespace Controllers;
@@ -21,7 +22,9 @@ namespace Controllers;
 /// Além de emitir o token, provisiona o usuário de teste: papel PGIA, papel do
 /// módulo Supervisão Contínua das Contratações, unidade e um Órgão de Teste (com os prazos de
 /// adesão, via o serviço real) — para as personas da tela /auth/local entrarem
-/// direto na visão de cada papel.
+/// direto na visão de cada papel. Na Governança Estratégica, o papel do módulo vem
+/// com a concessão (pelo IAcessoModuloService, como em produção) e as personas de
+/// órgão ficam na unidade SES de teste, com o órgão SES.
 /// Usa o AppDbContext diretamente de propósito: é ferramenta de teste, e criar
 /// camada de serviço própria só para isso espalharia código de teste no módulo.
 /// </summary>
@@ -31,23 +34,35 @@ public class AuthLocalController : ControllerBase
 {
     private const string SiglaOrgaoDeTeste = "TESTE";
     private const string NomeUnidadeOrgao = "Órgão de Teste do PGIA";
+    private const string NomeOrgaoDeTeste = "Secretaria de Teste do PGIA";
     private const string NomeUnidadeCentral = "Unidade Central de Teste";
+
+    // Órgão das personas de órgão da Governança Estratégica. A unidade imita a que o
+    // login do Keycloak cria para um grupo (nome e código iguais à sigla)
+    private const string SiglaOrgaoPlanejamento = "SES";
+    private const string NomeOrgaoPlanejamento = "Secretaria de Estado de Saúde";
+
+    // Autor das gravações feitas pelo modo local (concessões, papéis e histórico)
+    private const string AutorModoLocal = "modo-local";
 
     private readonly IConfiguration _configuration;
     private readonly AuthSettings _authSettings;
     private readonly AppDbContext _context;
     private readonly IPgiaAdminService _adminService;
+    private readonly IAcessoModuloService _acessos;
 
     public AuthLocalController(
         IConfiguration configuration,
         IOptions<AuthSettings> authSettings,
         AppDbContext context,
-        IPgiaAdminService adminService)
+        IPgiaAdminService adminService,
+        IAcessoModuloService acessos)
     {
         _configuration = configuration;
         _authSettings = authSettings.Value;
         _context = context;
         _adminService = adminService;
+        _acessos = acessos;
     }
 
     private bool ModoLocalAtivo => _configuration.GetValue<bool>("Auth:ModoLocal");
@@ -70,9 +85,18 @@ public class AuthLocalController : ControllerBase
         // do PapelPgia: ausente/null não mexe no papel já existente.
         public string? PapelContratacoes { get; set; }
 
-        // Módulos concedidos no sistema (ModulosSgdp.Concedidos: demandas, pgia), como a
-        // tela de gestão de acessos faria. Ausente/null não mexe nas concessões atuais.
+        // Módulos concedidos no sistema (ModulosSgdp.Concedidos: demandas, pgia,
+        // planejamento), como a tela de gestão de acessos faria. Ausente/null não mexe
+        // nas concessões atuais. "planejamento" sem PapelPlanejamento só vale para quem
+        // já tem papel no módulo (o acesso anda junto com o papel).
         public List<string>? ConcederModulos { get; set; }
+
+        // Papel na Governança Estratégica (PapeisPlanejamento). Grava o papel e a
+        // concessão do módulo juntos, com histórico (origem modo_local). Ausente/null não
+        // mexe no papel existente. Papel de órgão (pe_orgao, pe_orgao_consulta) põe a
+        // pessoa na unidade SES de teste, com o órgão SES, salvo quando ela já vai para o
+        // Órgão de Teste do PGIA; papel global usa a unidade central de teste.
+        public string? PapelPlanejamento { get; set; }
     }
 
     /// <summary>
@@ -97,7 +121,15 @@ public class AuthLocalController : ControllerBase
             return BadRequest("Papel de supervisão contínua das contratações inválido (use ctr_analise ou deixe vazio).");
 
         if (request.ConcederModulos != null && request.ConcederModulos.Any(m => !ModulosSgdp.Concedidos.Contains(m)))
-            return BadRequest("Módulo concedível inválido (use demandas ou pgia).");
+            return BadRequest("Módulo concedível inválido (use demandas, pgia ou planejamento).");
+
+        if (request.PapelPlanejamento != null && !PapeisPlanejamento.EhValido(request.PapelPlanejamento))
+            return BadRequest("Papel na Governança Estratégica inválido (pe_admin, pe_sgdi, pe_cgtic, pe_orgao ou pe_orgao_consulta).");
+
+        // Na Governança Estratégica não existe acesso sem papel
+        if (request.ConcederModulos?.Contains(ModulosSgdp.Planejamento) == true && request.PapelPlanejamento == null
+            && !await JaTemPapelPlanejamentoAsync(request.Email.Trim()))
+            return BadRequest("Para conceder a Governança Estratégica, informe também o PapelPlanejamento: o acesso ao módulo vem junto com o papel.");
 
         await ProvisionarUsuarioDeTesteAsync(request);
 
@@ -135,13 +167,19 @@ public class AuthLocalController : ControllerBase
     {
         var email = request.Email.Trim();
         var precisaOrgao = request.PapelPgia == PapeisPgia.Orgao || request.VincularAoOrgaoDeTeste;
-        // O userConfiguredGuard do front exige unidade: a persona de contratações
-        // também precisa de uma (a central de teste).
-        var precisaUnidade = precisaOrgao || request.PapelPgia != null || request.PapelContratacoes != null;
+        // Papel de órgão na Governança Estratégica: a pessoa fica num órgão (SES de
+        // teste), a não ser que a persona já vá para o Órgão de Teste do PGIA
+        var precisaOrgaoPlanejamento = !precisaOrgao && PapeisPlanejamento.EhDeOrgao(request.PapelPlanejamento);
+        // O userConfiguredGuard do front exige unidade: a persona de contratações e a
+        // de papel global na Governança Estratégica também precisam de uma (a central).
+        var precisaUnidade = precisaOrgao || request.PapelPgia != null || request.PapelContratacoes != null
+            || request.PapelPlanejamento != null;
 
         Unidade? unidade = null;
         if (precisaOrgao)
-            unidade = await GarantirOrgaoDeTesteAsync(email);
+            unidade = await GarantirOrgaoDeTesteAsync(email, SiglaOrgaoDeTeste, NomeUnidadeOrgao, NomeOrgaoDeTeste);
+        else if (precisaOrgaoPlanejamento)
+            unidade = await GarantirOrgaoDeTesteAsync(email, SiglaOrgaoPlanejamento, SiglaOrgaoPlanejamento, NomeOrgaoPlanejamento);
         else if (precisaUnidade)
             unidade = await GarantirUnidadeAsync(NomeUnidadeCentral);
 
@@ -164,7 +202,8 @@ public class AuthLocalController : ControllerBase
         await _context.SaveChangesAsync();
 
         // Concessões do sistema pedidas pela persona (a mesma linha que a tela de
-        // gestão de acessos grava)
+        // gestão de acessos grava). A da Governança Estratégica anda com o papel e
+        // é gravada logo abaixo
         if (request.ConcederModulos != null)
         {
             var existentes = await _context.AcessosModulo
@@ -172,7 +211,8 @@ public class AuthLocalController : ControllerBase
                 .Select(a => a.Modulo)
                 .ToListAsync();
 
-            foreach (var modulo in request.ConcederModulos.Distinct().Where(m => !existentes.Contains(m)))
+            foreach (var modulo in request.ConcederModulos.Distinct()
+                         .Where(m => m != ModulosSgdp.Planejamento && !existentes.Contains(m)))
             {
                 _context.AcessosModulo.Add(new AcessoModulo
                 {
@@ -180,11 +220,30 @@ public class AuthLocalController : ControllerBase
                     Modulo = modulo,
                     Origem = OrigemAcesso.Sistema,
                     ConcedidoEm = DateTime.UtcNow,
-                    ConcedidoPor = "modo-local"
+                    ConcedidoPor = AutorModoLocal
                 });
             }
             await _context.SaveChangesAsync();
         }
+
+        // Governança Estratégica: papel e concessão juntos, com histórico, pelo mesmo
+        // serviço que as telas usam
+        if (request.PapelPlanejamento != null)
+            await _acessos.DefinirPapelPlanejamentoAsync(user.Id, request.PapelPlanejamento,
+                AutorModoLocal, PeDominios.OrigemPapel.ModoLocal);
+    }
+
+    /// <summary>
+    /// Pessoa de teste que já tem papel na Governança Estratégica (mesma busca do
+    /// provisionamento: sub determinístico, depois e-mail). Só é consultada quando a
+    /// persona pede o módulo sem informar o papel.
+    /// </summary>
+    private async Task<bool> JaTemPapelPlanejamentoAsync(string email)
+    {
+        var keycloakId = ModoLocalTokens.SubjectDoEmail(email).ToString();
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.KeycloakId == keycloakId)
+            ?? await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+        return user != null && await _context.PePapeisUsuario.AnyAsync(p => p.UserId == user.Id);
     }
 
     private async Task<Unidade> GarantirUnidadeAsync(string nome, string? codigoExterno = null)
@@ -202,18 +261,20 @@ public class AuthLocalController : ControllerBase
     /// <summary>
     /// Garante um órgão PGIA ativo ligado à unidade de teste, criando-o pelo
     /// serviço real de adesão (que instancia os prazos de conformidade).
-    /// Devolve a unidade que mapeia o usuário a esse órgão.
+    /// Devolve a unidade que mapeia o usuário a esse órgão. Serve ao Órgão de Teste do
+    /// PGIA (sigla TESTE) e ao órgão das personas de órgão da Governança Estratégica
+    /// (sigla SES): os dois módulos usam os mesmos órgãos.
     /// </summary>
-    private async Task<Unidade> GarantirOrgaoDeTesteAsync(string email)
+    private async Task<Unidade> GarantirOrgaoDeTesteAsync(string email, string sigla, string nomeUnidade, string nomeOrgao)
     {
         // Se o órgão de teste já existe e tem unidade, ela é a fonte da verdade
         var orgao = await _context.PgiaOrgaos
-            .FirstOrDefaultAsync(o => o.Ativo && o.Sigla == SiglaOrgaoDeTeste);
+            .FirstOrDefaultAsync(o => o.Ativo && o.Sigla == sigla);
 
         if (orgao?.UnidadeId != null)
             return (await _context.Unidades.FirstAsync(u => u.id == orgao.UnidadeId));
 
-        var unidade = await GarantirUnidadeAsync(NomeUnidadeOrgao, codigoExterno: SiglaOrgaoDeTeste);
+        var unidade = await GarantirUnidadeAsync(nomeUnidade, codigoExterno: sigla);
 
         if (orgao != null)
         {
@@ -227,10 +288,10 @@ public class AuthLocalController : ControllerBase
         var orgaoDaUnidade = await _context.PgiaOrgaos
             .AnyAsync(o => o.Ativo && o.UnidadeId == unidade.id);
         if (!orgaoDaUnidade)
-            // A sigla nasce sozinha a partir do CodigoExterno da unidade (SiglaOrgaoDeTeste).
+            // A sigla nasce sozinha a partir do CodigoExterno da unidade (a sigla pedida).
             await _adminService.CriarOrgaoAsync(new PgiaOrgaoCreateDTO
             {
-                Nome = "Secretaria de Teste do PGIA",
+                Nome = nomeOrgao,
                 NaturezaJuridica = "Administração direta",
                 UnidadeId = unidade.id
             }, email);
