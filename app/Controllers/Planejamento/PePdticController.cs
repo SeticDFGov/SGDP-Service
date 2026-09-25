@@ -194,6 +194,15 @@ public class PePdticController : ControllerBase
     public Task<IActionResult> PlanilhaDaSecao(long id, string secaoChave, [FromQuery] string? formato) =>
         Executar(async ctx => Arquivo(await _planilhas.PdticSecaoAsync(id, secaoChave, formato, ctx)));
 
+    /// <summary>
+    /// Planilha de um passo do PDTIC (E8; ?formato=csv ou xlsx, padrão xlsx; ?cicloId= obrigatório
+    /// no passo com seção por ciclo): em xlsx, uma aba por seção do passo e a Leia-me; em csv, o
+    /// arquivo da seção quando o passo tem uma só, ou um zip com um csv por seção.
+    /// </summary>
+    [HttpGet("pdtic/{id:long}/planilha/passo/{passoChave}")]
+    public Task<IActionResult> PlanilhaDoPasso(long id, string passoChave, [FromQuery] string? formato, [FromQuery] long? cicloId) =>
+        Executar(async ctx => Arquivo(await _planilhas.PdticPassoAsync(id, passoChave, formato, cicloId, ctx)));
+
     /// <summary>Planilha completa do PDTIC (uma aba por seção e a Leia-me; só xlsx).</summary>
     [HttpGet("pdtic/{id:long}/planilha")]
     public Task<IActionResult> PlanilhaCompleta(long id, [FromQuery] string? formato) =>

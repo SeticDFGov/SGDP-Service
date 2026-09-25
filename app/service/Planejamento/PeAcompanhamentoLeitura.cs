@@ -171,6 +171,35 @@ public static class PeCiclosDoPdtic
         return Ordenar(plano.Resultado().Concat(gravados.Where(c => c.Tipo == PeDominios.TipoCiclo.Avaliacao)).ToList());
     }
 
+    /// <summary>
+    /// Os ciclos efetivos com o que já foi lido (a mesma regra do <see cref="EfetivosAsync"/>, sem
+    /// gravar): os gravados do PDTIC, os ciclos que têm registro e a periodicidade do passo 4.3. A
+    /// situação de vários PDTICs de uma vez (E8) usa.
+    /// </summary>
+    public static List<PeCiclo> Efetivos(PePdtic pdtic, PeTrilhaOrgao trilha, IReadOnlyList<PeCiclo> gravados, ISet<long> comRegistros,
+        string periodicidade)
+    {
+        if (PeDominios.SituacaoPdtic.DaElaboracao.Contains(pdtic.Situacao)) return new List<PeCiclo>();
+        if (!PeDominios.SituacaoPdtic.Vigentes.Contains(pdtic.Situacao)) return Ordenar(gravados);
+
+        var meses = PeDominios.Periodicidade.Meses(periodicidade) ?? 3;
+        var plano = PeCiclos.PlanejarMonitoramento(pdtic, gravados, comRegistros, meses, trilha.Dados.Acompanhamento.PrazoFechamentoDias,
+            "situacao", DateTime.UtcNow);
+        return Ordenar(plano.Resultado().Concat(gravados.Where(c => c.Tipo == PeDominios.TipoCiclo.Avaliacao)).ToList());
+    }
+
+    /// <summary>
+    /// A periodicidade do monitoramento a partir da seção já analisada (a do passo 4.3, quando o
+    /// órgão a vê, com o campo visível e preenchido com um valor que o módulo conhece); senão a padrão.
+    /// </summary>
+    public static string Periodicidade(PeTrilhaOrgao trilha, PeSecaoAnalisada? secao)
+    {
+        var padrao = trilha.Dados.Acompanhamento.PeriodicidadePadrao;
+        if (secao == null || secao.Secao.Visiveis.All(v => v.Campo.Chave != PeDominios.ChaveAcompanhamento.CampoPeriodicidade)) return padrao;
+        var valor = PeRegistroDados.Texto(PeRegistroDados.Ler(secao.Registros.FirstOrDefault()?.Dados)[PeDominios.ChaveAcompanhamento.CampoPeriodicidade]);
+        return PeDominios.Periodicidade.Meses(valor) != null ? valor! : padrao;
+    }
+
     /// <summary>O plano dos ciclos de monitoramento do PDTIC vigente, pela periodicidade do passo 4.3 (ou a padrão).</summary>
     public static async Task<PeCiclos.Plano> PlanoAsync(AppDbContext context, IPeRegistroService registros, PePdtic pdtic,
         PeTrilhaOrgao trilha, IReadOnlyList<PeCiclo> gravados, string autor)

@@ -869,4 +869,126 @@ public static class PeDominios
         public static readonly string[] SituacoesDoRisco = { RiscoAberto, RiscoFechado, RiscoExcluido, SemOcorrencia };
         public static readonly string[] NiveisDoRisco = { NivelAlto, NivelMedio, NivelBaixo };
     }
+
+    // ── Painéis da SGDI, conformidade e inadimplência (E8) ─────────────────────
+
+    /// <summary>
+    /// Situação de um registro de inadimplência (pe_inadimplencia.situacao), no caminho do art.
+    /// 11 do Decreto nº 48.899/2026: a SGDI notifica o órgão (5 dias úteis para regularizar ou
+    /// justificar); a justificativa aceita encerra; sem regularização nem justificativa aceita no
+    /// prazo, a SGDI registra a inadimplência com o motivo; o saneamento tira a marca do painel e
+    /// guarda a data. A vigente (painel, conformidade e página do órgão) é a notificada ou a
+    /// inadimplente.
+    /// </summary>
+    public static class SituacaoInadimplencia
+    {
+        public const string Notificado = "notificado";
+        public const string Justificado = "justificado";
+        public const string Inadimplente = "inadimplente";
+        public const string Saneado = "saneado";
+
+        public static readonly string[] Todas = { Notificado, Justificado, Inadimplente, Saneado };
+
+        // A marca que o painel, a conformidade e a página do órgão mostram
+        public static readonly string[] Vigentes = { Notificado, Inadimplente };
+
+        public static string Rotulo(string situacao) => situacao switch
+        {
+            Notificado => "Notificado",
+            Justificado => "Justificado",
+            Inadimplente => "Inadimplente",
+            Saneado => "Saneado",
+            _ => situacao
+        };
+    }
+
+    /// <summary>O motivo da inadimplência registrada (art. 11, III, do Decreto nº 48.899/2026).</summary>
+    public static class MotivoInadimplencia
+    {
+        public const string DescumprimentoPrazo = "descumprimento_prazo";
+        public const string OmissaoReiterada = "omissao_reiterada";
+        public const string RecusaInjustificada = "recusa_injustificada";
+
+        public static readonly string[] Todos = { DescumprimentoPrazo, OmissaoReiterada, RecusaInjustificada };
+
+        public static string Rotulo(string motivo) => motivo switch
+        {
+            DescumprimentoPrazo => "Descumprimento de prazo",
+            OmissaoReiterada => "Omissão reiterada",
+            RecusaInjustificada => "Recusa injustificada de comunicação",
+            _ => motivo
+        };
+    }
+
+    /// <summary>
+    /// Os itens de conformidade da SGDI (só itens de TIC, decisão 4 do plano), na ordem da tela e
+    /// da planilha, com o rótulo e a base legal.
+    /// </summary>
+    public static class ItemConformidade
+    {
+        public const string AprovadoCgtic = "aprovado_cgtic";
+        public const string ComunicadoSgdi = "comunicado_sgdi";
+        public const string Vigente = "vigente";
+        public const string NoveConteudos = "nove_conteudos";
+        public const string RevisaoEmDia = "revisao_em_dia";
+        public const string AcompanhamentoEmDia = "acompanhamento_em_dia";
+
+        public sealed record Item(string Chave, string Rotulo, string Base, string AtendeQuando);
+
+        public static readonly IReadOnlyList<Item> Todos = new[]
+        {
+            new Item(AprovadoCgtic, "PDTIC aprovado pelo CGTIC", "art. 5º do Decreto nº 48.900/2026",
+                "Há deliberação do CGTIC que aprova a versão do PDTIC."),
+            new Item(ComunicadoSgdi, "PDTIC comunicado à SGDI", "art. 7º, V, do Decreto nº 48.899/2026",
+                "A versão foi enviada pelo sistema ou registrada fora dele com a aprovação."),
+            new Item(Vigente, "PDTIC vigente", "art. 12 do Decreto nº 48.900/2026",
+                "O PDTIC está publicado ou em acompanhamento e hoje está dentro da vigência."),
+            new Item(NoveConteudos, "Os nove conteúdos preenchidos", "art. 12, § 2º, do Decreto nº 48.900/2026",
+                "Os passos dos nove conteúdos mínimos estão feitos."),
+            new Item(RevisaoEmDia, "Revisão em dia", "art. 12 do Decreto nº 48.900/2026",
+                "A última aprovação do CGTIC (no PDTIC registrado fora do sistema, a publicação) está dentro da periodicidade de revisão do passo da abrangência (anual por padrão)."),
+            new Item(AcompanhamentoEmDia, "Acompanhamento em dia", "Guia de PDTIC do SISP, capítulo 7",
+                "Nenhum ciclo de monitoramento passou do prazo de fechamento. Antes da publicação, o item não se aplica.")
+        };
+    }
+
+    /// <summary>
+    /// Grupo de conformidade pelo percentual de itens atendidos entre os que se aplicam: alta a
+    /// partir de 70%, média de 25% a 69% e baixa abaixo de 25% (o órgão sem PDTIC fica em baixa).
+    /// </summary>
+    public static class GrupoConformidade
+    {
+        public const string Alta = "alta";
+        public const string Media = "media";
+        public const string Baixa = "baixa";
+
+        public static readonly string[] Todos = { Alta, Media, Baixa };
+
+        public static string De(int percentual) => percentual >= 70 ? Alta : percentual >= 25 ? Media : Baixa;
+
+        public static string Rotulo(string grupo) => grupo switch
+        {
+            Alta => "Alta",
+            Media => "Média",
+            Baixa => "Baixa",
+            _ => grupo
+        };
+    }
+
+    /// <summary>
+    /// A situação de cada órgão no painel da SGDI: a do PDTIC de referência (a versão vigente;
+    /// sem ela, a versão da elaboração; sem as duas, a mais recente, encerrada) ou sem PDTIC.
+    /// </summary>
+    public static class SituacaoPainel
+    {
+        public const string SemPdtic = "sem_pdtic";
+
+        public static readonly string[] Todas =
+        {
+            SemPdtic, SituacaoPdtic.EmElaboracao, SituacaoPdtic.EmAprovacao, SituacaoPdtic.Devolvido, SituacaoPdtic.Aprovado,
+            SituacaoPdtic.Publicado, SituacaoPdtic.EmAcompanhamento, SituacaoPdtic.Encerrado
+        };
+
+        public static string Rotulo(string chave) => chave == SemPdtic ? "Sem PDTIC" : SituacaoPdtic.Rotulo(chave);
+    }
 }

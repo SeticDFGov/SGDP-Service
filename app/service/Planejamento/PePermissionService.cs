@@ -145,6 +145,16 @@ public class PePermissionService : IPePermissionService
 
     public bool PodeVerConsolidado(PeUserContext ctx) => VeTodosOsOrgaos(ctx);
 
+    // ── Painéis da SGDI (E8) ────────────────────────────────────────────────
+
+    // Plano, seção 12: o painel, a conformidade, a árvore do PETIC-DF, a lista das inadimplências e
+    // a página de qualquer órgão são dos papéis globais e do admin geral
+    public bool PodeVerPaineis(PeUserContext ctx) => VeTodosOsOrgaos(ctx);
+
+    // Plano, seção 4.1: notificação e inadimplência são do administrador do módulo e da SGDI
+    public bool PodeRegistrarInadimplencia(PeUserContext ctx) =>
+        ctx.EhAdminGeral || ctx.Papel is PapeisPlanejamento.Admin or PapeisPlanejamento.Sgdi;
+
     public async Task<Dictionary<Guid, PeOrgaoResumo>> OrgaosPorUnidadeAsync(IEnumerable<Guid> unidadeIds)
     {
         var ids = unidadeIds.Distinct().ToList();

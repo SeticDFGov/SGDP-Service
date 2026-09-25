@@ -76,6 +76,7 @@ public static class PeModelConfiguration
         modelBuilder.ApplyPeDocumentoConfiguration();
         modelBuilder.ApplyPeFluxoConfiguration();
         modelBuilder.ApplyPeAcompanhamentoConfiguration();
+        modelBuilder.ApplyPePaineisConfiguration();
     }
 
     // ── Modelo configurável e níveis de maturidade (E2) ──────────────────────
@@ -1241,6 +1242,70 @@ public static class PeModelConfiguration
                 .HasForeignKey(d => d.CicloId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("fk_pe_doc_versao_ciclo");
+        });
+    }
+
+    // ── Painéis da SGDI: inadimplência do art. 11 do Decreto nº 48.899/2026 (E8) ─
+
+    private static void ApplyPePaineisConfiguration(this ModelBuilder modelBuilder)
+    {
+        const string inadimplente = PeDominios.SituacaoInadimplencia.Inadimplente;
+        const string saneado = PeDominios.SituacaoInadimplencia.Saneado;
+        const string justificado = PeDominios.SituacaoInadimplencia.Justificado;
+
+        modelBuilder.Entity<PeInadimplencia>(entity =>
+        {
+            entity.ToTable("pe_inadimplencia", t =>
+            {
+                t.HasCheckConstraint("ck_pe_inadimplencia_situacao", EmLista("situacao", PeDominios.SituacaoInadimplencia.Todas));
+                t.HasCheckConstraint("ck_pe_inadimplencia_motivo", $"motivo IS NULL OR {EmLista("motivo", PeDominios.MotivoInadimplencia.Todos)}");
+                // O prazo (5 dias úteis) vem depois da notificação
+                t.HasCheckConstraint("ck_pe_inadimplencia_prazo", "prazo > notificado_em");
+                // A justificativa aceita tem o texto
+                t.HasCheckConstraint("ck_pe_inadimplencia_justificado", $"situacao <> '{justificado}' OR justificativa IS NOT NULL");
+                // O registro da inadimplência tem quem, quando, o motivo e a nota de motivação, juntos;
+                // a inadimplente tem o registro; a notificada e a justificada, não
+                t.HasCheckConstraint("ck_pe_inadimplencia_registro",
+                    "(registrado_em IS NULL) = (registrado_por IS NULL) AND (registrado_em IS NULL) = (motivo IS NULL) "
+                    + "AND (registrado_em IS NULL) = (nota_motivacao IS NULL) "
+                    + $"AND (situacao <> '{inadimplente}' OR registrado_em IS NOT NULL) "
+                    + $"AND (situacao IN ('{inadimplente}','{saneado}') OR registrado_em IS NULL) "
+                    + "AND (comunicado_controle_em IS NULL OR (registrado_em IS NOT NULL AND comunicado_controle_em >= notificado_em))");
+                // O saneado tem a data do saneamento, não antes da notificação
+                t.HasCheckConstraint("ck_pe_inadimplencia_saneado",
+                    $"(situacao = '{saneado}') = (saneado_em IS NOT NULL) AND (saneado_em IS NULL OR saneado_em >= notificado_em)");
+            });
+
+            entity.HasKey(i => i.Id).HasName("pk_pe_inadimplencia");
+            entity.Property(i => i.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(i => i.OrgaoId).HasColumnName("orgao_id");
+            entity.Property(i => i.Obrigacao).HasColumnName("obrigacao").HasMaxLength(500).IsRequired();
+            entity.Property(i => i.PrazoDescumprido).HasColumnName("prazo_descumprido").HasMaxLength(500).IsRequired();
+            entity.Property(i => i.NotificadoEm).HasColumnName("notificado_em");
+            entity.Property(i => i.Documento).HasColumnName("documento").HasMaxLength(200).IsRequired();
+            entity.Property(i => i.Sei).HasColumnName("sei").HasMaxLength(30);
+            entity.Property(i => i.Prazo).HasColumnName("prazo");
+            // Token de concorrência: duas pessoas registrando e saneando ao mesmo tempo não passam as duas
+            entity.Property(i => i.Situacao).HasColumnName("situacao").HasMaxLength(20).IsRequired().IsConcurrencyToken();
+            entity.Property(i => i.Justificativa).HasColumnName("justificativa").HasMaxLength(2000);
+            entity.Property(i => i.Motivo).HasColumnName("motivo").HasMaxLength(30);
+            entity.Property(i => i.NotaMotivacao).HasColumnName("nota_motivacao").HasMaxLength(10000);
+            entity.Property(i => i.ComunicadoControleEm).HasColumnName("comunicado_controle_em");
+            entity.Property(i => i.RegistradoEm).HasColumnName("registrado_em");
+            entity.Property(i => i.RegistradoPor).HasColumnName("registrado_por").HasMaxLength(200);
+            entity.Property(i => i.SaneadoEm).HasColumnName("saneado_em");
+            entity.Property(i => i.Observacao).HasColumnName("observacao").HasMaxLength(2000);
+            Auditoria(entity);
+
+            // As inadimplências de um órgão pela situação (a vigente é a notificada ou a inadimplente)
+            entity.HasIndex(i => new { i.OrgaoId, i.Situacao }).HasDatabaseName("ix_pe_inadimplencia_orgao");
+
+            // Órgão do PGIA não é apagado (só desativado): a FK só impede apagar por engano
+            entity.HasOne(i => i.Orgao)
+                .WithMany()
+                .HasForeignKey(i => i.OrgaoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_inadimplencia_orgao");
         });
     }
 }

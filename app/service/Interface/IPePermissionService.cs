@@ -79,6 +79,19 @@ public interface IPePermissionService
     /// <summary>Planilhas consolidadas de todos os órgãos e a lista dos PDTICs: papéis globais e admin geral.</summary>
     bool PodeVerConsolidado(PeUserContext ctx);
 
+    // ── Painéis da SGDI (E8) ────────────────────────────────────────────────
+
+    /// <summary>
+    /// O painel, a conformidade, a árvore do PETIC-DF, a lista de todas as inadimplências e a
+    /// página de qualquer órgão: papéis globais (pe_admin, pe_sgdi, pe_cgtic) e admin geral. A
+    /// equipe e a consulta do órgão veem só a página e as inadimplências do próprio órgão
+    /// (PodeVerOrgao), em leitura.
+    /// </summary>
+    bool PodeVerPaineis(PeUserContext ctx);
+
+    /// <summary>Notifica, aceita a justificativa, registra a inadimplência e o saneamento: pe_admin, pe_sgdi e admin geral.</summary>
+    bool PodeRegistrarInadimplencia(PeUserContext ctx);
+
     /// <summary>
     /// Órgão ativo de cada unidade, em lote (uma consulta): mesma resolução do
     /// PgiaPermissionService (Users.Unidade para o pgia_orgao ativo daquela unidade).

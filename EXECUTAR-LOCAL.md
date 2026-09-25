@@ -18,9 +18,9 @@ docker run -d --name sgdp-local-pg -e POSTGRES_USER=sgdp_user -e POSTGRES_PASSWO
 
 Usuário/senha/banco casam com `app/appsettings.Development.json` (`Host=localhost;Port=5432;Database=postgres;Username=sgdp_user;Password=sgdp_password_dev`). Alternativa: `docker compose up -d postgres` na raiz do `SGDP-Service-main` (exige `.env` copiado do `.env.example` com `POSTGRES_USER=user` e `POSTGRES_PASSWORD=password`).
 
-## 2. Migrations (cria as tabelas do SGDP, as 24 `pgia_*` com seeds, as 2 `ctr_*` e as 33 `pe_*`)
+## 2. Migrations (cria as tabelas do SGDP, as 24 `pgia_*` com seeds, as 2 `ctr_*` e as 34 `pe_*`)
 
-A última é a `20260925001531_PeAcompanhamento` (Governança Estratégica, E7, rodada B: a tabela `pe_ciclo` dos ciclos do acompanhamento, a marca `por_ciclo` das seções, o ciclo de cada registro e o documento de cada linha da cópia do órgão e das versões, para o RA e o RR; o conteúdo novo, com os modelos do RA e do RR, é carregado sozinho quando a API sobe). Antes dela vem a `20260924225911_PeAprovacaoPublicacao` (E7, rodada A: as datas do caminho da aprovação e o motivo do encerramento em `pe_pdtic`, o PDF enviado em `pe_deliberacao` e os índices que deixam a revisão conviver com a versão vigente; nenhuma tabela nova). Antes dela vêm a `20260924215548_PeFluxos` (E6: as 2 tabelas dos fluxos, os modelos do guia e a cópia de cada órgão; os fluxos do guia são carregados sozinhos quando a API sobe), a `20260924195055_PeDocumento` (E5: as 6 tabelas do documento do PDTIC, com o modelo, os capítulos, os blocos, a cópia do órgão e as versões; o modelo do documento é carregado sozinho quando a API sobe), a `20260924183900_PePdticTrilha` (E4: as 3 tabelas do PDTIC de cada órgão, do "não se aplica" dos passos e dos comentários, e a coluna `pdtic_id` em `pe_registro`), a `20260924174627_PeReferenciaisRegistros` (E3: as 6 tabelas do PETIC-DF, das deliberações do CGTIC, dos registros, das ligações, da sequência dos códigos e dos arquivos; os princípios do art. 4º são carregados sozinhos quando a API sobe), a `20260924162542_PeModeloConfiguravel` (E2: as 13 tabelas do modelo configurável; o modelo inicial é carregado sozinho quando a API sobe) e a `20260924151108_PeAcessoPapeis` (E1: `pe_papel_usuario`, `pe_papel_usuario_historico` e os CHECKs de módulo com `planejamento`). Sem elas aplicadas, a API sobe, o login e os outros módulos funcionam, mas as telas da Governança Estratégica falham (regra do deploy, ver o `CLAUDE.md`).
+A última é a `20260925021649_PePaineis` (Governança Estratégica, E8: a tabela `pe_inadimplencia`, das notificações e inadimplências do art. 11 do Decreto nº 48.899/2026; nenhuma tabela existente muda e não há conteúdo novo para carregar). Antes dela vem a `20260925001531_PeAcompanhamento` (E7, rodada B: a tabela `pe_ciclo` dos ciclos do acompanhamento, a marca `por_ciclo` das seções, o ciclo de cada registro e o documento de cada linha da cópia do órgão e das versões, para o RA e o RR; o conteúdo novo, com os modelos do RA e do RR, é carregado sozinho quando a API sobe). Antes dela vem a `20260924225911_PeAprovacaoPublicacao` (E7, rodada A: as datas do caminho da aprovação e o motivo do encerramento em `pe_pdtic`, o PDF enviado em `pe_deliberacao` e os índices que deixam a revisão conviver com a versão vigente; nenhuma tabela nova). Antes dela vêm a `20260924215548_PeFluxos` (E6: as 2 tabelas dos fluxos, os modelos do guia e a cópia de cada órgão; os fluxos do guia são carregados sozinhos quando a API sobe), a `20260924195055_PeDocumento` (E5: as 6 tabelas do documento do PDTIC, com o modelo, os capítulos, os blocos, a cópia do órgão e as versões; o modelo do documento é carregado sozinho quando a API sobe), a `20260924183900_PePdticTrilha` (E4: as 3 tabelas do PDTIC de cada órgão, do "não se aplica" dos passos e dos comentários, e a coluna `pdtic_id` em `pe_registro`), a `20260924174627_PeReferenciaisRegistros` (E3: as 6 tabelas do PETIC-DF, das deliberações do CGTIC, dos registros, das ligações, da sequência dos códigos e dos arquivos; os princípios do art. 4º são carregados sozinhos quando a API sobe), a `20260924162542_PeModeloConfiguravel` (E2: as 13 tabelas do modelo configurável; o modelo inicial é carregado sozinho quando a API sobe) e a `20260924151108_PeAcessoPapeis` (E1: `pe_papel_usuario`, `pe_papel_usuario_historico` e os CHECKs de módulo com `planejamento`). Sem elas aplicadas, a API sobe, o login e os outros módulos funcionam, mas as telas da Governança Estratégica falham (regra do deploy, ver o `CLAUDE.md`).
 
 ```bash
 cd SGDP-Service-main/app
@@ -229,6 +229,52 @@ Parte do PDTIC da SES publicado na seção 15 (Básico). Para ver o 5.2, as medi
 9. **Planilhas**: `GET pdtic/{id}/planilha/monitoramento_acoes?formato=csv` sai com a coluna "Ciclo" na frente, na ordem dos ciclos (e o consolidado da Gustavo também, depois das colunas do órgão).
 10. **Revisão** (Avançado): `POST pdtic/{id}/revisao` sem a decisão do comitê numa avaliação volta 409 ("... registre na avaliação intermediária (passo 6.3) ..."); com a avaliação do comitê "Revisar o PDTIC" registrada na avaliação mais recente, 201 com a 1.1, sem ciclos, sem os dados dos ciclos e sem as cópias e versões do RA e do RR (o texto do documento do PDTIC vem).
 11. **Regressão**: login, `/api/Auth/me`, E1 à rodada A (trilha, registros, comentários, planilhas, documento, fluxos, envio, deliberação e publicação) e os outros módulos seguem como antes.
+
+## 17. Roteiro de fumaça da Governança Estratégica (E8: painéis da SGDI, conformidade, inadimplência, árvore do PETIC-DF e página do órgão)
+
+Antes, aplique a migration `20260925021649_PePaineis` (comando da seção 2) e suba a API de novo; não há conteúdo novo para o carregador (o modelo continua na versão 6). Sem a migration, a API sobe e tudo o que já existia segue normal; o painel, a conformidade (e a planilha dela), a página do órgão e as inadimplências respondem 409 com a mensagem de atualização, sem gravar nada; a árvore do PETIC-DF e a planilha do passo funcionam.
+
+Parte dos dados das seções anteriores: o PETIC-DF vigente (seção 11), a SES publicada (seções 15 e 16) e o TESTE registrado fora do sistema (seção 15, item 8). As personas são as da seção 15: Patrícia do Planejamento, Gustavo da Governança, Célia do Comitê, Sérgio da Saúde e Solange da Saúde, mais a Ana Admin. Os outros órgãos do PGIA aparecem como "Sem PDTIC".
+
+1. **Painel** (Gustavo): `GET api/planejamento/painel` traz:
+   - `TotalOrgaos` (os órgãos ativos) e `PorSituacao` com as 8 situações;
+   - `EmElaboracaoPorEtapa` (as etapas 1 a 3 sempre; "Sem próximo passo", etapa 0, só quando há) e `PorNivel`;
+   - `PorObjetivoPetic` (os objetivos do PETIC-DF vigente, com as necessidades e as metas ligadas), `AcoesPorTema`, `RiscosPorNivel` e `ExecucaoUltimoCiclo`;
+   - `Alertas` (vigência vencida, revisão vencida, ciclo atrasado, inadimplentes e deliberações aguardando) e `Filtros`.
+
+   `?Situacao=publicado` e `?NivelId=<id>` filtram todos os blocos (e `TotalOrgaos`); `?Situacao=xyz` não traz nenhum órgão. Célia e Patrícia também leem. Sérgio e Solange recebem 403 com `{ "Code": 1002, "Message": ... }`, aqui e nos itens 2 e 4.
+2. **Conformidade** (Gustavo): `GET conformidade` traz os 6 itens (`Chave`, `Rotulo`, `Base`, `AtendeQuando`), o `Resumo` (alta, média e baixa) e uma linha por órgão. Cada item da linha tem `Atende` (true, false ou null quando não se aplica) e o `Detalhe`.
+   - A SES publicada: "Aprovado em dd/mm/aaaa (Resolução nº 12/2026)", "Enviado ao CGTIC pelo sistema em dd/mm/aaaa (vale como a comunicação à SGDI)", "Vigente de ... a ...", "Aprovação em ...; a próxima revisão vence em ... (revisão anual)" e o acompanhamento, com o ciclo atrasado quando há.
+   - O TESTE: "..., registrado fora do sistema".
+   - Um órgão sem PDTIC: 0% e grupo baixa.
+
+   `?Grupo=baixa` filtra a lista, e o `Resumo` continua contando todos os órgãos; `?Filtro=saúde` acha a SES. `GET conformidade/planilha?formato=csv` baixa `PDTIC_conformidade_aaaa-mm-dd.csv` (uma linha por órgão, com "Sim", "Não" ou "Não se aplica"); sem `formato`, sai o XLSX, com as abas "Conformidade" e "Leia-me".
+3. **Inadimplência** (Gustavo; o art. 11 do Decreto nº 48.899/2026):
+   1. Notifique a SES: `POST orgaos/{SES}/inadimplencias` com `{ "Obrigacao": "Comunicar à SGDI o PDTIC aprovado pelo comitê interno (art. 7º, V)", "PrazoDescumprido": "30 dias depois da aprovação", "NotificadoEm": "2026-09-01", "Documento": "Ofício nº 10/2026-SGDI", "Sei": "00040-00012345/2026-11" }`. Volta 201 com `Prazo` "2026-09-09" (5 dias úteis, sem o feriado de 7 de setembro), `Vencido: true` e `DiasUteisRestantes: 0`.
+   2. Notifique de novo com o `NotificadoEm` de hoje: o `Prazo` fica 5 dias úteis depois, com `DiasUteisRestantes: 5`.
+   3. `POST inadimplencias/{id}/registrar` nessa segunda volta 409 (1143): "O prazo para regularizar ou justificar vai até dd/mm/aaaa. A inadimplência só pode ser registrada a partir de dd/mm/aaaa (art. 11, II, do Decreto nº 48.899/2026)."
+   4. `POST inadimplencias/{id}/justificar` com `{ "Justificativa": "O órgão comprovou o envio pelo SEI." }` a encerra ("justificado").
+   5. Na primeira, `registrar` sem `Motivo` volta 400 com `Campos.Motivo`. Com `{ "Motivo": "descumprimento_prazo", "NotaMotivacao": "O prazo venceu sem a comunicação.", "ComunicadoControleEm": null }`, ela fica "inadimplente", com `RegistradoPor`; o painel mostra `Alertas.Inadimplentes: 1` e a conformidade da SES traz a `Inadimplencia`.
+   6. `POST inadimplencias/{id}/sanear` com `{ "SaneadoEm": "<hoje>", "Observacao": "PDTIC comunicado." }`: fica "saneado" e a marca sai do painel; sanear de novo volta 409 (1142).
+
+   Notificar com data futura, SEI fora do formato ou sem documento volta 400 com `Campos` (`NotificadoEm`, `Sei`, `Documento`); Sérgio notificando recebe 403. Sérgio e Solange leem `GET orgaos/{SES}/inadimplencias` e, em `GET inadimplencias`, só as da SES (com `OrgaoId` do TESTE, 403).
+4. **Árvore do PETIC-DF** (Célia): `GET petic/arvore` traz os objetivos do PETIC-DF vigente, com os indicadores (`Meta` como "80 % até 31/12/2027") e, por órgão, as necessidades e as metas ligadas pelo campo "Objetivo do PETIC-DF". Para ver uma ligação, a Ana Admin grava uma meta no PDTIC do TESTE (metas e ações aceitam dados no registrado fora do sistema): `POST pdtic/{TESTE}/secoes/metas/registros` com `"Vinculos": { "objetivo_petic": [<id>] }`, com o id de `GET catalogos/petic_objetivo`. `?orgaoId=<TESTE>` mostra só o TESTE; um órgão que não existe dá 404. Sem PETIC-DF vigente, vem `Petic: null` e nenhum objetivo.
+5. **Página do órgão**: Sérgio abre `GET orgaos/{SES}/resumo`, que traz tudo numa resposta:
+   - o PDTIC de referência (a versão vigente; com a revisão 1.1 aberta, a vigente continua sendo a referência) e as `Versoes`;
+   - o nível com o `Historico` (as trocas das seções 10 e 16);
+   - o `Andamento` por etapa (feitos, total, atrasados e aguardando) e o `ProximoPasso`;
+   - a linha da `Conformidade`, os `NaoSeAplica` e os `ComentariosAbertos` (com o número do passo);
+   - as `Aprovacoes` (a do SGTIC e as dos passos de aprovação preenchidos, com `Decisao` e `DecisaoValor`) e as `Deliberacoes` de todas as versões;
+   - os `Documentos` (PDTIC, RA e RR, com o `Url` relativo: `GET /<Url>` baixa o PDF);
+   - os `Ciclos` (a lista da E7) e as `Inadimplencias`.
+
+   Solange lê a da SES; Sérgio recebe 403 na do TESTE; `orgaos/999999/resumo` dá 404. A página de um órgão sem PDTIC (um órgão do PGIA qualquer) vem com `Pdtic: null`, 0% e o nível padrão (`Padrao: true`).
+6. **Planilha do passo** (Solange):
+   - `GET pdtic/{id}/planilha/passo/diagnostico.necessidades-tic` baixa `PDTIC_SES_passo-<número>_aaaa-mm-dd.xlsx` (o número do passo na trilha da SES: 2.3 no Básico, 2.9 no Avançado), com a aba das necessidades e a Leia-me (órgão, PDTIC, nível, passo, data da extração e a ajuda das colunas).
+   - Com `?formato=csv`, um passo de uma seção devolve o CSV; `GET .../passo/planejamento.metas-acoes?formato=csv` devolve um zip com `<número>-metas.csv` e `<número>-acoes.csv` (3.2 no Básico, 3.3 no Avançado).
+   - O passo do monitoramento (`monitoramento.ciclo-monitoramento`) sem `cicloId` volta 400 (1121); com `?cicloId=<id>`, o nome ganha o rótulo curto do ciclo (`PDTIC_SES_passo-5.1_2026-T3_aaaa-mm-dd.xlsx`).
+   - O passo do documento ou da deliberação (sem seção na planilha) volta 404 (1144); um passo fora da trilha, 404 (1053).
+7. **Regressão**: login, `/api/Auth/me`, a E1 à E7 (a situação dos passos passou a ser lida em lote, com as mesmas respostas) e os outros módulos seguem como antes.
 
 ## Limpeza
 

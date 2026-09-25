@@ -172,6 +172,10 @@ builder.Services.AddScoped<IPePdticAprovacaoService, service.Planejamento.PePdti
 // Acompanhamento (E7, rodada B): os ciclos de monitoramento e de avaliação, as grades das ações
 // e das medições e o painel do PDTIC (os relatórios RA e RR ficam no serviço do documento)
 builder.Services.AddScoped<IPeAcompanhamentoService, service.Planejamento.PeAcompanhamentoService>();
+// Painéis da SGDI (E8): o painel, a conformidade com a planilha, a árvore do PETIC-DF, a página do
+// órgão e a inadimplência do art. 11 do Decreto nº 48.899/2026
+builder.Services.AddScoped<IPePainelService, service.Planejamento.PePainelService>();
+builder.Services.AddScoped<IPeInadimplenciaService, service.Planejamento.PeInadimplenciaService>();
 // Modelo inicial (trilha e campos do PDTIC, e os referenciais do DF e do PETIC-DF, com os
 // princípios do art. 4º): carregado ao subir, fora das requisições.
 // Sem as tabelas (intervalo entre o PR e a migration do merge) só registra no log e

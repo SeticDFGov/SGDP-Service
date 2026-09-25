@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO.Compression;
 using System.Text.Json;
 using api.Planejamento;
 using demanda_service.Helpers;
@@ -88,6 +89,54 @@ public class PePlanilhaService : IPePlanilhaService
         var (pdtic, orgao, nivel) = await CabecalhoDoPdticAsync(pdticId);
         var nome = $"PDTIC_{NomeSeguro(orgao.Sigla)}_{Completa}_{Hoje()}.{Xlsx}";
         return new PePlanilhaArquivo(PeXlsx.Gerar(secoes.Select(Aba).ToList(), LeiaMeDoPdtic(pdtic, orgao, nivel)), MimeXlsx, nome);
+    }
+
+    public const string MimeZip = "application/zip";
+
+    public async Task<PePlanilhaArquivo> PdticPassoAsync(long pdticId, string passoChave, string? formato, long? cicloId, PeUserContext ctx)
+    {
+        var tipo = Formato(formato, completa: false);
+        // O motor confere quem chama, o passo na trilha do órgão, as seções e o ciclo
+        var passo = await _registros.ExportarPassoAsync(pdticId, passoChave, cicloId, ctx);
+        var (pdtic, orgao, nivel) = await CabecalhoDoPdticAsync(pdticId);
+        var numero = passo.Passo.Numero;
+        var nome = $"PDTIC_{NomeSeguro(orgao.Sigla)}_passo-{numero}"
+                   + (passo.Ciclo == null ? string.Empty : "_" + PeCiclos.RotuloCurto(passo.Ciclo))
+                   + $"_{Hoje()}";
+
+        if (tipo == Csv)
+        {
+            if (passo.Secoes.Count == 1) return new PePlanilhaArquivo(GerarCsv(passo.Secoes[0]), MimeCsv, $"{nome}.{Csv}");
+            // Mais de uma seção: um CSV por seção, num ZIP (numero-do-passo-chave-da-secao.csv)
+            using var memoria = new MemoryStream();
+            using (var zip = new ZipArchive(memoria, ZipArchiveMode.Create, leaveOpen: true))
+                foreach (var secao in passo.Secoes)
+                {
+                    var entrada = zip.CreateEntry($"{numero}-{secao.Modelo.Secao.Chave}.{Csv}", CompressionLevel.Optimal);
+                    using var saida = entrada.Open();
+                    var bytes = GerarCsv(secao);
+                    saida.Write(bytes, 0, bytes.Length);
+                }
+            return new PePlanilhaArquivo(memoria.ToArray(), MimeZip, $"{nome}.zip");
+        }
+
+        var leiaMe = new List<(string, string)>
+        {
+            ("Órgão", $"{orgao.Sigla} · {orgao.Nome}"),
+            ("PDTIC", $"Plano Diretor de Tecnologia da Informação e Comunicação, versão {pdtic.Versao} ({PeDominios.SituacaoPdtic.Rotulo(pdtic.Situacao).ToLowerInvariant()})"),
+            ("Nível de maturidade", nivel?.Nome ?? "-"),
+            ("Passo", $"{numero} · {passo.Passo.Titulo}")
+        };
+        if (passo.Ciclo != null)
+            leiaMe.Add(("Ciclo", passo.Ciclo.Tipo == PeDominios.TipoCiclo.Monitoramento
+                ? $"{passo.Ciclo.Rotulo} ({PeFormato.Data(passo.Ciclo.Inicio)} a {(passo.Ciclo.Fim is DateOnly fim ? PeFormato.Data(fim) : "-")})"
+                : passo.Ciclo.Rotulo));
+        leiaMe.Add(("Extraído em", Agora()));
+        leiaMe.Add(("Como ler", "Cada aba é uma seção do passo, com as colunas do nível do órgão. A coluna Código identifica cada registro "
+                                + "(por exemplo, N01), e as colunas de ligação mostram os códigos dos registros ligados, para cruzar as abas. "
+                                + (passo.Ciclo == null ? string.Empty : "As seções registradas a cada ciclo trazem só o ciclo acima. ")
+                                + "Datas e valores estão como números."));
+        return new PePlanilhaArquivo(PeXlsx.Gerar(passo.Secoes.Select(Aba).ToList(), leiaMe), MimeXlsx, $"{nome}.{Xlsx}");
     }
 
     private async Task<(PePdtic Pdtic, PgiaOrgao Orgao, PeNivel? Nivel)> CabecalhoDoPdticAsync(long pdticId)
@@ -584,7 +633,7 @@ public class PePlanilhaService : IPePlanilhaService
             : null;
 
     /// <summary>csv ou xlsx (padrão: xlsx); a completa só sai em xlsx.</summary>
-    private static string Formato(string? formato, bool completa)
+    internal static string Formato(string? formato, bool completa)
     {
         var texto = string.IsNullOrWhiteSpace(formato) ? Xlsx : formato.Trim().ToLowerInvariant();
         if (texto is not (Csv or Xlsx))
@@ -594,8 +643,8 @@ public class PePlanilhaService : IPePlanilhaService
         return texto;
     }
 
-    private static string Hoje() => DateTimeHelper.TodayBrasilia().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    internal static string Hoje() => DateTimeHelper.TodayBrasilia().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-    private static string Agora() =>
+    internal static string Agora() =>
         DateTimeHelper.NowBrasilia().ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture) + " (horário de Brasília)";
 }

@@ -74,6 +74,15 @@ public interface IPeRegistroService
     Task<List<PeSecaoExportada>> ExportarSecoesAsync(PeDono dono, PeUserContext ctx);
 
     /// <summary>
+    /// As seções de um passo do PDTIC para a planilha (E8): as visíveis para o órgão e marcadas "na
+    /// planilha", na ordem do passo, cada uma como o <see cref="ExportarSecaoAsync"/> a exporta. Com
+    /// seção por ciclo, o cicloId é obrigatório (400 PeCicloObrigatorio), do PDTIC (404) e do tipo
+    /// dela (400), e ela sai só com os registros dele; as outras seções o ignoram. Passo fora da
+    /// trilha: 404 PePassoIndisponivel; sem seção: 404 PePassoSemPlanilha. Lê: quem vê o órgão.
+    /// </summary>
+    Task<PePassoExportado> ExportarPassoAsync(long pdticId, string passoChave, long? cicloId, PeUserContext ctx);
+
+    /// <summary>
     /// Os registros de uma seção em vários PDTICs de uma vez (o consolidado), cada um com a
     /// seção como o órgão dele a vê; poucas consultas para todos os órgãos. Não confere quem
     /// chama: quem chama já conferiu.
@@ -120,6 +129,13 @@ public interface IPePlanilhaService
 
     /// <summary>O PDTIC inteiro, uma aba por seção visível (só xlsx).</summary>
     Task<PePlanilhaArquivo> PdticCompletaAsync(long pdticId, string? formato, PeUserContext ctx);
+
+    /// <summary>
+    /// Um passo do PDTIC (E8): em XLSX, uma aba por seção do passo e a Leia-me com o passo; em CSV,
+    /// o arquivo da seção quando o passo tem uma só, ou um ZIP com um CSV por seção
+    /// (numero-do-passo-chave-da-secao.csv). Nome PDTIC_SIGLA_passo-N.M[_ciclo]_aaaa-mm-dd.
+    /// </summary>
+    Task<PePlanilhaArquivo> PdticPassoAsync(long pdticId, string passoChave, string? formato, long? cicloId, PeUserContext ctx);
 
     /// <summary>
     /// Uma seção de todos os PDTICs atuais: as colunas do órgão (órgão, sigla, nível, versão e

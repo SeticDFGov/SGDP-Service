@@ -30,6 +30,19 @@ public sealed class PeSecaoExportada
 }
 
 /// <summary>
+/// Um passo do PDTIC pronto para a planilha (E8): o passo da trilha do órgão, o ciclo (quando o
+/// passo tem seção por ciclo) e as seções visíveis e "na planilha", na ordem do passo.
+/// </summary>
+public sealed class PePassoExportado
+{
+    public required PeTrilhaPasso Passo { get; init; }
+
+    public PeCiclo? Ciclo { get; init; }
+
+    public required List<PeSecaoExportada> Secoes { get; init; }
+}
+
+/// <summary>
 /// Uma linha das grades do ciclo (E7, rodada B), gravada pelo motor: o prefixo das chaves dos
 /// erros ("12" vira "12.situacao"), o registro que ela muda (nulo = um novo) e os dados (nulo =
 /// apagar o registro).
@@ -209,19 +222,40 @@ public class PeRegistroService : IPeRegistroService
                 .OrderBy(r => r.Ordem).ThenBy(r => r.Id)
                 .ToListAsync();
         // Seção por ciclo: só os registros do ciclo dado (sem ciclo, nenhum)
-        var (doCiclo, _) = await FiltrarPorCicloAsync(secoes, registros, cicloId, todos: false);
-        registros = doCiclo;
-        var idsRegistros = registros.Select(r => r.Id).ToList();
+        var (doCiclo, ciclos) = await FiltrarPorCicloAsync(secoes, registros, cicloId, todos: false);
+        var idsRegistros = doCiclo.Select(r => r.Id).ToList();
         var vinculos = idsRegistros.Count == 0
             ? new List<PeVinculo>()
             : await _context.PeVinculos.AsNoTracking().Where(v => idsRegistros.Contains(v.RegistroOrigemId)).ToListAsync();
-        var ligacoes = vinculos.Select(v => (v.RegistroOrigemId, v.CampoId)).ToHashSet();
         var semVigente = secoes.Any(s => s.Visiveis.Any(v => EhCatalogoDoPetic(v.Campo)))
                          && await PeTrilhaOrgao.SemPeticVigenteAsync(_context);
+        return AnalisarLidos(secoes, doCiclo, ciclos, cicloId, vinculos.ToLookup(v => v.RegistroOrigemId), semVigente);
+    }
 
+    /// <summary>
+    /// A análise com tudo já lido (a mesma regra do <see cref="AnalisarAsync"/>): os registros do
+    /// dono na ordem da seção (os de outras seções ficam de fora), o ciclo de cada registro das
+    /// seções por ciclo (na seção por ciclo, só os do cicloId; sem ele, nenhum), as ligações pela
+    /// origem e se falta o PETIC-DF vigente. A situação de vários PDTICs de uma vez (E8) lê tudo
+    /// numa consulta por tipo e analisa cada um aqui, em memória.
+    /// </summary>
+    internal static PeAnaliseDono AnalisarLidos(IReadOnlyList<PeSecaoDoDono> secoes, IEnumerable<PeRegistro> registrosDoDono,
+        IReadOnlyDictionary<long, long> cicloDoRegistro, long? cicloId, ILookup<long, PeVinculo> vinculosPelaOrigem, bool semPeticVigente)
+    {
+        var ids = secoes.Select(s => s.Secao.Id).ToHashSet();
+        var porCiclo = secoes.Where(s => s.PorCiclo != null).Select(s => s.Secao.Id).ToHashSet();
+        var registros = registrosDoDono
+            .Where(r => ids.Contains(r.SecaoId))
+            .Where(r => !porCiclo.Contains(r.SecaoId) || (cicloDoRegistro.TryGetValue(r.Id, out var ciclo) && ciclo == cicloId))
+            .ToList();
+        var vinculos = registros.SelectMany(r => vinculosPelaOrigem[r.Id]).ToList();
+        var ligacoes = vinculos.Select(v => (v.RegistroOrigemId, v.CampoId)).ToHashSet();
+        var semVigente = semPeticVigente && secoes.Any(s => s.Visiveis.Any(v => EhCatalogoDoPetic(v.Campo)));
+
+        var porSecao = registros.ToLookup(r => r.SecaoId);
         var analisadas = secoes.Select(secao =>
         {
-            var doSecao = registros.Where(r => r.SecaoId == secao.Secao.Id).ToList();
+            var doSecao = porSecao[secao.Secao.Id].ToList();
             var incompletos = doSecao
                 .Select(r => (Registro: r, Faltando: Faltando(secao, r, ligacoes, semVigente)))
                 .Where(x => x.Faltando.Count > 0)
@@ -260,6 +294,30 @@ public class PeRegistroService : IPeRegistroService
         foreach (var secao in await SecoesDoDonoAsync(aberto, soNaPlanilha: true))
             saida.Add(await ExportadaAsync(dono, secao));
         return saida;
+    }
+
+    public async Task<PePassoExportado> ExportarPassoAsync(long pdticId, string passoChave, long? cicloId, PeUserContext ctx)
+    {
+        var dono = PeDono.DoPdtic(pdticId);
+        var aberto = await AbrirAsync(dono, ctx, escrita: false);
+        var trilha = aberto.Trilha!;
+        var chave = passoChave?.Trim() ?? string.Empty;
+        var passo = trilha.Passos.FirstOrDefault(p => p.Chave == chave)
+            ?? throw new ApiException(ErrorCode.PePassoIndisponivel, "Este passo não está na trilha do órgão. Atualize a tela.");
+        var secoes = passo.Secoes.Select(trilha.Montar).Where(s => s.Secao.NaPlanilha).ToList();
+        if (secoes.Count == 0)
+            throw new ApiException(ErrorCode.PePassoSemPlanilha,
+                $"O passo {passo.Numero} não tem dados para a planilha: ele não tem seção que o órgão preencha (ou o administrador deixou as seções dele fora da planilha).");
+
+        // Seção por ciclo: o ciclo é obrigatório (400), do PDTIC (404) e do tipo de cada seção por ciclo (400)
+        PeCiclo? ciclo = null;
+        foreach (var secao in secoes.Where(s => s.PorCiclo != null))
+            ciclo = await CicloDaSecaoAsync(aberto, secao, cicloId, escrita: false);
+
+        var exportadas = new List<PeSecaoExportada>();
+        foreach (var secao in secoes)
+            exportadas.Add(await ExportadaAsync(dono, secao, secao.PorCiclo == null ? null : ciclo));
+        return new PePassoExportado { Passo = passo, Ciclo = ciclo, Secoes = exportadas };
     }
 
     public async Task<Dictionary<long, List<PeRegistroResponse>>> ExportarDosPdticsAsync(long secaoId,
@@ -1388,14 +1446,15 @@ public class PeRegistroService : IPeRegistroService
         };
     }
 
-    private async Task<PeSecaoExportada> ExportadaAsync(PeDono dono, PeSecaoDoDono secao)
+    private async Task<PeSecaoExportada> ExportadaAsync(PeDono dono, PeSecaoDoDono secao, PeCiclo? soDoCiclo = null)
     {
         var registros = await RegistrosDo(dono).AsNoTracking()
             .Where(r => r.SecaoId == secao.Secao.Id)
             .OrderBy(r => r.Ordem).ThenBy(r => r.Id)
             .ToListAsync();
-        // Seção por ciclo: os registros de todos os ciclos, com o ciclo de cada um (a planilha mostra)
-        var (filtrados, ciclos) = await FiltrarPorCicloAsync(new[] { secao }, registros, null, todos: true);
+        // Seção por ciclo: os registros de todos os ciclos, com o ciclo de cada um (a planilha mostra);
+        // na planilha de um passo por ciclo (E8), só os do ciclo pedido
+        var (filtrados, ciclos) = await FiltrarPorCicloAsync(new[] { secao }, registros, soDoCiclo?.Id, todos: soDoCiclo == null);
         return new PeSecaoExportada
         {
             Modelo = secao,

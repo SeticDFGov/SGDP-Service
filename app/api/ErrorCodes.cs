@@ -176,4 +176,10 @@ public enum ErrorCode
     PeCicloFechado = 1123,              // 409: o ciclo não aceita a operação agora (gravar num ciclo fechado ou que ainda não começou, fechar o fechado, reabrir o aberto)
     PeCicloComPendencias = 1124,        // 400: fechar o ciclo com pendências; o corpo traz Pendencias [{ PassoId, PassoNumero, PassoTitulo, Motivo }]
     PeAvaliacaoAberta = 1125,           // 409: já há uma avaliação intermediária aberta (uma por vez)
+    // Painéis da SGDI, conformidade e inadimplência (E8): faixa 1140 a 1159
+    PeInadimplenciaNaoEncontrada = 1140,    // 404: registro de inadimplência inexistente
+    PeInadimplenciaInvalida = 1141,         // 400: notificar, justificar, registrar ou sanear sem os dados; o corpo traz Campos (pelo nome do campo do corpo)
+    PeInadimplenciaSituacaoInvalida = 1142, // 409: a operação não vale na situação (justificar ou registrar fora de notificado, sanear o justificado ou o saneado)
+    PeInadimplenciaPrazoAberto = 1143,      // 409: registrar a inadimplência antes de vencer o prazo de 5 dias úteis (art. 11, II)
+    PePassoSemPlanilha = 1144,              // 404: a planilha do passo sem seção visível e marcada "na planilha" (documento, envio sem seção, deliberação)
 }

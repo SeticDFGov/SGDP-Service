@@ -25,6 +25,10 @@ public sealed class PeSituacaoDetalhada
     public required PeTrilhaOrgao Trilha { get; init; }
 
     public required PeAnaliseDono Analise { get; init; }
+
+    // Os ciclos que valem para o PDTIC (os gravados e o plano da periodicidade, sem gravar); vazio
+    // antes da publicação e sem o acompanhamento ligado (a conformidade da E8 confere os atrasados)
+    public List<PeCiclo> Ciclos { get; init; } = new();
 }
 
 /// <summary>
@@ -218,16 +222,22 @@ public class PePdticService : IPePdticService
             else trilha.AjustarAoPdtic(pdtic);
         }
 
-        var marcas = await _context.PePdticPassos.AsNoTracking()
-            .Where(p => p.PdticId == pdtic.Id && p.NaoSeAplica)
-            .ToDictionaryAsync(p => p.PassoId);
-        var abertos = (await _context.PeComentarios.AsNoTracking()
-                .Where(c => c.PdticId == pdtic.Id && c.PaiId == null && c.ResolvidoEm == null)
-                .Select(c => c.PassoId)
-                .ToListAsync())
-            .GroupBy(p => p)
-            .ToDictionary(g => g.Key, g => g.Count());
-        var analise = await _registros.AnalisarAsync(PeDono.DoPdtic(pdtic.Id), trilha.SecoesMontadas());
+        // O mesmo caminho da situação de vários PDTICs de uma vez (E8), com uma lista de um
+        var leitura = await PeLeituraDaSituacao.CarregarAsync(_context, new[] { pdtic.Id }, trilha.Dados.Acompanhamento.Ativo);
+        return Detalhar(pdtic, trilha, leitura, ctx != null && _permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId));
+    }
+
+    /// <summary>
+    /// A situação de cada passo com tudo já lido (<see cref="PeLeituraDaSituacao"/>): o PDTIC, a
+    /// trilha do órgão já ajustada a ele (<see cref="PeTrilhaOrgao.AjustarAoPdtic"/>) e se quem chama
+    /// tem o papel de editar (o PodeEditar de cada passo). Não lê o banco: o painel e a conformidade
+    /// da SGDI (E8) calculam aqui a situação de todos os órgãos, depois de ler tudo de uma vez.
+    /// </summary>
+    internal static PeSituacaoDetalhada Detalhar(PePdtic pdtic, PeTrilhaOrgao trilha, PeLeituraDaSituacao leitura, bool papelEdita)
+    {
+        var marcas = leitura.Marcas(pdtic.Id);
+        var abertos = leitura.Abertos(pdtic.Id);
+        var analise = leitura.Analisar(pdtic.Id, trilha.SecoesMontadas());
         var porSecao = analise.Secoes.ToDictionary(s => s.Secao.Secao.Id);
 
         // Acompanhamento (E7, rodada B; com a versão 6 do modelo inicial carregada): os ciclos (os
@@ -235,27 +245,20 @@ public class PePdticService : IPePdticService
         // recente (as seções da avaliação são analisadas nela) e a espera da etapa 7
         var acompanhamento = trilha.Dados.Acompanhamento;
         var ciclos = acompanhamento.Ativo
-            ? await PeCiclosDoPdtic.EfetivosAsync(_context, _registros, pdtic, trilha)
+            ? leitura.CiclosEfetivos(pdtic, trilha, analise)
             : new List<PeCiclo>();
         var avaliacao = ciclos.Where(c => c.Tipo == PeDominios.TipoCiclo.Avaliacao).OrderByDescending(c => c.Numero).FirstOrDefault();
         if (avaliacao != null)
         {
             var daAvaliacao = trilha.SecoesMontadas().Where(s => s.PorCiclo == PeDominios.TipoCiclo.Avaliacao).ToList();
-            foreach (var secao in (await _registros.AnalisarAsync(PeDono.DoPdtic(pdtic.Id), daAvaliacao, avaliacao.Id)).Secoes)
+            foreach (var secao in leitura.Analisar(pdtic.Id, daAvaliacao, avaliacao.Id).Secoes)
                 porSecao[secao.Secao.Secao.Id] = secao;
         }
         var esperaDoFechamento = acompanhamento.Ativo ? EsperaDoFechamento(pdtic, trilha, porSecao, acompanhamento.DiasAvaliacaoFinal) : null;
         // Só as versões do PDF do PDTIC contam (as do RA e do RR, não)
-        var temDocumento = trilha.Passos.Any(p => p.Tipo == PeDominios.TipoPasso.Documento)
-                           && await PeDocumentoService.TemVersaoDoPdticAsync(_context, pdtic.Id, acompanhamento.Ativo);
-        var deliberacao = pdtic.Situacao == PeDominios.SituacaoPdtic.Devolvido
-            ? await _context.PeDeliberacoes.AsNoTracking()
-                .Where(d => d.ObjetoTipo == PeDominios.ObjetoDeliberacao.Pdtic && d.ObjetoId == pdtic.Id)
-                .OrderByDescending(d => d.Id)
-                .FirstOrDefaultAsync()
-            : null;
+        var temDocumento = trilha.Passos.Any(p => p.Tipo == PeDominios.TipoPasso.Documento) && leitura.TemDocumento(pdtic.Id);
+        var deliberacao = pdtic.Situacao == PeDominios.SituacaoPdtic.Devolvido ? leitura.Deliberacoes(pdtic.Id).FirstOrDefault() : null;
         var etapas = PeEdicaoPdtic.EtapasDosPassos(trilha);
-        var papelEdita = ctx != null && _permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId);
 
         // Marca que ainda vale (o passo continua opcional, aceita e não é travado)
         bool NaoSeAplica(PeTrilhaPasso passo) => marcas.ContainsKey(passo.Id) && RecusaDoNaoSeAplica(passo) == null;
@@ -345,7 +348,8 @@ public class PePdticService : IPePdticService
             Resposta = new PePdticSituacaoResponse { ProximoPasso = ProximoPasso(pdtic, trilha, passos, editaveis), Passos = passos },
             OQueFalta = oQueFalta,
             Trilha = trilha,
-            Analise = analise
+            Analise = analise,
+            Ciclos = ciclos
         };
     }
 

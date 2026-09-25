@@ -110,6 +110,8 @@ namespace Models
         public DbSet<PeDocOrgaoDocumento> PeDocOrgaosDocumento { get; set; }
         public DbSet<PeDocOrgaoBlocoDocumento> PeDocOrgaoBlocosDocumento { get; set; }
         public DbSet<PeDocVersaoDocumento> PeDocVersoesDocumento { get; set; }
+        // Painéis da SGDI (E8): a inadimplência do art. 11 do Decreto nº 48.899/2026
+        public DbSet<PeInadimplencia> PeInadimplencias { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
