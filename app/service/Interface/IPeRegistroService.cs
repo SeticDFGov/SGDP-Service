@@ -56,9 +56,10 @@ public interface IPeRegistroService
 
     /// <summary>
     /// O que falta para o dono ir ao CGTIC: seção obrigatória sem registro e registro com
-    /// campo obrigatório vazio (pelo modelo de hoje). Lista vazia = pronto.
+    /// campo obrigatório vazio (pelo modelo de hoje), com a seção de cada pendência (F1). Lista
+    /// vazia = pronto.
     /// </summary>
-    Task<List<string>> PendenciasAsync(PeDono dono);
+    Task<List<PePeticPendenciaResponse>> PendenciasAsync(PeDono dono);
 
     /// <summary>
     /// Os registros das seções dadas e o que falta em cada um, mais as ligações que saem deles

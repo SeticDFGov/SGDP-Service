@@ -61,7 +61,8 @@ public class PeFluxoService : IPeFluxoService
         if (!_permissoes.PodeLerModelo(ctx)) throw SemPapel();
         var modelos = await _context.PeFluxosModelo.AsNoTracking().OrderBy(m => m.Ordem).ThenBy(m => m.Id).ToListAsync();
         if (modelos.Count == 0 && await AindaNaoCarregadosAsync(_context)) throw Indisponivel();
-        return modelos.Select(Modelo).ToList();
+        var nomes = await PeNomes.CarregarAsync(_context, modelos.Select(m => m.AlteradoPor));
+        return modelos.Select(m => Modelo(m, nomes)).ToList();
     }
 
     public async Task<PeFluxoModeloResponse> SalvarModeloAsync(string chave, PeFluxoSalvarDTO dto, PeUserContext ctx)
@@ -72,7 +73,8 @@ public class PeFluxoService : IPeFluxoService
         var definicao = PeFluxoDefinicaoLeitor.LerValida(dto.Definicao);
         var nome = NomeInformado(dto.Nome, modelo.Nome, modelo.Nome);
         var json = PeFluxoDefinicaoLeitor.ParaJson(definicao);
-        if (nome == modelo.Nome && Canonico(json) == Canonico(modelo.Definicao)) return Modelo(modelo);
+        if (nome == modelo.Nome && Canonico(json) == Canonico(modelo.Definicao))
+            return Modelo(modelo, await PeNomes.CarregarAsync(_context, new[] { modelo.AlteradoPor }));
 
         var agora = DateTime.UtcNow;
         var antes = Retrato(modelo.Nome, modelo.Definicao);
@@ -91,7 +93,7 @@ public class PeFluxoService : IPeFluxoService
             AlteradoPor = ctx.Email
         });
         await _context.SaveChangesAsync();
-        return Modelo(modelo);
+        return Modelo(modelo, await PeNomes.CarregarAsync(_context, new[] { modelo.AlteradoPor }));
     }
 
     public async Task<string> SvgDoModeloAsync(string chave, PeUserContext ctx) =>
@@ -121,6 +123,7 @@ public class PeFluxoService : IPeFluxoService
         var modelos = await _context.PeFluxosModelo.AsNoTracking().OrderBy(m => m.Ordem).ThenBy(m => m.Id).ToListAsync();
         if (modelos.Count == 0 && await AindaNaoCarregadosAsync(_context)) throw Indisponivel();
         var copias = await _context.PeFluxos.AsNoTracking().Where(f => f.PdticId == pdtic.Id).ToDictionaryAsync(f => f.ModeloId);
+        var nomes = await PeNomes.CarregarAsync(_context, copias.Values.Select(c => c.AlteradoPor ?? c.CriadoPor));
         return modelos.Select(m =>
         {
             copias.TryGetValue(m.Id, out var copia);
@@ -133,6 +136,7 @@ public class PeFluxoService : IPeFluxoService
                 ModeloMudou = copia != null && copia.ModeloHash != HashDoModelo(m),
                 AlteradoEm = copia?.AlteradoEm ?? copia?.CriadoEm,
                 AlteradoPor = copia?.AlteradoPor ?? copia?.CriadoPor,
+                AlteradoPorNome = nomes.De(copia?.AlteradoPor ?? copia?.CriadoPor),
                 Ordem = m.Ordem
             };
         }).ToList();
@@ -143,7 +147,7 @@ public class PeFluxoService : IPeFluxoService
         var pdtic = await PePdticService.LerAsync(_context, _permissoes, pdticId, ctx);
         var modelo = await ModeloAsync(_context, chave);
         var copia = await _context.PeFluxos.AsNoTracking().FirstOrDefaultAsync(f => f.PdticId == pdtic.Id && f.ModeloId == modelo.Id);
-        return Resposta(pdtic, modelo, copia, ctx);
+        return await RespostaAsync(pdtic, modelo, copia, ctx);
     }
 
     public async Task<PeFluxoResponse> SalvarAsync(long pdticId, string chave, PeFluxoSalvarDTO dto, PeUserContext ctx)
@@ -429,10 +433,13 @@ public class PeFluxoService : IPeFluxoService
     {
         var pdtic = await _context.PePdtics.AsNoTracking().FirstAsync(p => p.Id == pdticId);
         var copia = await _context.PeFluxos.AsNoTracking().FirstOrDefaultAsync(f => f.PdticId == pdticId && f.ModeloId == modelo.Id);
-        return Resposta(pdtic, modelo, copia, ctx);
+        return await RespostaAsync(pdtic, modelo, copia, ctx);
     }
 
-    private PeFluxoResponse Resposta(PePdtic pdtic, PeFluxoModelo modelo, PeFluxo? copia, PeUserContext ctx) => new()
+    private async Task<PeFluxoResponse> RespostaAsync(PePdtic pdtic, PeFluxoModelo modelo, PeFluxo? copia, PeUserContext ctx) =>
+        Resposta(pdtic, modelo, copia, ctx, await PeNomes.CarregarAsync(_context, new[] { copia?.AlteradoPor ?? copia?.CriadoPor }));
+
+    private PeFluxoResponse Resposta(PePdtic pdtic, PeFluxoModelo modelo, PeFluxo? copia, PeUserContext ctx, PeNomes nomes) => new()
     {
         Chave = modelo.Chave,
         Nome = copia?.Nome ?? modelo.Nome,
@@ -442,10 +449,11 @@ public class PeFluxoService : IPeFluxoService
         ModeloMudou = copia != null && copia.ModeloHash != HashDoModelo(modelo),
         PodeEditar = _permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId) && PeEdicaoPdtic.ElaboracaoAberta(pdtic),
         AlteradoEm = copia?.AlteradoEm ?? copia?.CriadoEm,
-        AlteradoPor = copia?.AlteradoPor ?? copia?.CriadoPor
+        AlteradoPor = copia?.AlteradoPor ?? copia?.CriadoPor,
+        AlteradoPorNome = nomes.De(copia?.AlteradoPor ?? copia?.CriadoPor)
     };
 
-    private static PeFluxoModeloResponse Modelo(PeFluxoModelo m) => new()
+    private static PeFluxoModeloResponse Modelo(PeFluxoModelo m, PeNomes nomes) => new()
     {
         Chave = m.Chave,
         Nome = m.Nome,
@@ -453,7 +461,8 @@ public class PeFluxoService : IPeFluxoService
         Ordem = m.Ordem,
         Definicao = PeFluxoDefinicaoLeitor.DoBanco(m.Definicao),
         AlteradoEm = m.AlteradoEm,
-        AlteradoPor = m.AlteradoPor
+        AlteradoPor = m.AlteradoPor,
+        AlteradoPorNome = nomes.De(m.AlteradoPor)
     };
 
     private async Task<PePdtic> PdticParaEditarAsync(long pdticId, PeUserContext ctx)

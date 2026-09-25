@@ -70,26 +70,31 @@ public class PePeticTest : PeReferenciaisTestBase
         var ctx = await Admin();
         var rascunho = await RascunhoAsync();
 
-        var ex = await Assert.ThrowsAsync<ApiException>(() => Petics.EnviarAsync(rascunho.Id, ctx));
+        // Desde a F1 (A06), o que falta vem em lista, com a seção de cada pendência
+        var ex = await Assert.ThrowsAsync<PePeticPendenciasException>(() => Petics.EnviarAsync(rascunho.Id, ctx));
         Assert.Equal((int)ErrorCode.PePeticIncompleto, ex.Error.Code);
-        Assert.Contains("\"Diretrizes\"", ex.Error.Message);
-        Assert.Contains("\"Objetivos estratégicos\"", ex.Error.Message);
-        Assert.Contains("\"Iniciativas\"", ex.Error.Message);
+        var titulos = ex.Pendencias.Select(p => p.SecaoTitulo).ToList();
+        Assert.Contains("Diretrizes", titulos);
+        Assert.Contains("Objetivos estratégicos", titulos);
+        Assert.Contains("Iniciativas", titulos);
+        Assert.Contains(ex.Pendencias, p => p.SecaoChave == "petic_diretriz" && p.Motivo == "Inclua pelo menos um item em \"Diretrizes\".");
         // As seções opcionais não entram
-        Assert.DoesNotContain("Missão", ex.Error.Message);
-        Assert.DoesNotContain("Eixos", ex.Error.Message);
+        Assert.DoesNotContain(ex.Pendencias, p => p.SecaoTitulo.Contains("Missão") || p.SecaoTitulo.Contains("Eixos"));
 
         // Registro que ficou sem um obrigatório (o administrador tornou a fonte obrigatória)
         await PreencherMinimoAsync(rascunho.Id);
         await Modelo.DefinirSituacaoCampoAsync(Campo("petic_indicador", "fonte").Id, new PeSituacoesDTO { SituacaoGeral = "obrigatorio" }, EmailAdmin);
-        ex = await Assert.ThrowsAsync<ApiException>(() => Petics.EnviarAsync(rascunho.Id, ctx));
-        Assert.Equal("Antes de enviar ao CGTIC: IE01: preencha \"Fonte dos dados\".", ex.Error.Message);
+        ex = await Assert.ThrowsAsync<PePeticPendenciasException>(() => Petics.EnviarAsync(rascunho.Id, ctx));
+        var pendencia = Assert.Single(ex.Pendencias);
+        Assert.Equal(("petic_indicador", "IE01: preencha \"Fonte dos dados\"."), (pendencia.SecaoChave, pendencia.Motivo));
+        Assert.Equal("Falta uma coisa para enviar o PETIC-DF ao CGTIC. Confira a lista.", ex.Error.Message);
 
-        // Sem vigência
+        // Sem vigência: a pendência sem seção (o título e a vigência da versão)
         await Modelo.DefinirSituacaoCampoAsync(Campo("petic_indicador", "fonte").Id, new PeSituacoesDTO { SituacaoGeral = "opcional" }, EmailAdmin);
         await Petics.AtualizarAsync(rascunho.Id, new PePeticAtualizarDTO { VigenciaInicio = null, Informados = new HashSet<string> { "VigenciaInicio" } }, ctx);
-        ex = await Assert.ThrowsAsync<ApiException>(() => Petics.EnviarAsync(rascunho.Id, ctx));
-        Assert.Contains("vigência", ex.Error.Message);
+        ex = await Assert.ThrowsAsync<PePeticPendenciasException>(() => Petics.EnviarAsync(rascunho.Id, ctx));
+        pendencia = Assert.Single(ex.Pendencias);
+        Assert.Equal((null, "Título e vigência", "Informe o início e o fim da vigência."), (pendencia.SecaoChave, pendencia.SecaoTitulo, pendencia.Motivo));
         Assert.Equal("rascunho", Context.PePetics.AsNoTracking().Single().Situacao);
         Assert.Empty(Context.PeDeliberacoes);
     }

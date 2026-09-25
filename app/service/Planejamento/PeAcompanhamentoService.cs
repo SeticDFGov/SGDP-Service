@@ -742,7 +742,7 @@ public class PeAcompanhamentoService : IPeAcompanhamentoService
         if (!PeDominios.SituacaoPdtic.Vigentes.Contains(pdtic.Situacao))
             throw new ApiException(ErrorCode.PePdticSituacaoInvalida, PeDominios.SituacaoPdtic.DaElaboracao.Contains(pdtic.Situacao)
                 ? "O acompanhamento começa depois da publicação do PDTIC."
-                : $"Este PDTIC está {PeDominios.SituacaoPdtic.Rotulo(pdtic.Situacao).ToLowerInvariant()} e o acompanhamento dele não muda mais.");
+                : $"Este PDTIC está {PeDominios.SituacaoPdtic.RotuloMinusculo(pdtic.Situacao)} e o acompanhamento dele não muda mais.");
     }
 
     private static bool TemSecoesDoTipo(PeTrilhaOrgao trilha, string tipo) =>
@@ -755,9 +755,20 @@ public class PeAcompanhamentoService : IPeAcompanhamentoService
     {
         if (ciclos.Count == 0) return new List<PeCicloResponse>();
         var hoje = PeCiclos.Hoje();
-        var dados = await PeDadosDoAcompanhamento.CarregarAsync(_registros, pdtic, trilha,
+        var chaves = new List<string>
+        {
             PeDominios.TemaDecreto.SecaoAcoes, PeDominios.ChaveAcompanhamento.SecaoMonitoramentoAcoes,
-            PeDominios.ChaveAcompanhamento.SecaoMedicoes, PeDominios.ChaveAcompanhamento.SecaoRiscosOcorridos);
+            PeDominios.ChaveAcompanhamento.SecaoMedicoes, PeDominios.ChaveAcompanhamento.SecaoRiscosOcorridos
+        };
+        // F1 (I04 e C23): o que a avaliação intermediária tem (resultados das metas, análise e decisão do comitê)
+        if (ciclos.Any(c => c.Tipo == PeDominios.TipoCiclo.Avaliacao))
+            chaves.AddRange(new[]
+            {
+                PeDominios.ChaveAcompanhamento.SecaoResultadosIntermediarios, PeDominios.ChaveAcompanhamento.SecaoAnaliseIntermediaria,
+                PeDominios.ChavePdtic.SecaoAvaliacaoComite
+            });
+        var dados = await PeDadosDoAcompanhamento.CarregarAsync(_registros, pdtic, trilha, chaves.ToArray());
+        var nomes = await PeNomes.CarregarAsync(_context, ciclos.SelectMany(c => new[] { c.FechadoPor, c.ReabertoPor }));
         var ids = ciclos.Select(c => c.Id).ToList();
         var relatorios = (await (from v in _context.PeDocVersoes.AsNoTracking()
                                  join d in _context.PeDocVersoesDocumento.AsNoTracking() on v.Id equals d.Id
@@ -776,6 +787,9 @@ public class PeAcompanhamentoService : IPeAcompanhamentoService
                 .SelectMany(r => PeDadosDoAcompanhamento.Ligados(r, PeDominios.ChaveAcompanhamento.CampoAcao))
                 .Distinct()
                 .Count();
+            var decisao = c.Tipo == PeDominios.TipoCiclo.Avaliacao
+                ? dados.DoCiclo(PeDominios.ChavePdtic.SecaoAvaliacaoComite, c.Id).FirstOrDefault()
+                : null;
             return new PeCicloResponse
             {
                 Id = c.Id,
@@ -788,15 +802,26 @@ public class PeAcompanhamentoService : IPeAcompanhamentoService
                 Situacao = PeCiclos.Exibida(c, hoje),
                 FechadoEm = c.FechadoEm,
                 FechadoPor = c.FechadoPor,
+                FechadoPorNome = nomes.De(c.FechadoPor),
                 ReabertoEm = c.ReabertoEm,
                 ReabertoPor = c.ReabertoPor,
+                ReabertoPorNome = nomes.De(c.ReabertoPor),
                 PodeEditar = papelEdita && PeCiclos.RecusaDeDados(c, hoje) == null,
                 Resumo = new PeCicloResumoResponse
                 {
                     AcoesComSituacao = acoesComSituacao,
                     TotalAcoes = totalAcoes,
                     Medicoes = dados.DoCiclo(PeDominios.ChaveAcompanhamento.SecaoMedicoes, c.Id).Count,
-                    RiscosOcorridos = dados.DoCiclo(PeDominios.ChaveAcompanhamento.SecaoRiscosOcorridos, c.Id).Count
+                    RiscosOcorridos = dados.DoCiclo(PeDominios.ChaveAcompanhamento.SecaoRiscosOcorridos, c.Id).Count,
+                    ResultadosMetas = c.Tipo == PeDominios.TipoCiclo.Avaliacao
+                        ? dados.DoCiclo(PeDominios.ChaveAcompanhamento.SecaoResultadosIntermediarios, c.Id).Count
+                        : 0,
+                    AnaliseRegistrada = c.Tipo == PeDominios.TipoCiclo.Avaliacao
+                                        && dados.DoCiclo(PeDominios.ChaveAcompanhamento.SecaoAnaliseIntermediaria, c.Id).Count > 0,
+                    DecisaoComite = decisao == null ? null : PeDadosDoAcompanhamento.Texto(decisao, PeDominios.ChavePdtic.CampoDecisao),
+                    DecisaoComiteRotulo = decisao != null && decisao.Rotulos.TryGetValue(PeDominios.ChavePdtic.CampoDecisao, out var rotulo)
+                        ? rotulo
+                        : null
                 },
                 Relatorio = relatorios.TryGetValue(c.Id, out var relatorio)
                     ? new PeCicloRelatorioResponse { Numero = relatorio.Numero, Situacao = relatorio.Situacao, GeradoEm = relatorio.GeradoEm }

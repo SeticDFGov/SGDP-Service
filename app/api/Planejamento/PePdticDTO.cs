@@ -45,6 +45,8 @@ public class PePdticResponse
     public DateTime CriadoEm { get; set; }
 
     public string CriadoPor { get; set; } = string.Empty;
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail)
+    public string CriadoPorNome { get; set; } = string.Empty;
 
     // ── Caminho da aprovação (E7) ──
 
@@ -178,6 +180,10 @@ public class PePdticSituacaoResponse
     // recém-aberta, o primeiro passo da etapa 2; nulo quando não há ou o PDTIC encerrou
     public string? ProximoPasso { get; set; }
 
+    // F1 (B12): por que o próximo passo é esse, quando não é o óbvio (na revisão recém-aberta, o
+    // passo recomendado pode estar feito: os dados vieram da versão anterior); nulo nos outros casos
+    public string? ProximoPassoMotivo { get; set; }
+
     public List<PePassoSituacaoResponse> Passos { get; set; } = new();
 }
 
@@ -213,6 +219,8 @@ public class PeNaoSeAplicaResponse
     public DateTime MarcadoEm { get; set; }
 
     public string MarcadoPor { get; set; } = string.Empty;
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail)
+    public string MarcadoPorNome { get; set; } = string.Empty;
 }
 
 /// <summary>PUT pdtic/{id}/passos/{passoId}/nao-se-aplica.</summary>
@@ -298,6 +306,8 @@ public class PeComentarioResponse
     public DateTime? ResolvidoEm { get; set; }
 
     public string? ResolvidoPor { get; set; }
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail); nulo com o ResolvidoPor
+    public string? ResolvidoPorNome { get; set; }
 
     public List<PeComentarioRespostaResponse> Respostas { get; set; } = new();
 }

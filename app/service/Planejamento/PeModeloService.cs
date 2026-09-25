@@ -98,10 +98,11 @@ public class PeModeloService : IPeModeloService
             .Take(pageSize)
             .ToListAsync();
 
-        return new PagedResponse<PeHistoricoResponse>(linhas.Select(Historico).ToList(), total, page, pageSize);
+        var nomes = await PeNomes.CarregarAsync(_context, linhas.Select(h => h.AlteradoPor));
+        return new PagedResponse<PeHistoricoResponse>(linhas.Select(h => Historico(h, nomes)).ToList(), total, page, pageSize);
     }
 
-    internal static PeHistoricoResponse Historico(PeModeloHistorico h) => new()
+    internal static PeHistoricoResponse Historico(PeModeloHistorico h, PeNomes nomes) => new()
     {
         Id = h.Id,
         Entidade = h.Entidade,
@@ -110,7 +111,8 @@ public class PeModeloService : IPeModeloService
         Antes = h.Antes == null ? null : PeModeloDados.Json(h.Antes),
         Depois = h.Depois == null ? null : PeModeloDados.Json(h.Depois),
         AlteradoEm = h.AlteradoEm,
-        AlteradoPor = h.AlteradoPor
+        AlteradoPor = h.AlteradoPor,
+        AlteradoPorNome = nomes.DeObrigatorio(h.AlteradoPor)
     };
 
     // ── Níveis ──────────────────────────────────────────────────────────────
@@ -574,9 +576,10 @@ public class PeModeloService : IPeModeloService
             ?? throw Dados("A seção do campo não existe.");
         await GarantirSecaoAtivaAsync(secao);
 
-        var rotulo = Obrigatorio(dto.Rotulo, 200, "o rótulo do campo");
-        var tipo = Dominio(dto.Tipo, PeDominios.TipoCampo.Todos, "o tipo do campo");
-        var largura = Largura(dto.Largura);
+        var rotulo = NoCampo(nameof(dto.Rotulo), () => Obrigatorio(dto.Rotulo, 200, "o rótulo do campo"));
+        var tipo = NoCampo(nameof(dto.Tipo), () => Dominio(dto.Tipo, PeDominios.TipoCampo.Todos, "o tipo do campo"));
+        var largura = NoCampo(nameof(dto.Largura), () => Largura(dto.Largura));
+        var ajuda = NoCampo(nameof(dto.Ajuda), () => Opcional(dto.Ajuda, 2000, "A ajuda"));
 
         var campos = await _context.PeCampos.AsNoTracking().Where(c => c.SecaoId == secao.Id).ToListAsync();
         string chave;
@@ -584,9 +587,10 @@ public class PeModeloService : IPeModeloService
         {
             chave = dto.Chave.Trim();
             if (!PeChaves.ChaveValida(chave, PeChaves.MaximoCampo))
-                throw Dados("A chave do campo usa só letras minúsculas sem acento, números e sublinhado, e começa por letra.");
+                throw NoCampo(nameof(dto.Chave), Dados("A chave do campo usa só letras minúsculas sem acento, números e sublinhado, e começa por letra."));
             if (campos.Any(c => c.Chave == chave))
-                throw new ApiException(ErrorCode.PeChaveDuplicada, $"Já existe um campo com a chave \"{chave}\" nesta seção (inclusive entre os apagados).");
+                throw NoCampo(nameof(dto.Chave),
+                    new ApiException(ErrorCode.PeChaveDuplicada, $"Já existe um campo com a chave \"{chave}\" nesta seção (inclusive entre os apagados)."));
         }
         else
         {
@@ -604,7 +608,7 @@ public class PeModeloService : IPeModeloService
             SecaoId = secao.Id,
             Chave = chave,
             Rotulo = rotulo,
-            Ajuda = Opcional(dto.Ajuda, 2000, "A ajuda"),
+            Ajuda = ajuda,
             Tipo = tipo,
             Config = config,
             Ordem = (campos.Max(c => (int?)c.Ordem) ?? 0) + 1,
@@ -652,14 +656,15 @@ public class PeModeloService : IPeModeloService
                             + "Se precisar, crie outro campo.");
         }
         var alvoAntes = AlvoDaLigacao(campo.Tipo, campo.Config);
-        if (mudaTipo) Dominio(novoTipo, PeDominios.TipoCampo.Todos, "o tipo do campo");
+        if (mudaTipo) NoCampo(nameof(dto.Tipo), () => Dominio(novoTipo, PeDominios.TipoCampo.Todos, "o tipo do campo"));
         if (mudaChave)
         {
             var chave = dto.Chave!.Trim();
             if (!PeChaves.ChaveValida(chave, PeChaves.MaximoCampo))
-                throw Dados("A chave do campo usa só letras minúsculas sem acento, números e sublinhado, e começa por letra.");
+                throw NoCampo(nameof(dto.Chave), Dados("A chave do campo usa só letras minúsculas sem acento, números e sublinhado, e começa por letra."));
             if (irmaos.Any(c => c.Chave == chave))
-                throw new ApiException(ErrorCode.PeChaveDuplicada, $"Já existe um campo com a chave \"{chave}\" nesta seção (inclusive entre os apagados).");
+                throw NoCampo(nameof(dto.Chave),
+                    new ApiException(ErrorCode.PeChaveDuplicada, $"Já existe um campo com a chave \"{chave}\" nesta seção (inclusive entre os apagados)."));
             campo.Chave = chave;
         }
 
@@ -680,9 +685,9 @@ public class PeModeloService : IPeModeloService
         }
         campo.Tipo = novoTipo;
 
-        if (dto.Informou(nameof(dto.Rotulo))) campo.Rotulo = Obrigatorio(dto.Rotulo, 200, "o rótulo do campo");
-        if (dto.Informou(nameof(dto.Ajuda))) campo.Ajuda = Opcional(dto.Ajuda, 2000, "A ajuda");
-        if (dto.Informou(nameof(dto.Largura))) campo.Largura = Largura(dto.Largura);
+        if (dto.Informou(nameof(dto.Rotulo))) campo.Rotulo = NoCampo(nameof(dto.Rotulo), () => Obrigatorio(dto.Rotulo, 200, "o rótulo do campo"));
+        if (dto.Informou(nameof(dto.Ajuda))) campo.Ajuda = NoCampo(nameof(dto.Ajuda), () => Opcional(dto.Ajuda, 2000, "A ajuda"));
+        if (dto.Informou(nameof(dto.Largura))) campo.Largura = NoCampo(nameof(dto.Largura), () => Largura(dto.Largura));
         if (dto.Informou(nameof(dto.NoDocumento)) && dto.NoDocumento != null) campo.NoDocumento = dto.NoDocumento.Value;
         if (dto.Informou(nameof(dto.NaPlanilha)) && dto.NaPlanilha != null) campo.NaPlanilha = dto.NaPlanilha.Value;
 
@@ -1213,6 +1218,28 @@ public class PeModeloService : IPeModeloService
     }
 
     // ── Validação de entrada ────────────────────────────────────────────────
+
+    /// <summary>
+    /// O erro de um campo da janela do campo (F1, achado A14): o mesmo código e a mesma mensagem,
+    /// com Campos pela propriedade do corpo ("Rotulo", "Chave", "Tipo", "Largura", "Ajuda"; o
+    /// config sai do PeConfigCampo como "Config.max", "Config.secao"...), para a janela mostrar o
+    /// erro no campo.
+    /// </summary>
+    private static ApiException NoCampo(string campo, ApiException ex) =>
+        ex as PeValidacaoException
+        ?? new PeValidacaoException(new Dictionary<string, string> { [campo] = ex.Error.Message }, ex.Error.Message, (ErrorCode)ex.Error.Code);
+
+    private static T NoCampo<T>(string campo, Func<T> ler)
+    {
+        try
+        {
+            return ler();
+        }
+        catch (ApiException ex) when (ex is not PeValidacaoException)
+        {
+            throw NoCampo(campo, ex);
+        }
+    }
 
     /// <summary>Texto obrigatório: sem espaço nas pontas, não vazio, até o máximo.</summary>
     internal static string Obrigatorio(string? valor, int maximo, string oQue)

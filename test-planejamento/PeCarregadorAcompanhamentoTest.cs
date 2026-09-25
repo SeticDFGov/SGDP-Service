@@ -121,7 +121,8 @@ public class PeCarregadorAcompanhamentoTest : PeDocumentoTestBase
 
         var resultado = await new PeCarregadorModelo(vazio.Context).CarregarAsync();
 
-        Assert.Equal((5, 6, 7, 2, 2), (resultado.VersaoAnterior, resultado.Versao, resultado.SecoesPorCiclo, resultado.Documentos, resultado.Configuracoes));
+        Assert.Equal((5, PeCarregadorModelo.LerSeed().Versao, 7, 2, 2),
+            (resultado.VersaoAnterior, resultado.Versao, resultado.SecoesPorCiclo, resultado.Documentos, resultado.Configuracoes));
         Assert.Equal(0, resultado.Secoes + resultado.Passos + resultado.Campos);
         Assert.Equal(Ordenadas(Esperadas), Marcadas(vazio.Context));
         Assert.True(await PeAcompanhamentoAtivo.AtivoAsync(vazio.Context));

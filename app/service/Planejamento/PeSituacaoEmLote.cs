@@ -36,8 +36,9 @@ public sealed class PeLeituraDaSituacao
 
     private PeLeituraDaSituacao(ILookup<long, PeRegistro> registros, Dictionary<long, long> cicloDoRegistro, ILookup<long, PeVinculo> vinculos,
         Dictionary<long, Dictionary<long, PePdticPasso>> marcas, Dictionary<long, Dictionary<long, int>> abertos, ILookup<long, PeCiclo> ciclos,
-        HashSet<long> comDocumento, ILookup<long, PeDeliberacao> deliberacoes, bool semPeticVigente)
+        HashSet<long> comDocumento, ILookup<long, PeDeliberacao> deliberacoes, bool semPeticVigente, PeNomes nomes)
     {
+        Nomes = nomes;
         _registros = registros;
         _cicloDoRegistro = cicloDoRegistro;
         _vinculos = vinculos;
@@ -53,6 +54,9 @@ public sealed class PeLeituraDaSituacao
     // Não há versão do PETIC-DF aprovada: a ligação com os catálogos dele fica opcional
     public bool SemPeticVigente { get; }
 
+    // F1 (C19): os nomes de quem marcou os "não se aplica" (lidos de uma vez com as marcas)
+    public PeNomes Nomes { get; }
+
     /// <summary>
     /// Lê tudo de uma vez para os PDTICs dados. Com acompanhamentoAtivo (a versão 6 do modelo
     /// inicial carregada), também o ciclo de cada registro, os ciclos gravados e o documento de
@@ -65,7 +69,8 @@ public sealed class PeLeituraDaSituacao
             return new PeLeituraDaSituacao(Array.Empty<PeRegistro>().ToLookup(r => 0L), new Dictionary<long, long>(),
                 Array.Empty<PeVinculo>().ToLookup(v => 0L), new Dictionary<long, Dictionary<long, PePdticPasso>>(),
                 new Dictionary<long, Dictionary<long, int>>(), Array.Empty<PeCiclo>().ToLookup(c => 0L), new HashSet<long>(),
-                Array.Empty<PeDeliberacao>().ToLookup(d => 0L), !await context.PePetics.AnyAsync(p => p.Situacao == PeDominios.SituacaoPetic.Aprovado));
+                Array.Empty<PeDeliberacao>().ToLookup(d => 0L), !await context.PePetics.AnyAsync(p => p.Situacao == PeDominios.SituacaoPetic.Aprovado),
+                PeNomes.Vazio);
 
         // Os registros de todas as seções (na ordem da seção) e as ligações que saem deles
         var registros = await context.PeRegistros.AsNoTracking()
@@ -96,6 +101,7 @@ public sealed class PeLeituraDaSituacao
                 .ToListAsync())
             .GroupBy(p => p.PdticId)
             .ToDictionary(g => g.Key, g => g.ToDictionary(p => p.PassoId));
+        var nomes = await PeNomes.CarregarAsync(context, marcas.Values.SelectMany(m => m.Values).Select(p => p.MarcadoPor));
         var abertos = (await context.PeComentarios.AsNoTracking()
                 .Where(c => ids.Contains(c.PdticId) && c.PaiId == null && c.ResolvidoEm == null)
                 .Select(c => new { c.PdticId, c.PassoId })
@@ -116,7 +122,7 @@ public sealed class PeLeituraDaSituacao
 
         return new PeLeituraDaSituacao(registros.ToLookup(r => r.PdticId!.Value), cicloDoRegistro, vinculos.ToLookup(v => v.RegistroOrigemId),
             marcas, abertos, ciclos.ToLookup(c => c.PdticId), comDocumento,
-            deliberacoes.OrderByDescending(d => d.Id).ToLookup(d => d.ObjetoId), semPeticVigente);
+            deliberacoes.OrderByDescending(d => d.Id).ToLookup(d => d.ObjetoId), semPeticVigente, nomes);
     }
 
     /// <summary>A análise das seções dadas no PDTIC (na seção por ciclo, só os registros do cicloId; sem ele, nenhum).</summary>

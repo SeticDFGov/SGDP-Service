@@ -28,7 +28,16 @@ public interface IPePeticService
 
     Task<PePeticResponse> AtualizarAsync(long id, PePeticAtualizarDTO dto, PeUserContext ctx);
 
-    /// <summary>Confere as pendências, cria a deliberação e põe a versão em deliberação.</summary>
+    /// <summary>
+    /// A prévia do envio (F1): se a versão vai ao CGTIC agora, o que falta (com a seção de cada
+    /// pendência) e o porquê quando não vai (a situação ou o papel).
+    /// </summary>
+    Task<PePeticEnvioResponse> EnvioAsync(long id, PeUserContext ctx);
+
+    /// <summary>
+    /// Confere as pendências (400 PePeticIncompleto com a lista Pendencias), cria a deliberação e
+    /// põe a versão em deliberação.
+    /// </summary>
     Task<PePeticResponse> EnviarAsync(long id, PeUserContext ctx);
 
     /// <summary>Apaga o rascunho que nunca foi ao CGTIC (com os registros dele).</summary>

@@ -20,7 +20,7 @@ public class PeInadimplencia : IPeAuditavel
 
     public PgiaOrgao? Orgao { get; set; }
 
-    // A comunicação pendente ("Comunicar à SGDI o PDTIC aprovado pelo comitê interno (art. 7º, V)")
+    // A comunicação pendente ("Comunicar à SGDI o PDTIC aprovado pelo comitê interno (art. 7º, V, do Decreto nº 48.899/2026)")
     public string Obrigacao { get; set; } = string.Empty;
 
     // O prazo que o órgão descumpriu, como a notificação diz

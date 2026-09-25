@@ -67,10 +67,14 @@ public class PeRegistroResponse
     public DateTime CriadoEm { get; set; }
 
     public string CriadoPor { get; set; } = string.Empty;
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail)
+    public string CriadoPorNome { get; set; } = string.Empty;
 
     public DateTime? AlteradoEm { get; set; }
 
     public string? AlteradoPor { get; set; }
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail); nulo com o AlteradoPor
+    public string? AlteradoPorNome { get; set; }
 }
 
 public class PeVinculoResponse

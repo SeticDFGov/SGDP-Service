@@ -40,7 +40,8 @@ public class PePeticService : IPePeticService
             .Where(p => _permissoes.PodeVerVersaoPetic(ctx, p.Situacao))
             .ToList();
         var deliberacoes = await UltimasDeliberacoesAsync(versoes.Select(p => p.Id));
-        return versoes.Select(p => Resposta(p, deliberacoes.GetValueOrDefault(p.Id))).ToList();
+        var nomes = await NomesAsync(deliberacoes.Values);
+        return versoes.Select(p => Resposta(p, deliberacoes.GetValueOrDefault(p.Id), nomes)).ToList();
     }
 
     public async Task<PePeticResponse?> VigenteAsync()
@@ -124,22 +125,27 @@ public class PePeticService : IPePeticService
         return await RespostaAsync(petic);
     }
 
+    public async Task<PePeticEnvioResponse> EnvioAsync(long id, PeUserContext ctx)
+    {
+        var petic = await VersaoAsync(id, rastrear: false);
+        if (!_permissoes.PodeVerVersaoPetic(ctx, petic.Situacao))
+            throw new ApiException(ErrorCode.PePeticNaoEncontrado, "Versão do PETIC-DF não encontrada. Atualize a tela.");
+        if (petic.Situacao != PeDominios.SituacaoPetic.Rascunho)
+            return new PePeticEnvioResponse { PodeEnviar = false, Motivo = PeRegistroService.VersaoFechada(petic).Error.Message };
+        var pendencias = await PendenciasDoEnvioAsync(petic);
+        string? motivo = pendencias.Count > 0 ? "Resolva o que falta na lista antes de enviar o PETIC-DF ao CGTIC." : null;
+        if (!_permissoes.PodeEditarReferenciais(ctx)) motivo = "Quem envia o PETIC-DF ao CGTIC é o administrador do módulo.";
+        return new PePeticEnvioResponse { PodeEnviar = motivo == null, Pendencias = pendencias, Motivo = motivo };
+    }
+
     public async Task<PePeticResponse> EnviarAsync(long id, PeUserContext ctx)
     {
         var petic = await VersaoAsync(id, rastrear: true);
         if (petic.Situacao != PeDominios.SituacaoPetic.Rascunho) throw PeRegistroService.VersaoFechada(petic);
 
-        var pendencias = new List<string>();
-        if (petic.VigenciaInicio == null || petic.VigenciaFim == null)
-            pendencias.Add("Informe o início e o fim da vigência.");
-        pendencias.AddRange(await _registros.PendenciasAsync(PeDono.DoPetic(id)));
-        if (pendencias.Count > 0)
-        {
-            var lista = pendencias.Count <= 5
-                ? string.Join(" ", pendencias)
-                : string.Join(" ", pendencias.Take(5)) + $" E mais {pendencias.Count - 5} pendências.";
-            throw new ApiException(ErrorCode.PePeticIncompleto, "Antes de enviar ao CGTIC: " + lista);
-        }
+        // O que falta vai em lista, com a seção de cada item (F1, A06): a tela mostra e leva a cada seção
+        var pendencias = await PendenciasDoEnvioAsync(petic);
+        if (pendencias.Count > 0) throw new PePeticPendenciasException(pendencias);
 
         var agora = DateTime.UtcNow;
         petic.Situacao = PeDominios.SituacaoPetic.EmDeliberacao;
@@ -236,6 +242,16 @@ public class PePeticService : IPePeticService
 
     // ── Apoio ───────────────────────────────────────────────────────────────
 
+    /// <summary>A vigência (título e vigência da versão) e o que falta nas seções, na ordem das seções.</summary>
+    private async Task<List<PePeticPendenciaResponse>> PendenciasDoEnvioAsync(PePetic petic)
+    {
+        var pendencias = new List<PePeticPendenciaResponse>();
+        if (petic.VigenciaInicio == null || petic.VigenciaFim == null)
+            pendencias.Add(new PePeticPendenciaResponse { SecaoChave = null, SecaoTitulo = "Título e vigência", Motivo = "Informe o início e o fim da vigência." });
+        pendencias.AddRange(await _registros.PendenciasAsync(PeDono.DoPetic(petic.Id)));
+        return pendencias;
+    }
+
     private async Task<PePetic> VersaoAsync(long id, bool rastrear)
     {
         var consulta = rastrear ? _context.PePetics : _context.PePetics.AsNoTracking();
@@ -300,10 +316,17 @@ public class PePeticService : IPePeticService
         return todas.GroupBy(d => d.ObjetoId).ToDictionary(g => g.Key, g => g.OrderByDescending(d => d.Id).First());
     }
 
-    private async Task<PePeticResponse> RespostaAsync(PePetic petic) =>
-        Resposta(petic, (await UltimasDeliberacoesAsync(new[] { petic.Id })).GetValueOrDefault(petic.Id));
+    private async Task<PePeticResponse> RespostaAsync(PePetic petic)
+    {
+        var deliberacao = (await UltimasDeliberacoesAsync(new[] { petic.Id })).GetValueOrDefault(petic.Id);
+        return Resposta(petic, deliberacao, await NomesAsync(deliberacao == null ? Array.Empty<PeDeliberacao>() : new[] { deliberacao }));
+    }
 
-    private static PePeticResponse Resposta(PePetic petic, PeDeliberacao? deliberacao) => new()
+    /// <summary>Os nomes de quem enviou e de quem decidiu (F1, C19), de uma vez.</summary>
+    private Task<PeNomes> NomesAsync(IEnumerable<PeDeliberacao> deliberacoes) =>
+        PeNomes.CarregarAsync(_context, deliberacoes.SelectMany(d => new[] { d.EnviadoPor, d.DecididoPor }));
+
+    private static PePeticResponse Resposta(PePetic petic, PeDeliberacao? deliberacao, PeNomes nomes) => new()
     {
         Id = petic.Id,
         Versao = petic.Versao,
@@ -313,7 +336,7 @@ public class PePeticService : IPePeticService
         Situacao = petic.Situacao,
         AprovadoEm = petic.AprovadoEm,
         AnteriorId = petic.AnteriorId,
-        Deliberacao = deliberacao == null ? null : PeDeliberacaoService.Resposta(deliberacao)
+        Deliberacao = deliberacao == null ? null : PeDeliberacaoService.Resposta(deliberacao, nomes)
     };
 }
 
@@ -512,13 +535,13 @@ public partial class PeDeliberacaoService : IPeDeliberacaoService
     {
         var pdtics = deliberacoes.Where(d => d.ObjetoTipo == PeDominios.ObjetoDeliberacao.Pdtic).Select(d => d.ObjetoId).Distinct().ToList();
         var orgaos = pdtics.Count == 0
-            ? new Dictionary<long, (string Sigla, string Nome)>()
+            ? new Dictionary<long, (string Sigla, string Nome, bool Externo)>()
             : (await (from p in context.PePdtics.AsNoTracking()
                       join o in context.PgiaOrgaos.AsNoTracking() on p.OrgaoId equals o.Id
                       where pdtics.Contains(p.Id)
-                      select new { p.Id, o.Sigla, o.Nome })
+                      select new { p.Id, o.Sigla, o.Nome, p.RegistradoExternamente })
                 .ToListAsync())
-                .ToDictionary(x => x.Id, x => (x.Sigla, x.Nome));
+                .ToDictionary(x => x.Id, x => (x.Sigla, x.Nome, Externo: x.RegistradoExternamente));
         var idsVersoes = deliberacoes.Where(d => d.DocVersaoId != null).Select(d => d.DocVersaoId!.Value).Distinct().ToList();
         var versoes = idsVersoes.Count == 0
             ? new Dictionary<long, PeDeliberacaoDocumentoResponse>()
@@ -526,15 +549,25 @@ public partial class PeDeliberacaoService : IPeDeliberacaoService
                 .Where(v => idsVersoes.Contains(v.Id))
                 .ToDictionaryAsync(v => v.Id, v => new PeDeliberacaoDocumentoResponse { PdticId = v.PdticId, Numero = v.Numero });
 
+        var nomes = await PeNomes.CarregarAsync(context, deliberacoes.SelectMany(d => new[] { d.EnviadoPor, d.DecididoPor }));
+
         return deliberacoes.Select(d =>
         {
-            var resposta = Resposta(d);
+            var resposta = Resposta(d, nomes);
             if (d.ObjetoTipo != PeDominios.ObjetoDeliberacao.Pdtic) return resposta;
             if (orgaos.TryGetValue(d.ObjetoId, out var orgao))
             {
                 resposta.OrgaoSigla = orgao.Sigla;
                 resposta.OrgaoNome = orgao.Nome;
                 resposta.Titulo = $"PDTIC {orgao.Sigla} {d.VersaoObjeto}";
+                // O PDTIC registrado fora do sistema não passa pelo envio: a deliberação dele é a
+                // do registro (C40), decidida na data do ato (também nas linhas gravadas antes da F1,
+                // que guardaram o dia do registro)
+                if (orgao.Externo)
+                {
+                    resposta.RegistradaForaDoSistema = true;
+                    if (d.AtoData is DateOnly ato) resposta.DecididoEm = PePdticAprovacaoService.MeioDia(ato);
+                }
             }
             resposta.Documento = d.DocVersaoId is long versao ? versoes.GetValueOrDefault(versao) : null;
             return resposta;
@@ -553,7 +586,7 @@ public partial class PeDeliberacaoService : IPeDeliberacaoService
         return (await RespostasAsync(context, ultimas)).ToDictionary(r => r.ObjetoId);
     }
 
-    internal static PeDeliberacaoResponse Resposta(PeDeliberacao d) => new()
+    internal static PeDeliberacaoResponse Resposta(PeDeliberacao d, PeNomes nomes) => new()
     {
         Id = d.Id,
         ObjetoTipo = d.ObjetoTipo,
@@ -563,9 +596,11 @@ public partial class PeDeliberacaoService : IPeDeliberacaoService
         OrgaoSigla = null,
         EnviadoEm = d.EnviadoEm,
         EnviadoPor = d.EnviadoPor,
+        EnviadoPorNome = nomes.DeObrigatorio(d.EnviadoPor),
         Situacao = d.Situacao,
         DecididoEm = d.DecididoEm,
         DecididoPor = d.DecididoPor,
+        DecididoPorNome = nomes.De(d.DecididoPor),
         AtoTipo = d.AtoTipo,
         AtoNumero = d.AtoNumero,
         AtoData = d.AtoData,

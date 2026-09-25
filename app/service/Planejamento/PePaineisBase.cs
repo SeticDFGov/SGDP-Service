@@ -242,7 +242,7 @@ public static class PeConformidadeRegras
         var ultimo = retrato.Pdtics.FirstOrDefault();
         if (ultimo == null) return "O órgão ainda não abriu o PDTIC";
         var quando = ultimo.EncerradoEm is DateTime encerrado ? $" em {PePdticService.DataBrasilia(encerrado)}" : string.Empty;
-        return $"O PDTIC {ultimo.Versao} foi {PeDominios.SituacaoPdtic.Rotulo(ultimo.Situacao).ToLowerInvariant()}{quando} e o próximo ainda não foi aberto";
+        return $"O PDTIC {ultimo.Versao} foi {PeDominios.SituacaoPdtic.RotuloMinusculo(ultimo.Situacao)}{quando} e o próximo ainda não foi aberto";
     }
 
     /// <summary>A data do ato de aprovação (ou do dia da decisão, em Brasília).</summary>
@@ -304,7 +304,7 @@ public static class PeConformidadeRegras
         }
         return Item(false, pdtic.Situacao == PeDominios.SituacaoPdtic.Aprovado
             ? "Aprovado pelo CGTIC e ainda não publicado"
-            : $"Ainda não publicado ({PeDominios.SituacaoPdtic.Rotulo(pdtic.Situacao).ToLowerInvariant()})");
+            : $"Ainda não publicado ({PeDominios.SituacaoPdtic.RotuloMinusculo(pdtic.Situacao)})");
     }
 
     private static PeConformidadeAtendeResponse NoveConteudos(PeSituacaoDetalhada situacao)
@@ -364,7 +364,7 @@ public static class PeConformidadeRegras
         return Item(false, $"A revisão venceu em {PeCiclos.Data(limite)}: a última {oQue} foi em {PeCiclos.Data(desde)} ({rotulo})"
                            + (revisao == null
                                ? string.Empty
-                               : $"; a revisão {revisao.Versao} está {PeDominios.SituacaoPdtic.Rotulo(revisao.Situacao).ToLowerInvariant()}"));
+                               : $"; a revisão {revisao.Versao} está {PeDominios.SituacaoPdtic.RotuloMinusculo(revisao.Situacao)}"));
     }
 
     // O campo da periodicidade da revisão na seção da abrangência (passo 1.1)

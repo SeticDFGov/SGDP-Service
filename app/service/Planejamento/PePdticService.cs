@@ -69,6 +69,10 @@ public class PePdticService : IPePdticService
     public const string AvisoDevolvido = "Devolvido: ajuste e registre a nova decisão.";
     public const string MotivoSemAvaliacao = "Abra uma avaliação intermediária quando o comitê pedir";
 
+    /// <summary>O motivo do monitoramento sem ciclo porque a vigência terminou antes do começo do acompanhamento (C37).</summary>
+    public static string MotivoVigenciaTerminada(DateOnly fim) =>
+        $"A vigência do PDTIC terminou em {PeCiclos.Data(fim)}, antes do começo do acompanhamento no sistema: não há ciclo de monitoramento a registrar";
+
     private readonly AppDbContext _context;
     private readonly IPeRegistroService _registros;
     private readonly IPePermissionService _permissoes;
@@ -158,9 +162,9 @@ public class PePdticService : IPePdticService
     /// <summary>409 de quem tenta abrir (ou registrar) um PDTIC com outro em andamento no órgão.</summary>
     internal static ApiException JaTemAtual(PePdtic atual) => new(ErrorCode.PePdticJaExiste,
         PeDominios.SituacaoPdtic.Vigentes.Contains(atual.Situacao)
-            ? $"O órgão já tem o PDTIC {atual.Versao} {PeDominios.SituacaoPdtic.Rotulo(atual.Situacao).ToLowerInvariant()}. "
+            ? $"O órgão já tem o PDTIC {atual.Versao} {PeDominios.SituacaoPdtic.RotuloMinusculo(atual.Situacao)}. "
               + "Para mudar o plano, abra uma revisão; um PDTIC novo só depois de encerrar este."
-            : $"O órgão já tem um PDTIC em andamento (versão {atual.Versao}, {PeDominios.SituacaoPdtic.Rotulo(atual.Situacao).ToLowerInvariant()}). Continue por ele.");
+            : $"O órgão já tem um PDTIC em andamento (versão {atual.Versao}, {PeDominios.SituacaoPdtic.RotuloMinusculo(atual.Situacao)}). Continue por ele.");
 
     public async Task<PagedResponse<PePdticResponse>> ListarAsync(PePdticConsulta consulta, PeUserContext ctx)
     {
@@ -301,13 +305,24 @@ public class PePdticService : IPePdticService
             }
             else if (acompanhamento.Ativo && grupo == PeEdicaoPdtic.Grupo.Acompanhamento && passo.Tipo == PeDominios.TipoPasso.Monitoramento)
             {
-                (situacao, motivo, falta) = PeloCiclo(passo, ciclos, PeCiclos.Hoje());
+                (situacao, motivo, falta) = PeloCiclo(pdtic, passo, ciclos, PeCiclos.Hoje());
             }
             else if (acompanhamento.Ativo && grupo == PeEdicaoPdtic.Grupo.Acompanhamento
                      && passo.Secoes.Any(s => s.PorCiclo == PeDominios.TipoCiclo.Avaliacao) && avaliacao == null)
             {
-                situacao = PeDominios.SituacaoPasso.Aguardando;
-                motivo = MotivoSemAvaliacao;
+                // Encerrado ou substituído sem avaliação: não há mais o que esperar (F1, junto do C37)
+                if (PeDominios.SituacaoPdtic.Encerradas.Contains(pdtic.Situacao))
+                {
+                    situacao = PeDominios.SituacaoPasso.NaoSeAplica;
+                    motivo = pdtic.Situacao == PeDominios.SituacaoPdtic.Encerrado
+                        ? "O PDTIC foi encerrado sem avaliação intermediária"
+                        : "Esta versão do PDTIC foi substituída sem avaliação intermediária";
+                }
+                else
+                {
+                    situacao = PeDominios.SituacaoPasso.Aguardando;
+                    motivo = MotivoSemAvaliacao;
+                }
             }
             else if (esperaDoFechamento != null && etapas.GetValueOrDefault(passo.Id) == PeDominios.EtapaPdtic.Fechamento)
             {
@@ -337,7 +352,13 @@ public class PePdticService : IPePdticService
                 PodeEditar = papelEdita && editaveis.Contains(passo.Id),
                 NaoSeAplica = marca == null
                     ? null
-                    : new PeNaoSeAplicaResponse { Justificativa = marca.Justificativa ?? string.Empty, MarcadoEm = marca.MarcadoEm, MarcadoPor = marca.MarcadoPor },
+                    : new PeNaoSeAplicaResponse
+                    {
+                        Justificativa = marca.Justificativa ?? string.Empty,
+                        MarcadoEm = marca.MarcadoEm,
+                        MarcadoPor = marca.MarcadoPor,
+                        MarcadoPorNome = leitura.Nomes.DeObrigatorio(marca.MarcadoPor)
+                    },
                 ComentariosAbertos = comentarios,
                 Avisos = doPasso
             };
@@ -345,7 +366,7 @@ public class PePdticService : IPePdticService
 
         return new PeSituacaoDetalhada
         {
-            Resposta = new PePdticSituacaoResponse { ProximoPasso = ProximoPasso(pdtic, trilha, passos, editaveis), Passos = passos },
+            Resposta = ComProximoPasso(new PePdticSituacaoResponse { Passos = passos }, ProximoPasso(pdtic, trilha, passos, editaveis)),
             OQueFalta = oQueFalta,
             Trilha = trilha,
             Analise = analise,
@@ -431,13 +452,26 @@ public class PePdticService : IPePdticService
     /// <summary>
     /// Os passos do monitoramento (5.1 e 5.2) pelos ciclos (E7, rodada B): atrasado quando algum
     /// ciclo começado passou do prazo sem fechar; pendente quando há ciclo aberto no prazo; feito
-    /// quando todos os ciclos começados estão fechados; aguardando enquanto nenhum começou.
+    /// quando todos os ciclos começados estão fechados; aguardando enquanto nenhum começou. Sem
+    /// ciclo nenhum (F1, achado C37): "não se aplica" quando nunca haverá ciclo (a vigência terminou
+    /// antes do começo do acompanhamento, como no PDTIC registrado fora do sistema depois do fim
+    /// dela, ou o PDTIC foi encerrado ou substituído sem ciclo), com o motivo; aguardando só
+    /// enquanto falta a vigência.
     /// </summary>
-    private static (string Situacao, string? Motivo, string? Falta) PeloCiclo(PeTrilhaPasso passo, IReadOnlyList<PeCiclo> ciclos, DateOnly hoje)
+    private static (string Situacao, string? Motivo, string? Falta) PeloCiclo(PePdtic pdtic, PeTrilhaPasso passo, IReadOnlyList<PeCiclo> ciclos,
+        DateOnly hoje)
     {
         var monitoramento = ciclos.Where(c => c.Tipo == PeDominios.TipoCiclo.Monitoramento).OrderBy(c => c.Inicio).ToList();
         if (monitoramento.Count == 0)
+        {
+            if (pdtic.VigenciaFim is DateOnly fim && PeCiclos.InicioDoAcompanhamento(pdtic) > fim)
+                return (PeDominios.SituacaoPasso.NaoSeAplica, MotivoVigenciaTerminada(fim), null);
+            if (PeDominios.SituacaoPdtic.Encerradas.Contains(pdtic.Situacao))
+                return (PeDominios.SituacaoPasso.NaoSeAplica, pdtic.Situacao == PeDominios.SituacaoPdtic.Encerrado
+                    ? "O PDTIC foi encerrado sem ciclo de monitoramento"
+                    : "Esta versão do PDTIC foi substituída sem ciclo de monitoramento", null);
             return (PeDominios.SituacaoPasso.Aguardando, "Os ciclos de monitoramento saem da vigência do PDTIC (passo da abrangência)", null);
+        }
         var comecados = monitoramento.Where(c => c.Inicio <= hoje).ToList();
         if (comecados.Count == 0)
             return (PeDominios.SituacaoPasso.Aguardando, $"O primeiro ciclo de monitoramento começa em {PeCiclos.Data(monitoramento[0].Inicio)}", null);
@@ -532,25 +566,36 @@ public class PePdticService : IPePdticService
         passo.Secoes.Any(s => s.Campos.Any(c => c.Chave == PeDominios.ChavePdtic.CampoDecisao)
                               && Decisao(porSecao.GetValueOrDefault(s.Id)) == PeDominios.Decisao.Devolvido);
 
+    /// <summary>O motivo do próximo passo na revisão recém-aberta (F1, achado B12).</summary>
+    public const string MotivoInicioDaRevisao =
+        "Revise o PDTIC a partir do diagnóstico (etapa 2): os dados da versão anterior já estão nos passos. Confira cada um e ajuste o que mudou.";
+
+    private static PePdticSituacaoResponse ComProximoPasso(PePdticSituacaoResponse resposta, (string? Numero, string? Motivo) proximo)
+    {
+        resposta.ProximoPasso = proximo.Numero;
+        resposta.ProximoPassoMotivo = proximo.Motivo;
+        return resposta;
+    }
+
     /// <summary>
     /// O passo recomendado: o primeiro atrasado, senão o primeiro em atenção (responder ao
     /// comentário ou à devolução sempre se faz), senão (na revisão que ninguém mexeu ainda) o
-    /// primeiro passo da etapa 2, senão o primeiro pendente que a situação do PDTIC deixa fazer
-    /// agora (o pendente de uma etapa fechada não é recomendado: por exemplo, um passo opcional
-    /// da elaboração depois do envio).
+    /// primeiro passo da etapa 2, com o motivo próprio (<see cref="MotivoInicioDaRevisao"/>),
+    /// senão o primeiro pendente que a situação do PDTIC deixa fazer agora (o pendente de uma
+    /// etapa fechada não é recomendado: por exemplo, um passo opcional da elaboração depois do envio).
     /// </summary>
-    private static string? ProximoPasso(PePdtic pdtic, PeTrilhaOrgao trilha, IReadOnlyList<PePassoSituacaoResponse> passos,
+    private static (string? Numero, string? Motivo) ProximoPasso(PePdtic pdtic, PeTrilhaOrgao trilha, IReadOnlyList<PePassoSituacaoResponse> passos,
         IReadOnlySet<long> editaveis)
     {
-        if (PeDominios.SituacaoPdtic.Encerradas.Contains(pdtic.Situacao)) return null;
+        if (PeDominios.SituacaoPdtic.Encerradas.Contains(pdtic.Situacao)) return (null, null);
         var atrasado = passos.FirstOrDefault(p => p.Situacao == PeDominios.SituacaoPasso.Atrasado);
-        if (atrasado != null) return atrasado.Numero;
+        if (atrasado != null) return (atrasado.Numero, null);
         var atencao = passos.FirstOrDefault(p => p.Situacao == PeDominios.SituacaoPasso.Atencao);
-        if (atencao != null) return atencao.Numero;
+        if (atencao != null) return (atencao.Numero, null);
         if (PeEdicaoPdtic.EhRevisao(pdtic) && pdtic.AlteradoEm == null && pdtic.Situacao == PeDominios.SituacaoPdtic.EmElaboracao
             && trilha.Etapas.FirstOrDefault(e => e.Chave == PeDominios.EtapaPdtic.Diagnostico)?.Passos.FirstOrDefault() is { } inicio)
-            return inicio.Numero;
-        return passos.FirstOrDefault(p => p.Situacao == PeDominios.SituacaoPasso.Pendente && editaveis.Contains(p.PassoId))?.Numero;
+            return (inicio.Numero, MotivoInicioDaRevisao);
+        return (passos.FirstOrDefault(p => p.Situacao == PeDominios.SituacaoPasso.Pendente && editaveis.Contains(p.PassoId))?.Numero, null);
     }
 
     /// <summary>A data em Brasília, dd/mm/aaaa (vazio sem data).</summary>
@@ -835,6 +880,7 @@ public class PePdticService : IPePdticService
         var niveis = await PeTrilhaOrgao.NiveisDosOrgaosAsync(_context, itens.Select(i => i.Orgao.Id));
         var deliberacoes = await PeDeliberacaoService.UltimasDosPdticsAsync(_context, itens.Select(i => i.Pdtic.Id).ToList());
         var idsAnteriores = itens.Where(i => PeEdicaoPdtic.EhRevisao(i.Pdtic)).Select(i => i.Pdtic.AnteriorId!.Value).Distinct().ToList();
+        var nomes = await PeNomes.CarregarAsync(_context, itens.Select(i => i.Pdtic.CriadoPor));
         var anteriores = idsAnteriores.Count == 0
             ? new Dictionary<long, string>()
             : await _context.PePdtics.AsNoTracking().Where(p => idsAnteriores.Contains(p.Id)).ToDictionaryAsync(p => p.Id, p => p.Versao);
@@ -860,6 +906,7 @@ public class PePdticService : IPePdticService
                 PodeEditar = _permissoes.PodeEditarPdtic(ctx, i.Orgao.Id) && PeEdicaoPdtic.ElaboracaoAberta(pdtic),
                 CriadoEm = pdtic.CriadoEm,
                 CriadoPor = pdtic.CriadoPor,
+                CriadoPorNome = nomes.DeObrigatorio(pdtic.CriadoPor),
                 EnviadoEm = pdtic.EnviadoEm,
                 AprovadoEm = pdtic.AprovadoEm,
                 PublicadoEm = pdtic.PublicadoEm,
@@ -905,7 +952,8 @@ public class PeComentarioService : IPeComentarioService
         if (passoId != null) query = query.Where(c => c.PassoId == passoId);
         var todos = await query.OrderBy(c => c.CriadoEm).ThenBy(c => c.Id).ToListAsync();
         var respostas = todos.Where(c => c.PaiId != null).ToLookup(c => c.PaiId!.Value);
-        return todos.Where(c => c.PaiId == null).Select(c => Resposta(c, respostas[c.Id])).ToList();
+        var nomes = await PeNomes.CarregarAsync(_context, todos.Select(c => c.ResolvidoPor));
+        return todos.Where(c => c.PaiId == null).Select(c => Resposta(c, respostas[c.Id], nomes)).ToList();
     }
 
     public async Task<PeComentarioResponse> CriarAsync(long pdticId, PeComentarioCriarDTO dto, PeUserContext ctx)
@@ -988,10 +1036,11 @@ public class PeComentarioService : IPeComentarioService
             .Where(c => c.Id == id || c.PaiId == id)
             .OrderBy(c => c.CriadoEm).ThenBy(c => c.Id)
             .ToListAsync();
-        return Resposta(linhas.Single(c => c.Id == id), linhas.Where(c => c.PaiId == id));
+        var nomes = await PeNomes.CarregarAsync(_context, linhas.Select(c => c.ResolvidoPor));
+        return Resposta(linhas.Single(c => c.Id == id), linhas.Where(c => c.PaiId == id), nomes);
     }
 
-    private static PeComentarioResponse Resposta(PeComentario c, IEnumerable<PeComentario> respostas) => new()
+    private static PeComentarioResponse Resposta(PeComentario c, IEnumerable<PeComentario> respostas, PeNomes nomes) => new()
     {
         Id = c.Id,
         PassoId = c.PassoId,
@@ -1001,6 +1050,7 @@ public class PeComentarioService : IPeComentarioService
         CriadoEm = c.CriadoEm,
         ResolvidoEm = c.ResolvidoEm,
         ResolvidoPor = c.ResolvidoPor,
+        ResolvidoPorNome = nomes.De(c.ResolvidoPor),
         Respostas = respostas.Select(r => new PeComentarioRespostaResponse
         {
             Id = r.Id,

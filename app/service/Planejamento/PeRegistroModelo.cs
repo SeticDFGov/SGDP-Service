@@ -120,6 +120,23 @@ public sealed class PePendenciasException : ApiException
     }
 }
 
+/// <summary>
+/// Envio do PETIC-DF ao CGTIC com pendências (F1, achado A06): 400 PePeticIncompleto com { Code,
+/// Message, Pendencias }, a mesma lista da prévia (GET petic/{id}/envio), cada item com a seção.
+/// </summary>
+public sealed class PePeticPendenciasException : ApiException
+{
+    public IReadOnlyList<api.Planejamento.PePeticPendenciaResponse> Pendencias { get; }
+
+    public PePeticPendenciasException(IReadOnlyList<api.Planejamento.PePeticPendenciaResponse> pendencias)
+        : base(ErrorCode.PePeticIncompleto, pendencias.Count == 1
+            ? "Falta uma coisa para enviar o PETIC-DF ao CGTIC. Confira a lista."
+            : $"Faltam {pendencias.Count} coisas para enviar o PETIC-DF ao CGTIC. Confira a lista.")
+    {
+        Pendencias = pendencias;
+    }
+}
+
 /// <summary>Leitura dos valores guardados no jsonb dos registros.</summary>
 public static class PeRegistroDados
 {

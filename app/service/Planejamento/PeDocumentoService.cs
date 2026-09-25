@@ -477,7 +477,7 @@ public partial class PeDocumentoService : IPeDocumentoService
 
         var (versao, tamanho) = await GerarVersaoAsync(pdtic, documento, ctx, PeDominios.SituacaoVersaoDoc.Minuta);
         await _context.SaveChangesAsync();
-        return Versao(versao, tamanho);
+        return Versao(versao, tamanho, await PeNomes.CarregarAsync(_context, new[] { versao.GeradoPor }));
     }
 
     public Task<(PeDocVersao Versao, long Tamanho)> GerarVersaoAsync(PePdtic pdtic, PeUserContext ctx, string situacao) =>
@@ -525,7 +525,8 @@ public partial class PeDocumentoService : IPeDocumentoService
             Logotipo = resolvido.LogotipoId is long logo ? (await ImagensAsync(new[] { logo }, pdtic, soDoRegistro: true)).GetValueOrDefault(logo) : null,
             Historico = historico,
             Rodape = Rodape(resolvido.Orgao.Sigla, pdtic.Versao, numero, situacao, alvo.Tipo, documento.Ciclo?.Rotulo),
-            GeradoEm = agoraBrasilia
+            GeradoEm = agoraBrasilia,
+            Ciclo = documento.Ciclo
         };
 
         PeDocumentoPdf.Resultado pdf;
@@ -616,19 +617,21 @@ public partial class PeDocumentoService : IPeDocumentoService
                              orderby v.Numero descending
                              select new { Versao = v, a.Tamanho })
             .ToListAsync();
-        return versoes.Select(x => Versao(x.Versao, x.Tamanho)).ToList();
+        var nomes = await PeNomes.CarregarAsync(_context, versoes.Select(x => x.Versao.GeradoPor));
+        return versoes.Select(x => Versao(x.Versao, x.Tamanho, nomes)).ToList();
     }
 
     /// <summary>O documento do PDTIC tem alguma versão gerada (o passo do documento, 3.10).</summary>
     internal static async Task<bool> TemVersaoDoPdticAsync(AppDbContext context, long pdticId, bool ativo) =>
         await PeDocLinhas.Versoes(context, PeDocAlvo.DoPdtic(pdticId), ativo).AnyAsync();
 
-    private static PeDocVersaoResponse Versao(PeDocVersao v, long tamanho) => new()
+    private static PeDocVersaoResponse Versao(PeDocVersao v, long tamanho, PeNomes nomes) => new()
     {
         Numero = v.Numero,
         Situacao = v.Situacao,
         GeradoEm = v.GeradoEm,
         GeradoPor = v.GeradoPor,
+        GeradoPorNome = nomes.DeObrigatorio(v.GeradoPor),
         Tamanho = tamanho,
         Paginas = v.Paginas
     };
@@ -961,7 +964,8 @@ public partial class PeDocumentoService : IPeDocumentoService
             Versoes = await VersoesDoDocumentoAsync(documento)
         };
         var resolvido = new Resolvido { Orgao = base_.Orgao, Resposta = resposta, Marcadores = marcadores, LogotipoId = logotipo };
-        var contexto = new ContextoDosBlocos(base_, documento, marcadores, dados, sistemasIa, fluxos);
+        var nomes = await PeNomes.CarregarAsync(_context, base_.CopiaBlocos.Values.Select(c => c.EditadoPor));
+        var contexto = new ContextoDosBlocos(base_, documento, marcadores, dados, sistemasIa, fluxos, nomes);
 
         foreach (var (capitulo, nivel) in presentes)
         {
@@ -1037,7 +1041,8 @@ public partial class PeDocumentoService : IPeDocumentoService
     /// <summary>
     /// Todos os marcadores conhecidos com o valor para o órgão (nulo = sem valor). Os de
     /// aprovação e de publicação (E7) vêm em aprovacoes (sem ele, ficam sem valor); os do ciclo
-    /// (rodada B), do ciclo do RA (no PDTIC e no RR, sem valor).
+    /// (rodada B), do ciclo do RA. Sem o ciclo (o PDTIC, o RR e os fluxos), os do ciclo não são
+    /// marcadores (F1, achado B07): o texto "{ciclo.rotulo}" fica como está.
     /// </summary>
     public static Dictionary<string, string?> Marcadores(PePdtic pdtic, PgiaOrgao orgao, IReadOnlyDictionary<string, string?> dicionario,
         IReadOnlyDictionary<string, string?>? aprovacoes = null, PeCiclo? ciclo = null)
@@ -1054,9 +1059,14 @@ public partial class PeDocumentoService : IPeDocumentoService
         valores["pdtic.versao"] = pdtic.Versao;
         valores["hoje"] = PeFormato.Data(DateOnly.FromDateTime(DateTimeHelper.TodayBrasilia()));
         foreach (var chave in PeDocMarcadores.DaAprovacao) valores[chave] = aprovacoes?.GetValueOrDefault(chave);
-        valores["ciclo.rotulo"] = ciclo?.Rotulo;
-        valores["ciclo.inicio"] = ciclo == null ? null : PeFormato.Data(ciclo.Inicio);
-        valores["ciclo.fim"] = ciclo?.Fim is DateOnly fimDoCiclo ? PeFormato.Data(fimDoCiclo) : null;
+        if (ciclo == null)
+        {
+            foreach (var chave in PeDocMarcadores.DoCiclo) valores.Remove(chave);
+            return valores;
+        }
+        valores["ciclo.rotulo"] = ciclo.Rotulo;
+        valores["ciclo.inicio"] = PeFormato.Data(ciclo.Inicio);
+        valores["ciclo.fim"] = ciclo.Fim is DateOnly fimDoCiclo ? PeFormato.Data(fimDoCiclo) : null;
         return valores;
     }
 
@@ -1146,7 +1156,7 @@ public partial class PeDocumentoService : IPeDocumentoService
     /// <summary>O que a resolução de um bloco usa: a base, o documento, os marcadores e os dados lidos de uma vez.</summary>
     private sealed record ContextoDosBlocos(Base Base, PeDocContexto Documento, IReadOnlyDictionary<string, string?> Marcadores,
         IReadOnlyDictionary<string, PeSecaoExportada> Dados, IReadOnlyList<PgiaSistemaIa> SistemasIa,
-        IReadOnlyDictionary<string, PeFluxoService.ParaDocumento> Fluxos);
+        IReadOnlyDictionary<string, PeFluxoService.ParaDocumento> Fluxos, PeNomes Nomes);
 
     private static PeDocBlocoResponse? Bloco(PeDocBloco bloco, ContextoDosBlocos ctx)
     {
@@ -1162,7 +1172,7 @@ public partial class PeDocumentoService : IPeDocumentoService
         switch (bloco.Tipo)
         {
             case PeDominios.TipoBloco.Texto:
-                Texto(resposta, bloco, config, ctx.Base, ctx.Marcadores);
+                Texto(resposta, bloco, config, ctx.Base, ctx.Marcadores, ctx.Nomes);
                 break;
             case PeDominios.TipoBloco.TabelaSecao:
                 resposta.Tabela = PeDocConfig.Secao(config) == PeDocConfig.SecaoPgia
@@ -1210,7 +1220,7 @@ public partial class PeDocumentoService : IPeDocumentoService
     }
 
     private static void Texto(PeDocBlocoResponse resposta, PeDocBloco bloco, JsonObject config, Base base_,
-        IReadOnlyDictionary<string, string?> marcadores)
+        IReadOnlyDictionary<string, string?> marcadores, PeNomes nomes)
     {
         var doModelo = PeDocConfig.TextoDoBloco(config);
         base_.CopiaBlocos.TryGetValue(bloco.Id, out var copia);
@@ -1224,6 +1234,7 @@ public partial class PeDocumentoService : IPeDocumentoService
 
         resposta.EditadoEm = copia.EditadoEm;
         resposta.EditadoPor = copia.EditadoPor;
+        resposta.EditadoPorNome = nomes.De(copia.EditadoPor);
         resposta.ModeloMudou = PeDocMarcadores.Hash(doModelo) != copia.ModeloHash;
         if (resposta.ModeloMudou) resposta.TextoModeloAtual = Elemento(PeDocMarcadores.Resolver(doModelo, marcadores, emBranco: false));
     }

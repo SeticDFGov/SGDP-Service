@@ -117,7 +117,7 @@ public abstract class PePaineisTestBase : PeAcompanhamentoTestBase
         var inadimplencia = new PeInadimplencia
         {
             OrgaoId = orgao.Id,
-            Obrigacao = "Comunicar à SGDI o PDTIC aprovado pelo comitê interno (art. 7º, V)",
+            Obrigacao = "Comunicar à SGDI o PDTIC aprovado pelo comitê interno (art. 7º, V, do Decreto nº 48.899/2026)",
             PrazoDescumprido = "30 dias depois da aprovação",
             NotificadoEm = notificado,
             Documento = "Ofício nº 1/2026-SGDI",

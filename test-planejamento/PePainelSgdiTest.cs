@@ -89,7 +89,7 @@ public class PePainelSgdiTest : PePaineisTestBase
         Assert.Equal(new[] { "sem_pdtic", "em_elaboracao", "em_aprovacao", "devolvido", "aprovado", "publicado", "em_acompanhamento", "encerrado" },
             painel.PorSituacao.Select(s => s.Chave));
         Assert.Equal(new[] { 3, 2, 1, 1, 1, 1, 1, 1 }, painel.PorSituacao.Select(s => s.Quantidade));
-        Assert.Equal(new[] { "Sem PDTIC", "Em elaboração", "Em aprovação", "Devolvido para ajuste", "Aprovado", "Publicado", "Em acompanhamento", "Encerrado" },
+        Assert.Equal(new[] { "Sem PDTIC", "Em elaboração", "Em aprovação", "Devolvido pelo CGTIC", "Aprovado", "Publicado", "Em acompanhamento", "Encerrado" },
             painel.PorSituacao.Select(s => s.Rotulo));
 
         // SEDUH no 1.1 (etapa 1) e SEJUS no 2.1 (etapa 2); as três etapas da elaboração sempre aparecem

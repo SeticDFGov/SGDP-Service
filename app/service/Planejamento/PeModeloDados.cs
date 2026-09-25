@@ -352,6 +352,7 @@ public static class PeTrilhaResolver
             Situacao = situacao,
             Travada = secao.Travada,
             PorCiclo = dados.PorCicloDe(secao.Id),
+            NaPlanilha = secao.NaPlanilha,
             Campos = campos
         };
     }

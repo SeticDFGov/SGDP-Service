@@ -260,12 +260,15 @@ public static class PeDominios
         // A versão vigente do órgão (publicada): no máximo uma por órgão (ux_pe_pdtic_vigente)
         public static readonly string[] Vigentes = { Publicado, EmAcompanhamento };
 
-        /// <summary>Texto para a tela e para as planilhas.</summary>
+        /// <summary>
+        /// Texto para a tela e para as planilhas. Desde a F1 (achado B15), "Devolvido pelo CGTIC",
+        /// o mesmo rótulo da tela (a planilha consolidada dizia "Devolvido para ajuste").
+        /// </summary>
         public static string Rotulo(string situacao) => situacao switch
         {
             EmElaboracao => "Em elaboração",
             EmAprovacao => "Em aprovação",
-            Devolvido => "Devolvido para ajuste",
+            Devolvido => "Devolvido pelo CGTIC",
             Aprovado => "Aprovado",
             Publicado => "Publicado",
             EmAcompanhamento => "Em acompanhamento",
@@ -273,6 +276,13 @@ public static class PeDominios
             Substituido => "Substituído",
             _ => situacao
         };
+
+        /// <summary>O rótulo no meio da frase: só a primeira letra em minúscula (a sigla "CGTIC" fica).</summary>
+        public static string RotuloMinusculo(string situacao)
+        {
+            var rotulo = Rotulo(situacao);
+            return rotulo.Length == 0 ? rotulo : char.ToLowerInvariant(rotulo[0]) + rotulo[1..];
+        }
     }
 
     /// <summary>
@@ -467,6 +477,18 @@ public static class PeDominios
 
         // Limite geral dos anexos do módulo (plano, seção 14)
         public const int MaximoMb = 25;
+    }
+
+    /// <summary>
+    /// Formato de um campo de texto curto (config "formato", desde a F1): o número de um
+    /// processo SEI (00000-00000000/0000-00) ou um endereço de internet completo (http ou https).
+    /// </summary>
+    public static class FormatoTexto
+    {
+        public const string Sei = "sei";
+        public const string Url = "url";
+
+        public static readonly string[] Todos = { Sei, Url };
     }
 
     /// <summary>

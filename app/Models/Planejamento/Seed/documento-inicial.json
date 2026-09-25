@@ -625,10 +625,16 @@
             {
               "tipo": "texto",
               "texto": [
-                "Ciclo {ciclo.rotulo}",
-                "Período do ciclo: de {ciclo.inicio} a {ciclo.fim}",
                 "Vigência do PDTIC: de {vigencia.inicio} a {vigencia.fim}",
                 "PDTIC versão {pdtic.versao}"
+              ],
+              "antes": [
+                [
+                  "Ciclo {ciclo.rotulo}",
+                  "Período do ciclo: de {ciclo.inicio} a {ciclo.fim}",
+                  "Vigência do PDTIC: de {vigencia.inicio} a {vigencia.fim}",
+                  "PDTIC versão {pdtic.versao}"
+                ]
               ]
             }
           ]

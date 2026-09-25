@@ -64,7 +64,7 @@ public class PeDocModeloService : IPeDocModeloService
             Capitulos = PeDocumentoService.Arvore(capitulos)
                 .Select(x => Capitulo(x.Capitulo, blocos.Where(b => b.CapituloId == x.Capitulo.Id)))
                 .ToList(),
-            Marcadores = PeDocMarcadores.Lista(dicionario)
+            Marcadores = PeDocMarcadores.Lista(dicionario, modelo.Tipo)
                 .Select(m => new PeDocMarcadorResponse { Chave = m.Chave, Descricao = m.Descricao, Exemplo = m.Exemplo })
                 .ToList()
         };

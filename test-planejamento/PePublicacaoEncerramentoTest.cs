@@ -78,11 +78,11 @@ public class PePublicacaoEncerramentoTest : PeAprovacaoTestBase
         var pdtic = await PublicadoAsync();
         var dono = PeDono.DoPdtic(pdtic.Id);
 
-        var registro = await IncluirNoPdticAsync(pdtic.Id, "aprovacao_plano_acompanhamento", new { decisao = "devolvido", data = "2026-10-01" });
+        var registro = await IncluirNoPdticAsync(pdtic.Id, "aprovacao_plano_acompanhamento", new { decisao = "devolvido", data = "2026-09-01" });
         Assert.Equal(PeDominios.SituacaoPdtic.Publicado, PdticNoBanco(pdtic.Id).Situacao);
         Assert.Contains(PePdticService.AvisoDevolvido, (await PassoDaSituacaoAsync(pdtic.Id, "plano-acompanhamento.aprovacao-acompanhamento")).Avisos);
 
-        await Registros.AtualizarAsync(dono, "aprovacao_plano_acompanhamento", registro.Id, Salvar(new { decisao = "aprovado", data = "2026-10-05" }), await Orgao());
+        await Registros.AtualizarAsync(dono, "aprovacao_plano_acompanhamento", registro.Id, Salvar(new { decisao = "aprovado", data = "2026-09-05" }), await Orgao());
         Assert.Equal(PeDominios.SituacaoPdtic.EmAcompanhamento, PdticNoBanco(pdtic.Id).Situacao);
         Assert.Equal(PeDominios.SituacaoPasso.Feito, (await PassoDaSituacaoAsync(pdtic.Id, "plano-acompanhamento.aprovacao-acompanhamento")).Situacao);
 
@@ -102,11 +102,11 @@ public class PePublicacaoEncerramentoTest : PeAprovacaoTestBase
         Assert.Equal((int)ErrorCode.PeEncerramentoRecusado, ex.Error.Code);
         Assert.Equal($"Para encerrar o PDTIC, registre a aprovação da autoridade máxima (passo {numero}) com a decisão \"Aprovado\".", ex.Error.Message);
 
-        await IncluirNoPdticAsync(pdtic.Id, "aprovacao_resultados_autoridade", new { decisao = "devolvido", data = "2029-12-10" });
+        await IncluirNoPdticAsync(pdtic.Id, "aprovacao_resultados_autoridade", new { decisao = "devolvido", data = "2026-09-10" });
         Assert.Equal(Codigo(ErrorCode.PeEncerramentoRecusado), await ErroAsync(async () => await Aprovacao.EncerrarAsync(pdtic.Id, new PeEncerrarDTO(), await Orgao())));
         var registro = (await Registros.ListarAsync(PeDono.DoPdtic(pdtic.Id), "aprovacao_resultados_autoridade", await Orgao())).Registros.Single();
         await Registros.AtualizarAsync(PeDono.DoPdtic(pdtic.Id), "aprovacao_resultados_autoridade", registro.Id,
-            Salvar(new { decisao = "aprovado", data = "2029-12-15" }), await Orgao());
+            Salvar(new { decisao = "aprovado", data = "2026-09-15" }), await Orgao());
 
         var encerrado = await Aprovacao.EncerrarAsync(pdtic.Id, new PeEncerrarDTO(), await Orgao());
         Assert.Equal(PeDominios.SituacaoPdtic.Encerrado, encerrado.Situacao);

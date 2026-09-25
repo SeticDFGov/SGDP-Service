@@ -66,7 +66,8 @@ public class PeCarregadorModeloTest : PeModeloTestBase
         ("plano-acompanhamento.plano-avaliacao", "Planeje a avaliação: indicadores de resultado e metas intermediárias", "d d o"),
         ("plano-acompanhamento.plano-acompanhamento", "Feche o plano de acompanhamento: riscos atualizados e comunicação", "d d o"),
         ("plano-acompanhamento.aprovacao-acompanhamento", "Registre a aprovação do plano de acompanhamento", "d d o"),
-        ("monitoramento.ciclo-monitoramento", "Atualize a situação das ações e registre as medições e os riscos que ocorreram", "o o o"),
+        // F1 (C18): o título do 5.1 serve a todos os níveis (o Básico não registra medições nem riscos)
+        ("monitoramento.ciclo-monitoramento", "Atualize a situação das ações no ciclo", "o o o"),
         ("monitoramento.relatorio-acompanhamento", "Feche o ciclo no relatório de acompanhamento", "d o o"),
         ("avaliacao-intermediaria.resultados-intermediarios", "Consolide os resultados intermediários", "d o o"),
         ("avaliacao-intermediaria.comparacao-metas", "Compare com as metas e proponha ajustes", "d o o"),
@@ -274,8 +275,9 @@ public class PeCarregadorModeloTest : PeModeloTestBase
     [Fact]
     public void Configuracoes_VersaoDoModeloEPeriodicidadeTrimestral()
     {
-        // Versão 6 (E7, rodada B): as seções por ciclo, os modelos do RA e do RR e as configurações do acompanhamento
-        Assert.Equal("6", Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChaveVersaoModelo).Valor);
+        // Versão 7 (F1): as correções da revisão final (a 6, da E7 rodada B, trouxe as seções por
+        // ciclo, os modelos do RA e do RR e as configurações do acompanhamento)
+        Assert.Equal("7", Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChaveVersaoModelo).Valor);
         Assert.Equal("\"trimestral\"",
             Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChavePeriodicidadeMonitoramento).Valor);
         Assert.Equal("15", Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChavePrazoFechamentoCiclo).Valor);
@@ -291,7 +293,7 @@ public class PeCarregadorModeloTest : PeModeloTestBase
 
         Assert.DoesNotContain('\u2014', texto);
         Assert.DoesNotContain('\u2013', texto);
-        Assert.Equal(6, PeCarregadorModelo.LerSeed(texto).Versao);
+        Assert.Equal(PeCarregadorModelo.VersaoDaRevisaoFinal, PeCarregadorModelo.LerSeed(texto).Versao);
     }
 
     // ── Idempotência e "nunca sobrescreve" ────────────────────────────────────
@@ -302,7 +304,7 @@ public class PeCarregadorModeloTest : PeModeloTestBase
         var resultado = await new PeCarregadorModelo(Context).CarregarAsync();
 
         Assert.False(resultado.Executou);
-        Assert.Equal(6, resultado.VersaoAnterior);
+        Assert.Equal(PeCarregadorModelo.VersaoDaRevisaoFinal, resultado.VersaoAnterior);
         Assert.Equal(50, Context.PePassos.Count());
         // 346 do PDTIC (com o logotipo da versão 3) e 33 do DF e do PETIC-DF (versão 2)
         Assert.Equal(379, Context.PeCampos.Count());

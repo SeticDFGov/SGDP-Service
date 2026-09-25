@@ -75,15 +75,8 @@ public class PeDocumentoPdfTest : PeDocumentoTestBase
         foreach (var travado in documento.Capitulos.Where(c => c.Travado))
             Assert.Contains(roteiro.Sumario, i => i.Secao == PeDocumentoPdf.NomeDaSecao(travado));
 
-        // As tabelas largas vão para páginas deitadas; o resto fica em pé
-        var deitadas = roteiro.Grupos.Where(g => g.Deitada).SelectMany(g => g.Pecas)
-            .Where(p => p.Bloco?.Tabela != null).Select(p => p.Bloco!.Tabela!.SecaoChave).ToList();
-        Assert.Equal(new[] { "ativos", "necessidades", "contratacoes", "metas", "acoes", "riscos" }, deitadas);
-        Assert.All(roteiro.Grupos.Where(g => g.Deitada).SelectMany(g => g.Pecas), p => Assert.True(p.Deitada));
-        // O título e o texto que vêm antes da tabela larga vão para a mesma página deitada
-        var ativos = roteiro.Grupos.Single(g => g.Pecas.Any(p => p.Bloco?.Tabela?.SecaoChave == "ativos"));
-        Assert.Equal(new[] { PeDocumentoPdf.TipoPeca.Titulo, PeDocumentoPdf.TipoPeca.Bloco, PeDocumentoPdf.TipoPeca.Bloco },
-            ativos.Pecas.Where(p => p.Capitulo?.Chave == "ativos").Select(p => p.Tipo));
+        // Sem dado, a tabela larga fica em pé, junto do capítulo (F1, C26): nenhuma página deitada só com "Nenhum item"
+        Assert.Empty(roteiro.Grupos.Where(g => g.Deitada).SelectMany(g => g.Pecas).Where(p => p.Bloco?.Tabela != null));
 
         // O começo do capítulo não se separa do título: os títulos e os textos seguidos, até o
         // primeiro bloco que não é texto; para na quebra de página (a conclusão, antes dos anexos)
@@ -98,6 +91,23 @@ public class PeDocumentoPdfTest : PeDocumentoTestBase
         var semTermos = PeDocumentoPdf.Montar(await DocumentoAsync(pdtic.Id));
         Assert.DoesNotContain(semTermos.Sumario, i => i.Titulo == "Termos e abreviações");
         Assert.Equal(20, semTermos.Sumario.Count(i => i.Nivel == 1 && i.Numero != null));
+    }
+
+    [Fact]
+    public async Task Roteiro_TabelasLargasComDado_VaoParaAPaginaDeitada()
+    {
+        var pdtic = await PdticCompletoAsync();
+        var roteiro = PeDocumentoPdf.Montar(await DocumentoAsync(pdtic.Id));
+
+        // As tabelas largas com dado vão para páginas deitadas; o resto fica em pé
+        var deitadas = roteiro.Grupos.Where(g => g.Deitada).SelectMany(g => g.Pecas)
+            .Where(p => p.Bloco?.Tabela != null).Select(p => p.Bloco!.Tabela!.SecaoChave).ToList();
+        Assert.Equal(new[] { "ativos", "necessidades", "contratacoes", "metas", "acoes", "riscos" }, deitadas);
+        Assert.All(roteiro.Grupos.Where(g => g.Deitada).SelectMany(g => g.Pecas), p => Assert.True(p.Deitada));
+        // O título e o texto que vêm antes da tabela larga vão para a mesma página deitada
+        var ativos = roteiro.Grupos.Single(g => g.Pecas.Any(p => p.Bloco?.Tabela?.SecaoChave == "ativos"));
+        Assert.Equal(new[] { PeDocumentoPdf.TipoPeca.Titulo, PeDocumentoPdf.TipoPeca.Bloco, PeDocumentoPdf.TipoPeca.Bloco },
+            ativos.Pecas.Where(p => p.Capitulo?.Chave == "ativos").Select(p => p.Tipo));
     }
 
     [Fact]

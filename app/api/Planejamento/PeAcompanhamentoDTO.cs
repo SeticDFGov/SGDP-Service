@@ -34,6 +34,8 @@ public class PeCicloResponse
     public DateTime? FechadoEm { get; set; }
 
     public string? FechadoPor { get; set; }
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail); nulo com o FechadoPor
+    public string? FechadoPorNome { get; set; }
 
     public PeCicloResumoResponse Resumo { get; set; } = new();
 
@@ -44,6 +46,8 @@ public class PeCicloResponse
     public DateTime? ReabertoEm { get; set; }
 
     public string? ReabertoPor { get; set; }
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail); nulo com o ReabertoPor
+    public string? ReabertoPorNome { get; set; }
 
     // A mais que o contrato: quem chama grava dados neste ciclo agora (a equipe do órgão, o PDTIC
     // vigente e o ciclo começado e aberto)
@@ -60,6 +64,17 @@ public class PeCicloResumoResponse
     public int Medicoes { get; set; }
 
     public int RiscosOcorridos { get; set; }
+
+    // A mais que o contrato (F1, I04 e C23), só na avaliação intermediária (zero e nulos no
+    // monitoramento): os resultados das metas registrados, se a análise foi registrada e a
+    // decisão do comitê (o valor, seguir ou revisar, e o rótulo)
+    public int ResultadosMetas { get; set; }
+
+    public bool AnaliseRegistrada { get; set; }
+
+    public string? DecisaoComite { get; set; }
+
+    public string? DecisaoComiteRotulo { get; set; }
 }
 
 public class PeCicloRelatorioResponse

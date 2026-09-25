@@ -56,15 +56,24 @@ public class PeOrgaoService : IPeOrgaoService
     public async Task<PeOrgaoNivelResponse> DefinirNivelAsync(long orgaoId, PeOrgaoNivelDTO dto, string autor)
     {
         var orgao = await OrgaoAtivoAsync(orgaoId);
-        if (dto.NivelId == null) throw new ApiException(ErrorCode.PeDadosInvalidos, "Escolha o nível do órgão.");
-
         var niveis = await NiveisAsync();
+        var justificativa = dto.Justificativa?.Trim();
+
+        // Sem nível: o órgão volta ao nível padrão (F1, achado A21), com a justificativa
+        if (dto.NivelId == null)
+        {
+            if (string.IsNullOrEmpty(justificativa))
+                throw new ApiException(ErrorCode.PeJustificativaObrigatoria, "Explique por que o órgão volta ao nível padrão.");
+            if (justificativa.Length > 1000)
+                throw new ApiException(ErrorCode.PeDadosInvalidos, "A justificativa tem no máximo 1000 caracteres.");
+            return await VoltarAoPadraoAsync(orgao, niveis, justificativa, autor);
+        }
+
         var nivel = niveis.FirstOrDefault(n => n.Id == dto.NivelId)
             ?? throw new ApiException(ErrorCode.PeDadosInvalidos, "O nível escolhido não existe. Atualize a tela.");
         if (!nivel.Ativo)
             throw new ApiException(ErrorCode.PeNivelInativo, $"O nível \"{nivel.Nome}\" está desativado. Escolha um nível ativo.");
 
-        var justificativa = dto.Justificativa?.Trim();
         if (string.IsNullOrEmpty(justificativa))
             throw new ApiException(ErrorCode.PeJustificativaObrigatoria, "Explique por que o órgão fica neste nível.");
         if (justificativa.Length > 1000)
@@ -110,6 +119,35 @@ public class PeOrgaoService : IPeOrgaoService
         return Item(orgao, nivel.Id, niveis, await TotalAjustesAsync(orgaoId));
     }
 
+    /// <summary>
+    /// O órgão volta ao nível padrão (o primeiro ativo pela ordem): a escolha sai e a troca fica no
+    /// histórico com o novo nível marcado como padrão. Órgão que já está no padrão não muda nada.
+    /// </summary>
+    private async Task<PeOrgaoNivelResponse> VoltarAoPadraoAsync(PgiaOrgao orgao, List<PeNivel> niveis, string justificativa, string autor)
+    {
+        var config = await _context.PeOrgaosConfig.FirstOrDefaultAsync(c => c.OrgaoId == orgao.Id);
+        if (config == null) return Item(orgao, null, niveis, await TotalAjustesAsync(orgao.Id));
+
+        var anterior = niveis.FirstOrDefault(n => n.Id == config.NivelId);
+        var padrao = niveis.FirstOrDefault(n => n.Ativo);
+        var agora = DateTime.UtcNow;
+        _context.PeOrgaosConfig.Remove(config);
+        _context.PeModeloHistorico.Add(new PeModeloHistorico
+        {
+            Entidade = PeDominios.EntidadeHistorico.OrgaoNivel,
+            EntidadeId = orgao.Id,
+            Acao = PeDominios.AcaoHistorico.Alteracao,
+            Antes = JsonSerializer.Serialize(new { NivelId = anterior?.Id, NivelNome = anterior?.Nome, Padrao = false, config.Justificativa },
+                PeModeloService.JsonHistorico),
+            Depois = JsonSerializer.Serialize(new { NivelId = padrao?.Id, NivelNome = padrao?.Nome, Padrao = true, Justificativa = justificativa },
+                PeModeloService.JsonHistorico),
+            AlteradoEm = agora,
+            AlteradoPor = autor
+        });
+        await _context.SaveChangesAsync();
+        return Item(orgao, null, niveis, await TotalAjustesAsync(orgao.Id));
+    }
+
     public async Task<List<PeOrgaoNivelHistoricoResponse>> HistoricoNivelAsync(long orgaoId)
     {
         if (!await _context.PgiaOrgaos.AnyAsync(o => o.Id == orgaoId))
@@ -119,6 +157,7 @@ public class PeOrgaoService : IPeOrgaoService
             .Where(h => h.Entidade == PeDominios.EntidadeHistorico.OrgaoNivel && h.EntidadeId == orgaoId)
             .OrderByDescending(h => h.AlteradoEm).ThenByDescending(h => h.Id)
             .ToListAsync();
+        var nomes = await PeNomes.CarregarAsync(_context, linhas.Select(h => h.AlteradoPor));
 
         return linhas.Select(h =>
         {
@@ -131,9 +170,11 @@ public class PeOrgaoService : IPeOrgaoService
                 NivelAnteriorPadrao = antes?.Padrao ?? false,
                 NivelNovoId = depois?.NivelId,
                 NivelNovo = depois?.NivelNome,
+                NivelNovoPadrao = depois?.Padrao ?? false,
                 Justificativa = depois?.Justificativa,
                 DefinidoEm = h.AlteradoEm,
-                DefinidoPor = h.AlteradoPor
+                DefinidoPor = h.AlteradoPor,
+                DefinidoPorNome = nomes.DeObrigatorio(h.AlteradoPor)
             };
         }).ToList();
     }
@@ -146,6 +187,7 @@ public class PeOrgaoService : IPeOrgaoService
         var passos = await _context.PePassos.AsNoTracking().ToDictionaryAsync(p => p.Id);
         var secoes = await _context.PeSecoes.AsNoTracking().ToDictionaryAsync(s => s.Id);
         var campos = await _context.PeCampos.AsNoTracking().ToDictionaryAsync(c => c.Id);
+        var nomes = await PeNomes.CarregarAsync(_context, ajustes.Select(a => a.AlteradoPor ?? a.CriadoPor));
 
         return ajustes
             .OrderBy(a => Array.IndexOf(PeDominios.AlvoAjuste.Todos, a.AlvoTipo)).ThenBy(a => a.AlvoId)
@@ -166,7 +208,8 @@ public class PeOrgaoService : IPeOrgaoService
                     AlvoTitulo = titulo,
                     AlvoExcluido = excluido,
                     AlteradoEm = a.AlteradoEm ?? a.CriadoEm,
-                    AlteradoPor = a.AlteradoPor ?? a.CriadoPor
+                    AlteradoPor = a.AlteradoPor ?? a.CriadoPor,
+                    AlteradoPorNome = nomes.DeObrigatorio(a.AlteradoPor ?? a.CriadoPor)
                 };
             })
             .ToList();

@@ -187,7 +187,7 @@ public class PeRegistroService : IPeRegistroService
             .ToList();
     }
 
-    public async Task<List<string>> PendenciasAsync(PeDono dono)
+    public async Task<List<PePeticPendenciaResponse>> PendenciasAsync(PeDono dono)
     {
         var trilha = await TrilhaDoDonoAsync(dono);
         var secoes = trilha != null
@@ -195,19 +195,26 @@ public class PeRegistroService : IPeRegistroService
             : await MontarAsync(await SecoesForaDoPdticAsync(dono.Escopo, soNaPlanilha: false));
         var analise = await AnalisarAsync(dono, secoes);
 
-        var pendencias = new List<string>();
+        var pendencias = new List<PePeticPendenciaResponse>();
         foreach (var secao in analise.Secoes)
         {
+            PePeticPendenciaResponse Pendencia(string motivo) => new()
+            {
+                SecaoChave = secao.Secao.Secao.Chave,
+                SecaoTitulo = secao.Secao.Secao.Titulo,
+                Motivo = motivo
+            };
             if (secao.Registros.Count == 0)
             {
                 if (secao.Secao.Obrigatoria)
-                    pendencias.Add(secao.Secao.EhFormulario
+                    pendencias.Add(Pendencia(secao.Secao.EhFormulario
                         ? $"Preencha \"{secao.Secao.Secao.Titulo}\"."
-                        : $"Inclua pelo menos um item em \"{secao.Secao.Secao.Titulo}\".");
+                        : $"Inclua pelo menos um item em \"{secao.Secao.Secao.Titulo}\"."));
                 continue;
             }
             foreach (var (registro, faltando) in secao.Incompletos)
-                pendencias.Add($"{registro.Codigo ?? secao.Secao.Secao.Titulo}: preencha {string.Join(", ", faltando.Select(c => $"\"{c.Rotulo}\""))}.");
+                pendencias.Add(Pendencia(
+                    $"{registro.Codigo ?? secao.Secao.Secao.Titulo}: preencha {string.Join(", ", faltando.Select(c => $"\"{c.Rotulo}\""))}."));
         }
         return pendencias;
     }
@@ -350,7 +357,7 @@ public class PeRegistroService : IPeRegistroService
         return pdtics.GroupBy(p => p.PdticId).ToDictionary(g => g.Key, g =>
         {
             var secao = g.First().Secao;
-            return porPdtic[g.Key].Select(r => Resposta(secao, r, porOrigem[r.Id], destinos, sistemas)).ToList();
+            return porPdtic[g.Key].Select(r => Resposta(secao, r, porOrigem[r.Id], destinos, sistemas, PeNomes.Vazio)).ToList();
         });
     }
 
@@ -388,7 +395,7 @@ public class PeRegistroService : IPeRegistroService
         {
             Modelo = secao,
             Colunas = secao.Visiveis.ToList(),
-            Registros = porSecao[secao.Secao.Id].Select(r => Resposta(secao, r, porOrigem[r.Id], destinos, sistemas)).ToList(),
+            Registros = porSecao[secao.Secao.Id].Select(r => Resposta(secao, r, porOrigem[r.Id], destinos, sistemas, PeNomes.Vazio)).ToList(),
             CicloDoRegistro = secao.PorCiclo == null
                 ? new Dictionary<long, long>()
                 : porSecao[secao.Secao.Id].Where(r => ciclos.ContainsKey(r.Id)).ToDictionary(r => r.Id, r => ciclos[r.Id]),
@@ -1483,7 +1490,10 @@ public class PeRegistroService : IPeRegistroService
         var sistemas = await SistemasPgiaAsync(
             secao.Visiveis.Where(v => PeRegistroDados.EhLigacaoPgia(v.Campo)).Select(v => v.Campo.Chave).ToList(), registros);
 
-        return registros.Select(r => Resposta(secao, r, porOrigem[r.Id], destinos, sistemas)).ToList();
+        // Os nomes de quem incluiu e de quem alterou (F1, C19): só nas respostas da tela (as
+        // exportações para o documento, as planilhas e os painéis não os usam)
+        var nomes = await PeNomes.CarregarAsync(_context, registros.SelectMany(r => new[] { r.CriadoPor, r.AlteradoPor }));
+        return registros.Select(r => Resposta(secao, r, porOrigem[r.Id], destinos, sistemas, nomes)).ToList();
     }
 
     /// <summary>Nome dos sistemas de IA do PGIA ligados nos campos dados (ligação com o PGIA), em lote.</summary>
@@ -1511,7 +1521,7 @@ public class PeRegistroService : IPeRegistroService
     }
 
     private static PeRegistroResponse Resposta(PeSecaoDoDono secao, PeRegistro registro, IEnumerable<PeVinculo> ligacoes,
-        IReadOnlyDictionary<long, PeVinculoResponse> destinos, IReadOnlyDictionary<long, PeVinculoResponse> sistemas)
+        IReadOnlyDictionary<long, PeVinculoResponse> destinos, IReadOnlyDictionary<long, PeVinculoResponse> sistemas, PeNomes nomes)
     {
         var dados = PeRegistroDados.Ler(registro.Dados);
         var resposta = new PeRegistroResponse
@@ -1522,8 +1532,10 @@ public class PeRegistroService : IPeRegistroService
             Sistema = registro.Sistema,
             CriadoEm = registro.CriadoEm,
             CriadoPor = registro.CriadoPor,
+            CriadoPorNome = nomes.DeObrigatorio(registro.CriadoPor),
             AlteradoEm = registro.AlteradoEm,
-            AlteradoPor = registro.AlteradoPor
+            AlteradoPor = registro.AlteradoPor,
+            AlteradoPorNome = nomes.De(registro.AlteradoPor)
         };
         var lista = ligacoes.ToList();
 

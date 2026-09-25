@@ -72,7 +72,18 @@ public class PePeticController : ControllerBase
             async ctx => Ok(await _service.AtualizarAsync(id, PeCorpoParcial.Ler<PePeticAtualizarDTO>(corpo), ctx)),
             SoAdministrador);
 
-    /// <summary>Envia ao CGTIC: confere as pendências, cria a deliberação e devolve a versão em deliberação.</summary>
+    /// <summary>
+    /// A prévia do envio (F1, A06): { PodeEnviar, Pendencias: [{ SecaoChave, SecaoTitulo, Motivo }],
+    /// Motivo }. Lê quem lê os referenciais (o papel de órgão não vê o rascunho: 404).
+    /// </summary>
+    [HttpGet("{id:long}/envio")]
+    public Task<IActionResult> Envio(long id) =>
+        Executar(_permissoes.PodeLerReferenciais, async ctx => Ok(await _service.EnvioAsync(id, ctx)), SemPapel);
+
+    /// <summary>
+    /// Envia ao CGTIC: confere as pendências (400 PePeticIncompleto com { Code, Message, Pendencias },
+    /// a lista da prévia), cria a deliberação e devolve a versão em deliberação.
+    /// </summary>
     [HttpPost("{id:long}/enviar")]
     public Task<IActionResult> Enviar(long id) =>
         Executar(_permissoes.PodeEditarReferenciais, async ctx => Ok(await _service.EnviarAsync(id, ctx)), SoAdministrador);

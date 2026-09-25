@@ -68,6 +68,11 @@ public sealed class PeSeedDocBloco
 
     public bool PaginaDeitada { get; set; }
 
+    // Desde a versão 7 (F1), só no bloco de texto: os textos (linhas da marcação simples) que o
+    // carregador gravou antes neste bloco. No capítulo que já existe, o bloco da mesma posição
+    // que ainda tem um deles passa ao texto de hoje
+    public List<List<string>>? Antes { get; set; }
+
     /// <summary>O config do bloco antes de conferir (chaves como o PeDocConfig lê).</summary>
     public JsonElement Config()
     {

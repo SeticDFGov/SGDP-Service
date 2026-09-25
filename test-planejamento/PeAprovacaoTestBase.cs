@@ -139,4 +139,8 @@ public abstract class PeAprovacaoTestBase : PeDocumentoTestBase
 
     /// <summary>A data de hoje (Brasília) no formato dd/mm/aaaa.</summary>
     protected static string Hoje() => DateOnly.FromDateTime(demanda_service.Helpers.DateTimeHelper.TodayBrasilia()).ToString("dd/MM/yyyy");
+
+    /// <summary>A data de hoje (Brasília) no formato aaaa-mm-dd, como os campos de data recebem.</summary>
+    protected static string HojeIso() =>
+        DateOnly.FromDateTime(demanda_service.Helpers.DateTimeHelper.TodayBrasilia()).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
 }

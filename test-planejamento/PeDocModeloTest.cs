@@ -37,7 +37,9 @@ public class PeDocModeloTest : PeDocumentoTestBase
         Assert.Equal("ativos", ativos.Blocos[1].Config.GetProperty("Secao").GetString());
         Assert.True(ativos.Blocos[1].Config.GetProperty("PaginaDeitada").GetBoolean());
 
-        Assert.Equal(PeDocMarcadores.Fixos.Select(m => m.Chave).Append("nomes.ouvidoria"), modelo.Marcadores.Select(m => m.Chave));
+        // Os marcadores do ciclo são só do RA (F1, B07): o modelo do PDTIC não os oferece
+        Assert.Equal(PeDocMarcadores.Fixos.Select(m => m.Chave).Where(c => !PeDocMarcadores.DoCiclo.Contains(c)).Append("nomes.ouvidoria"),
+            modelo.Marcadores.Select(m => m.Chave));
         Assert.All(modelo.Marcadores, m => Assert.False(string.IsNullOrWhiteSpace(m.Descricao)));
 
         var invalido = await Assert.ThrowsAsync<ApiException>(() => ModeloDoc.ObterAsync("xyz"));

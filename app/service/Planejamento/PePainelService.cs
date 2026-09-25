@@ -705,6 +705,7 @@ public class PePainelService : IPePainelService
 
         var versoes = await _pdtics.VersoesAsync(orgaoId, ctx);
         var historico = await _orgaos.HistoricoNivelAsync(orgaoId);
+        var nomesInadimplencias = await PeInadimplenciaService.NomesAsync(_context, inadimplencias);
 
         var resposta = new PeOrgaoResumoResponse
         {
@@ -717,16 +718,20 @@ public class PePainelService : IPePainelService
                 Historico = historico.Select(h => new PeOrgaoNivelTrocaResponse
                 {
                     NivelNome = h.NivelNovo,
+                    Padrao = h.NivelNovoPadrao,
+                    NivelAnterior = h.NivelAnterior,
+                    NivelAnteriorPadrao = h.NivelAnteriorPadrao,
                     Justificativa = h.Justificativa,
                     AlteradoEm = h.DefinidoEm,
-                    AlteradoPor = h.DefinidoPor
+                    AlteradoPor = h.DefinidoPor,
+                    AlteradoPorNome = h.DefinidoPorNome
                 }).ToList()
             },
             Pdtic = pdtic == null ? null : versoes.FirstOrDefault(v => v.Id == pdtic.Id),
             Versoes = versoes,
             ProximoPasso = situacao?.Resposta.ProximoPasso,
             Conformidade = retrato.Conformidade!.Linha,
-            Inadimplencias = inadimplencias.Select(i => PeInadimplenciaService.Resposta(i, orgao, hoje)).ToList()
+            Inadimplencias = inadimplencias.Select(i => PeInadimplenciaService.Resposta(i, orgao, hoje, nomesInadimplencias)).ToList()
         };
 
         if (pdtic != null && trilha != null && situacao != null)
@@ -754,7 +759,8 @@ public class PePainelService : IPePainelService
                     PassoTitulo = trilha.Passo(p.PassoId)?.Titulo ?? string.Empty,
                     Justificativa = p.NaoSeAplica!.Justificativa,
                     MarcadoEm = p.NaoSeAplica.MarcadoEm,
-                    MarcadoPor = p.NaoSeAplica.MarcadoPor
+                    MarcadoPor = p.NaoSeAplica.MarcadoPor,
+                    MarcadoPorNome = p.NaoSeAplica.MarcadoPorNome
                 })
                 .ToList();
             resposta.ComentariosAbertos = (await _context.PeComentarios.AsNoTracking()
@@ -801,9 +807,11 @@ public class PePainelService : IPePainelService
                     Situacao = c.Situacao,
                     FechadoEm = c.FechadoEm,
                     FechadoPor = c.FechadoPor,
+                    FechadoPorNome = c.FechadoPorNome,
                     Relatorio = c.Relatorio,
                     ReabertoEm = c.ReabertoEm,
                     ReabertoPor = c.ReabertoPor,
+                    ReabertoPorNome = c.ReabertoPorNome,
                     PodeEditar = c.PodeEditar,
                     PdticId = pdtic.Id
                 })

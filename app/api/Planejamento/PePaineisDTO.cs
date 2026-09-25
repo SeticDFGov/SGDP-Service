@@ -312,6 +312,8 @@ public class PeInadimplenciaResponse
     public DateTime? RegistradoEm { get; set; }
 
     public string? RegistradoPor { get; set; }
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail); nulo com o RegistradoPor
+    public string? RegistradoPorNome { get; set; }
 
     public DateOnly? SaneadoEm { get; set; }
 
@@ -320,6 +322,8 @@ public class PeInadimplenciaResponse
     public DateTime CriadoEm { get; set; }
 
     public string CriadoPor { get; set; } = string.Empty;
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail)
+    public string CriadoPorNome { get; set; } = string.Empty;
 }
 
 /// <summary>GET inadimplencias: filtros e página (vigentes primeiro).</summary>
@@ -529,11 +533,20 @@ public class PeOrgaoNivelTrocaResponse
 {
     public string? NivelNome { get; set; }
 
+    // F1 (A21): o nível desta troca é o padrão (o órgão voltou ao padrão) e o de antes dela
+    public bool Padrao { get; set; }
+
+    public string? NivelAnterior { get; set; }
+
+    public bool NivelAnteriorPadrao { get; set; }
+
     public string? Justificativa { get; set; }
 
     public DateTime AlteradoEm { get; set; }
 
     public string AlteradoPor { get; set; } = string.Empty;
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail)
+    public string AlteradoPorNome { get; set; } = string.Empty;
 }
 
 public class PeOrgaoAndamentoResponse
@@ -564,6 +577,8 @@ public class PeOrgaoNaoSeAplicaResponse
     public DateTime MarcadoEm { get; set; }
 
     public string MarcadoPor { get; set; } = string.Empty;
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail)
+    public string MarcadoPorNome { get; set; } = string.Empty;
 }
 
 public class PeOrgaoComentarioAbertoResponse
@@ -652,12 +667,16 @@ public class PeOrgaoCicloResponse
     public DateTime? FechadoEm { get; set; }
 
     public string? FechadoPor { get; set; }
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail); nulo com o FechadoPor
+    public string? FechadoPorNome { get; set; }
 
     public PeCicloRelatorioResponse? Relatorio { get; set; }
 
     public DateTime? ReabertoEm { get; set; }
 
     public string? ReabertoPor { get; set; }
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail); nulo com o ReabertoPor
+    public string? ReabertoPorNome { get; set; }
 
     public bool PodeEditar { get; set; }
 

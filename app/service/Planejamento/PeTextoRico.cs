@@ -324,12 +324,17 @@ public static partial class PeTextoRico
         return saida;
     }
 
-    /// <summary>Endereço completo com http ou https e servidor (sem javascript:, data: e afins).</summary>
+    /// <summary>
+    /// Endereço completo com http ou https e servidor (sem javascript:, data: e afins). Desde a F1
+    /// (achado B02), o servidor tem ponto ("www.df.gov.br") e não começa por um segundo esquema:
+    /// "https://https://www.df.gov.br" (o prefixo colado duas vezes) não vale.
+    /// </summary>
     public static bool LinkValido(string? href) =>
         !string.IsNullOrWhiteSpace(href) && href.Length <= MaximoLink
         && Uri.TryCreate(href, UriKind.Absolute, out var uri)
         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
         && !string.IsNullOrEmpty(uri.Host)
+        && uri.Host.Contains('.') && !uri.Host.StartsWith('.') && !uri.Host.EndsWith('.')
         && !href.Any(char.IsControl);
 
     /// <summary>O id do arquivo de uma imagem ("api/planejamento/arquivos/12"), ou nulo.</summary>

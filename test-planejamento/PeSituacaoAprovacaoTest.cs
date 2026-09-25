@@ -64,10 +64,10 @@ public class PeSituacaoAprovacaoTest : PeAprovacaoTestBase
         Assert.Equal((PeDominios.SituacaoPasso.Aguardando, PePdticService.MotivoSemAvaliacao), (antes.Situacao, antes.Motivo));
 
         var avaliacao = await Acompanhamento.CriarCicloAsync(pdtic.Id, new PeCicloCriarDTO { Tipo = "avaliacao" }, await Orgao());
-        var registro = await IncluirNoPdticAsync(pdtic.Id, "avaliacao_comite", new { decisao = "seguir", data = "2027-06-30" }, cicloId: avaliacao.Id);
+        var registro = await IncluirNoPdticAsync(pdtic.Id, "avaliacao_comite", new { decisao = "seguir", data = "2026-06-30" }, cicloId: avaliacao.Id);
         Assert.Equal(PeDominios.SituacaoPasso.Feito, (await PassoDaSituacaoAsync(pdtic.Id, chave)).Situacao);
         await Registros.AtualizarAsync(PeDono.DoPdtic(pdtic.Id), "avaliacao_comite", registro.Id,
-            Salvar(new { decisao = "revisar", data = "2027-06-30" }), await Orgao(), avaliacao.Id);
+            Salvar(new { decisao = "revisar", data = "2026-06-30" }), await Orgao(), avaliacao.Id);
         Assert.Equal(PeDominios.SituacaoPasso.Feito, (await PassoDaSituacaoAsync(pdtic.Id, chave)).Situacao);
     }
 

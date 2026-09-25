@@ -63,7 +63,7 @@ public class PePaineisControllerTest : PePaineisTestBase
         var sgdi = ControladorInadimplencias(UserPeSgdi);
         var notificacao = new
         {
-            Obrigacao = "Comunicar à SGDI o PDTIC aprovado pelo comitê interno (art. 7º, V)",
+            Obrigacao = "Comunicar à SGDI o PDTIC aprovado pelo comitê interno (art. 7º, V, do Decreto nº 48.899/2026)",
             PrazoDescumprido = "30 dias depois da aprovação",
             NotificadoEm = Iso(HojeData()),
             Documento = "Ofício nº 12/2026-SGDI"

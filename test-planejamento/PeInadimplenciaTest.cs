@@ -18,7 +18,7 @@ public class PeInadimplenciaTest : PePaineisTestBase
 {
     private static PeInadimplenciaNotificarDTO Notificacao(DateOnly notificadoEm) => new()
     {
-        Obrigacao = "Comunicar à SGDI o PDTIC aprovado pelo comitê interno (art. 7º, V)",
+        Obrigacao = "Comunicar à SGDI o PDTIC aprovado pelo comitê interno (art. 7º, V, do Decreto nº 48.899/2026)",
         PrazoDescumprido = "30 dias depois da aprovação pelo SGTIC",
         NotificadoEm = Iso(notificadoEm),
         Documento = "Ofício nº 12/2026-SGDI",

@@ -259,6 +259,22 @@ public static class PeXlsx
         }
         linha++;
 
+        // Cada aba com o título inteiro (o nome da aba tem no máximo 31 caracteres: F1, B20)
+        var cabecalhoDasAbas = new Row { RowIndex = linha };
+        cabecalhoDasAbas.Append(CelulaTexto(Ref(0, linha), "Aba", EstiloCabecalho));
+        cabecalhoDasAbas.Append(CelulaTexto(Ref(1, linha), "Título completo", EstiloCabecalho));
+        dados.Append(cabecalhoDasAbas);
+        linha++;
+        for (var a = 0; a < abas.Count; a++)
+        {
+            var row = new Row { RowIndex = linha };
+            row.Append(CelulaTexto(Ref(0, linha), nomes[a], EstiloPadrao));
+            row.Append(CelulaTexto(Ref(1, linha), abas[a].Nome, EstiloTextoLongo));
+            dados.Append(row);
+            linha++;
+        }
+        linha++;
+
         var cabecalho = new Row { RowIndex = linha };
         cabecalho.Append(CelulaTexto(Ref(0, linha), "Aba", EstiloCabecalho));
         cabecalho.Append(CelulaTexto(Ref(1, linha), "Coluna", EstiloCabecalho));
@@ -454,7 +470,8 @@ public static class PeXlsx
 
     /// <summary>
     /// Nomes de aba válidos no Excel: sem : \ / ? * [ ], até 31 caracteres, sem apóstrofo nas
-    /// pontas e sem repetir (ignorando maiúsculas).
+    /// pontas e sem repetir (ignorando maiúsculas). Desde a F1 (achado B20), o nome longo é cortado
+    /// numa palavra inteira (e sem a preposição solta no fim); o título inteiro fica na Leia-me.
     /// </summary>
     public static List<string> NomesUnicos(IReadOnlyList<string> nomes)
     {
@@ -465,16 +482,38 @@ public static class PeXlsx
             var limpo = new string(original.Where(c => c is not (':' or '\\' or '/' or '?' or '*' or '[' or ']') && !char.IsControl(c)).ToArray())
                 .Trim().Trim('\'').Trim();
             if (limpo.Length == 0 || string.Equals(limpo, "History", StringComparison.OrdinalIgnoreCase)) limpo = "Aba";
-            if (limpo.Length > 31) limpo = limpo[..31].TrimEnd();
+            limpo = Cortar(limpo, 31);
 
             var nome = limpo;
             for (var n = 2; !usados.Add(nome); n++)
             {
                 var sufixo = $" ({n})";
-                nome = (limpo.Length + sufixo.Length > 31 ? limpo[..(31 - sufixo.Length)].TrimEnd() : limpo) + sufixo;
+                nome = Cortar(limpo, 31 - sufixo.Length) + sufixo;
             }
             saida.Add(nome);
         }
         return saida;
+    }
+
+    // Palavras que não terminam um nome cortado ("Plano de levantamento das" vira "Plano de levantamento")
+    private static readonly HashSet<string> Ligacoes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "a", "as", "o", "os", "e", "de", "da", "das", "do", "dos", "em", "na", "nas", "no", "nos", "que", "com", "para", "por", "pela", "pelo"
+    };
+
+    /// <summary>
+    /// O texto em até "maximo" caracteres, cortado numa palavra inteira e sem a palavra de ligação
+    /// solta no fim; sem espaço onde cortar (uma palavra só, longa), o corte é no caractere.
+    /// </summary>
+    public static string Cortar(string texto, int maximo)
+    {
+        texto = texto.Trim();
+        if (texto.Length <= maximo) return texto;
+        var palavras = texto[..maximo].Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
+        // A última palavra do trecho foi cortada no meio quando o texto seguia sem espaço
+        if (texto[maximo] != ' ' && palavras.Count > 1) palavras.RemoveAt(palavras.Count - 1);
+        while (palavras.Count > 1 && Ligacoes.Contains(palavras[^1])) palavras.RemoveAt(palavras.Count - 1);
+        var cortado = string.Join(' ', palavras).TrimEnd(',', ';', '.', ' ', '(');
+        return cortado.Length == 0 ? texto[..maximo].TrimEnd() : cortado;
     }
 }

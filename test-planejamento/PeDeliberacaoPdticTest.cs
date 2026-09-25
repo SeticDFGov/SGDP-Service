@@ -92,8 +92,10 @@ public class PeDeliberacaoPdticTest : PeAprovacaoTestBase
         Assert.Equal(PeDominios.SituacaoPasso.Pendente, envio.Situacao);
         Assert.Equal(deliberacao.Numero, situacao.ProximoPasso);
 
-        // Ajusta e reenvia: outra deliberação, com outro PDF; a devolvida fica no histórico
+        // Ajusta, registra de novo a aprovação do SGTIC (D3: a versão ajustada volta ao comitê
+        // interno) e reenvia: outra deliberação, com outro PDF; a devolvida fica no histórico
         await IncluirNoPdticAsync(pdtic.Id, "ativos", new { nome = "Firewall", tipo = "infraestrutura", situacao = "em_operacao" });
+        await AprovacaoSgticAsync(pdtic.Id, data: HojeIso());
         var reenviado = await EnviarAsync(pdtic.Id);
         Assert.Equal(PeDominios.SituacaoPdtic.EmAprovacao, reenviado.Situacao);
         Assert.Equal("aguardando", reenviado.Deliberacao!.Situacao);

@@ -302,6 +302,10 @@ public class PeTrilhaSecao
     // (as rotas de registros pedem ?cicloId=), ou nulo
     public string? PorCiclo { get; set; }
 
+    // Desde a F1: a seção sai nas planilhas (a do passo, a completa e a consolidada); o front
+    // conta por ela quantas seções o CSV do passo leva (uma: o CSV; mais de uma: o .zip)
+    public bool NaPlanilha { get; set; }
+
     public List<PeTrilhaCampo> Campos { get; set; } = new();
 }
 
@@ -601,6 +605,8 @@ public class PeHistoricoResponse
     public DateTime AlteradoEm { get; set; }
 
     public string AlteradoPor { get; set; } = string.Empty;
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail)
+    public string AlteradoPorNome { get; set; } = string.Empty;
 }
 
 // ── Órgãos: nível e ajustes ──────────────────────────────────────────────────
@@ -636,6 +642,7 @@ public class PeOrgaoNivelResponse
 
 public class PeOrgaoNivelDTO
 {
+    // Desde a F1: nulo devolve o órgão ao nível padrão (com a justificativa)
     public long? NivelId { get; set; }
 
     // Obrigatória
@@ -655,11 +662,16 @@ public class PeOrgaoNivelHistoricoResponse
 
     public string? NivelNovo { get; set; }
 
+    // F1 (A21): o órgão voltou ao nível padrão nesta troca (a escolha saiu)
+    public bool NivelNovoPadrao { get; set; }
+
     public string? Justificativa { get; set; }
 
     public DateTime DefinidoEm { get; set; }
 
     public string DefinidoPor { get; set; } = string.Empty;
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail)
+    public string DefinidoPorNome { get; set; } = string.Empty;
 }
 
 /// <summary>Um ajuste do órgão, como o PUT recebe (Situacao nula remove o ajuste).</summary>
@@ -693,4 +705,6 @@ public class PeOrgaoAjusteResponse
     public DateTime AlteradoEm { get; set; }
 
     public string AlteradoPor { get; set; } = string.Empty;
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail)
+    public string AlteradoPorNome { get; set; } = string.Empty;
 }

@@ -26,7 +26,8 @@ namespace service.Planejamento;
 /// {aprovacao.cgtic.ato} (a deliberação aprovada do CGTIC) e {publicacao.data} e
 /// {publicacao.endereco} (a seção da publicação);</item>
 /// <item>ciclo (E7, rodada B): {ciclo.rotulo}, {ciclo.inicio} e {ciclo.fim}, do ciclo do
-/// relatório de acompanhamento (RA); no PDTIC e no RR, sem valor.</item>
+/// relatório de acompanhamento (RA). Desde a F1 (achado B07), só existem no RA: o modelo do PDTIC
+/// e o do RR não os oferecem, e no texto deles "{ciclo.rotulo}" é texto comum.</item>
 /// </list>
 /// </summary>
 public static partial class PeDocMarcadores
@@ -86,11 +87,12 @@ public static partial class PeDocMarcadores
 
     /// <summary>
     /// A lista para o editor do modelo: os fixos e um por campo de texto do dicionário de nomes
-    /// que ainda não tem marcador fixo (os que o administrador criou).
+    /// que ainda não tem marcador fixo (os que o administrador criou). Os do ciclo só no modelo do
+    /// RA (F1, B07); sem o tipo, todos.
     /// </summary>
-    public static List<Marcador> Lista(IEnumerable<PeCampo> camposDoDicionario)
+    public static List<Marcador> Lista(IEnumerable<PeCampo> camposDoDicionario, string? tipo = null)
     {
-        var lista = Fixos.ToList();
+        var lista = Fixos.Where(m => tipo == null || tipo == PeDominios.TipoDocumento.Ra || !DoCiclo.Contains(m.Chave)).ToList();
         foreach (var campo in camposDoDicionario.Where(c => c.ExcluidoEm == null && EhDeTexto(c)).OrderBy(c => c.Ordem).ThenBy(c => c.Id))
         {
             var chave = "nomes." + campo.Chave;

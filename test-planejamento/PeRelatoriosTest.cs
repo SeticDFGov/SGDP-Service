@@ -66,10 +66,11 @@ public class PeRelatoriosTest : PeAcompanhamentoTestBase
         Assert.True(ra.PodeEditar);
         Assert.Empty(ra.Versoes);
 
-        // Os marcadores do ciclo, na capa
-        var capa = TextoDe(Texto(ra, "capa").TextoResolvido);
-        Assert.Contains("Ciclo 2026 · 1º trimestre", capa);
-        Assert.Contains("de 01/01/2026 a 31/03/2026", capa);
+        // O ciclo na capa: a capa do PDF (e a da prévia) traz a linha do ciclo com o período, e o
+        // texto da capa do modelo não repete (F1, C25)
+        var ciclo = Context.PeCiclos.AsNoTracking().Single(c => c.Id == t1.Id);
+        Assert.Equal("Ciclo 2026 · 1º trimestre (01/01/2026 a 31/03/2026)", PeDocumentoPdf.LinhaDoCiclo(ra, ciclo));
+        Assert.DoesNotContain("Ciclo", TextoDe(Texto(ra, "capa").TextoResolvido));
         Assert.DoesNotContain(Texto(ra, "capa").MarcadoresSemValor, m => m.StartsWith("ciclo."));
 
         // Os capítulos 4, 5 e 8 (da avaliação intermediária) saem em branco, com o aviso
@@ -143,8 +144,9 @@ public class PeRelatoriosTest : PeAcompanhamentoTestBase
 
         Assert.Equal("Avaliação intermediária 1", ra.CicloRotulo);
         Assert.Empty(ra.Capitulos.Where(c => c.Aviso != null));
-        // A avaliação aberta ainda não tem fim
-        Assert.Contains("ciclo.fim", Texto(ra, "capa").MarcadoresSemValor);
+        // A avaliação aberta ainda não tem fim: a capa diz desde quando, sem a palavra "Ciclo" (F1, C25)
+        var doCiclo = Context.PeCiclos.AsNoTracking().Single(c => c.Id == avaliacao.Id);
+        Assert.Equal($"Avaliação intermediária 1 (desde {PeFormato.Data(doCiclo.Inicio)})", PeDocumentoPdf.LinhaDoCiclo(ra, doCiclo));
 
         var metas = Bloco(ra, "avaliacao_metas", PeDominios.TipoBloco.MetasPorResultado);
         Assert.Equal(new[] { "alcancadas", "em_andamento", "nao_alcancadas", "canceladas" }, metas.Grupos!.Select(g => g.Chave));

@@ -123,7 +123,7 @@ public class PePlanilhaService : IPePlanilhaService
         var leiaMe = new List<(string, string)>
         {
             ("Órgão", $"{orgao.Sigla} · {orgao.Nome}"),
-            ("PDTIC", $"Plano Diretor de Tecnologia da Informação e Comunicação, versão {pdtic.Versao} ({PeDominios.SituacaoPdtic.Rotulo(pdtic.Situacao).ToLowerInvariant()})"),
+            ("PDTIC", $"Plano Diretor de Tecnologia da Informação e Comunicação, versão {pdtic.Versao} ({PeDominios.SituacaoPdtic.RotuloMinusculo(pdtic.Situacao)})"),
             ("Nível de maturidade", nivel?.Nome ?? "-"),
             ("Passo", $"{numero} · {passo.Passo.Titulo}")
         };
@@ -152,7 +152,7 @@ public class PePlanilhaService : IPePlanilhaService
         var itens = new List<(string, string)>
         {
             ("Órgão", $"{orgao.Sigla} · {orgao.Nome}"),
-            ("PDTIC", $"Plano Diretor de Tecnologia da Informação e Comunicação, versão {pdtic.Versao} ({PeDominios.SituacaoPdtic.Rotulo(pdtic.Situacao).ToLowerInvariant()})"),
+            ("PDTIC", $"Plano Diretor de Tecnologia da Informação e Comunicação, versão {pdtic.Versao} ({PeDominios.SituacaoPdtic.RotuloMinusculo(pdtic.Situacao)})"),
             ("Nível de maturidade", nivel?.Nome ?? "-"),
             ("Vigência", pdtic.VigenciaInicio != null && pdtic.VigenciaFim != null
                 ? $"{PeFormato.Data(pdtic.VigenciaInicio.Value)} a {PeFormato.Data(pdtic.VigenciaFim.Value)}"

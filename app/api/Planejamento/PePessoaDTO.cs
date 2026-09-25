@@ -51,6 +51,8 @@ public class PePessoaResponse
     public DateTime? ConcedidoEm { get; set; }
 
     public string? ConcedidoPor { get; set; }
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail); nulo com o ConcedidoPor
+    public string? ConcedidoPorNome { get; set; }
 
     // Retrato do último login: perfil admin do SGDP (tem tudo, com ou sem papel)
     public bool EhAdminGeral { get; set; }

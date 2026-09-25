@@ -83,8 +83,9 @@ public class PePessoaService : IPePessoaService
         var usuarios = linhas.Select(l => l.User!).ToList();
         var orgaos = await OrgaosAsync(usuarios);
         var admins = await AdminsGeraisAsync(usuarios.Select(u => u.Id));
+        var nomes = await PeNomes.CarregarAsync(_context, linhas.Select(l => l.ConcedidoPor));
 
-        var itens = linhas.Select(l => Mapear(l.User!, l, orgaos, admins)).ToList();
+        var itens = linhas.Select(l => Mapear(l.User!, l, orgaos, admins, nomes)).ToList();
         return new PagedResponse<PePessoaResponse>(itens, total, page, pageSize);
     }
 
@@ -150,7 +151,8 @@ public class PePessoaService : IPePessoaService
         var papel = await _context.PePapeisUsuario.AsNoTracking().FirstOrDefaultAsync(p => p.UserId == userId);
         var orgaos = await OrgaosAsync(new[] { user });
         var admins = await AdminsGeraisAsync(new[] { userId });
-        return Mapear(user, papel, orgaos, admins);
+        var nomes = await PeNomes.CarregarAsync(_context, new[] { papel?.ConcedidoPor });
+        return Mapear(user, papel, orgaos, admins, nomes);
     }
 
     private Task<Dictionary<Guid, PeOrgaoResumo>> OrgaosAsync(IEnumerable<User> usuarios) =>
@@ -174,7 +176,7 @@ public class PePessoaService : IPePessoaService
     }
 
     private static PePessoaResponse Mapear(User user, PePapelUsuario? papel,
-        IReadOnlyDictionary<Guid, PeOrgaoResumo> orgaos, IReadOnlySet<Guid> admins)
+        IReadOnlyDictionary<Guid, PeOrgaoResumo> orgaos, IReadOnlySet<Guid> admins, PeNomes nomes)
     {
         PeOrgaoResumo? orgao = null;
         if (user.Unidade != null) orgaos.TryGetValue(user.Unidade.id, out orgao);
@@ -191,6 +193,7 @@ public class PePessoaService : IPePessoaService
             Papel = papel?.Papel,
             ConcedidoEm = papel?.ConcedidoEm,
             ConcedidoPor = papel?.ConcedidoPor,
+            ConcedidoPorNome = nomes.De(papel?.ConcedidoPor),
             EhAdminGeral = admins.Contains(user.Id)
         };
     }

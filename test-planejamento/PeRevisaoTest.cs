@@ -202,10 +202,10 @@ public class PeRevisaoTest : PeAprovacaoTestBase
 
         // A decisão é a da avaliação intermediária (E7, rodada B: a seção é por ciclo de avaliação)
         var avaliacao = await Acompanhamento.CriarCicloAsync(pdtic.Id, new PeCicloCriarDTO { Tipo = "avaliacao" }, await Orgao());
-        var registro = await IncluirNoPdticAsync(pdtic.Id, "avaliacao_comite", new { decisao = "seguir", data = "2027-06-30" }, cicloId: avaliacao.Id);
+        var registro = await IncluirNoPdticAsync(pdtic.Id, "avaliacao_comite", new { decisao = "seguir", data = "2026-06-30" }, cicloId: avaliacao.Id);
         Assert.Equal(Codigo(ErrorCode.PeRevisaoRecusada), await ErroAsync(() => RevisarAsync(pdtic.Id)));
         await Registros.AtualizarAsync(PeDono.DoPdtic(pdtic.Id), "avaliacao_comite", registro.Id,
-            Salvar(new { decisao = "revisar", data = "2027-06-30" }), await Orgao(), avaliacao.Id);
+            Salvar(new { decisao = "revisar", data = "2026-06-30" }), await Orgao(), avaliacao.Id);
 
         // Com a decisão do comitê, a justificativa é opcional
         var nova = await RevisarAsync(pdtic.Id, null);

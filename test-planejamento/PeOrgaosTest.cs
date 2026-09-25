@@ -42,8 +42,9 @@ public class PeOrgaosTest : PeModeloTestBase
             new PeOrgaoNivelDTO { NivelId = NivelId("avancado"), Justificativa = "  " }, EmailAdmin)));
         Assert.Equal(Codigo(ErrorCode.PeDadosInvalidos), await ErroAsync(() => Orgaos.DefinirNivelAsync(OrgaoSes.Id,
             new PeOrgaoNivelDTO { NivelId = 999_999, Justificativa = "Teste" }, EmailAdmin)));
-        Assert.Equal(Codigo(ErrorCode.PeDadosInvalidos), await ErroAsync(() => Orgaos.DefinirNivelAsync(OrgaoSes.Id,
-            new PeOrgaoNivelDTO { Justificativa = "Teste" }, EmailAdmin)));
+        // Sem nível, o órgão volta ao padrão (F1, A21): também pede a justificativa
+        Assert.Equal(Codigo(ErrorCode.PeJustificativaObrigatoria), await ErroAsync(() => Orgaos.DefinirNivelAsync(OrgaoSes.Id,
+            new PeOrgaoNivelDTO { Justificativa = "  " }, EmailAdmin)));
         Assert.Equal(Codigo(ErrorCode.PeOrgaoNaoEncontrado), await ErroAsync(() => Orgaos.DefinirNivelAsync(999_999,
             new PeOrgaoNivelDTO { NivelId = NivelId("avancado"), Justificativa = "Teste" }, EmailAdmin)));
 

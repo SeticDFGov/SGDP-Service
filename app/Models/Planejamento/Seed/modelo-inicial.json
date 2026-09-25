@@ -1,5 +1,5 @@
 {
-  "versao": 6,
+  "versao": 7,
   "niveis": [
     {
       "codigo": "basico",
@@ -142,7 +142,10 @@
                   "rotulo": "Sigla do órgão",
                   "tipo": "texto_curto",
                   "niveis": "opcional",
-                  "ajuda": "Deixe em branco para usar a sigla do cadastro."
+                  "largura": "estreita",
+                  "config": {"max": 20},
+                  "ajuda": "Deixe em branco para usar a sigla do cadastro.",
+                  "antes": {"config": [{}], "largura": [null]}
                 },
                 {
                   "chave": "logotipo",
@@ -204,8 +207,8 @@
                   ]
                 },
                 {"chave": "ato_numero", "rotulo": "Número do ato", "tipo": "texto_curto"},
-                {"chave": "ato_data", "rotulo": "Data do ato", "tipo": "data"},
-                {"chave": "sei", "rotulo": "Processo SEI", "tipo": "texto_curto", "niveis": "opcional", "config": {"max": 30}},
+                {"chave": "ato_data", "rotulo": "Data do ato", "tipo": "data", "config": {"naoFutura": true}},
+                {"chave": "sei", "rotulo": "Processo SEI", "tipo": "texto_curto", "niveis": "opcional", "config": {"max": 30, "formato": "sei"}},
                 {
                   "chave": "ato_arquivo",
                   "rotulo": "Cópia do ato",
@@ -339,8 +342,8 @@
                     {"valor": "outro", "rotulo": "Outro"}
                   ]
                 },
-                {"chave": "ato_data", "rotulo": "Data do ato", "tipo": "data", "niveis": "obrigatorio"},
-                {"chave": "sei", "rotulo": "Processo SEI", "tipo": "texto_curto", "niveis": "opcional", "config": {"max": 30}},
+                {"chave": "ato_data", "rotulo": "Data do ato", "tipo": "data", "niveis": "obrigatorio", "config": {"naoFutura": true}},
+                {"chave": "sei", "rotulo": "Processo SEI", "tipo": "texto_curto", "niveis": "opcional", "config": {"max": 30, "formato": "sei"}},
                 {
                   "chave": "ato_arquivo",
                   "rotulo": "Cópia do ato",
@@ -464,7 +467,7 @@
                   "tipo": "texto_curto",
                   "niveis": "opcional",
                   "largura": "media",
-                  "config": {"max": 500}
+                  "config": {"max": 500, "formato": "url"}
                 }
               ]
             }
@@ -705,14 +708,15 @@
                     {"valor": "devolvido", "rotulo": "Devolvido para ajustes", "cor": "amarelo"}
                   ]
                 },
-                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita"},
+                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita", "config": {"naoFutura": true}},
                 {
                   "chave": "instancia",
                   "rotulo": "Quem decidiu",
                   "tipo": "lista",
                   "niveis": "opcional",
                   "largura": "media",
-                  "ajuda": "Em geral, o SGTIC. Mude quando outra instância decidiu.",
+                  "ajuda": "Em geral, quem aprova o plano de trabalho é o comitê interno de TIC (SGTIC). Mude quando outra instância decidiu.",
+                  "antes": {"ajuda": ["Em geral, o SGTIC. Mude quando outra instância decidiu."]},
                   "opcoes": [
                     {"valor": "sgtic", "rotulo": "SGTIC (comitê interno de TIC)"},
                     {"valor": "autoridade_maxima", "rotulo": "Autoridade máxima do órgão"},
@@ -746,7 +750,7 @@
                   "tipo": "texto_curto",
                   "niveis": "opcional",
                   "largura": "media",
-                  "config": {"max": 30}
+                  "config": {"max": 30, "formato": "sei"}
                 },
                 {
                   "chave": "documento",
@@ -1564,14 +1568,15 @@
                     {"valor": "devolvido", "rotulo": "Devolvido para ajustes", "cor": "amarelo"}
                   ]
                 },
-                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita"},
+                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita", "config": {"naoFutura": true}},
                 {
                   "chave": "instancia",
                   "rotulo": "Quem decidiu",
                   "tipo": "lista",
                   "niveis": "opcional",
                   "largura": "media",
-                  "ajuda": "Em geral, o SGTIC. Mude quando outra instância decidiu.",
+                  "ajuda": "Em geral, quem aprova o inventário de necessidades é o comitê interno de TIC (SGTIC). Mude quando outra instância decidiu.",
+                  "antes": {"ajuda": ["Em geral, o SGTIC. Mude quando outra instância decidiu."]},
                   "opcoes": [
                     {"valor": "sgtic", "rotulo": "SGTIC (comitê interno de TIC)"},
                     {"valor": "autoridade_maxima", "rotulo": "Autoridade máxima do órgão"},
@@ -1605,7 +1610,7 @@
                   "tipo": "texto_curto",
                   "niveis": "opcional",
                   "largura": "media",
-                  "config": {"max": 30}
+                  "config": {"max": 30, "formato": "sei"}
                 },
                 {
                   "chave": "documento",
@@ -2404,7 +2409,7 @@
                     {"valor": "devolvido", "rotulo": "Devolvido para ajustes", "cor": "amarelo"}
                   ]
                 },
-                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita"},
+                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita", "config": {"naoFutura": true}},
                 {
                   "chave": "instancia",
                   "rotulo": "Quem decidiu",
@@ -2445,7 +2450,7 @@
                   "tipo": "texto_curto",
                   "niveis": "opcional",
                   "largura": "media",
-                  "config": {"max": 30}
+                  "config": {"max": 30, "formato": "sei"}
                 },
                 {
                   "chave": "documento",
@@ -2494,12 +2499,12 @@
               "niveis": "obrigatorio",
               "ajuda": "A íntegra do PDTIC vai para o sítio do órgão, e o resumo, para o Diário Oficial do Distrito Federal (DODF).",
               "campos": [
-                {"chave": "data", "rotulo": "Data da publicação", "tipo": "data", "principal": true},
+                {"chave": "data", "rotulo": "Data da publicação", "tipo": "data", "principal": true, "config": {"naoFutura": true}},
                 {
                   "chave": "endereco",
                   "rotulo": "Endereço da íntegra na internet",
                   "tipo": "texto_curto",
-                  "config": {"max": 500}
+                  "config": {"max": 500, "formato": "url"}
                 },
                 {
                   "chave": "dodf",
@@ -2572,9 +2577,10 @@
                   "chave": "ato_data",
                   "rotulo": "Data do ato",
                   "tipo": "data",
-                  "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"}
+                  "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "config": {"naoFutura": true}
                 },
-                {"chave": "sei", "rotulo": "Processo SEI", "tipo": "texto_curto", "niveis": "opcional", "config": {"max": 30}}
+                {"chave": "sei", "rotulo": "Processo SEI", "tipo": "texto_curto", "niveis": "opcional", "config": {"max": 30, "formato": "sei"}}
               ]
             }
           ]
@@ -2802,14 +2808,15 @@
                     {"valor": "devolvido", "rotulo": "Devolvido para ajustes", "cor": "amarelo"}
                   ]
                 },
-                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita"},
+                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita", "config": {"naoFutura": true}},
                 {
                   "chave": "instancia",
                   "rotulo": "Quem decidiu",
                   "tipo": "lista",
                   "niveis": "opcional",
                   "largura": "media",
-                  "ajuda": "Em geral, o SGTIC. Mude quando outra instância decidiu.",
+                  "ajuda": "Em geral, quem aprova o plano de acompanhamento é o comitê interno de TIC (SGTIC). Mude quando outra instância decidiu.",
+                  "antes": {"ajuda": ["Em geral, o SGTIC. Mude quando outra instância decidiu."]},
                   "opcoes": [
                     {"valor": "sgtic", "rotulo": "SGTIC (comitê interno de TIC)"},
                     {"valor": "autoridade_maxima", "rotulo": "Autoridade máxima do órgão"},
@@ -2843,7 +2850,7 @@
                   "tipo": "texto_curto",
                   "niveis": "opcional",
                   "largura": "media",
-                  "config": {"max": 30}
+                  "config": {"max": 30, "formato": "sei"}
                 },
                 {
                   "chave": "documento",
@@ -2876,12 +2883,16 @@
       "passos": [
         {
           "chave": "monitoramento.ciclo-monitoramento",
-          "titulo": "Atualize a situação das ações e registre as medições e os riscos que ocorreram",
+          "titulo": "Atualize a situação das ações no ciclo",
           "tipo": "monitoramento",
           "referenciaGuia": "5.1",
           "aceitaNaoSeAplica": false,
           "niveis": "obrigatorio",
-          "oQueFazer": "A cada ciclo, atualize a situação e a execução de cada ação, registre o valor dos indicadores e os riscos que ocorreram.",
+          "oQueFazer": "A cada ciclo, atualize a situação de cada ação. Conforme o nível do órgão, o passo pede também a execução, o valor dos indicadores e os riscos que ocorreram.",
+          "antes": {
+            "titulo": ["Atualize a situação das ações e registre as medições e os riscos que ocorreram"],
+            "oQueFazer": ["A cada ciclo, atualize a situação e a execução de cada ação, registre o valor dos indicadores e os riscos que ocorreram."]
+          },
           "secoes": [
             {
               "chave": "monitoramento_acoes",
@@ -3180,7 +3191,7 @@
                     {"valor": "revisar", "rotulo": "Revisar o PDTIC", "cor": "amarelo"}
                   ]
                 },
-                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita"},
+                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita", "config": {"naoFutura": true}},
                 {
                   "chave": "ato_tipo",
                   "rotulo": "Tipo do ato",
@@ -3208,7 +3219,7 @@
                   "tipo": "texto_curto",
                   "niveis": "opcional",
                   "largura": "media",
-                  "config": {"max": 30}
+                  "config": {"max": 30, "formato": "sei"}
                 },
                 {
                   "chave": "documento",
@@ -3399,14 +3410,15 @@
                     {"valor": "devolvido", "rotulo": "Devolvido para ajustes", "cor": "amarelo"}
                   ]
                 },
-                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita"},
+                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita", "config": {"naoFutura": true}},
                 {
                   "chave": "instancia",
                   "rotulo": "Quem decidiu",
                   "tipo": "lista",
                   "niveis": "opcional",
                   "largura": "media",
-                  "ajuda": "Em geral, o SGTIC. Mude quando outra instância decidiu.",
+                  "ajuda": "Em geral, quem aprova o relatório de resultados preliminar é o comitê interno de TIC (SGTIC). Mude quando outra instância decidiu.",
+                  "antes": {"ajuda": ["Em geral, o SGTIC. Mude quando outra instância decidiu."]},
                   "opcoes": [
                     {"valor": "sgtic", "rotulo": "SGTIC (comitê interno de TIC)"},
                     {"valor": "autoridade_maxima", "rotulo": "Autoridade máxima do órgão"},
@@ -3440,7 +3452,7 @@
                   "tipo": "texto_curto",
                   "niveis": "opcional",
                   "largura": "media",
-                  "config": {"max": 30}
+                  "config": {"max": 30, "formato": "sei"}
                 },
                 {
                   "chave": "documento",
@@ -3490,14 +3502,15 @@
                     {"valor": "devolvido", "rotulo": "Devolvido para ajustes", "cor": "amarelo"}
                   ]
                 },
-                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita"},
+                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita", "config": {"naoFutura": true}},
                 {
                   "chave": "instancia",
                   "rotulo": "Quem decidiu",
                   "tipo": "lista",
                   "niveis": "opcional",
                   "largura": "media",
-                  "ajuda": "Em geral, o SGTIC. Mude quando outra instância decidiu.",
+                  "ajuda": "Em geral, quem aprova o relatório de resultados final é a autoridade máxima do órgão. Mude quando outra instância decidiu.",
+                  "antes": {"ajuda": ["Em geral, o SGTIC. Mude quando outra instância decidiu."]},
                   "opcoes": [
                     {"valor": "sgtic", "rotulo": "SGTIC (comitê interno de TIC)"},
                     {"valor": "autoridade_maxima", "rotulo": "Autoridade máxima do órgão"},
@@ -3531,7 +3544,7 @@
                   "tipo": "texto_curto",
                   "niveis": "opcional",
                   "largura": "media",
-                  "config": {"max": 30}
+                  "config": {"max": 30, "formato": "sei"}
                 },
                 {
                   "chave": "documento",

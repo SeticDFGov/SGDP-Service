@@ -113,6 +113,8 @@ public class PeDocBlocoResponse
     public DateTime? EditadoEm { get; set; }
 
     public string? EditadoPor { get; set; }
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail); nulo com o EditadoPor
+    public string? EditadoPorNome { get; set; }
 
     // Chaves dos marcadores do texto sem valor para o órgão ("nomes.comite")
     public List<string> MarcadoresSemValor { get; set; } = new();
@@ -248,6 +250,8 @@ public class PeDocVersaoResponse
     public DateTime GeradoEm { get; set; }
 
     public string GeradoPor { get; set; } = string.Empty;
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail)
+    public string GeradoPorNome { get; set; } = string.Empty;
 
     // Bytes do PDF
     public long Tamanho { get; set; }

@@ -14,8 +14,11 @@ namespace service.Planejamento;
 /// O PDF do documento do PDTIC (QuestPDF, licença Community como os outros PDFs do projeto),
 /// a partir da estrutura resolvida (<see cref="PeDocumentoResponse"/>). Layout limpo e sóbrio:
 /// <list type="bullet">
-/// <item>capa com a identificação do Governo do Distrito Federal, o nome do órgão, o logotipo
-/// (quando houver), o título e o texto da capa (vigência e versão, editáveis pelo órgão);</item>
+/// <item>capa como a da prévia (F1, achados C25 e B09): a faixa escura com a marca monocromática
+/// do GDF, "GOVERNO DO DISTRITO FEDERAL" e o nome do órgão; no meio, o logotipo do órgão (quando
+/// houver), o título, a sigla do documento com a do órgão ("PDTIC · SES", "RA · SES", "RR · SES"),
+/// no RA o ciclo com o período ("Ciclo" só no de monitoramento) e o texto da capa (vigência e
+/// versão, editáveis pelo órgão); no pé, "Brasília, ano";</item>
 /// <item>folha de rosto, histórico de versões e sumário, cada um na sua página; o sumário com
 /// os números de página e os links para os capítulos;</item>
 /// <item>capítulos com o número pela posição (6, 6.1); texto rico pelo conversor único
@@ -24,8 +27,11 @@ namespace service.Planejamento;
 /// valor; ações do tema; matriz SWOT em quatro quadrantes; fluxo em SVG (a partir da E6); os
 /// blocos do acompanhamento em grupos de tabelas e o aviso do capítulo em branco (E7, rodada B,
 /// nos relatórios RA e RR, que usam o mesmo PDF);</item>
-/// <item>bloco com página deitada abre páginas A4 deitadas só para ele; a quebra de página
-/// começa uma página nova; os anexos começam numa página nova;</item>
+/// <item>bloco com página deitada abre páginas A4 deitadas só para ele (desde a F1, só quando
+/// tem dado: a tabela vazia fica na página em pé, junto do capítulo, achado C26); a quebra de
+/// página começa uma página nova; os anexos começam numa página nova;</item>
+/// <item>colunas de data, código, número e valor com a largura mínima do texto delas (sem quebrar
+/// no meio, achado C06), e as outras pelo peso do texto;</item>
 /// <item>rodapé com o órgão, a versão e "Página N de M" (menos na capa).</item>
 /// </list>
 /// O roteiro (<see cref="Montar"/>) diz o que vai em cada grupo de páginas e o que entra no
@@ -47,6 +53,35 @@ public static partial class PeDocumentoPdf
 
     private const float LarguraDoCodigo = 44f;
     private const string Governo = "GOVERNO DO DISTRITO FEDERAL";
+
+    // Largura útil da página (pontos), pelas margens de cada orientação
+    public const float LarguraUtilEmPe = 595.28f - (2.5f + 2f) * PontosPorCentimetro;
+    public const float LarguraUtilDeitada = 841.89f - 2 * 1.8f * PontosPorCentimetro;
+    private const float PontosPorCentimetro = 28.3465f;
+
+    // Espaço interno e borda de uma célula (4 de cada lado e a borda de 0,5)
+    private const float SobraDaCelula = 9f;
+
+    // Texto sem espaço até este tamanho é um "átomo" (data, código, número, valor): não quebra
+    private const int MaximoDoAtomo = 24;
+
+    // A largura mínima não passa disto (o cabeçalho longo pode quebrar na palavra)
+    private const float MaximoDaLarguraMinima = 96f;
+
+    // A marca monocromática do GDF (a mesma da prévia no front), embutida na aplicação
+    private const string RecursoDaMarca = "Planejamento.marca-gdf.png";
+    private static readonly Lazy<byte[]?> Marca = new(() =>
+    {
+        using var stream = typeof(PeDocumentoPdf).Assembly.GetManifestResourceStream(RecursoDaMarca);
+        if (stream == null) return null;
+        using var memoria = new MemoryStream();
+        stream.CopyTo(memoria);
+        return memoria.ToArray();
+    });
+
+    // A faixa da capa: o fundo escuro e o texto claro (os tons da prévia)
+    private static readonly Color FundoDaFaixa = Color.FromHex("#0F172A");
+    private static readonly Color TextoDaFaixa = Color.FromHex("#CBD5E1");
 
     private static readonly Color Branco = Color.FromHex("#FFFFFF");
     private static readonly Color FundoRotulo = Color.FromHex("#F3F5F8");
@@ -77,6 +112,9 @@ public static partial class PeDocumentoPdf
 
         // Horário de Brasília
         public DateTime GeradoEm { get; init; }
+
+        // O ciclo do RA (a capa mostra o ciclo e o período); nulo no PDTIC e no RR
+        public PeCiclo? Ciclo { get; init; }
     }
 
     public sealed record LinhaHistorico(string Data, string Versao, string Descricao, string Autor);
@@ -205,7 +243,22 @@ public static partial class PeDocumentoPdf
     private static Peca PecaDoBloco(PeDocCapituloResponse capitulo, PeDocBlocoResponse bloco) =>
         bloco.Tipo == PeDominios.TipoBloco.QuebraPagina
             ? new Peca(TipoPeca.Quebra, false)
-            : new Peca(TipoPeca.Bloco, bloco.PaginaDeitada, capitulo, bloco);
+            : new Peca(TipoPeca.Bloco, Deitado(bloco), capitulo, bloco);
+
+    /// <summary>
+    /// O bloco vai para a página deitada: marcado para ela e com dado. A tabela (ou os grupos do
+    /// acompanhamento) sem nenhuma linha fica em pé, junto do capítulo, em vez de ocupar uma página
+    /// deitada inteira só com "Nenhum item" (F1, achado C26).
+    /// </summary>
+    public static bool Deitado(PeDocBlocoResponse bloco) => bloco.PaginaDeitada && !SemDados(bloco);
+
+    private static bool SemDados(PeDocBlocoResponse bloco) =>
+        bloco.Tipo switch
+        {
+            PeDominios.TipoBloco.TabelaSecao => bloco.Tabela == null || bloco.Tabela.Vazia || bloco.Tabela.Linhas.Count == 0,
+            _ when bloco.Grupos != null => bloco.Grupos.All(g => g.Tabela.Vazia || g.Tabela.Linhas.Count == 0),
+            _ => false
+        };
 
     /// <summary>
     /// A orientação de cada bloco do capítulo: a do próprio bloco; o texto que vem antes de um
@@ -214,7 +267,7 @@ public static partial class PeDocumentoPdf
     /// </summary>
     private static List<bool> Orientacoes(IReadOnlyList<PeDocBlocoResponse> blocos)
     {
-        var saida = blocos.Select(b => b.PaginaDeitada).ToList();
+        var saida = blocos.Select(Deitado).ToList();
         bool? seguinte = null;
         for (var i = blocos.Count - 1; i >= 0; i--)
         {
@@ -226,10 +279,10 @@ public static partial class PeDocumentoPdf
             }
             if (bloco.Tipo == PeDominios.TipoBloco.Texto)
             {
-                if (!bloco.PaginaDeitada && seguinte == true) saida[i] = true;
+                if (!saida[i] && seguinte == true) saida[i] = true;
                 continue;
             }
-            if (Aparece(bloco)) seguinte = bloco.PaginaDeitada;
+            if (Aparece(bloco)) seguinte = saida[i];
         }
         return saida;
     }
@@ -344,7 +397,7 @@ public static partial class PeDocumentoPdf
             }
         }).WithMetadata(new DocumentMetadata
         {
-            Title = $"PDTIC {entrada.Documento.OrgaoSigla} · {entrada.Documento.Titulo}",
+            Title = $"{SiglaDoDocumento(entrada.Documento.DocTipo)} {entrada.Documento.OrgaoSigla} · {entrada.Documento.Titulo}",
             Author = entrada.Documento.OrgaoNome,
             Subject = $"{entrada.Documento.Titulo}, versão {entrada.Documento.Versao}",
             Creator = "SGDP · Governança Estratégica",
@@ -490,7 +543,7 @@ public static partial class PeDocumentoPdf
                 Sumario(col.Item(), ctx.Roteiro.Sumario);
                 break;
             case TipoPeca.Bloco:
-                Bloco(col.Item(), peca.Bloco!, ctx);
+                Bloco(col.Item(), peca.Bloco!, ctx, peca.Deitada);
                 break;
             case TipoPeca.Aviso:
                 col.Item().Text(peca.Capitulo!.Aviso!).FontSize(9.5f).Italic().FontColor(PeTextoRicoPdf.CorSuave);
@@ -514,27 +567,43 @@ public static partial class PeDocumentoPdf
         });
     }
 
+    /// <summary>
+    /// A capa, na ordem da prévia (F1, C25 e B09): a faixa escura com a marca do GDF, o governo e o
+    /// órgão; no meio, o logotipo do órgão, o título, "PDTIC · SES" (ou "RA · SES", "RR · SES"),
+    /// no RA o ciclo com o período e o texto da capa.
+    /// </summary>
     private static void Capa(IContainer container, Contexto ctx, PeDocCapituloResponse capitulo)
     {
         var documento = ctx.Entrada.Documento;
         container.Column(col =>
         {
-            col.Item().AlignCenter().Column(topo =>
+            col.Item().Background(FundoDaFaixa).PaddingVertical(14).PaddingHorizontal(18).Row(faixa =>
             {
-                if (ctx.Logotipo is PeImagemPdf logo)
+                if (Marca.Value is byte[] marca)
                 {
-                    var largura = Math.Min(180f, 80f * logo.Largura / Math.Max(1, logo.Altura));
-                    topo.Item().AlignCenter().MaxWidth(largura).Image(logo.Imagem).FitWidth();
-                    topo.Item().Height(14);
+                    faixa.ConstantItem(92).Height(55).AlignMiddle().Image(marca).FitArea();
+                    faixa.ConstantItem(16);
                 }
-                topo.Item().AlignCenter().Text(Governo).FontSize(11).SemiBold().LetterSpacing(0.08f).FontColor(PeTextoRicoPdf.CorTitulo);
-                topo.Item().PaddingTop(4).AlignCenter().Text(documento.OrgaoNome).FontSize(13).FontColor(PeTextoRicoPdf.CorTexto);
+                faixa.RelativeItem().AlignMiddle().Column(textos =>
+                {
+                    textos.Item().Text(Governo).FontSize(10.5f).SemiBold().LetterSpacing(0.06f).FontColor(Branco);
+                    textos.Item().PaddingTop(2).Text(documento.OrgaoNome).FontSize(10.5f).FontColor(TextoDaFaixa);
+                });
             });
 
             col.Item().ExtendVertical().AlignMiddle().Column(meio =>
             {
+                if (ctx.Logotipo is PeImagemPdf logo)
+                {
+                    var largura = Math.Min(180f, 80f * logo.Largura / Math.Max(1, logo.Altura));
+                    meio.Item().AlignCenter().MaxWidth(largura).Image(logo.Imagem).FitWidth();
+                    meio.Item().Height(18);
+                }
                 meio.Item().AlignCenter().Text(documento.Titulo).FontSize(26).Bold().FontColor(PeTextoRicoPdf.CorTitulo).AlignCenter();
-                meio.Item().PaddingTop(8).AlignCenter().Text($"PDTIC {documento.OrgaoSigla}").FontSize(15).FontColor(PeTextoRicoPdf.CorSuave);
+                meio.Item().PaddingTop(8).AlignCenter().Text($"{SiglaDoDocumento(documento.DocTipo)} · {documento.OrgaoSigla}")
+                    .FontSize(15).SemiBold().FontColor(PeTextoRicoPdf.CorSuave);
+                if (LinhaDoCiclo(documento, ctx.Entrada.Ciclo) is string ciclo)
+                    meio.Item().PaddingTop(6).AlignCenter().Text(ciclo).FontSize(13).SemiBold().FontColor(PeTextoRicoPdf.CorTexto).AlignCenter();
                 meio.Item().PaddingTop(12).AlignCenter().Width(90).LineHorizontal(1.5f).LineColor(PeTextoRicoPdf.CorTitulo);
                 foreach (var bloco in capitulo.Blocos.OrderBy(b => b.Ordem).Where(b => b.Tipo == PeDominios.TipoBloco.Texto))
                 {
@@ -544,6 +613,32 @@ public static partial class PeDocumentoPdf
                 }
             });
         });
+    }
+
+    /// <summary>A sigla do documento na capa: PDTIC, RA (relatório de acompanhamento) ou RR (relatório de resultados).</summary>
+    public static string SiglaDoDocumento(string? tipo) => tipo switch
+    {
+        PeDominios.TipoDocumento.Ra => "RA",
+        PeDominios.TipoDocumento.Rr => "RR",
+        _ => "PDTIC"
+    };
+
+    /// <summary>
+    /// A linha do ciclo na capa do RA: "Ciclo 2027 · 1º trimestre (01/01/2027 a 31/03/2027)" no
+    /// ciclo de monitoramento; na avaliação intermediária, o nome dela ("Avaliação da frente C
+    /// (01/09/2026 a 25/09/2026)", ou "desde" enquanto aberta), sem a palavra "Ciclo". Nula fora do RA.
+    /// </summary>
+    public static string? LinhaDoCiclo(PeDocumentoResponse documento, PeCiclo? ciclo)
+    {
+        if (documento.DocTipo != PeDominios.TipoDocumento.Ra) return null;
+        var rotulo = ciclo?.Rotulo ?? documento.CicloRotulo;
+        if (string.IsNullOrWhiteSpace(rotulo)) return null;
+        var nome = ciclo?.Tipo == PeDominios.TipoCiclo.Avaliacao ? rotulo.Trim() : $"Ciclo {rotulo.Trim()}";
+        if (ciclo == null) return nome;
+        var periodo = ciclo.Fim is DateOnly fim
+            ? $"{PeFormato.Data(ciclo.Inicio)} a {PeFormato.Data(fim)}"
+            : $"desde {PeFormato.Data(ciclo.Inicio)}";
+        return $"{nome} ({periodo})";
     }
 
     private static void Sumario(IContainer container, IReadOnlyList<ItemSumario> itens)
@@ -602,8 +697,9 @@ public static partial class PeDocumentoPdf
 
     // ── Blocos ──────────────────────────────────────────────────────────────
 
-    private static void Bloco(IContainer container, PeDocBlocoResponse bloco, Contexto ctx)
+    private static void Bloco(IContainer container, PeDocBlocoResponse bloco, Contexto ctx, bool deitada)
     {
+        var largura = deitada ? LarguraUtilDeitada : LarguraUtilEmPe;
         switch (bloco.Tipo)
         {
             case PeDominios.TipoBloco.Texto:
@@ -613,7 +709,7 @@ public static partial class PeDocumentoPdf
                 break;
             }
             case PeDominios.TipoBloco.TabelaSecao when bloco.Tabela != null:
-                TabelaDeDados(container, bloco.Tabela, ctx);
+                TabelaDeDados(container, bloco.Tabela, ctx, largura);
                 break;
             case PeDominios.TipoBloco.ListaTema when bloco.Lista != null:
                 ListaDoTema(container, bloco.Lista);
@@ -625,7 +721,7 @@ public static partial class PeDocumentoPdf
                 Fluxo(container, bloco);
                 break;
             case var tipo when bloco.Grupos != null && PeDominios.TipoBloco.DoAcompanhamento.Contains(tipo):
-                GruposDoAcompanhamento(container, bloco.Grupos, ctx);
+                GruposDoAcompanhamento(container, bloco.Grupos, ctx, largura);
                 break;
         }
     }
@@ -634,13 +730,13 @@ public static partial class PeDocumentoPdf
     /// Os blocos do acompanhamento (E7, rodada B): cada grupo com o título, a frase que o explica
     /// (quando há) e a tabela; o grupo sem linha diz que não há nenhum item.
     /// </summary>
-    private static void GruposDoAcompanhamento(IContainer container, IReadOnlyList<PeDocGrupoResponse> grupos, Contexto ctx)
+    private static void GruposDoAcompanhamento(IContainer container, IReadOnlyList<PeDocGrupoResponse> grupos, Contexto ctx, float largura)
     {
         container.Column(col =>
         {
             col.Spacing(10);
             foreach (var grupo in grupos)
-                col.Item().Element(c => TabelaDeDados(c, grupo.Tabela, ctx, grupo.Titulo, grupo.Texto, "Nenhum item neste grupo."));
+                col.Item().Element(c => TabelaDeDados(c, grupo.Tabela, ctx, largura, grupo.Titulo, grupo.Texto, "Nenhum item neste grupo."));
         });
     }
 
@@ -662,7 +758,7 @@ public static partial class PeDocumentoPdf
     private static void Vazio(ColumnDescriptor col, string texto) =>
         col.Item().Text(texto).FontSize(9).Italic().FontColor(PeTextoRicoPdf.CorSuave);
 
-    private static void TabelaDeDados(IContainer container, PeDocTabelaResponse tabela, Contexto ctx, string? legenda = null,
+    private static void TabelaDeDados(IContainer container, PeDocTabelaResponse tabela, Contexto ctx, float largura, string? legenda = null,
         string? explicacao = null, string vazia = "Nenhum item registrado.")
     {
         container.Column(col =>
@@ -683,14 +779,17 @@ public static partial class PeDocumentoPdf
             }
 
             var comCodigo = tabela.Linhas.Any(l => l.Codigo != null);
-            var pesos = tabela.Colunas.Select(c => Peso(tabela, c)).ToList();
+            var larguraDoCodigo = comCodigo ? LarguraDaColunaDoCodigo(tabela) : 0f;
+            var larguras = Larguras(tabela, largura - larguraDoCodigo);
             var total = (uint)(tabela.Colunas.Count + (comCodigo ? 1 : 0));
             col.Item().Table(t =>
             {
                 t.ColumnsDefinition(c =>
                 {
-                    if (comCodigo) c.ConstantColumn(LarguraDoCodigo);
-                    foreach (var peso in pesos) c.RelativeColumn(peso);
+                    if (comCodigo) c.ConstantColumn(larguraDoCodigo);
+                    foreach (var coluna in larguras)
+                        if (coluna.Constante) c.ConstantColumn(coluna.Valor);
+                        else c.RelativeColumn(coluna.Valor);
                 });
                 t.Header(h =>
                 {
@@ -702,11 +801,11 @@ public static partial class PeDocumentoPdf
                     // A linha não se divide entre páginas (a não ser que não caiba numa página inteira)
                     LinhaInteira(t, total, row =>
                     {
-                        if (comCodigo) Celula(row.ConstantItem(LarguraDoCodigo), linha.Codigo ?? "-");
+                        if (comCodigo) Celula(row.ConstantItem(larguraDoCodigo), linha.Codigo ?? "-");
                         for (var i = 0; i < tabela.Colunas.Count; i++)
                         {
                             var coluna = tabela.Colunas[i];
-                            var item = row.RelativeItem(pesos[i]);
+                            var item = larguras[i].Constante ? row.ConstantItem(larguras[i].Valor) : row.RelativeItem(larguras[i].Valor);
                             if (linha.Ricos != null && linha.Ricos.TryGetValue(coluna.Chave, out var rico))
                             {
                                 var no = JsonNode.Parse(rico.GetRawText());
@@ -786,6 +885,75 @@ public static partial class PeDocumentoPdf
         }
         FecharSimples();
         if (!desenhou) Vazio(col, "Não preenchido.");
+    }
+
+    /// <summary>A largura de uma coluna da tabela: fixa (pontos) ou relativa (o peso).</summary>
+    public sealed record LarguraDaColuna(bool Constante, float Valor);
+
+    /// <summary>
+    /// As larguras das colunas de dados (F1, achado C06): a coluna de "átomos" (toda célula
+    /// preenchida é um texto sem espaço de até 24 caracteres: data, código, número, percentual,
+    /// valor em reais) tem uma largura mínima em que o maior deles cabe inteiro (e a maior palavra
+    /// do cabeçalho, até um teto); quando o peso daria menos que isso, a coluna fica fixa nessa
+    /// largura e as outras dividem o resto pelo peso. Se as mínimas somadas passam de 70% da
+    /// largura útil (tabela com colunas demais), vale só o peso, como antes.
+    /// </summary>
+    public static List<LarguraDaColuna> Larguras(PeDocTabelaResponse tabela, float larguraUtil)
+    {
+        var pesos = tabela.Colunas.Select(c => Peso(tabela, c)).ToList();
+        var minimas = tabela.Colunas.Select(c => LarguraMinima(tabela, c)).ToList();
+        var fixas = new bool[pesos.Count];
+        bool mudou;
+        do
+        {
+            mudou = false;
+            var resto = larguraUtil - minimas.Where((_, i) => fixas[i]).Sum();
+            var somaDosPesos = pesos.Where((_, i) => !fixas[i]).Sum();
+            if (somaDosPesos <= 0) break;
+            for (var i = 0; i < pesos.Count; i++)
+            {
+                if (fixas[i] || minimas[i] <= 0) continue;
+                if (pesos[i] / somaDosPesos * resto >= minimas[i]) continue;
+                fixas[i] = true;
+                mudou = true;
+            }
+        } while (mudou);
+
+        if (minimas.Where((_, i) => fixas[i]).Sum() > larguraUtil * 0.7f || fixas.All(f => f))
+            return pesos.Select(p => new LarguraDaColuna(false, p)).ToList();
+        return pesos.Select((p, i) => fixas[i] ? new LarguraDaColuna(true, minimas[i]) : new LarguraDaColuna(false, p)).ToList();
+    }
+
+    /// <summary>A largura mínima da coluna de átomos (zero nas outras colunas).</summary>
+    public static float LarguraMinima(PeDocTabelaResponse tabela, PeDocColunaResponse coluna)
+    {
+        var textos = tabela.Linhas
+            .Select(l => l.Ricos != null && l.Ricos.ContainsKey(coluna.Chave) ? null : l.Celulas.GetValueOrDefault(coluna.Chave))
+            .Where(t => !string.IsNullOrWhiteSpace(t) && t != "-")
+            .Select(t => SemQuebra(t!.Trim()))
+            .ToList();
+        if (textos.Count == 0 || textos.Any(t => t.Contains(' ') || t.Contains('\n') || t.Length > MaximoDoAtomo)) return 0;
+        var valor = textos.Max(t => LarguraDoTexto(t, negrito: false));
+        var cabecalho = coluna.Rotulo.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => LarguraDoTexto(p, negrito: true))
+            .DefaultIfEmpty(0)
+            .Max();
+        return (float)Math.Ceiling(Math.Min(MaximoDaLarguraMinima, Math.Max(valor, cabecalho) + SobraDaCelula));
+    }
+
+    /// <summary>A coluna do código: o maior código (e o cabeçalho "Código") inteiro, no mínimo a largura de sempre.</summary>
+    private static float LarguraDaColunaDoCodigo(PeDocTabelaResponse tabela)
+    {
+        var maior = tabela.Linhas.Select(l => l.Codigo ?? "-").Append("Código")
+            .Max(c => LarguraDoTexto(c, negrito: c == "Código"));
+        return (float)Math.Max(LarguraDoCodigo, Math.Ceiling(maior + SobraDaCelula));
+    }
+
+    /// <summary>A largura do texto na fonte das tabelas (a Lato do PDF; sem os arquivos dela, a estimada).</summary>
+    private static double LarguraDoTexto(string texto, bool negrito)
+    {
+        var fonte = negrito ? PeFluxoFonte.Negrito : PeFluxoFonte.Regular;
+        return fonte?.Largura(texto, FonteTabela) ?? PeFluxoFonte.LarguraEstimada(texto, FonteTabela, negrito);
     }
 
     /// <summary>

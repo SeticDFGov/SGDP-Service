@@ -49,6 +49,8 @@
     <EmbeddedResource Include="Models\Planejamento\Seed\documento-inicial.json" LogicalName="Planejamento.documento-inicial.json" />
     <!-- Fluxos do guia como modelo (E6): figuras 4 a 22, com raias, passos, decisões e artefatos -->
     <EmbeddedResource Include="Models\Planejamento\Seed\fluxos-inicial.json" LogicalName="Planejamento.fluxos-inicial.json" />
+    <!-- Marca monocromática do GDF (a mesma da prévia no front) na faixa da capa dos PDFs (F1) -->
+    <EmbeddedResource Include="Models\Planejamento\Seed\marca-gdf.png" LogicalName="Planejamento.marca-gdf.png" />
   </ItemGroup>
 
 

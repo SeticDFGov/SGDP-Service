@@ -117,7 +117,8 @@ public abstract class PeModeloTestBase : PeTestBase
 
     protected static async Task<int> ErroAsync(Func<Task> acao)
     {
-        var ex = await Assert.ThrowsAsync<ApiException>(acao);
+        // Desde a F1, parte dos erros vem com Campos (PeValidacaoException, que é uma ApiException)
+        var ex = await Assert.ThrowsAnyAsync<ApiException>(acao);
         return ex.Error.Code;
     }
 

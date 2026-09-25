@@ -146,7 +146,7 @@ public partial class PeInadimplenciaService : IPeInadimplenciaService
         };
         _context.PeInadimplencias.Add(inadimplencia);
         await _context.SaveChangesAsync();
-        return Resposta(inadimplencia, orgao, hoje);
+        return Resposta(inadimplencia, orgao, hoje, await NomesAsync(_context, new[] { inadimplencia }));
     }
 
     public async Task<PeInadimplenciaResponse> JustificarAsync(long id, PeInadimplenciaJustificarDTO dto, PeUserContext ctx)
@@ -239,7 +239,7 @@ public partial class PeInadimplenciaService : IPeInadimplenciaService
         return dias;
     }
 
-    internal static PeInadimplenciaResponse Resposta(PeInadimplencia i, PgiaOrgao? orgao, DateOnly hoje) => new()
+    internal static PeInadimplenciaResponse Resposta(PeInadimplencia i, PgiaOrgao? orgao, DateOnly hoje, PeNomes nomes) => new()
     {
         Id = i.Id,
         OrgaoId = i.OrgaoId,
@@ -262,11 +262,17 @@ public partial class PeInadimplenciaService : IPeInadimplenciaService
         ComunicadoControleEm = i.ComunicadoControleEm,
         RegistradoEm = i.RegistradoEm,
         RegistradoPor = i.RegistradoPor,
+        RegistradoPorNome = nomes.De(i.RegistradoPor),
         SaneadoEm = i.SaneadoEm,
         Observacao = i.Observacao,
         CriadoEm = i.CriadoEm,
-        CriadoPor = i.CriadoPor
+        CriadoPor = i.CriadoPor,
+        CriadoPorNome = nomes.DeObrigatorio(i.CriadoPor)
     };
+
+    /// <summary>Os nomes de quem registrou e de quem notificou (F1, C19), de uma vez para a lista.</summary>
+    internal static Task<PeNomes> NomesAsync(AppDbContext context, IEnumerable<PeInadimplencia> linhas) =>
+        PeNomes.CarregarAsync(context, linhas.SelectMany(i => new[] { i.RegistradoPor, i.CriadoPor }));
 
     /// <summary>As respostas de uma lista, com os órgãos lidos de uma vez.</summary>
     internal async Task<List<PeInadimplenciaResponse>> RespostasAsync(IReadOnlyList<PeInadimplencia> linhas)
@@ -276,7 +282,8 @@ public partial class PeInadimplenciaService : IPeInadimplenciaService
             ? new Dictionary<long, PgiaOrgao>()
             : await _context.PgiaOrgaos.AsNoTracking().Where(o => ids.Contains(o.Id)).ToDictionaryAsync(o => o.Id);
         var hoje = PeCiclos.Hoje();
-        return linhas.Select(i => Resposta(i, orgaos.GetValueOrDefault(i.OrgaoId), hoje)).ToList();
+        var nomes = await NomesAsync(_context, linhas);
+        return linhas.Select(i => Resposta(i, orgaos.GetValueOrDefault(i.OrgaoId), hoje, nomes)).ToList();
     }
 
     // ── Apoio ───────────────────────────────────────────────────────────────
@@ -297,7 +304,7 @@ public partial class PeInadimplenciaService : IPeInadimplenciaService
         inadimplencia.AlteradoPor = ctx.Email;
         await _context.SaveChangesAsync();
         var orgao = await _context.PgiaOrgaos.AsNoTracking().FirstOrDefaultAsync(o => o.Id == inadimplencia.OrgaoId);
-        return Resposta(inadimplencia, orgao, PeCiclos.Hoje());
+        return Resposta(inadimplencia, orgao, PeCiclos.Hoje(), await NomesAsync(_context, new[] { inadimplencia }));
     }
 
     private static string Rotulo(PeInadimplencia i) => PeDominios.SituacaoInadimplencia.Rotulo(i.Situacao).ToLowerInvariant();

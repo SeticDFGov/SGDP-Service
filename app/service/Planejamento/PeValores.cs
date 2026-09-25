@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
+using demanda_service.Helpers;
 using Models.Planejamento;
 
 namespace service.Planejamento;
@@ -40,17 +42,18 @@ public static class PeFormato
 /// Valores dos registros: a validação de cada tipo de campo (com mensagens em linguagem
 /// simples), o texto pronto para exibir e os cálculos. Formato guardado no jsonb:
 /// <list type="bullet">
-/// <item>texto curto e longo: texto (sem espaço nas pontas); texto rico: o JSON do TipTap,
+/// <item>texto curto e longo: texto (sem espaço nas pontas); o texto curto com o formato do config
+/// (F1) confere o número do processo SEI ou o endereço de internet; texto rico: o JSON do TipTap,
 /// conferido e limpo por <see cref="PeTextoRico"/> (E4);</item>
 /// <item>número, moeda (duas casas, não negativa) e percentual (0 a 100): número;</item>
-/// <item>data: "aaaa-mm-dd"; sim ou não: verdadeiro ou falso;</item>
+/// <item>data: "aaaa-mm-dd" (com naoFutura no config, desde a F1, até hoje); sim ou não: verdadeiro ou falso;</item>
 /// <item>lista: o valor da opção; lista múltipla: lista de valores, na ordem das opções;</item>
 /// <item>arquivo: { "ArquivoId", "Nome" }; calculado: número (nível de risco: o valor da opção).</item>
 /// </list>
 /// Vazio (nulo, texto em branco, lista vazia) não é guardado. Opção desativada só vale se já
 /// era o valor guardado (o registro antigo continua gravando).
 /// </summary>
-public static class PeValores
+public static partial class PeValores
 {
     public const int MaximoTextoCurto = 1000;
     public const int MaximoTextoLongo = 50000;
@@ -59,6 +62,24 @@ public static class PeValores
 
     private const decimal MaximoNumero = 1_000_000_000_000_000m;
     private const decimal MaximoMoeda = 10_000_000_000_000m;
+
+    // Mensagens das regras de formato e de data do config (F1, achados C05 e C33 da revisão final)
+    public const string MensagemSei = "Informe o processo SEI no formato 00000-00000000/0000-00.";
+    public const string MensagemEndereco =
+        "Informe o endereço completo, que começa com http:// ou https:// (por exemplo, https://www.df.gov.br/pdtic).";
+    public const string MensagemDataFutura = "A data não pode ser depois de hoje.";
+
+    [GeneratedRegex(@"^\d{5}-\d{8}/\d{4}-\d{2}$")]
+    private static partial Regex FormatoSei();
+
+    /// <summary>O número do processo SEI no formato 00000-00000000/0000-00.</summary>
+    public static bool SeiValido(string? texto) => texto != null && FormatoSei().IsMatch(texto.Trim());
+
+    /// <summary>Um endereço de internet completo, com http ou https (a mesma regra dos links do texto rico).</summary>
+    public static bool EnderecoValido(string? texto) => texto != null && PeTextoRico.LinkValido(texto.Trim());
+
+    /// <summary>Hoje, em Brasília (a data de decisão não passa dele).</summary>
+    public static DateOnly Hoje() => DateOnly.FromDateTime(DateTimeHelper.TodayBrasilia());
 
     /// <summary>
     /// Resultado da validação de um valor: o valor a guardar (nulo = vazio) ou o erro. No
@@ -96,6 +117,12 @@ public static class PeValores
                              ?? (campo.Tipo == PeDominios.TipoCampo.TextoCurto ? MaximoTextoCurto : MaximoTextoLongo);
                 if (texto.Length > maximo)
                     return Resultado.Falha($"Use no máximo {maximo} caracteres (o texto tem {texto.Length}).");
+                if (campo.Tipo == PeDominios.TipoCampo.TextoCurto)
+                {
+                    var formato = Texto(campo.Config, "formato");
+                    if (formato == PeDominios.FormatoTexto.Sei && !SeiValido(texto)) return Resultado.Falha(MensagemSei);
+                    if (formato == PeDominios.FormatoTexto.Url && !EnderecoValido(texto)) return Resultado.Falha(MensagemEndereco);
+                }
                 return Resultado.Com(JsonValue.Create(texto)!);
             }
             case PeDominios.TipoCampo.TextoRico:
@@ -144,6 +171,7 @@ public static class PeValores
                 if (!DateOnly.TryParseExact(texto, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var data))
                     return Resultado.Falha("Informe uma data válida, no formato aaaa-mm-dd.");
                 if (data.Year < 1900 || data.Year > 2199) return Resultado.Falha("A data está fora do intervalo aceito.");
+                if (Booleano(campo.Config, "naoFutura") == true && data > Hoje()) return Resultado.Falha(MensagemDataFutura);
                 return Resultado.Com(JsonValue.Create(data.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))!);
             }
             case PeDominios.TipoCampo.SimNao:

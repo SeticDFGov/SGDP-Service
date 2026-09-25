@@ -46,6 +46,14 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
     public const int MaximoTexto = 1000;
     private const int MaximoEndereco = 500;
 
+    // O reenvio depois da devolução do CGTIC (decisão D3 da revisão final): a versão ajustada volta
+    // ao comitê interno, então vale só a aprovação do SGTIC registrada no dia da devolução ou depois
+    public const string PendenciaSgticDepoisDaDevolucao =
+        "Registre de novo a aprovação do SGTIC: a versão ajustada depois da devolução do CGTIC precisa passar pelo comitê interno.";
+
+    // A aprovação do SGTIC com a data no futuro (achado C05)
+    public const string PendenciaSgticDataFutura = "Corrija a data da aprovação do SGTIC: ela não pode ser depois de hoje.";
+
     [GeneratedRegex(@"^\d{1,3}\.\d{1,3}$")]
     private static partial Regex FormatoVersao();
 
@@ -138,7 +146,9 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
     /// <summary>
     /// O que falta para o envio: cada passo obrigatório das etapas 1 a 3 anterior ao passo do
     /// envio que não está feito nem "não se aplica" (com o que falta nele), e a aprovação do SGTIC
-    /// (a decisão "aprovado" e a data), no passo do envio.
+    /// (a decisão "aprovado" e a data), no passo do envio. Desde a F1: a data da aprovação do SGTIC
+    /// não pode ser depois de hoje (C05) e, depois de uma devolução do CGTIC, precisa ser do dia da
+    /// devolução ou depois (D3: a versão ajustada volta ao comitê interno antes do reenvio).
     /// </summary>
     private async Task<List<PePendenciaResponse>> PendenciasAsync(PePdtic pdtic, PeTrilhaOrgao trilha, PeUserContext ctx)
     {
@@ -172,9 +182,28 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
                     : analisada is { Incompletos.Count: > 0 }
                         ? "Complete os campos obrigatórios da aprovação do SGTIC."
                         : null;
+            if (motivo == null && PeValores.DataGuardada(dados[PeDominios.ChavePdtic.CampoData]) is DateOnly data)
+            {
+                if (data > PeValores.Hoje())
+                    motivo = PendenciaSgticDataFutura;
+                else if (await DevolucaoAsync(pdtic.Id) is DateOnly devolvidoEm && data < devolvidoEm)
+                    motivo = PendenciaSgticDepoisDaDevolucao;
+            }
             if (motivo != null) pendencias.Add(Pendencia(sgtic.Passo, motivo));
         }
         return pendencias;
+    }
+
+    /// <summary>O dia (em Brasília) da devolução mais recente do PDTIC pelo CGTIC, ou nulo sem devolução.</summary>
+    private async Task<DateOnly?> DevolucaoAsync(long pdticId)
+    {
+        var devolvidoEm = await _context.PeDeliberacoes.AsNoTracking()
+            .Where(d => d.ObjetoTipo == PeDominios.ObjetoDeliberacao.Pdtic && d.ObjetoId == pdticId
+                        && d.Situacao == PeDominios.SituacaoDeliberacao.Devolvido && d.DecididoEm != null)
+            .OrderByDescending(d => d.Id)
+            .Select(d => d.DecididoEm)
+            .FirstOrDefaultAsync();
+        return devolvidoEm is DateTime quando ? DateOnly.FromDateTime(DateTimeHelper.ToBrasilia(quando)) : null;
     }
 
     private static PePendenciaResponse Pendencia(PeTrilhaPasso passo, string motivo) => new()
@@ -212,6 +241,11 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
                      })
                 if (secao.Visiveis.Any(v => v.Campo.Chave == chave) && PeRegistroDados.EhVazio(dados[chave]))
                     campos[chave] = mensagem;
+            // O endereço gravado antes da regra do formato (C33) também precisa ser de internet
+            if (!campos.ContainsKey(PeDominios.ChavePdtic.CampoEndereco)
+                && PeRegistroDados.Texto(dados[PeDominios.ChavePdtic.CampoEndereco]) is string endereco
+                && !PeValores.EnderecoValido(endereco))
+                campos[PeDominios.ChavePdtic.CampoEndereco] = PeValores.MensagemEndereco;
             foreach (var campo in analisada.Incompletos.SelectMany(i => i.Faltando))
                 campos.TryAdd(campo.Chave, PeValores.MensagemObrigatorio(campo));
             if (campos.Count > 0)
@@ -318,7 +352,7 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
         var doOrgao = await _context.PePdtics.AsNoTracking().Where(p => p.OrgaoId == atual.OrgaoId).ToListAsync();
         if (doOrgao.FirstOrDefault(p => PeDominios.SituacaoPdtic.DaElaboracao.Contains(p.Situacao)) is { } emAndamento)
             throw new ApiException(ErrorCode.PeRevisaoEmAndamento,
-                $"O órgão já tem a versão {emAndamento.Versao} em andamento ({PeDominios.SituacaoPdtic.Rotulo(emAndamento.Situacao).ToLowerInvariant()}). "
+                $"O órgão já tem a versão {emAndamento.Versao} em andamento ({PeDominios.SituacaoPdtic.RotuloMinusculo(emAndamento.Situacao)}). "
                 + "Termine aquela antes de abrir outra revisão.");
 
         // A decisão do comitê (6.3) libera a revisão; sem o passo na trilha, a justificativa. Com a
@@ -542,6 +576,9 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
         var endereco = TextoDoCampo(dto.PublicacaoEndereco, MaximoEndereco, nameof(dto.PublicacaoEndereco), "O endereço", campos);
         if (endereco == null && !campos.ContainsKey(nameof(dto.PublicacaoEndereco)))
             campos[nameof(dto.PublicacaoEndereco)] = "Informe o endereço da íntegra do PDTIC na internet.";
+        // Um endereço de internet de verdade (C33): http ou https, com o servidor
+        else if (endereco != null && !PeValores.EnderecoValido(endereco))
+            campos[nameof(dto.PublicacaoEndereco)] = PeValores.MensagemEndereco;
 
         // O PDF: enviado pela mesma pessoa e ainda sem dono
         PeArquivo? arquivo = null;
@@ -636,7 +673,8 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
                 EnviadoEm = agora,
                 EnviadoPor = ctx.Email,
                 Situacao = PeDominios.SituacaoDeliberacao.Aprovado,
-                DecididoEm = agora,
+                // A decisão é a do ato do CGTIC (C40): o registro no sistema fica em EnviadoEm
+                DecididoEm = MeioDia(dataAprovacao.Value),
                 DecididoPor = ctx.Email,
                 AtoTipo = atoTipo,
                 AtoNumero = atoNumero,
@@ -749,7 +787,7 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
     private static string Iso(DateOnly data) => data.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     /// <summary>A data informada como o meio-dia de Brasília (em UTC), para não mudar de dia na exibição.</summary>
-    private static DateTime MeioDia(DateOnly data) => DateTimeHelper.ToUtc(new DateTime(data.Year, data.Month, data.Day, 12, 0, 0));
+    internal static DateTime MeioDia(DateOnly data) => DateTimeHelper.ToUtc(new DateTime(data.Year, data.Month, data.Day, 12, 0, 0));
 
     private static bool MesmaPessoa(string? a, string? b) =>
         !string.IsNullOrWhiteSpace(a) && string.Equals(a.Trim(), b?.Trim(), StringComparison.OrdinalIgnoreCase);

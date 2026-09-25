@@ -58,6 +58,23 @@ public sealed class PeSeedPasso
     public bool AceitaNaoSeAplica { get; set; }
     public JsonElement Niveis { get; set; }
     public List<PeSeedSecao> Secoes { get; set; } = new();
+    // Desde a versão 7 (F1): textos gravados por versões anteriores, trocados pelos de hoje
+    public PeSeedAntes? Antes { get; set; }
+}
+
+/// <summary>
+/// Os textos que versões anteriores do carregador gravaram num item do sistema (desde a versão
+/// 7, F1). Quando o item já existe e o texto dele ainda é um destes (ninguém mudou), a carga
+/// troca pelo texto de hoje do JSON; o texto que o administrador mudou fica como está.
+/// </summary>
+public sealed class PeSeedAntes
+{
+    public List<string>? Titulo { get; set; }
+    public List<string>? OQueFazer { get; set; }
+    public List<string>? Ajuda { get; set; }
+    // O config inteiro de antes (comparado sem a ordem das chaves) e a largura de antes (nulo = sem largura)
+    public List<JsonElement>? Config { get; set; }
+    public List<string?>? Largura { get; set; }
 }
 
 public sealed class PeSeedSecao
@@ -106,6 +123,8 @@ public sealed class PeSeedCampo
     // Situação geral (só fora do PDTIC; sem ela, vale a da seção)
     public string? Situacao { get; set; }
     public List<PeSeedOpcao> Opcoes { get; set; } = new();
+    // Desde a versão 7 (F1): a ajuda gravada por versões anteriores, trocada pela de hoje
+    public PeSeedAntes? Antes { get; set; }
 }
 
 public sealed class PeSeedOpcao
@@ -120,7 +139,7 @@ public sealed class PeSeedOpcao
 public sealed record PeCarregamentoResultado(
     int VersaoAnterior, int Versao, bool Executou,
     int Niveis, int Etapas, int Passos, int Secoes, int Campos, int Opcoes, int Configuracoes, int Registros = 0,
-    int Documentos = 0, int Capitulos = 0, int Blocos = 0, int Fluxos = 0, int SecoesPorCiclo = 0);
+    int Documentos = 0, int Capitulos = 0, int Blocos = 0, int Fluxos = 0, int SecoesPorCiclo = 0, int Correcoes = 0);
 
 /// <summary>
 /// Carregador do modelo inicial do módulo Governança Estratégica: a trilha da seção 7 do
@@ -139,7 +158,11 @@ public sealed record PeCarregamentoResultado(
 /// monitoramento em 5.1 e 5.2 e a avaliação intermediária em 6.1 a 6.3, marcadas também nas
 /// seções que já existiam, porque a coluna é nova), as configurações do prazo de fechamento do
 /// ciclo e da avaliação final e os modelos do relatório de acompanhamento (RA, Anexo XIV) e do
-/// relatório de resultados (RR, Anexo XV). O conteúdo fica em JSON embutido na aplicação.
+/// relatório de resultados (RR, Anexo XV); na versão 7 (F1, a rodada de correções da revisão
+/// final), as regras novas do config nos campos que já existiam (a data de decisão que não pode
+/// ser futura, o formato do processo SEI e o do endereço de internet) e a troca dos textos que o
+/// próprio carregador gravou e que ninguém mudou (a ajuda de "Quem decidiu" em cada aprovação, os
+/// textos do passo 5.1 e a capa do RA). O conteúdo fica em JSON embutido na aplicação.
 /// <list type="bullet">
 /// <item>Idempotente: se a versão gravada em pe_configuracao (seed_modelo_versao) já é a do
 /// JSON, não faz nada; senão insere só o que falta, achando cada item pela chave (nível
@@ -181,6 +204,20 @@ public sealed class PeCarregadorModelo
     /// (<see cref="PeAcompanhamentoAtivo"/>).
     /// </summary>
     public const int VersaoDoAcompanhamento = 6;
+
+    /// <summary>
+    /// Versão do modelo inicial da F1 (rodada de correções da revisão final): acrescenta aos campos
+    /// que já existem as chaves novas do config (<see cref="ChavesNovasDoConfig"/>) e troca os
+    /// textos do sistema que ainda são os que o carregador gravou (os "antes" do JSON).
+    /// </summary>
+    public const int VersaoDaRevisaoFinal = 7;
+
+    /// <summary>
+    /// As chaves do config que a versão 7 trouxe (a data que não pode ser futura e o formato do
+    /// texto curto). Só elas entram num campo que já existia, e só na carga que vem de uma versão
+    /// anterior à 7: o que o administrador mudou depois (inclusive tirar a chave) fica.
+    /// </summary>
+    public static readonly string[] ChavesNovasDoConfig = { "naoFutura", "formato" };
 
     // Trava do carregador no PostgreSQL: segura até o fim da transação
     private const string SqlTrava = "SELECT pg_advisory_xact_lock(4890020260924)";
@@ -403,7 +440,8 @@ public sealed class PeCarregadorModelo
             return new PeCarregamentoResultado(versaoAnterior, versaoAnterior, false, 0, 0, 0, 0, 0, 0, 0);
 
         var agora = DateTime.UtcNow;
-        int nNiveis = 0, nEtapas = 0, nPassos = 0, nSecoes = 0, nCampos = 0, nOpcoes = 0, nConfig = 0;
+        int nNiveis = 0, nEtapas = 0, nPassos = 0, nSecoes = 0, nCampos = 0, nOpcoes = 0, nConfig = 0, nCorrecoes = 0;
+        var existentesAntes = new List<(PeCampo Campo, PeSeedCampo Seed)>();
 
         // Níveis (pelo código)
         var niveis = await _context.PeNiveis.ToListAsync(ct);
@@ -493,6 +531,10 @@ public sealed class PeCarregadorModelo
                     passos.Add(passo);
                     _context.PePassos.Add(passo);
                     nPassos++;
+                }
+                else
+                {
+                    nCorrecoes += CorrigirPasso(passo, sp, agora);
                 }
 
                 foreach (var (ss, iss) in sp.Secoes.Select((s, i) => (s, i)))
@@ -595,6 +637,11 @@ public sealed class PeCarregadorModelo
                     novosCampos.Add((campo, sc));
                     nCampos++;
                 }
+                else
+                {
+                    nCorrecoes += CorrigirCampo(campo, sc, agora);
+                    existentesAntes.Add((campo, sc));
+                }
 
                 foreach (var (so, io) in sc.Opcoes.Select((o, i) => (o, i)))
                 {
@@ -648,6 +695,11 @@ public sealed class PeCarregadorModelo
                 throw new InvalidOperationException($"Modelo inicial inválido: config do campo \"{secao.Chave}.{campo.Chave}\": {ex.Error.Message}");
             }
         }
+
+        // Versão 7 (F1): as chaves novas do config nos campos que já existiam (só vindo de antes da 7)
+        if (versaoAnterior < VersaoDaRevisaoFinal)
+            foreach (var (campo, sc) in existentesAntes)
+                nCorrecoes += AcrescentarConfig(campo, sc, agora);
 
         // Registros do sistema (os princípios do art. 4º), no catálogo do DF: os que faltam,
         // achados pelo código; a sequência passa a começar depois do maior código semeado
@@ -716,9 +768,10 @@ public sealed class PeCarregadorModelo
         // Modelo do documento do PDTIC (versão 3, E5): o que falta, achado pelo tipo do modelo e
         // pela chave do capítulo; os blocos entram com o capítulo novo (capítulo que já existe não
         // é tocado, nem os blocos dele)
-        var (nDocumentos, nCapitulos, nBlocos) = seed.Versao >= VersaoDoDocumento
+        var (nDocumentos, nCapitulos, nBlocos, nBlocosCorrigidos) = seed.Versao >= VersaoDoDocumento
             ? await CarregarDocumentosAsync(documentos ?? PeDocSeed.Ler(), passos, secoes, campos, opcoes, agora, ct)
-            : (0, 0, 0);
+            : (0, 0, 0, 0);
+        nCorrecoes += nBlocosCorrigidos;
 
         // Fluxos do guia (versão 4, E6): os que faltam, achados pela chave; o que já existe
         // (inclusive o que o administrador mudou) não é tocado
@@ -748,7 +801,120 @@ public sealed class PeCarregadorModelo
         if (transacao != null) await transacao.CommitAsync(ct);
 
         return new PeCarregamentoResultado(versaoAnterior, seed.Versao, true, nNiveis, nEtapas, nPassos, nSecoes, nCampos, nOpcoes, nConfig,
-            nRegistros, nDocumentos, nCapitulos, nBlocos, nFluxos, nPorCiclo);
+            nRegistros, nDocumentos, nCapitulos, nBlocos, nFluxos, nPorCiclo, nCorrecoes);
+    }
+
+    // ── Correções da versão 7 (F1) ──────────────────────────────────────────
+
+    /// <summary>Troca o título e o "o que fazer" do passo que ainda são os que o carregador gravou.</summary>
+    private static int CorrigirPasso(PePasso passo, PeSeedPasso sp, DateTime agora)
+    {
+        if (sp.Antes == null || passo.ExcluidoEm != null) return 0;
+        var mudou = false;
+        if (sp.Antes.Titulo?.Contains(passo.Titulo) == true && passo.Titulo != sp.Titulo)
+        {
+            passo.Titulo = sp.Titulo;
+            mudou = true;
+        }
+        if (sp.Antes.OQueFazer?.Contains(passo.OQueFazer) == true && passo.OQueFazer != sp.OQueFazer)
+        {
+            passo.OQueFazer = sp.OQueFazer;
+            mudou = true;
+        }
+        if (!mudou) return 0;
+        passo.AlteradoEm = agora;
+        passo.AlteradoPor = Autor;
+        return 1;
+    }
+
+    /// <summary>
+    /// Troca a ajuda, o config e a largura do campo que ainda são os que o carregador gravou (os
+    /// "antes" do JSON); o que o administrador mudou fica.
+    /// </summary>
+    private static int CorrigirCampo(PeCampo campo, PeSeedCampo sc, DateTime agora)
+    {
+        if (sc.Antes == null || campo.ExcluidoEm != null) return 0;
+        var mudou = false;
+        if (sc.Antes.Ajuda != null && campo.Ajuda != null && sc.Antes.Ajuda.Contains(campo.Ajuda) && campo.Ajuda != sc.Ajuda)
+        {
+            campo.Ajuda = sc.Ajuda;
+            mudou = true;
+        }
+        if (sc.Antes.Largura != null && sc.Antes.Largura.Contains(campo.Largura) && campo.Largura != sc.Largura)
+        {
+            campo.Largura = sc.Largura;
+            mudou = true;
+        }
+        if (sc.Antes.Config != null && campo.Tipo == sc.Tipo
+            && sc.Antes.Config.Any(antigo => Canonico(antigo.GetRawText()) == Canonico(campo.Config)))
+        {
+            string novo;
+            try
+            {
+                novo = PeConfigCampo.Normalizar(campo.Tipo, sc.Config, new PeContextoConfig { ChaveDoCampo = campo.Chave });
+            }
+            catch (ApiException ex)
+            {
+                throw new InvalidOperationException($"Modelo inicial inválido: config do campo \"{campo.Chave}\": {ex.Error.Message}");
+            }
+            if (Canonico(novo) != Canonico(campo.Config))
+            {
+                campo.Config = novo;
+                mudou = true;
+            }
+        }
+        if (!mudou) return 0;
+        campo.AlteradoEm = agora;
+        campo.AlteradoPor = Autor;
+        return 1;
+    }
+
+    /// <summary>O JSON com as chaves dos objetos em ordem (o jsonb do PostgreSQL reordena as chaves).</summary>
+    private static string Canonico(string? json)
+    {
+        static System.Text.Json.Nodes.JsonNode? Ordenar(System.Text.Json.Nodes.JsonNode? no) => no switch
+        {
+            System.Text.Json.Nodes.JsonObject o => new System.Text.Json.Nodes.JsonObject(o
+                .OrderBy(p => p.Key, StringComparer.Ordinal)
+                .Select(p => KeyValuePair.Create(p.Key, Ordenar(p.Value)))),
+            System.Text.Json.Nodes.JsonArray a => new System.Text.Json.Nodes.JsonArray(a.Select(Ordenar).ToArray()),
+            null => null,
+            _ => System.Text.Json.Nodes.JsonNode.Parse(no.ToJsonString())
+        };
+        var raiz = System.Text.Json.Nodes.JsonNode.Parse(string.IsNullOrWhiteSpace(json) ? PeConfigCampo.Vazio : json);
+        return Ordenar(raiz)?.ToJsonString() ?? "null";
+    }
+
+    /// <summary>
+    /// Acrescenta ao config de um campo que já existia as chaves novas da versão 7 que o JSON traz
+    /// e que o campo ainda não tem (as outras chaves do config, que o administrador pode ter mudado,
+    /// ficam como estão). O config resultante passa pela mesma conferência da API.
+    /// </summary>
+    private static int AcrescentarConfig(PeCampo campo, PeSeedCampo sc, DateTime agora)
+    {
+        if (campo.ExcluidoEm != null || campo.Tipo != sc.Tipo || sc.Config is not { ValueKind: JsonValueKind.Object } doSeed) return 0;
+        var atual = System.Text.Json.Nodes.JsonNode.Parse(string.IsNullOrWhiteSpace(campo.Config) ? PeConfigCampo.Vazio : campo.Config)
+            as System.Text.Json.Nodes.JsonObject ?? new System.Text.Json.Nodes.JsonObject();
+        var mudou = false;
+        foreach (var propriedade in doSeed.EnumerateObject())
+        {
+            if (!ChavesNovasDoConfig.Contains(propriedade.Name) || atual.ContainsKey(propriedade.Name)) continue;
+            atual[propriedade.Name] = System.Text.Json.Nodes.JsonNode.Parse(propriedade.Value.GetRawText());
+            mudou = true;
+        }
+        if (!mudou) return 0;
+        try
+        {
+            campo.Config = PeConfigCampo.Normalizar(campo.Tipo, JsonSerializer.SerializeToElement(atual),
+                new PeContextoConfig { ChaveDoCampo = campo.Chave });
+        }
+        catch (ApiException ex)
+        {
+            throw new InvalidOperationException($"Modelo inicial inválido: config do campo \"{campo.Chave}\": {ex.Error.Message}");
+        }
+        campo.AlteradoEm = agora;
+        campo.AlteradoPor = Autor;
+        return 1;
     }
 
     /// <summary>
@@ -784,7 +950,7 @@ public sealed class PeCarregadorModelo
     /// campos em volta (os que acabaram de entrar também); erro = modelo inicial inválido e
     /// nada é gravado.
     /// </summary>
-    private async Task<(int Documentos, int Capitulos, int Blocos)> CarregarDocumentosAsync(PeSeedDocumentos documentos,
+    private async Task<(int Documentos, int Capitulos, int Blocos, int Corrigidos)> CarregarDocumentosAsync(PeSeedDocumentos documentos,
         List<PePasso> passos, List<PeSecao> secoes, List<PeCampo> campos, List<PeOpcao> opcoes, DateTime agora, CancellationToken ct)
     {
         PeDocSeed.Validar(documentos, passos.Where(p => p.ExcluidoEm == null).Select(p => p.Chave).ToHashSet());
@@ -812,6 +978,10 @@ public sealed class PeCarregadorModelo
         var modelos = await _context.PeDocModelos.ToListAsync(ct);
         var capitulos = await _context.PeDocCapitulos.ToListAsync(ct);
         int nDocumentos = 0, nCapitulos = 0, nBlocos = 0;
+        // Os blocos de texto com "antes" nos capítulos que já existem (versão 7): lidos só quando há
+        var comAntes = documentos.Modelos.SelectMany(m => Todos(m.Capitulos)).Any(c => c.Blocos.Any(b => b.Antes is { Count: > 0 }));
+        var blocosExistentes = comAntes ? await _context.PeDocBlocos.ToListAsync(ct) : new List<PeDocBloco>();
+        var nCorrigidos = 0;
 
         foreach (var sm in documentos.Modelos)
         {
@@ -882,6 +1052,10 @@ public sealed class PeCarregadorModelo
                     capitulos.Add(capitulo);
                     nCapitulos++;
                 }
+                else
+                {
+                    nCorrigidos += CorrigirBlocos(capitulo, sc, blocosExistentes, contexto, agora);
+                }
                 foreach (var (sub, i) in sc.Subcapitulos.Select((s, i) => (s, i)))
                     Carregar(sub, capitulo, i + 1, novo);
             }
@@ -889,7 +1063,39 @@ public sealed class PeCarregadorModelo
             foreach (var (sc, i) in sm.Capitulos.Select((c, i) => (c, i)))
                 Carregar(sc, null, i + 1, modeloNovo);
         }
-        return (nDocumentos, nCapitulos, nBlocos);
+        return (nDocumentos, nCapitulos, nBlocos, nCorrigidos);
+    }
+
+    private static IEnumerable<PeSeedDocCapitulo> Todos(IEnumerable<PeSeedDocCapitulo> capitulos) =>
+        capitulos.SelectMany(c => new[] { c }.Concat(Todos(c.Subcapitulos)));
+
+    /// <summary>
+    /// Num capítulo que já existia (versão 7): o bloco de texto da mesma posição cujo texto ainda é
+    /// um dos que o carregador gravou antes (os "antes" do JSON) passa ao texto de hoje. O texto que
+    /// o administrador mudou fica, e a cópia do órgão (o texto que ele editou) não é tocada.
+    /// </summary>
+    private static int CorrigirBlocos(PeDocCapitulo capitulo, PeSeedDocCapitulo sc, List<PeDocBloco> blocos, PeDocConfig.Contexto contexto,
+        DateTime agora)
+    {
+        if (capitulo.Id == 0) return 0;
+        var corrigidos = 0;
+        foreach (var (sb, ib) in sc.Blocos.Select((b, i) => (b, i)))
+        {
+            if (sb.Antes is not { Count: > 0 } || sb.Tipo != PeDominios.TipoBloco.Texto || sb.Texto == null) continue;
+            var bloco = blocos.FirstOrDefault(b => b.CapituloId == capitulo.Id && b.Ordem == ib + 1 && b.ExcluidoEm == null
+                                                   && b.Tipo == PeDominios.TipoBloco.Texto);
+            if (bloco == null) continue;
+            var atual = PeDocMarcadores.Hash(PeDocConfig.TextoDoBloco(PeDocConfig.Ler(bloco.Config)));
+            string Normalizado(IEnumerable<string> linhas) =>
+                PeDocMarcadores.Hash(PeDocConfig.TextoDoBloco(PeDocConfig.Ler(PeDocConfig.Normalizar(PeDominios.TipoBloco.Texto,
+                    new PeSeedDocBloco { Tipo = PeDominios.TipoBloco.Texto, Texto = linhas.ToList() }.Config(), contexto).Json)));
+            if (!sb.Antes.Any(antigas => Normalizado(antigas) == atual)) continue;
+            bloco.Config = PeDocConfig.Normalizar(sb.Tipo, sb.Config(), contexto).Json;
+            bloco.AlteradoEm = agora;
+            bloco.AlteradoPor = Autor;
+            corrigidos++;
+        }
+        return corrigidos;
     }
 
     /// <summary>

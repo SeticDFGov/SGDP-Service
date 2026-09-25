@@ -21,7 +21,8 @@ namespace Controllers.Planejamento;
 /// registrada antes do prazo; 400 para o resto). A validação de registro (e das grades do
 /// ciclo), da publicação, do registro externo e da inadimplência (PeValidacaoException) leva
 /// também Campos, com a mensagem de cada campo; o envio e o fechamento do ciclo com pendências
-/// (PePendenciasException), a lista Pendencias;</item>
+/// (PePendenciasException), a lista Pendencias; desde a F1, o envio do PETIC-DF com pendências
+/// (PePeticPendenciasException), a lista Pendencias com a seção de cada uma;</item>
 /// <item>tabela ou coluna pe_ que ainda não existe (o PR publica o código antes da
 /// migration, que só roda no merge; desde a E4, a coluna pdtic_id de pe_registro): 409
 /// PeModeloIndisponivel, com mensagem para tentar de novo;</item>
@@ -87,6 +88,9 @@ internal static class PeRespostas
         // Envio ao CGTIC com pendências: os passos que faltam, em lista
         if (ex is PePendenciasException pendencias)
             return new ObjectResult(new { ex.Error.Code, ex.Error.Message, pendencias.Pendencias }) { StatusCode = status };
+        // Envio do PETIC-DF com pendências (F1): o que falta, seção por seção
+        if (ex is PePeticPendenciasException doPetic)
+            return new ObjectResult(new { ex.Error.Code, ex.Error.Message, doPetic.Pendencias }) { StatusCode = status };
         // Validação do fluxo: os erros em linguagem simples, em lista
         if (ex is PeFluxoInvalidoException fluxo)
             return new ObjectResult(new { ex.Error.Code, ex.Error.Message, fluxo.Erros }) { StatusCode = status };

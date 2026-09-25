@@ -79,6 +79,8 @@ public class PeDeliberacaoResponse
     public DateTime EnviadoEm { get; set; }
 
     public string EnviadoPor { get; set; } = string.Empty;
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail)
+    public string EnviadoPorNome { get; set; } = string.Empty;
 
     // aguardando, aprovado ou devolvido
     public string Situacao { get; set; } = string.Empty;
@@ -86,6 +88,8 @@ public class PeDeliberacaoResponse
     public DateTime? DecididoEm { get; set; }
 
     public string? DecididoPor { get; set; }
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail); nulo com o DecididoPor
+    public string? DecididoPorNome { get; set; }
 
     public string? AtoTipo { get; set; }
 
@@ -96,6 +100,36 @@ public class PeDeliberacaoResponse
     public string? Sei { get; set; }
 
     public string? Observacao { get; set; }
+
+    // F1 (C40): a deliberação nasceu do registro de um PDTIC aprovado fora do sistema (não houve
+    // envio: EnviadoEm é o dia do registro, e DecididoEm, o dia do ato do CGTIC, ao meio-dia)
+    public bool RegistradaForaDoSistema { get; set; }
+}
+
+/// <summary>
+/// Uma pendência do envio do PETIC-DF ao CGTIC (F1, achado A06 da revisão final): a seção e o que
+/// falta nela. Na vigência (que não é seção), SecaoChave vem nula e SecaoTitulo "Título e vigência".
+/// </summary>
+public class PePeticPendenciaResponse
+{
+    public string? SecaoChave { get; set; }
+
+    public string SecaoTitulo { get; set; } = string.Empty;
+
+    public string Motivo { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// A prévia do envio do PETIC-DF (GET petic/{id}/envio, F1): se a versão pode ir ao CGTIC agora,
+/// o que falta (a mesma lista do 400 do POST petic/{id}/enviar) e, quando não pode, o porquê.
+/// </summary>
+public class PePeticEnvioResponse
+{
+    public bool PodeEnviar { get; set; }
+
+    public List<PePeticPendenciaResponse> Pendencias { get; set; } = new();
+
+    public string? Motivo { get; set; }
 }
 
 /// <summary>A versão do documento enviada ao CGTIC com a deliberação do PDTIC (E7).</summary>

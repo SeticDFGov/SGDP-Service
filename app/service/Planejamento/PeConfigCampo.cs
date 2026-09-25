@@ -33,8 +33,11 @@ public sealed class PeContextoConfig
 /// <summary>
 /// Regras do config (jsonb) de cada tipo de campo, do jeito que a E2 fixou:
 /// <list type="bullet">
-/// <item>texto_curto { max } (1 a 1000) e texto_longo { max } (1 a 50000); texto_rico, moeda,
-/// percentual, data, sim_nao, lista e lista_multipla não têm config ({});</item>
+/// <item>texto_curto { max, formato } (max de 1 a 1000; formato, desde a F1, "sei" para o número
+/// de um processo SEI ou "url" para um endereço de internet completo) e texto_longo { max } (1 a
+/// 50000); data { naoFutura } (desde a F1: verdadeiro recusa data depois de hoje, e só é guardado
+/// quando verdadeiro); texto_rico, moeda, percentual, sim_nao, lista e lista_multipla não têm
+/// config ({});</item>
 /// <item>numero { min, max, casas (0 a 6), unidade };</item>
 /// <item>ligacao_secao { secao, multipla }: seção do tipo tabela, do mesmo escopo, não apagada;</item>
 /// <item>ligacao_catalogo { catalogo, multipla } (PeDominios.Catalogo);</item>
@@ -66,8 +69,18 @@ public static class PeConfigCampo
         switch (tipo)
         {
             case PeDominios.TipoCampo.TextoCurto:
-                Permitir(entrada, "max");
+                Permitir(entrada, "max", "formato");
                 Inteiro(entrada, saida, "max", 1, 1000, "O tamanho máximo do texto curto vai de 1 a 1000 caracteres.");
+                if (Texto(entrada, "formato") is string formato)
+                {
+                    if (!PeDominios.FormatoTexto.Todos.Contains(formato))
+                        throw Erro("O formato do texto curto é \"sei\" (número de processo SEI) ou \"url\" (endereço de internet).", "Config.formato");
+                    saida["formato"] = formato;
+                }
+                break;
+            case PeDominios.TipoCampo.Data:
+                Permitir(entrada, "naoFutura");
+                if (Booleano(entrada, "naoFutura") == true) saida["naoFutura"] = true;
                 break;
             case PeDominios.TipoCampo.TextoLongo:
                 Permitir(entrada, "max");
@@ -90,7 +103,7 @@ public static class PeConfigCampo
                 break;
             default:
                 if (!PeDominios.TipoCampo.Todos.Contains(tipo))
-                    throw Erro($"Tipo de campo inválido: {tipo}.");
+                    throw Erro($"Tipo de campo inválido: {tipo}.", "Tipo");
                 Permitir(entrada);
                 break;
         }
@@ -159,14 +172,14 @@ public static class PeConfigCampo
         var min = Decimal(entrada, "min");
         var max = Decimal(entrada, "max");
         if (min != null && max != null && min > max)
-            throw Erro("O mínimo não pode ser maior que o máximo.");
+            throw Erro("O mínimo não pode ser maior que o máximo.", "Config.min");
         if (min != null) saida["min"] = min;
         if (max != null) saida["max"] = max;
         Inteiro(entrada, saida, "casas", 0, 6, "As casas decimais vão de 0 a 6.");
         var unidade = Texto(entrada, "unidade");
         if (unidade != null)
         {
-            if (unidade.Length > 30) throw Erro("A unidade tem no máximo 30 caracteres.");
+            if (unidade.Length > 30) throw Erro("A unidade tem no máximo 30 caracteres.", "Config.unidade");
             saida["unidade"] = unidade;
         }
     }
@@ -175,13 +188,13 @@ public static class PeConfigCampo
     {
         Permitir(entrada, "secao", "multipla");
         var chave = Texto(entrada, "secao")
-            ?? throw Erro("Diga a chave da seção que o campo liga (secao).");
+            ?? throw Erro("Diga a chave da seção que o campo liga (secao).", "Config.secao");
         var alvo = ctx.SecaoPorChave(chave)
-            ?? throw Erro($"A seção \"{chave}\" não existe ou foi apagada.");
+            ?? throw Erro($"A seção \"{chave}\" não existe ou foi apagada.", "Config.secao");
         if (alvo.Escopo != ctx.Escopo)
-            throw Erro("A ligação só vale entre seções do mesmo escopo (PDTIC com PDTIC, PETIC-DF com PETIC-DF).");
+            throw Erro("A ligação só vale entre seções do mesmo escopo (PDTIC com PDTIC, PETIC-DF com PETIC-DF).", "Config.secao");
         if (alvo.Tipo != PeDominios.TipoSecao.Tabela)
-            throw Erro($"A seção \"{chave}\" é um formulário: a ligação precisa apontar para uma tabela.");
+            throw Erro($"A seção \"{chave}\" é um formulário: a ligação precisa apontar para uma tabela.", "Config.secao");
         saida["secao"] = alvo.Chave;
         saida["multipla"] = Booleano(entrada, "multipla") ?? false;
     }
@@ -190,9 +203,9 @@ public static class PeConfigCampo
     {
         Permitir(entrada, "catalogo", "multipla");
         var catalogo = Texto(entrada, "catalogo")
-            ?? throw Erro("Diga o catálogo da ligação: " + string.Join(", ", PeDominios.Catalogo.Todos) + ".");
+            ?? throw Erro("Diga o catálogo da ligação: " + string.Join(", ", PeDominios.Catalogo.Todos) + ".", "Config.catalogo");
         if (!PeDominios.Catalogo.Todos.Contains(catalogo))
-            throw Erro($"Catálogo inválido: {catalogo}. Use um destes: {string.Join(", ", PeDominios.Catalogo.Todos)}.");
+            throw Erro($"Catálogo inválido: {catalogo}. Use um destes: {string.Join(", ", PeDominios.Catalogo.Todos)}.", "Config.catalogo");
         saida["catalogo"] = catalogo;
         saida["multipla"] = Booleano(entrada, "multipla") ?? false;
     }
@@ -203,11 +216,11 @@ public static class PeConfigCampo
         var tipos = PeDominios.TipoArquivo.Todos.ToList();
         if (entrada.TryGetValue("tipos", out var t) && t.ValueKind != JsonValueKind.Null)
         {
-            if (t.ValueKind != JsonValueKind.Array) throw Erro("Os tipos de arquivo vêm numa lista (tipos).");
+            if (t.ValueKind != JsonValueKind.Array) throw Erro("Os tipos de arquivo vêm numa lista (tipos).", "Config.tipos");
             tipos = t.EnumerateArray().Select(e => e.ValueKind == JsonValueKind.String ? e.GetString()!.Trim().ToLowerInvariant() : "")
                 .Distinct().ToList();
             if (tipos.Count == 0 || tipos.Any(x => !PeDominios.TipoArquivo.Todos.Contains(x)))
-                throw Erro("Os tipos de arquivo aceitos são: " + string.Join(", ", PeDominios.TipoArquivo.Todos) + ".");
+                throw Erro("Os tipos de arquivo aceitos são: " + string.Join(", ", PeDominios.TipoArquivo.Todos) + ".", "Config.tipos");
         }
         saida["tipos"] = new JsonArray(tipos.Select(x => (JsonNode)JsonValue.Create(x)!).ToArray());
         var maxMb = LerInteiro(entrada, "maxMb", 1, PeDominios.TipoArquivo.MaximoMb,
@@ -219,50 +232,50 @@ public static class PeConfigCampo
     {
         Permitir(entrada, "calculo", "campos", "pesos", "matriz");
         var calculo = Texto(entrada, "calculo")
-            ?? throw Erro("Diga o cálculo: " + string.Join(", ", PeDominios.Calculo.Todos) + ".");
+            ?? throw Erro("Diga o cálculo: " + string.Join(", ", PeDominios.Calculo.Todos) + ".", "Config.calculo");
         if (!PeDominios.Calculo.Todos.Contains(calculo))
-            throw Erro($"Cálculo inválido: {calculo}. Use um destes: {string.Join(", ", PeDominios.Calculo.Todos)}.");
+            throw Erro($"Cálculo inválido: {calculo}. Use um destes: {string.Join(", ", PeDominios.Calculo.Todos)}.", "Config.calculo");
 
         if (!entrada.TryGetValue("campos", out var c) || c.ValueKind != JsonValueKind.Array)
-            throw Erro("Diga os campos que entram no cálculo (campos).");
+            throw Erro("Diga os campos que entram no cálculo (campos).", "Config.campos");
         var chaves = c.EnumerateArray().Select(e => e.ValueKind == JsonValueKind.String ? e.GetString()!.Trim() : "").ToList();
         if (chaves.Any(k => k.Length == 0) || chaves.Distinct().Count() != chaves.Count)
-            throw Erro("Os campos do cálculo precisam ser chaves diferentes umas das outras.");
+            throw Erro("Os campos do cálculo precisam ser chaves diferentes umas das outras.", "Config.campos");
 
         var campos = new List<PeCampoInfo>();
         foreach (var chave in chaves)
         {
-            if (chave == ctx.ChaveDoCampo) throw Erro("O campo calculado não pode entrar no próprio cálculo.");
+            if (chave == ctx.ChaveDoCampo) throw Erro("O campo calculado não pode entrar no próprio cálculo.", "Config.campos");
             var campo = ctx.CamposDaSecao.FirstOrDefault(x => x.Chave == chave)
-                ?? throw Erro($"O campo \"{chave}\" não existe nesta seção (ou foi apagado).");
+                ?? throw Erro($"O campo \"{chave}\" não existe nesta seção (ou foi apagado).", "Config.campos");
             campos.Add(campo);
         }
 
         switch (calculo)
         {
             case PeDominios.Calculo.Produto when campos.Count < 2:
-                throw Erro("O produto precisa de pelo menos dois campos.");
+                throw Erro("O produto precisa de pelo menos dois campos.", "Config.campos");
             case PeDominios.Calculo.Subtracao when campos.Count != 2:
-                throw Erro("A subtração usa exatamente dois campos: o primeiro menos o segundo.");
+                throw Erro("A subtração usa exatamente dois campos: o primeiro menos o segundo.", "Config.campos");
             case PeDominios.Calculo.SomaPonderada when campos.Count < 1:
-                throw Erro("A soma ponderada precisa de pelo menos um campo.");
+                throw Erro("A soma ponderada precisa de pelo menos um campo.", "Config.campos");
             case PeDominios.Calculo.NivelRisco when campos.Count != 2:
-                throw Erro("O nível de risco usa exatamente dois campos: probabilidade e impacto.");
+                throw Erro("O nível de risco usa exatamente dois campos: probabilidade e impacto.", "Config.campos");
         }
 
         if (calculo == PeDominios.Calculo.NivelRisco)
         {
             if (campos.Any(x => x.Tipo != PeDominios.TipoCampo.Lista))
-                throw Erro("O nível de risco cruza dois campos de lista (probabilidade e impacto).");
+                throw Erro("O nível de risco cruza dois campos de lista (probabilidade e impacto).", "Config.campos");
         }
         else
         {
             foreach (var campo in campos)
             {
                 if (!TiposNumericos.Contains(campo.Tipo))
-                    throw Erro($"O campo \"{campo.Chave}\" não é numérico: entram número, valor em reais, percentual ou lista com valores numéricos.");
+                    throw Erro($"O campo \"{campo.Chave}\" não é numérico: entram número, valor em reais, percentual ou lista com valores numéricos.", "Config.campos");
                 if (campo.Tipo == PeDominios.TipoCampo.Lista && campo.Opcoes.Any(o => !EhNumero(o)))
-                    throw Erro($"As opções do campo \"{campo.Chave}\" precisam ter valores numéricos para entrar no cálculo.");
+                    throw Erro($"As opções do campo \"{campo.Chave}\" precisam ter valores numéricos para entrar no cálculo.", "Config.campos");
             }
         }
 
@@ -278,18 +291,18 @@ public static class PeConfigCampo
     private static JsonObject Pesos(Dictionary<string, JsonElement> entrada, List<string> chaves)
     {
         if (!entrada.TryGetValue("pesos", out var p) || p.ValueKind != JsonValueKind.Object)
-            throw Erro("A soma ponderada precisa do peso de cada campo (pesos).");
+            throw Erro("A soma ponderada precisa do peso de cada campo (pesos).", "Config.pesos");
         var pesos = p.EnumerateObject().ToDictionary(x => x.Name, x => x.Value);
         var saida = new JsonObject();
         foreach (var chave in chaves)
         {
             if (!pesos.TryGetValue(chave, out var valor) || valor.ValueKind != JsonValueKind.Number
                 || !valor.TryGetDecimal(out var peso) || peso <= 0)
-                throw Erro($"Dê um peso maior que zero ao campo \"{chave}\".");
+                throw Erro($"Dê um peso maior que zero ao campo \"{chave}\".", "Config.pesos");
             saida[chave] = peso;
         }
         if (pesos.Keys.Any(k => !chaves.Contains(k)))
-            throw Erro("Há peso para um campo que não entra no cálculo.");
+            throw Erro("Há peso para um campo que não entra no cálculo.", "Config.pesos");
         return saida;
     }
 
@@ -297,25 +310,25 @@ public static class PeConfigCampo
         IReadOnlyList<string> resultados)
     {
         if (!entrada.TryGetValue("matriz", out var m) || m.ValueKind != JsonValueKind.Object)
-            throw Erro("O nível de risco precisa da matriz (probabilidade nas linhas, impacto nas colunas).");
+            throw Erro("O nível de risco precisa da matriz (probabilidade nas linhas, impacto nas colunas).", "Config.matriz");
 
         var saida = new JsonObject();
         var linhasInformadas = m.EnumerateObject().ToList();
         foreach (var linha in linhasInformadas)
         {
             if (!linhas.Opcoes.Contains(linha.Name))
-                throw Erro($"A matriz tem a linha \"{linha.Name}\", que não é opção do campo \"{linhas.Chave}\".");
+                throw Erro($"A matriz tem a linha \"{linha.Name}\", que não é opção do campo \"{linhas.Chave}\".", "Config.matriz");
             if (linha.Value.ValueKind != JsonValueKind.Object)
-                throw Erro($"A linha \"{linha.Name}\" da matriz precisa dizer o nível de cada impacto.");
+                throw Erro($"A linha \"{linha.Name}\" da matriz precisa dizer o nível de cada impacto.", "Config.matriz");
 
             var celulas = new JsonObject();
             foreach (var celula in linha.Value.EnumerateObject())
             {
                 if (!colunas.Opcoes.Contains(celula.Name))
-                    throw Erro($"A matriz tem a coluna \"{celula.Name}\", que não é opção do campo \"{colunas.Chave}\".");
+                    throw Erro($"A matriz tem a coluna \"{celula.Name}\", que não é opção do campo \"{colunas.Chave}\".", "Config.matriz");
                 var nivel = celula.Value.ValueKind == JsonValueKind.String ? celula.Value.GetString()!.Trim() : "";
                 if (nivel.Length == 0 || (resultados.Count > 0 && !resultados.Contains(nivel)))
-                    throw Erro($"A célula \"{linha.Name}\" x \"{celula.Name}\" precisa ser uma das opções do nível de risco.");
+                    throw Erro($"A célula \"{linha.Name}\" x \"{celula.Name}\" precisa ser uma das opções do nível de risco.", "Config.matriz");
                 celulas[celula.Name] = nivel;
             }
             saida[linha.Name] = celulas;
@@ -325,10 +338,10 @@ public static class PeConfigCampo
         foreach (var linha in linhas.OpcoesAtivas)
         {
             if (saida[linha] is not JsonObject celulas)
-                throw Erro($"Falta a linha \"{linha}\" na matriz do nível de risco.");
+                throw Erro($"Falta a linha \"{linha}\" na matriz do nível de risco.", "Config.matriz");
             foreach (var coluna in colunas.OpcoesAtivas)
                 if (celulas[coluna] == null)
-                    throw Erro($"Falta a célula \"{linha}\" x \"{coluna}\" na matriz do nível de risco.");
+                    throw Erro($"Falta a célula \"{linha}\" x \"{coluna}\" na matriz do nível de risco.", "Config.matriz");
         }
         return saida;
     }
@@ -339,13 +352,13 @@ public static class PeConfigCampo
     {
         var entrada = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
         if (config == null || config.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) return entrada;
-        if (config.Value.ValueKind != JsonValueKind.Object) throw Erro("O config precisa ser um objeto JSON.");
+        if (config.Value.ValueKind != JsonValueKind.Object) throw Erro("O config precisa ser um objeto JSON.", "Config");
         foreach (var p in config.Value.EnumerateObject())
         {
             // Chave com nulo não diz nada: conta como ausente (o formulário do front manda
             // todas as chaves do tipo PeConfigCampo, as que não usa com nulo)
             if (p.Value.ValueKind == JsonValueKind.Null) continue;
-            if (!entrada.TryAdd(p.Name, p.Value)) throw Erro($"O config repete a chave \"{p.Name}\".");
+            if (!entrada.TryAdd(p.Name, p.Value)) throw Erro($"O config repete a chave \"{p.Name}\".", "Config");
         }
         return entrada;
     }
@@ -356,13 +369,13 @@ public static class PeConfigCampo
         if (sobrando.Count == 0) return;
         throw Erro(chaves.Length == 0
             ? "Este tipo de campo não tem configuração."
-            : $"O config não aceita \"{string.Join("\", \"", sobrando)}\" neste tipo de campo. Aceita: {string.Join(", ", chaves)}.");
+            : $"O config não aceita \"{string.Join("\", \"", sobrando)}\" neste tipo de campo. Aceita: {string.Join(", ", chaves)}.", "Config");
     }
 
     private static string? Texto(Dictionary<string, JsonElement> entrada, string chave)
     {
         if (!entrada.TryGetValue(chave, out var e) || e.ValueKind == JsonValueKind.Null) return null;
-        if (e.ValueKind != JsonValueKind.String) throw Erro($"\"{chave}\" precisa ser um texto.");
+        if (e.ValueKind != JsonValueKind.String) throw Erro($"\"{chave}\" precisa ser um texto.", $"Config.{chave}");
         var texto = e.GetString()!.Trim();
         return texto.Length == 0 ? null : texto;
     }
@@ -374,7 +387,7 @@ public static class PeConfigCampo
         {
             JsonValueKind.True => true,
             JsonValueKind.False => false,
-            _ => throw Erro($"\"{chave}\" precisa ser verdadeiro ou falso.")
+            _ => throw Erro($"\"{chave}\" precisa ser verdadeiro ou falso.", $"Config.{chave}")
         };
     }
 
@@ -382,7 +395,7 @@ public static class PeConfigCampo
     {
         if (!entrada.TryGetValue(chave, out var e) || e.ValueKind == JsonValueKind.Null) return null;
         if (e.ValueKind != JsonValueKind.Number || !e.TryGetDecimal(out var valor))
-            throw Erro($"\"{chave}\" precisa ser um número.");
+            throw Erro($"\"{chave}\" precisa ser um número.", $"Config.{chave}");
         return valor;
     }
 
@@ -390,7 +403,7 @@ public static class PeConfigCampo
     {
         if (!entrada.TryGetValue(chave, out var e) || e.ValueKind == JsonValueKind.Null) return null;
         if (e.ValueKind != JsonValueKind.Number || !e.TryGetInt32(out var valor) || valor < min || valor > max)
-            throw Erro(mensagem);
+            throw Erro(mensagem, $"Config.{chave}");
         return valor;
     }
 
@@ -401,5 +414,11 @@ public static class PeConfigCampo
         if (valor != null) saida[chave] = valor;
     }
 
-    private static ApiException Erro(string mensagem) => new(ErrorCode.PeConfigInvalida, mensagem);
+    /// <summary>
+    /// O erro do config com o campo da tela a que ele se refere (F1, achado A14): "Config.max",
+    /// "Config.secao" e assim por diante ("Config" quando é o config inteiro; "Tipo" no tipo). A
+    /// resposta 400 leva Campos com essa chave, e a mensagem continua em Message.
+    /// </summary>
+    private static ApiException Erro(string mensagem, string campo) =>
+        new PeValidacaoException(new Dictionary<string, string> { [campo] = mensagem }, mensagem, ErrorCode.PeConfigInvalida);
 }

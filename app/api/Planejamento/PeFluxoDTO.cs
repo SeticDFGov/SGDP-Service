@@ -87,6 +87,8 @@ public class PeFluxoModeloResponse
     public DateTime? AlteradoEm { get; set; }
 
     public string? AlteradoPor { get; set; }
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail); nulo com o AlteradoPor
+    public string? AlteradoPorNome { get; set; }
 }
 
 /// <summary>Um fluxo na lista do PDTIC (GET api/planejamento/pdtic/{id}/fluxos).</summary>
@@ -109,6 +111,8 @@ public class PeFluxoResumoResponse
     public DateTime? AlteradoEm { get; set; }
 
     public string? AlteradoPor { get; set; }
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail); nulo com o AlteradoPor
+    public string? AlteradoPorNome { get; set; }
 
     // A mais que o contrato: a ordem do modelo
     public int Ordem { get; set; }
@@ -137,6 +141,8 @@ public class PeFluxoResponse
     public DateTime? AlteradoEm { get; set; }
 
     public string? AlteradoPor { get; set; }
+    // F1 (C19): o nome da pessoa (o do cadastro do usuário; sem nome, o e-mail); nulo com o AlteradoPor
+    public string? AlteradoPorNome { get; set; }
 }
 
 /// <summary>

@@ -34,7 +34,10 @@ public class PeOrgaosController : ControllerBase
         Executar(ctx => _permissoes.VeTodosOsOrgaos(ctx), async _ => Ok(await _service.ListarAsync(consulta)),
             "A lista de órgãos é da SGDI, da Secretaria do CGTIC e do administrador do módulo.");
 
-    /// <summary>Troca o nível do órgão ({ NivelId, Justificativa }, justificativa obrigatória).</summary>
+    /// <summary>
+    /// Troca o nível do órgão ({ NivelId, Justificativa }, justificativa obrigatória). Desde a F1,
+    /// NivelId nulo devolve o órgão ao nível padrão (o histórico marca NivelNovoPadrao).
+    /// </summary>
     [HttpPut("{id:long}/nivel")]
     public Task<IActionResult> DefinirNivel(long id, [FromBody] PeOrgaoNivelDTO dto) =>
         Executar(ctx => _permissoes.PodeConfigurarModelo(ctx), async ctx => Ok(await _service.DefinirNivelAsync(id, dto, ctx.Email)),
