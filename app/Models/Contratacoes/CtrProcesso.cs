@@ -14,6 +14,10 @@ public class CtrProcesso
     // Formato SEI 00000-00000000/AAAA-DD; único entre os ativos
     public string NumeroProcesso { get; set; } = string.Empty;
 
+    // Nº SEI do Formulário (pedido de 2026-09-24): opcional, no mesmo formato SEI do número
+    // do processo (CtrProcessoService.FormatoSei). Não é único.
+    public string? NumeroSeiFormulario { get; set; }
+
     // Órgão comunicante em texto livre: o universo aqui é maior que o dos
     // órgãos aderentes ao PGIA, então não há FK para pgia_orgao.
     public string OrgaoNome { get; set; } = string.Empty;
@@ -45,6 +49,21 @@ public class CtrProcesso
     // Só conclui o processo junto do retorno ao Gab SGDI (CalcularSituacao).
     public bool RetornoOrgaoNaoSeAplica { get; set; }
 
+    // ── Análise técnica (pedido de 2026-09-24) ────────────────────────────────
+    // Encaminhamento do processo a uma área técnica (CtrDominios.AreaTecnica) e o retorno
+    // dela. Tudo opcional e FORA da cronologia do trâmite (como o esclarecimento): a área é
+    // exigida com a data do encaminhamento, o retorno exige o encaminhamento e não pode
+    // ser anterior a ele, e nenhuma das datas pode ser futura. Encaminhar e receber o
+    // retorno é movimentação do processo (CalcularUltimaMovimentacao). Não muda a situação.
+    public DateOnly? AnaliseTecnicaEncaminhadaEm { get; set; }
+
+    public string? AnaliseTecnicaArea { get; set; }
+
+    public DateOnly? AnaliseTecnicaRetornoEm { get; set; }
+
+    // Resumo curto do que a área técnica respondeu (acompanha a data do retorno)
+    public string? AnaliseTecnicaRetornoResumo { get; set; }
+
     // CtrDominios.EtapaPlanejamento — onde o planejamento está (ou parou). Continua
     // registrada depois da assinatura do contrato.
     public string? EtapaPlanejamento { get; set; }
@@ -62,7 +81,9 @@ public class CtrProcesso
     public string? Criticidade { get; set; }
 
     // Respostas aos critérios do art. 11, § 3º, da IN (CtrDominios.CriterioCriticidade),
-    // em jsonb {"I":"Sim","II":"Alto",...}. Nulo = critérios ainda não avaliados.
+    // em jsonb {"I":"Sim","II":"Desconhecido",...}. Nulo = critérios ainda não avaliados. No
+    // II pode estar a resposta à pergunta ANTERIOR (Nenhum, Baixo, Médio ou Alto), guardada
+    // até alguém responder à pergunta nova; na conta ela vale Desconhecido.
     public string? CriteriosCriticidade { get; set; }
 
     // CtrDominios.Origem: nem toda contratação chega pelo órgão comunicante —
@@ -88,6 +109,11 @@ public class CtrProcesso
     public DateOnly? EsclarecimentoSolicitadoEm { get; set; }
 
     public string? EsclarecimentoDescricao { get; set; }
+
+    // Nº do documento SEI pelo qual a SGDI pediu os esclarecimentos ou as informações
+    // complementares (pedido de 2026-09-24). Texto livre, opcional, e faz parte do pedido:
+    // sem a data do pedido é anulado, como a descrição.
+    public string? EsclarecimentoDocumentoSei { get; set; }
 
     public DateOnly? EsclarecimentoRespondidoEm { get; set; }
 
@@ -121,7 +147,9 @@ public class CtrProcesso
     // atual, sem histórico; independente da Criticidade.
     public ICollection<CtrRiscoDeclarado> RiscosDeclarados { get; set; } = new List<CtrRiscoDeclarado>();
 
-    // Restituição ao órgão: conceito de primeira classe (hoje vive na Observação)
+    // Restituição ao órgão: conceito de primeira classe (hoje vive na Observação). Desde
+    // 2026-09-24 as telas não a pedem mais (a tramitação tem a data do retorno ao órgão);
+    // colunas e dados gravados continuam, e a importação da planilha legada ainda a infere.
     public bool Restituido { get; set; }
 
     public DateOnly? RestituidoEm { get; set; }

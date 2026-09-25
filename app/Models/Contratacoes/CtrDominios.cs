@@ -151,17 +151,24 @@ public static class CtrDominios
 
     /// <summary>
     /// Critérios de priorização do art. 11, § 3º, da IN SGDI nº 1/2026, respondidos no
-    /// cadastro do processo. I, III, V e VII são Sim/Não; II, IV e VI são graduados
-    /// (Nenhum, Baixo, Médio, Alto), e o IV aceita ainda "Não foi possível avaliar com as
-    /// informações apresentadas". A resposta padrão de cada um é a primeira da lista.
+    /// cadastro do processo. I, III, V e VII são Sim/Não; IV e VI são graduados (Nenhum,
+    /// Baixo, Médio, Alto), e o IV aceita ainda "Não foi possível avaliar com as informações
+    /// apresentadas". Desde 2026-09-24 o II pergunta se a contratação impacta diretamente
+    /// algum projeto de Transformação Digital do órgão (Sim, Não ou Desconhecido) e deixou de
+    /// ser graduado. A resposta padrão é a primeira da lista, menos no II, em que é
+    /// Desconhecido.
     /// </summary>
     public static class CriterioCriticidade
     {
         /// <summary>I: alinhamento às diretrizes da EGD/DF.</summary>
         public const string AlinhamentoEgd = "I";
 
-        /// <summary>II: impacto sobre a prestação de serviços públicos digitais.</summary>
-        public const string ImpactoServicos = "II";
+        /// <summary>
+        /// II: a contratação impacta diretamente algum projeto de Transformação Digital do
+        /// órgão ou entidade (pergunta nova de 2026-09-24; antes era o impacto sobre a
+        /// prestação de serviços públicos digitais, respondido de Nenhum a Alto).
+        /// </summary>
+        public const string ProjetoTransformacaoDigital = "II";
 
         /// <summary>III: potencial de compartilhamento ou utilização corporativa da solução.</summary>
         public const string Compartilhamento = "III";
@@ -180,7 +187,7 @@ public static class CtrDominios
 
         public static readonly string[] Todos =
         {
-            AlinhamentoEgd, ImpactoServicos, Compartilhamento, ImpactoArquitetura,
+            AlinhamentoEgd, ProjetoTransformacaoDigital, Compartilhamento, ImpactoArquitetura,
             TecnologiasEmergentes, RiscosSeguranca, ValorEstimado
         };
 
@@ -189,12 +196,30 @@ public static class CtrDominios
 
         public static readonly string[] RespostasSimNao = { Nao, Sim };
 
+        /// <summary>Só no critério II: não se sabe se a contratação impacta algum projeto.</summary>
+        public const string Desconhecido = "Desconhecido";
+
+        /// <summary>As respostas do critério II, nesta ordem (decisão do usuário).</summary>
+        public static readonly string[] RespostasProjetoTransformacaoDigital = { Sim, Nao, Desconhecido };
+
         public const string Nenhum = "Nenhum";
         public const string Baixo = "Baixo";
         public const string Medio = "Médio";
         public const string Alto = "Alto";
 
         public static readonly string[] RespostasGrau = { Nenhum, Baixo, Medio, Alto };
+
+        /// <summary>
+        /// Respostas à pergunta ANTERIOR do critério II (impacto sobre os serviços públicos
+        /// digitais, de Nenhum a Alto). Continuam gravadas nos processos que as têm e são
+        /// aceitas na entrada (front e planilha antigos), mas contam como Desconhecido até
+        /// alguém responder à pergunta nova; a tela as mostra como referência.
+        /// </summary>
+        public static readonly string[] RespostasPerguntaAnteriorII = RespostasGrau;
+
+        /// <summary>A resposta gravada no II é da pergunta anterior (Nenhum, Baixo, Médio ou Alto).</summary>
+        public static bool EhRespostaPerguntaAnteriorII(string? resposta) =>
+            resposta != null && RespostasPerguntaAnteriorII.Contains(resposta);
 
         /// <summary>
         /// Só no critério IV: as informações apresentadas não permitiram avaliar o impacto.
@@ -211,16 +236,47 @@ public static class CtrDominios
         /// <summary>As respostas do critério IV: a graduação e, por último, a que não avalia.</summary>
         public static readonly string[] RespostasImpactoArquitetura = { Nenhum, Baixo, Medio, Alto, NaoFoiPossivelAvaliar };
 
-        /// <summary>Os três critérios graduados (os demais são Sim/Não).</summary>
-        public static readonly string[] Graduados = { ImpactoServicos, ImpactoArquitetura, RiscosSeguranca };
+        /// <summary>Os dois critérios graduados (o II deixou de ser em 2026-09-24).</summary>
+        public static readonly string[] Graduados = { ImpactoArquitetura, RiscosSeguranca };
 
+        /// <summary>As respostas da pergunta atual de cada critério (sem as da pergunta anterior do II).</summary>
         public static string[] RespostasDe(string codigo) =>
-            codigo == ImpactoArquitetura ? RespostasImpactoArquitetura
+            codigo == ProjetoTransformacaoDigital ? RespostasProjetoTransformacaoDigital
+            : codigo == ImpactoArquitetura ? RespostasImpactoArquitetura
             : Graduados.Contains(codigo) ? RespostasGrau
             : RespostasSimNao;
 
-        /// <summary>Resposta assumida quando o critério não é respondido (Não ou Nenhum).</summary>
-        public static string RespostaPadrao(string codigo) => RespostasDe(codigo)[0];
+        /// <summary>
+        /// Resposta assumida quando o critério não é respondido: Desconhecido no II, a primeira
+        /// da lista nos demais (Não ou Nenhum).
+        /// </summary>
+        public static string RespostaPadrao(string codigo) =>
+            codigo == ProjetoTransformacaoDigital ? Desconhecido : RespostasDe(codigo)[0];
+    }
+
+    /// <summary>
+    /// Área técnica para onde a SGDI encaminha o processo para análise técnica (pedido de
+    /// 2026-09-24): a Subsecretaria de Sistemas ou a de Infraestrutura.
+    /// </summary>
+    public static class AreaTecnica
+    {
+        public const string Subsis = "SUBSIS";
+        public const string Subinfra = "SUBINFRA";
+
+        public static readonly string[] Todos = { Subsis, Subinfra };
+    }
+
+    /// <summary>
+    /// Status da contratação na supervisão contínua, DERIVADO pela regra de conclusão do
+    /// módulo (contrato assinado = processo Concluído) e nunca gravado. Fonte única do
+    /// cálculo: <c>CtrProcessoService.CalcularStatusSupervisao</c>.
+    /// </summary>
+    public static class StatusSupervisao
+    {
+        public const string EmRegimeSupervisao = "Em regime de supervisão";
+        public const string Concluida = "Concluída";
+
+        public static readonly string[] Todos = { EmRegimeSupervisao, Concluida };
     }
 
     /// <summary>Resultado da análise e providência adotada (inciso I do despacho).</summary>

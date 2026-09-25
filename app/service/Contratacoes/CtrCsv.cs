@@ -127,7 +127,9 @@ public static class CtrCsv
         "Restituído", "Data da restituição", "Motivo da restituição",
         "Etapa do planejamento", "Assinatura do contrato", "Criticidade", "Origem",
         "Pedido de esclarecimento em", "Esclarecimento solicitado", "Esclarecimento respondido em",
-        "Critério I - Alinhamento à EGD/DF", "Critério II - Impacto nos serviços públicos digitais",
+        // O II mudou de pergunta em 2026-09-24 (a coluna é a mesma: a leitura é por posição e
+        // aceita também as respostas da pergunta anterior, que ficam guardadas como vieram)
+        "Critério I - Alinhamento à EGD/DF", "Critério II - Impacta projeto de Transformação Digital",
         "Critério III - Compartilhamento ou uso corporativo",
         "Critério IV - Impacto na arquitetura, interoperabilidade ou dados",
         "Critério V - Tecnologias emergentes, nuvem ou IA",
@@ -375,7 +377,10 @@ public static class CtrCsv
         // ── Colunas 23-29 (bloco dos critérios de criticidade) ────────────────
         // As sete células vazias = critérios não avaliados (a coluna Criticidade decide,
         // como antes). Qualquer resposta preenchida avalia o bloco: as ausentes recebem a
-        // resposta padrão e a criticidade passa a ser DERIVADA das respostas.
+        // resposta padrão (na validação do serviço, que completa o bloco) e a criticidade
+        // passa a ser DERIVADA das respostas. O parser guarda só as respondidas: é assim que
+        // a importação sabe que o II veio vazio e mantém a resposta gravada à pergunta
+        // anterior dele (CtrCriticidade.ManterRespostaPerguntaAnteriorII).
         Dictionary<string, string>? criterios = null;
         if (colunas.CriteriosCriticidade)
         {
@@ -393,7 +398,7 @@ public static class CtrCsv
                 respostas[codigo] = resposta;
             }
 
-            if (respostas.Count > 0) criterios = CtrCriticidade.Normalizar(respostas);
+            if (respostas.Count > 0) criterios = respostas;
         }
 
         // Criticidade digitada que não confere com os critérios é RECUSADA, não corrigida em
@@ -875,7 +880,9 @@ public static class CtrCsv
                 (Data(p.EsclarecimentoRespondidoEm), false),
                 // Os sete critérios: vazios quando o processo ainda não os tem avaliados
                 (Criterio(p, CtrDominios.CriterioCriticidade.AlinhamentoEgd), false),
-                (Criterio(p, CtrDominios.CriterioCriticidade.ImpactoServicos), false),
+                // O II sai como está gravado: a resposta à pergunta nova ou, até alguém
+                // responder, a da pergunta anterior (a importação a aceita de volta)
+                (Criterio(p, CtrDominios.CriterioCriticidade.ProjetoTransformacaoDigital), false),
                 (Criterio(p, CtrDominios.CriterioCriticidade.Compartilhamento), false),
                 (Criterio(p, CtrDominios.CriterioCriticidade.ImpactoArquitetura), false),
                 (Criterio(p, CtrDominios.CriterioCriticidade.TecnologiasEmergentes), false),
