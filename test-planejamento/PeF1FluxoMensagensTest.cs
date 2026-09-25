@@ -115,10 +115,10 @@ public class PeF1FluxoMensagensTest : PeFluxoTestBase
     }
 
     [Fact]
-    public void AMesmaLinha_UmaVezSo()
+    public void AMesmaLinha_UmaVezSo_EDoisItensIguais_PelaPosicao()
     {
-        // Dois paralelos sem nome depois da mesma tarefa, cada um com uma saída: o mesmo problema
-        // descrito do mesmo jeito sai uma vez só
+        // Dois paralelos sem nome depois da mesma tarefa, cada um com uma saída: desde a F2
+        // (observação D-O2), cada um pela posição na raia (o de cima é o 1º), uma linha para cada
         var erros = ErrosDe(Def(
             new[] { R("zqr1", "Equipe", 1) },
             new[]
@@ -127,7 +127,11 @@ public class PeF1FluxoMensagensTest : PeFluxoTestBase
                 E("zq5", "tarefa", "zqr1", "Consolidar"), E("zq6", "fim", "zqr1")
             },
             new[] { L("zql1", "zq1", "zq2"), L("zql2", "zq2", "zq3"), L("zql3", "zq2", "zq4"), L("zql4", "zq3", "zq5"), L("zql5", "zq4", "zq5"), L("zql6", "zq5", "zq6") }));
-        Assert.Equal(new[] { "O paralelo sem nome, depois de 2.1, precisa abrir caminhos (duas saídas ou mais) ou juntar caminhos (duas entradas ou mais)." }, erros);
+        Assert.Equal(new[]
+        {
+            "O 1º paralelo da raia \"Equipe\" precisa abrir caminhos (duas saídas ou mais) ou juntar caminhos (duas entradas ou mais).",
+            "O 2º paralelo da raia \"Equipe\" precisa abrir caminhos (duas saídas ou mais) ou juntar caminhos (duas entradas ou mais)."
+        }, erros);
 
         // Duas ligações da mesma tarefa para passos apagados: uma linha
         var apagados = ErrosDe(Def(

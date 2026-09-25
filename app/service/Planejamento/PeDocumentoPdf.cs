@@ -30,8 +30,11 @@ namespace service.Planejamento;
 /// <item>bloco com página deitada abre páginas A4 deitadas só para ele (desde a F1, só quando
 /// tem dado: a tabela vazia fica na página em pé, junto do capítulo, achado C26); a quebra de
 /// página começa uma página nova; os anexos começam numa página nova;</item>
-/// <item>colunas de data, código, número e valor com a largura mínima do texto delas (sem quebrar
-/// no meio, achado C06), e as outras pelo peso do texto;</item>
+/// <item>colunas com a largura mínima da maior palavra delas, do cabeçalho e das células (a data,
+/// o código, o número e o valor inteiros, e nenhuma palavra quebrada no meio: achado C06, F1 e
+/// F2), e o resto pelo peso do texto;</item>
+/// <item>a legenda da tabela sai com o cabeçalho das colunas e a primeira linha, e a tabela curta
+/// (até um terço da página) não se divide entre páginas (F2, achado B-N1);</item>
 /// <item>rodapé com o órgão, a versão e "Página N de M" (menos na capa).</item>
 /// </list>
 /// O roteiro (<see cref="Montar"/>) diz o que vai em cada grupo de páginas e o que entra no
@@ -62,11 +65,19 @@ public static partial class PeDocumentoPdf
     // Espaço interno e borda de uma célula (4 de cada lado e a borda de 0,5)
     private const float SobraDaCelula = 9f;
 
-    // Texto sem espaço até este tamanho é um "átomo" (data, código, número, valor): não quebra
-    private const int MaximoDoAtomo = 24;
-
-    // A largura mínima não passa disto (o cabeçalho longo pode quebrar na palavra)
+    // A largura mínima não passa disto (a palavra maior, como um endereço de internet, quebra)
     private const float MaximoDaLarguraMinima = 96f;
+
+    // A entrelinha do texto (a da página)
+    private const float Entrelinha = 1.3f;
+
+    // A altura útil da página (pontos): sem as margens e sem o rodapé (linha, espaço e texto)
+    private const float AlturaDoRodape = 0.5f + 4f + 8f * Entrelinha;
+    public const float AlturaUtilEmPe = 841.89f - (2.2f + 1.6f) * PontosPorCentimetro - AlturaDoRodape;
+    public const float AlturaUtilDeitada = 595.28f - 2 * 1.6f * PontosPorCentimetro - AlturaDoRodape;
+
+    // A tabela curta (com a legenda, até um terço da altura útil) não se divide entre páginas
+    private const float FracaoDaTabelaCurta = 1f / 3f;
 
     // A marca monocromática do GDF (a mesma da prévia no front), embutida na aplicação
     private const string RecursoDaMarca = "Planejamento.marca-gdf.png";
@@ -712,7 +723,7 @@ public static partial class PeDocumentoPdf
                 TabelaDeDados(container, bloco.Tabela, ctx, largura);
                 break;
             case PeDominios.TipoBloco.ListaTema when bloco.Lista != null:
-                ListaDoTema(container, bloco.Lista);
+                ListaDoTema(container, bloco.Lista, largura);
                 break;
             case PeDominios.TipoBloco.MatrizSwot when bloco.Swot != null:
                 Swot(container, bloco.Swot);
@@ -758,13 +769,30 @@ public static partial class PeDocumentoPdf
     private static void Vazio(ColumnDescriptor col, string texto) =>
         col.Item().Text(texto).FontSize(9).Italic().FontColor(PeTextoRicoPdf.CorSuave);
 
+    // ── Tabelas de dados ────────────────────────────────────────────────────
+
+    // Metade da linha mais baixa de uma tabela (uma linha de texto e o espaço interno da célula).
+    // Somada à altura estimada da legenda e do cabeçalho, fica entre o cabeçalho sem nenhuma linha
+    // e o cabeçalho com a primeira (a linha não se divide entre páginas, então não há meio-termo)
+    private const float MeiaLinha = (FonteTabela * Entrelinha + 8f) / 2;
+
+    /// <summary>
+    /// A tabela de dados (ou o formulário) com a legenda e a frase que a explica. A legenda não fica
+    /// sozinha no pé da página (F2, achado B-N1): a tabela curta (até um terço da página) vai
+    /// inteira para a página seguinte quando não cabe no resto desta, e a longa só começa numa
+    /// página em que cabem a legenda, o cabeçalho e a primeira linha (<see cref="ComecoDaTabela"/>).
+    /// </summary>
     private static void TabelaDeDados(IContainer container, PeDocTabelaResponse tabela, Contexto ctx, float largura, string? legenda = null,
         string? explicacao = null, string vazia = "Nenhum item registrado.")
     {
+        var titulo = legenda ?? tabela.SecaoTitulo;
+        container = TabelaCurta(tabela, largura, titulo, explicacao)
+            ? container.PreventPageBreak()
+            : container.EnsureSpace(ComecoDaTabela(tabela, largura, titulo, explicacao));
         container.Column(col =>
         {
             col.Spacing(4);
-            Legenda(col, legenda ?? tabela.SecaoTitulo);
+            Legenda(col, titulo);
             if (!string.IsNullOrWhiteSpace(explicacao))
                 col.Item().Text(explicacao).FontSize(9).FontColor(PeTextoRicoPdf.CorSuave);
             if (tabela.SecaoTipo == PeDominios.TipoSecao.Formulario)
@@ -821,9 +849,20 @@ public static partial class PeDocumentoPdf
         });
     }
 
+    // Proporção das colunas do rótulo e do valor no formulário
+    private const float RotuloDoFormulario = 1.1f;
+    private const float ValorDoFormulario = 2.6f;
+
+    // O rótulo de um texto formatado do formulário (o espaço acima, a linha de 9 e o espaço abaixo)
+    private const float RotuloDoTexto = 2f + 9f * Entrelinha + 4f;
+
+    // O começo de um texto que não fica sozinho no pé da página: duas linhas do corpo
+    private const float DuasLinhas = 2 * Fonte * Entrelinha;
+
     /// <summary>
     /// Formulário: os campos preenchidos como rótulo e valor; o texto formatado (o diagnóstico,
-    /// com organograma) sai na largura da página, abaixo do rótulo.
+    /// com organograma) sai na largura da página, abaixo do rótulo, que não fica sozinho no pé da
+    /// página (vai com as duas primeiras linhas do texto, F2).
     /// </summary>
     private static void Formulario(ColumnDescriptor col, PeDocTabelaResponse tabela, Contexto ctx)
     {
@@ -835,11 +874,7 @@ public static partial class PeDocumentoPdf
         }
 
         // Só um texto formatado preenchido (o diagnóstico): sai sem o rótulo, logo abaixo da legenda
-        var preenchidas = tabela.Colunas.Where(c => linha.Ricos != null && linha.Ricos.TryGetValue(c.Chave, out var r)
-                ? PeTextoRicoPdf.TemConteudo(JsonNode.Parse(r.GetRawText()))
-                : !string.IsNullOrWhiteSpace(linha.Celulas.GetValueOrDefault(c.Chave)) && linha.Celulas.GetValueOrDefault(c.Chave) != "-")
-            .ToList();
-        if (preenchidas.Count == 1 && linha.Ricos != null && linha.Ricos.TryGetValue(preenchidas[0].Chave, out var unico))
+        if (TextoUnico(tabela, linha) is { } unico)
         {
             var no = JsonNode.Parse(unico.GetRawText());
             col.Item().Element(c => PeTextoRicoPdf.Desenhar(c, no, ctx.Texto()));
@@ -860,9 +895,9 @@ public static partial class PeDocumentoPdf
                 foreach (var (rotulo, valor) in pares)
                     LinhaInteira(t, 1, row =>
                     {
-                        row.RelativeItem(1.1f).Border(0.5f).BorderColor(PeTextoRicoPdf.CorBorda).Background(FundoRotulo).Padding(4)
+                        row.RelativeItem(RotuloDoFormulario).Border(0.5f).BorderColor(PeTextoRicoPdf.CorBorda).Background(FundoRotulo).Padding(4)
                             .Text(rotulo).FontSize(FonteTabela).SemiBold();
-                        Celula(row.RelativeItem(2.6f), valor);
+                        Celula(row.RelativeItem(ValorDoFormulario), valor);
                     });
             });
         }
@@ -875,8 +910,12 @@ public static partial class PeDocumentoPdf
                 var no = JsonNode.Parse(rico.GetRawText());
                 if (!PeTextoRicoPdf.TemConteudo(no)) continue;
                 desenhou = true;
-                col.Item().PaddingTop(2).Text(coluna.Rotulo).FontSize(9).SemiBold().FontColor(PeTextoRicoPdf.CorSuave);
-                col.Item().Element(c => PeTextoRicoPdf.Desenhar(c, no, ctx.Texto()));
+                col.Item().EnsureSpace(RotuloDoTexto + DuasLinhas).Column(c =>
+                {
+                    c.Spacing(4);
+                    c.Item().PaddingTop(2).Text(coluna.Rotulo).FontSize(9).SemiBold().FontColor(PeTextoRicoPdf.CorSuave);
+                    c.Item().Element(x => PeTextoRicoPdf.Desenhar(x, no, ctx.Texto()));
+                });
                 continue;
             }
             var valor = linha.Celulas.GetValueOrDefault(coluna.Chave);
@@ -887,21 +926,34 @@ public static partial class PeDocumentoPdf
         if (!desenhou) Vazio(col, "Não preenchido.");
     }
 
+    /// <summary>O formulário com um só campo preenchido, e ele é um texto formatado: o texto dele (senão, nulo).</summary>
+    private static JsonElement? TextoUnico(PeDocTabelaResponse tabela, PeDocLinhaResponse linha)
+    {
+        var preenchidas = tabela.Colunas.Where(c => linha.Ricos != null && linha.Ricos.TryGetValue(c.Chave, out var r)
+                ? PeTextoRicoPdf.TemConteudo(JsonNode.Parse(r.GetRawText()))
+                : !string.IsNullOrWhiteSpace(linha.Celulas.GetValueOrDefault(c.Chave)) && linha.Celulas.GetValueOrDefault(c.Chave) != "-")
+            .ToList();
+        return preenchidas.Count == 1 && linha.Ricos != null && linha.Ricos.TryGetValue(preenchidas[0].Chave, out var unico) ? unico : null;
+    }
+
     /// <summary>A largura de uma coluna da tabela: fixa (pontos) ou relativa (o peso).</summary>
     public sealed record LarguraDaColuna(bool Constante, float Valor);
 
     /// <summary>
-    /// As larguras das colunas de dados (F1, achado C06): a coluna de "átomos" (toda célula
-    /// preenchida é um texto sem espaço de até 24 caracteres: data, código, número, percentual,
-    /// valor em reais) tem uma largura mínima em que o maior deles cabe inteiro (e a maior palavra
-    /// do cabeçalho, até um teto); quando o peso daria menos que isso, a coluna fica fixa nessa
-    /// largura e as outras dividem o resto pelo peso. Se as mínimas somadas passam de 70% da
-    /// largura útil (tabela com colunas demais), vale só o peso, como antes.
+    /// As larguras das colunas de dados (F1, achado C06; F2): toda coluna tem uma largura mínima
+    /// em que a maior palavra dela cabe inteira (<see cref="LarguraMinima"/>: a do cabeçalho e a de
+    /// cada célula; a data, o código, o número e o valor em reais são uma palavra só). A coluna
+    /// que pelo peso ficaria mais estreita que a mínima fica fixa nela, e as outras dividem o resto
+    /// pelo peso. Se as mínimas somadas não cabem na largura útil (colunas demais), cada coluna
+    /// fica com a parte proporcional à sua mínima.
     /// </summary>
     public static List<LarguraDaColuna> Larguras(PeDocTabelaResponse tabela, float larguraUtil)
     {
         var pesos = tabela.Colunas.Select(c => Peso(tabela, c)).ToList();
         var minimas = tabela.Colunas.Select(c => LarguraMinima(tabela, c)).ToList();
+        if (minimas.Sum() > larguraUtil)
+            return minimas.Select(m => new LarguraDaColuna(false, Math.Max(m, 1f))).ToList();
+
         var fixas = new bool[pesos.Count];
         bool mudou;
         do
@@ -919,26 +971,69 @@ public static partial class PeDocumentoPdf
             }
         } while (mudou);
 
-        if (minimas.Where((_, i) => fixas[i]).Sum() > larguraUtil * 0.7f || fixas.All(f => f))
-            return pesos.Select(p => new LarguraDaColuna(false, p)).ToList();
+        if (fixas.All(f => f))
+            return minimas.Select(m => new LarguraDaColuna(false, Math.Max(m, 1f))).ToList();
         return pesos.Select((p, i) => fixas[i] ? new LarguraDaColuna(true, minimas[i]) : new LarguraDaColuna(false, p)).ToList();
     }
 
-    /// <summary>A largura mínima da coluna de átomos (zero nas outras colunas).</summary>
+    /// <summary>
+    /// A largura mínima da coluna (F2, achado C06): a maior palavra dela inteira, a do cabeçalho
+    /// (em negrito) e a de cada célula (o texto formatado pelas palavras dele), mais o espaço
+    /// interno da célula, até o teto de <see cref="MaximoDaLarguraMinima"/> pontos. Palavra é o que
+    /// fica entre espaços: a data, o código, o número e o "R$" com o valor (espaço sem quebra) são
+    /// uma palavra só. Zero na coluna sem palavra nenhuma.
+    /// </summary>
     public static float LarguraMinima(PeDocTabelaResponse tabela, PeDocColunaResponse coluna)
     {
-        var textos = tabela.Linhas
-            .Select(l => l.Ricos != null && l.Ricos.ContainsKey(coluna.Chave) ? null : l.Celulas.GetValueOrDefault(coluna.Chave))
-            .Where(t => !string.IsNullOrWhiteSpace(t) && t != "-")
-            .Select(t => SemQuebra(t!.Trim()))
-            .ToList();
-        if (textos.Count == 0 || textos.Any(t => t.Contains(' ') || t.Contains('\n') || t.Length > MaximoDoAtomo)) return 0;
-        var valor = textos.Max(t => LarguraDoTexto(t, negrito: false));
-        var cabecalho = coluna.Rotulo.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Select(p => LarguraDoTexto(p, negrito: true))
-            .DefaultIfEmpty(0)
-            .Max();
-        return (float)Math.Ceiling(Math.Min(MaximoDaLarguraMinima, Math.Max(valor, cabecalho) + SobraDaCelula));
+        var cabecalho = Palavras(coluna.Rotulo).Select(p => LarguraDoTexto(p, negrito: true));
+        var celulas = tabela.Linhas.SelectMany(l => Palavras(TextoDaCelula(l, coluna))).Select(p => LarguraDoTexto(p, negrito: false));
+        var maior = cabecalho.Concat(celulas).DefaultIfEmpty(0).Max();
+        return maior <= 0 ? 0 : (float)Math.Ceiling(Math.Min(MaximoDaLarguraMinima, maior + SobraDaCelula));
+    }
+
+    // As palavras de um texto (o que fica entre espaços e quebras de linha; o espaço sem quebra não separa)
+    private static IEnumerable<string> Palavras(string texto) =>
+        texto.Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+
+    /// <summary>O texto da célula como o PDF o mostra ("-" quando vazia; o texto formatado, pelas palavras dele).</summary>
+    private static string TextoDaCelula(PeDocLinhaResponse linha, PeDocColunaResponse coluna) =>
+        linha.Ricos != null && linha.Ricos.TryGetValue(coluna.Chave, out var rico)
+            ? TextoDoRico(rico)
+            : SemQuebra(linha.Celulas.GetValueOrDefault(coluna.Chave) ?? "-");
+
+    /// <summary>O texto de um texto formatado (TipTap), um bloco por linha, sem as marcas.</summary>
+    private static string TextoDoRico(JsonElement documento)
+    {
+        var texto = new System.Text.StringBuilder();
+        void Visitar(JsonElement no)
+        {
+            if (no.ValueKind != JsonValueKind.Object) return;
+            if (no.TryGetProperty("text", out var t) && t.ValueKind == JsonValueKind.String) texto.Append(t.GetString());
+            if (no.TryGetProperty("type", out var tipo) && tipo.ValueKind == JsonValueKind.String && tipo.GetString() == "hardBreak") texto.Append('\n');
+            if (no.TryGetProperty("content", out var filhos) && filhos.ValueKind == JsonValueKind.Array)
+                foreach (var filho in filhos.EnumerateArray())
+                {
+                    Visitar(filho);
+                    // Depois de um bloco (parágrafo, título, item), a linha seguinte
+                    if (filho.ValueKind == JsonValueKind.Object && filho.TryGetProperty("content", out _) && texto.Length > 0 && texto[^1] != '\n')
+                        texto.Append('\n');
+                }
+        }
+        Visitar(documento);
+        return texto.ToString().Trim();
+    }
+
+    // A altura de uma imagem de texto formatado, na conta da altura (a máxima do PDF: a conta erra para mais)
+    private const float AlturaDaImagem = 480f;
+
+    /// <summary>Quantas imagens o texto formatado tem (a altura delas não sai do texto).</summary>
+    private static int ImagensDoRico(JsonElement no)
+    {
+        if (no.ValueKind != JsonValueKind.Object) return 0;
+        var imagens = no.TryGetProperty("type", out var tipo) && tipo.ValueKind == JsonValueKind.String && tipo.GetString() == "image" ? 1 : 0;
+        if (no.TryGetProperty("content", out var filhos) && filhos.ValueKind == JsonValueKind.Array)
+            foreach (var filho in filhos.EnumerateArray()) imagens += ImagensDoRico(filho);
+        return imagens;
     }
 
     /// <summary>A coluna do código: o maior código (e o cabeçalho "Código") inteiro, no mínimo a largura de sempre.</summary>
@@ -950,10 +1045,174 @@ public static partial class PeDocumentoPdf
     }
 
     /// <summary>A largura do texto na fonte das tabelas (a Lato do PDF; sem os arquivos dela, a estimada).</summary>
-    private static double LarguraDoTexto(string texto, bool negrito)
+    private static double LarguraDoTexto(string texto, bool negrito) => LarguraDoTexto(texto, FonteTabela, negrito);
+
+    public static double LarguraDoTexto(string texto, float tamanho, bool negrito)
     {
         var fonte = negrito ? PeFluxoFonte.Negrito : PeFluxoFonte.Regular;
-        return fonte?.Largura(texto, FonteTabela) ?? PeFluxoFonte.LarguraEstimada(texto, FonteTabela, negrito);
+        return fonte?.Largura(texto, tamanho) ?? PeFluxoFonte.LarguraEstimada(texto, tamanho, negrito);
+    }
+
+    // ── Altura estimada (F2, achado B-N1) ───────────────────────────────────
+
+    /// <summary>
+    /// A tabela (ou o formulário) é curta quando, com a legenda, cabe em um terço da altura útil
+    /// da página (em pé ou deitada, pela largura): não se divide entre páginas.
+    /// </summary>
+    public static bool TabelaCurta(PeDocTabelaResponse tabela, float largura, string legenda, string? explicacao) =>
+        AlturaEstimada(tabela, largura, legenda, explicacao) <= AlturaUtil(largura) * FracaoDaTabelaCurta;
+
+    private static float AlturaUtil(float largura) => largura > LarguraUtilEmPe + 1 ? AlturaUtilDeitada : AlturaUtilEmPe;
+
+    /// <summary>
+    /// A altura estimada da tabela (pontos), com a legenda e a explicação: as linhas de cada célula
+    /// pela largura da coluna e pelas medidas da Lato, quebrando nas palavras como o PDF.
+    /// </summary>
+    public static float AlturaEstimada(PeDocTabelaResponse tabela, float largura, string legenda, string? explicacao)
+    {
+        var altura = AlturaDaCabeca(largura, legenda, explicacao) + 4f;
+        if (tabela.SecaoTipo == PeDominios.TipoSecao.Formulario) return altura + AlturaDoFormulario(tabela, largura);
+        if (tabela.Vazia || tabela.Colunas.Count == 0) return altura + 9f * Entrelinha;
+
+        var (larguraDoCodigo, colunas, cabecalho) = ColunasEOCabecalho(tabela, largura);
+        altura += cabecalho;
+        foreach (var linha in tabela.Linhas)
+        {
+            var celulas = tabela.Colunas.Select((c, i) => (TextoDaCelula(linha, c), colunas[i])).ToList();
+            if (larguraDoCodigo > 0) celulas.Insert(0, (linha.Codigo ?? "-", larguraDoCodigo));
+            altura += AlturaDaLinha(celulas, negrito: false);
+            // A imagem de um texto formatado na célula: a altura dela não sai do texto
+            if (linha.Ricos != null) altura += linha.Ricos.Values.Sum(ImagensDoRico) * AlturaDaImagem;
+        }
+        return altura;
+    }
+
+    /// <summary>
+    /// O mínimo para a tabela começar numa página (F2, achado B-N1): a legenda, a explicação e o
+    /// cabeçalho estimados e metade da linha mais baixa. Com menos que isso no resto da página, a
+    /// tabela começa na seguinte: a legenda não fica sozinha no pé da página, nem com o cabeçalho
+    /// sem nenhuma linha (a linha não se divide entre páginas). No formulário, a legenda e metade
+    /// do primeiro par de rótulo e valor ou, quando ele começa por um texto formatado, o rótulo e
+    /// as duas primeiras linhas do texto.
+    /// </summary>
+    public static float ComecoDaTabela(PeDocTabelaResponse tabela, float largura, string legenda, string? explicacao)
+    {
+        var cabeca = AlturaDaCabeca(largura, legenda, explicacao) + 4f;
+        if (tabela.SecaoTipo == PeDominios.TipoSecao.Formulario)
+        {
+            var linha = tabela.Linhas.FirstOrDefault();
+            if (linha == null) return cabeca + 9f * Entrelinha;
+            if (TextoUnico(tabela, linha) != null) return cabeca + DuasLinhas;
+            foreach (var coluna in tabela.Colunas)
+            {
+                if (linha.Ricos != null && linha.Ricos.TryGetValue(coluna.Chave, out var rico))
+                {
+                    if (PeTextoRicoPdf.TemConteudo(JsonNode.Parse(rico.GetRawText()))) return cabeca + RotuloDoTexto + DuasLinhas;
+                    continue;
+                }
+                var valor = linha.Celulas.GetValueOrDefault(coluna.Chave);
+                if (!string.IsNullOrWhiteSpace(valor) && valor != "-") return cabeca + MeiaLinha;
+            }
+            return cabeca + 9f * Entrelinha;
+        }
+        if (tabela.Vazia || tabela.Colunas.Count == 0) return cabeca + 9f * Entrelinha;
+        return cabeca + ColunasEOCabecalho(tabela, largura).Cabecalho + MeiaLinha;
+    }
+
+    /// <summary>As larguras das colunas em pontos (a do código à parte, zero sem código) e a altura do cabeçalho.</summary>
+    private static (float LarguraDoCodigo, List<float> Colunas, float Cabecalho) ColunasEOCabecalho(PeDocTabelaResponse tabela, float largura)
+    {
+        var comCodigo = tabela.Linhas.Any(l => l.Codigo != null);
+        var larguraDoCodigo = comCodigo ? LarguraDaColunaDoCodigo(tabela) : 0f;
+        var colunas = EmPontos(Larguras(tabela, largura - larguraDoCodigo), largura - larguraDoCodigo);
+        var cabecalho = tabela.Colunas.Select((c, i) => (c.Rotulo, colunas[i])).ToList();
+        if (comCodigo) cabecalho.Insert(0, ("Código", larguraDoCodigo));
+        return (larguraDoCodigo, colunas, AlturaDaLinha(cabecalho, negrito: true));
+    }
+
+    /// <summary>A legenda (9,5 em negrito) e a explicação (9), na largura toda.</summary>
+    private static float AlturaDaCabeca(float largura, string legenda, string? explicacao)
+    {
+        var altura = LinhasDoTexto(legenda, largura, 9.5f, negrito: true) * 9.5f * Entrelinha;
+        if (!string.IsNullOrWhiteSpace(explicacao))
+            altura += 4f + LinhasDoTexto(explicacao, largura, 9f, negrito: false) * 9f * Entrelinha;
+        return altura;
+    }
+
+    /// <summary>Uma linha da tabela: a célula mais alta (as linhas do texto e o espaço interno).</summary>
+    private static float AlturaDaLinha(IEnumerable<(string Texto, float Largura)> celulas, bool negrito) =>
+        celulas.Select(c => LinhasDoTexto(c.Texto, c.Largura - SobraDaCelula, FonteTabela, negrito)).DefaultIfEmpty(1).Max()
+        * FonteTabela * Entrelinha + 8f;
+
+    /// <summary>O formulário: os pares de rótulo e valor e os textos formatados (rótulo e texto na largura toda).</summary>
+    private static float AlturaDoFormulario(PeDocTabelaResponse tabela, float largura)
+    {
+        var linha = tabela.Linhas.FirstOrDefault();
+        if (linha == null) return 9f * Entrelinha;
+        var rotulo = largura * RotuloDoFormulario / (RotuloDoFormulario + ValorDoFormulario);
+        var valor = largura * ValorDoFormulario / (RotuloDoFormulario + ValorDoFormulario);
+        var altura = 0f;
+        foreach (var coluna in tabela.Colunas)
+        {
+            if (linha.Ricos != null && linha.Ricos.TryGetValue(coluna.Chave, out var rico))
+            {
+                var texto = TextoDoRico(rico);
+                var imagens = ImagensDoRico(rico);
+                if (texto.Length == 0 && imagens == 0) continue;
+                altura += 4f + RotuloDoTexto + AlturaDoTextoCorrido(texto, largura) + imagens * AlturaDaImagem;
+                continue;
+            }
+            var celula = linha.Celulas.GetValueOrDefault(coluna.Chave);
+            if (string.IsNullOrWhiteSpace(celula) || celula == "-") continue;
+            // O par: a mais alta das duas células (o rótulo em negrito)
+            altura += Math.Max(AlturaDaLinha(new[] { (coluna.Rotulo, rotulo) }, negrito: true),
+                AlturaDaLinha(new[] { (SemQuebra(celula), valor) }, negrito: false));
+        }
+        return altura > 0 ? altura : 9f * Entrelinha;
+    }
+
+    /// <summary>O texto corrido do corpo (10,5), um parágrafo por linha do texto, com o espaço entre eles.</summary>
+    private static float AlturaDoTextoCorrido(string texto, float largura) =>
+        texto.Split('\n').Sum(p => LinhasDoTexto(p, largura, Fonte, negrito: false) * Fonte * Entrelinha + Fonte * 0.5f);
+
+    /// <summary>
+    /// Quantas linhas o texto ocupa na largura: quebra nas palavras (a palavra que não cabe numa
+    /// linha inteira quebra no meio, como no PDF) e em cada quebra de linha do texto.
+    /// </summary>
+    public static int LinhasDoTexto(string texto, float largura, float tamanho, bool negrito)
+    {
+        largura = Math.Max(largura, 1f);
+        var espaco = LarguraDoTexto(" ", tamanho, negrito);
+        var linhas = 0;
+        foreach (var paragrafo in texto.Split('\n'))
+        {
+            linhas++;
+            var atual = 0.0;
+            foreach (var palavra in paragrafo.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var medida = LarguraDoTexto(palavra, tamanho, negrito);
+                if (atual > 0 && atual + espaco + medida > largura)
+                {
+                    linhas++;
+                    atual = 0;
+                }
+                atual += (atual > 0 ? espaco : 0) + medida;
+                while (atual > largura)
+                {
+                    linhas++;
+                    atual -= largura;
+                }
+            }
+        }
+        return Math.Max(1, linhas);
+    }
+
+    /// <summary>As larguras em pontos: a fixa como está e a relativa pela parte dela no que sobra.</summary>
+    private static List<float> EmPontos(IReadOnlyList<LarguraDaColuna> larguras, float disponivel)
+    {
+        var fixas = larguras.Where(l => l.Constante).Sum(l => l.Valor);
+        var relativas = larguras.Where(l => !l.Constante).Sum(l => l.Valor);
+        return larguras.Select(l => l.Constante ? l.Valor : relativas <= 0 ? 0 : (disponivel - fixas) * l.Valor / relativas).ToList();
     }
 
     /// <summary>
@@ -972,12 +1231,35 @@ public static partial class PeDocumentoPdf
         return (float)Math.Max(palavra + 2, Math.Sqrt(media) * 4);
     }
 
-    private static void ListaDoTema(IContainer container, PeDocListaResponse lista)
+    // As colunas da lista de ações do tema: o código, a ação e a situação
+    private const float AcaoDoTema = 4f;
+    private const float SituacaoDoTema = 1.4f;
+
+    /// <summary>
+    /// As ações de um tema do decreto. Como nas tabelas de dados (F2, achado B-N1), a legenda sai
+    /// com o cabeçalho e a primeira ação, e a lista curta não se divide entre páginas.
+    /// </summary>
+    private static void ListaDoTema(IContainer container, PeDocListaResponse lista, float largura)
     {
+        var legenda = $"Ações do tema {lista.Tema}";
+        var acao = (largura - LarguraDoCodigo) * AcaoDoTema / (AcaoDoTema + SituacaoDoTema);
+        var situacao = largura - LarguraDoCodigo - acao;
+        var comeco = AlturaDaCabeca(largura, legenda, null) + 4f
+                     + AlturaDaLinha(new[] { ("Código", LarguraDoCodigo), ("Ação", acao), ("Situação", situacao) }, negrito: true);
+        var altura = comeco + lista.Itens.Sum(item => AlturaDaLinha(new[]
+        {
+            (item.Codigo ?? "-", LarguraDoCodigo),
+            (string.IsNullOrWhiteSpace(item.Texto) ? "-" : item.Texto, acao),
+            (item.Situacao ?? "-", situacao)
+        }, negrito: false));
+        container = lista.Itens.Count == 0 || altura <= AlturaUtil(largura) * FracaoDaTabelaCurta
+            ? container.PreventPageBreak()
+            : container.EnsureSpace(comeco + MeiaLinha);
+
         container.Column(col =>
         {
             col.Spacing(4);
-            Legenda(col, $"Ações do tema {lista.Tema}");
+            Legenda(col, legenda);
             if (lista.Itens.Count == 0)
             {
                 Vazio(col, "Nenhuma ação deste tema no plano.");
@@ -994,8 +1276,8 @@ public static partial class PeDocumentoPdf
                 t.ColumnsDefinition(c =>
                 {
                     c.ConstantColumn(LarguraDoCodigo);
-                    c.RelativeColumn(4);
-                    c.RelativeColumn(1.4f);
+                    c.RelativeColumn(AcaoDoTema);
+                    c.RelativeColumn(SituacaoDoTema);
                 });
                 t.Header(h =>
                 {
@@ -1007,8 +1289,8 @@ public static partial class PeDocumentoPdf
                     LinhaInteira(t, 3, row =>
                     {
                         Celula(row.ConstantItem(LarguraDoCodigo), item.Codigo ?? "-");
-                        Celula(row.RelativeItem(4), string.IsNullOrWhiteSpace(item.Texto) ? "-" : item.Texto);
-                        Celula(row.RelativeItem(1.4f), item.Situacao ?? "-");
+                        Celula(row.RelativeItem(AcaoDoTema), string.IsNullOrWhiteSpace(item.Texto) ? "-" : item.Texto);
+                        Celula(row.RelativeItem(SituacaoDoTema), item.Situacao ?? "-");
                     });
             });
         });

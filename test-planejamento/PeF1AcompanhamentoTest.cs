@@ -154,8 +154,11 @@ public class PeF1AcompanhamentoTest : PeAcompanhamentoTestBase
         Assert.True(larguras[tabela.Colunas.FindIndex(c => c.Chave == "medido")].Constante);
         // O texto longo segue pelo peso
         Assert.False(larguras[tabela.Colunas.FindIndex(c => c.Chave == "descricao")].Constante);
-        // Coluna de texto com espaço não tem largura mínima
-        Assert.Equal(0, PeDocumentoPdf.LarguraMinima(tabela, tabela.Colunas.Single(c => c.Chave == "situacao")));
+        // Desde a F2 (C06 parcial), a coluna de texto com espaço também tem largura mínima: a da
+        // maior palavra dela ("andamento"; no cabeçalho, "Situação" em negrito)
+        var situacao = PeDocumentoPdf.LarguraMinima(tabela, tabela.Colunas.Single(c => c.Chave == "situacao"));
+        Assert.True(situacao >= PeDocumentoPdf.LarguraDoTexto("andamento", 8.5f, negrito: false) + 8, $"{situacao}");
+        Assert.True(situacao >= PeDocumentoPdf.LarguraDoTexto("Situação", 8.5f, negrito: true) + 8, $"{situacao}");
 
         // Com espaço de sobra (página deitada, poucas colunas), vale só o peso
         var estreita = new PeDocTabelaResponse

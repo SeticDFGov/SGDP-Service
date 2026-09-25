@@ -22,6 +22,16 @@ namespace service.Planejamento;
 /// Os números são os do desenho (a conta do <see cref="PeFluxoAnalise.Numerar"/>, também na
 /// definição com erros), e os nomes passam pelo dicionário: o marcador ("{nomes.comite}") sai como
 /// o desenho mostra (o nome do órgão ou, sem ele, o padrão).
+/// <para>
+/// F2 (observação D-O2 da reconferência): dois itens que sairiam com a mesma descrição (dois fins
+/// soltos na mesma raia, dois paralelos sem nome depois da mesma tarefa) ou o item solto que só
+/// teria a raia para ser achado, quando a raia tem outro do mesmo tipo (o segundo início ao lado
+/// do primeiro), passam a ser citados pela posição entre os do mesmo tipo na raia em que o desenho
+/// os põe, na ordem de leitura (da esquerda para a direita e, na mesma coluna, de cima para baixo):
+/// "o 2º fim da raia \"Equipe\"", "a decisão \"Aprovado?\", a 2ª da raia \"Equipe\"". Cada um fica
+/// com a sua mensagem, então a lista diz quantos são. O vizinho sem nome de um tipo que se repete
+/// no fluxo também vai pela raia ("antes do fim da raia \"Comitê\"").
+/// </para>
 /// </summary>
 public sealed class PeFluxoReferencias
 {
@@ -32,6 +42,15 @@ public sealed class PeFluxoReferencias
     private readonly int _inicios;
     private readonly int _fins;
 
+    // A posição de cada elemento entre os do mesmo tipo na raia em que é desenhado (1, 2...) e quantos são
+    private readonly Dictionary<string, (int Posicao, int Total)> _posicoes;
+
+    // Quantos elementos de cada tipo o desenho tem
+    private readonly Dictionary<string, int> _porTipo;
+
+    // Os elementos citados pela posição (a descrição de sempre não os distingue)
+    private readonly HashSet<string> _pelaPosicao;
+
     public PeFluxoReferencias(PeFluxoDefinicao definicao, IReadOnlyDictionary<string, string?>? nomes = null)
     {
         _definicao = definicao;
@@ -40,6 +59,9 @@ public sealed class PeFluxoReferencias
         _numeros = PeFluxoAnalise.Numeros(_analise, definicao.PrefixoNumeracao);
         _inicios = definicao.Elementos.Count(e => e.Tipo == PeDominios.TipoElementoFluxo.Inicio);
         _fins = definicao.Elementos.Count(e => e.Tipo == PeDominios.TipoElementoFluxo.Fim);
+        _posicoes = Posicoes(_analise);
+        _porTipo = _analise.Elementos.GroupBy(e => e.Tipo ?? string.Empty).ToDictionary(g => g.Key, g => g.Count());
+        _pelaPosicao = PelaPosicao();
     }
 
     // ── Elementos ───────────────────────────────────────────────────────────
@@ -58,19 +80,28 @@ public sealed class PeFluxoReferencias
         return aposto == null ? nucleo : $"{nucleo}, {aposto},";
     }
 
-    /// <summary>O pedido do nome que falta: "Dê um nome à tarefa 2.3." ou, sem número, pelo vizinho.</summary>
+    /// <summary>
+    /// O pedido do nome que falta: "Dê um nome à tarefa 2.3." ou, sem número, pelo vizinho; o que
+    /// só a posição distingue, pela posição ("Dê um nome à 2ª tarefa da raia \"Equipe\".").
+    /// </summary>
     public string PedidoDeNome(PeFluxoElemento e)
     {
         var (artigo, tipo) = Tipo(e.Tipo);
-        var alvo = ComA($"{artigo} {tipo}");
-        var onde = Numero(e) is string numero
-            ? $" {numero}"
-            : Contexto(e) is string contexto
-                ? contexto.StartsWith("na ", StringComparison.Ordinal) ? $" {contexto}" : $" que vem {contexto}"
-                : string.Empty;
+        string alvo;
+        if (Numero(e) is string numero)
+            alvo = $"{ComA($"{artigo} {tipo}")} {numero}";
+        else if (PelaPosicao(e))
+            alvo = ComA(Posicional(e).Nucleo);
+        else
+        {
+            var contexto = Contexto(e).Texto;
+            var onde = contexto == null ? string.Empty
+                : contexto.StartsWith("na ", StringComparison.Ordinal) ? $" {contexto}" : $" que vem {contexto}";
+            alvo = ComA($"{artigo} {tipo}") + onde;
+        }
         return e.Tipo == PeDominios.TipoElementoFluxo.Ligacao
-            ? $"Dê um nome {alvo}{onde}, dizendo de onde o fluxo vem ou para onde segue."
-            : $"Dê um nome {alvo}{onde}.";
+            ? $"Dê um nome {alvo}, dizendo de onde o fluxo vem ou para onde segue."
+            : $"Dê um nome {alvo}.";
     }
 
     /// <summary>A tarefa, a decisão e a ligação com outro fluxo concordam no feminino ("alcançada", "ligue-a").</summary>
@@ -83,45 +114,69 @@ public sealed class PeFluxoReferencias
 
     private (string Nucleo, string? Aposto) Descrever(PeFluxoElemento e)
     {
+        if (PelaPosicao(e)) return Posicional(e);
+        var (nucleo, aposto, _) = DescreverSemPosicao(e);
+        return (nucleo, aposto);
+    }
+
+    /// <summary>
+    /// A descrição de sempre (D11), sem a posição; SoARaia diz que o aposto é só a raia (o item
+    /// sem ligação, que a raia não distingue de outro do mesmo tipo nela).
+    /// </summary>
+    private (string Nucleo, string? Aposto, bool SoARaia) DescreverSemPosicao(PeFluxoElemento e)
+    {
         var (artigo, tipo) = Tipo(e.Tipo);
         var nome = Nome(e.Nome);
         if (PeDominios.TipoElementoFluxo.EhAtividade(e.Tipo) && Numero(e) is string numero)
-            return nome.Length > 0 ? ($"{artigo} {tipo} {numero} \"{Curto(nome)}\"", null) : ($"{artigo} {tipo} {numero}", "ainda sem nome");
-        if (nome.Length > 0) return ($"{artigo} {tipo} \"{Curto(nome)}\"", null);
+            return nome.Length > 0 ? ($"{artigo} {tipo} {numero} \"{Curto(nome)}\"", null, false) : ($"{artigo} {tipo} {numero}", "ainda sem nome", false);
+        if (nome.Length > 0) return ($"{artigo} {tipo} \"{Curto(nome)}\"", null, false);
+        var (contexto, soARaia) = Contexto(e);
         return e.Tipo switch
         {
-            PeDominios.TipoElementoFluxo.Inicio => ("o início", _inicios > 1 ? Contexto(e) : null),
-            PeDominios.TipoElementoFluxo.Fim => ("o fim", _fins > 1 ? Contexto(e) : null),
-            PeDominios.TipoElementoFluxo.Decisao => ("a decisão sem pergunta", Contexto(e)),
-            _ => ($"{artigo} {tipo} sem nome", Contexto(e))
+            PeDominios.TipoElementoFluxo.Inicio => _inicios > 1 ? ("o início", contexto, soARaia) : ("o início", null, false),
+            PeDominios.TipoElementoFluxo.Fim => _fins > 1 ? ("o fim", contexto, soARaia) : ("o fim", null, false),
+            PeDominios.TipoElementoFluxo.Decisao => ("a decisão sem pergunta", contexto, soARaia),
+            _ => ($"{artigo} {tipo} sem nome", contexto, soARaia)
         };
     }
 
     /// <summary>
     /// Onde o item sem nome fica no desenho: depois de quem vem antes dele ("depois de 2.4"), antes
-    /// de quem vem depois ("antes de 2.5") ou, sem ligação, na raia em que ele é desenhado.
+    /// de quem vem depois ("antes de 2.5") ou, sem ligação, na raia em que ele é desenhado
+    /// (SoARaia).
     /// </summary>
-    private string? Contexto(PeFluxoElemento e)
+    private (string? Texto, bool SoARaia) Contexto(PeFluxoElemento e)
     {
         if (Analisado(e))
         {
             var entrada = _analise.EntradasDeAvanco(e.Id).FirstOrDefault() ?? _analise.Entradas[e.Id].FirstOrDefault();
-            if (entrada != null) return "depois " + ComDe(Vizinho(_analise.PorId[entrada.De]));
+            if (entrada != null) return ("depois " + ComDe(Vizinho(_analise.PorId[entrada.De])), false);
             var saida = _analise.SaidasDeAvanco(e.Id).FirstOrDefault() ?? _analise.Saidas[e.Id].FirstOrDefault();
-            if (saida != null) return "antes " + ComDe(Vizinho(_analise.PorId[saida.Para]));
+            if (saida != null) return ("antes " + ComDe(Vizinho(_analise.PorId[saida.Para])), false);
         }
         // Sem raia que exista, o desenho põe o item na primeira
         var raia = _definicao.Raias.FirstOrDefault(r => r.Id == e.RaiaId) ?? _definicao.Raias.FirstOrDefault();
-        return raia == null ? null : "na " + RaiaCurta(raia);
+        return raia == null ? (null, false) : ("na " + RaiaCurta(raia), true);
     }
 
-    /// <summary>O vizinho, curto: o número ("2.4") ou o tipo com o nome ("a decisão \"Aprovado?\"", "o início").</summary>
+    /// <summary>
+    /// O vizinho, curto: o número ("2.4") ou o tipo com o nome ("a decisão \"Aprovado?\"", "o
+    /// início"). Sem nome, num tipo que se repete no fluxo, pela raia e, quando ela tem outro do
+    /// mesmo tipo, pela posição ("o fim da raia \"Comitê\"", "o 2º paralelo da raia \"Equipe\"").
+    /// </summary>
     private string Vizinho(PeFluxoElemento e)
     {
         if (Numero(e) is string numero) return numero;
         var (artigo, tipo) = Tipo(e.Tipo);
         var nome = Nome(e.Nome);
         if (nome.Length > 0) return $"{artigo} {tipo} \"{Curto(nome)}\"";
+        if (Analisado(e) && _porTipo.GetValueOrDefault(e.Tipo ?? string.Empty) > 1 && RaiaDoDesenho(e) is { } raia)
+        {
+            var (posicao, total) = _posicoes[e.Id];
+            return total > 1
+                ? $"{artigo} {Ordinal(e, posicao)} {tipo} da {RaiaCurta(raia)}"
+                : $"{artigo} {tipo} da {RaiaCurta(raia)}";
+        }
         return e.Tipo switch
         {
             PeDominios.TipoElementoFluxo.Inicio => "o início",
@@ -134,6 +189,78 @@ public sealed class PeFluxoReferencias
     // O elemento entrou na análise (o id é o dele): tem número e vizinhos
     private bool Analisado(PeFluxoElemento e) =>
         e.Id.Length > 0 && _analise.PorId.TryGetValue(e.Id, out var analisado) && ReferenceEquals(analisado, e);
+
+    // ── Posição (F2, D-O2) ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// A posição de cada elemento entre os do mesmo tipo na raia em que o desenho o põe, na ordem
+    /// de leitura (coluna e, na mesma coluna, a linha de cima primeiro), e quantos são.
+    /// </summary>
+    private static Dictionary<string, (int Posicao, int Total)> Posicoes(PeFluxoAnalise analise)
+    {
+        var posicoes = new Dictionary<string, (int, int)>(StringComparer.Ordinal);
+        foreach (var grupo in analise.Elementos.GroupBy(e => (e.Tipo ?? string.Empty, analise.RaiaDe(e))))
+        {
+            var ordem = grupo
+                .OrderBy(e => analise.Camada[e.Id])
+                .ThenBy(e => analise.Faixa[e.Id])
+                .ThenBy(e => analise.IndiceElemento[e.Id])
+                .ToList();
+            for (var i = 0; i < ordem.Count; i++) posicoes[ordem[i].Id] = (i + 1, ordem.Count);
+        }
+        return posicoes;
+    }
+
+    /// <summary>
+    /// Os elementos que a descrição de sempre não distingue: a mesma descrição de outro elemento,
+    /// ou só a raia para achá-lo quando ela tem outro do mesmo tipo.
+    /// </summary>
+    private HashSet<string> PelaPosicao()
+    {
+        var descricoes = _analise.Elementos
+            .Where(e => RaiaDoDesenho(e) != null)
+            .Select(e => (e.Id, Descricao: DescreverSemPosicao(e)))
+            .ToList();
+        var pelaPosicao = descricoes
+            .GroupBy(d => d.Descricao.Aposto == null ? d.Descricao.Nucleo : $"{d.Descricao.Nucleo}, {d.Descricao.Aposto}", StringComparer.Ordinal)
+            .Where(g => g.Count() > 1)
+            .SelectMany(g => g.Select(d => d.Id))
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (var (id, descricao) in descricoes)
+            if (descricao.SoARaia && _posicoes[id].Total > 1) pelaPosicao.Add(id);
+        return pelaPosicao;
+    }
+
+    private bool PelaPosicao(PeFluxoElemento e) => Analisado(e) && _pelaPosicao.Contains(e.Id);
+
+    /// <summary>
+    /// O item pela posição na raia: "o 2º fim da raia \"Equipe\"", "a 2ª decisão da raia
+    /// \"Equipe\", sem pergunta", "a 2ª tarefa da raia \"Equipe\", ainda sem nome"; com nome,
+    /// "a decisão \"Aprovado?\", a 2ª da raia \"Equipe\"".
+    /// </summary>
+    private (string Nucleo, string? Aposto) Posicional(PeFluxoElemento e)
+    {
+        var (artigo, tipo) = Tipo(e.Tipo);
+        var ordinal = Ordinal(e, _posicoes[e.Id].Posicao);
+        var raia = $"da {RaiaCurta(RaiaDoDesenho(e)!)}";
+        var nome = Nome(e.Nome);
+        if (nome.Length > 0) return ($"{artigo} {tipo} \"{Curto(nome)}\"", $"{artigo} {ordinal} {raia}");
+        return e.Tipo switch
+        {
+            PeDominios.TipoElementoFluxo.Decisao => ($"a {ordinal} decisão {raia}", "sem pergunta"),
+            PeDominios.TipoElementoFluxo.Tarefa or PeDominios.TipoElementoFluxo.Subprocesso or PeDominios.TipoElementoFluxo.Ligacao =>
+                ($"{artigo} {ordinal} {tipo} {raia}", "ainda sem nome"),
+            _ => ($"{artigo} {ordinal} {tipo} {raia}", null)
+        };
+    }
+
+    // "2º" ou "2ª", pelo gênero do tipo
+    private static string Ordinal(PeFluxoElemento e, int posicao) =>
+        posicao.ToString(System.Globalization.CultureInfo.InvariantCulture) + (Feminino(e) ? "ª" : "º");
+
+    // A raia em que o desenho põe o elemento (sem raia que exista, a primeira); nula sem raia nenhuma
+    private PeFluxoRaia? RaiaDoDesenho(PeFluxoElemento e) =>
+        _analise.Raias.Count == 0 ? null : _analise.Raias[_analise.RaiaDe(e)];
 
     // ── Raias e ligações ────────────────────────────────────────────────────
 
