@@ -673,7 +673,7 @@ public class CtrValorHospedagemGdfnetTest : CtrTestBase
     // ══ 5. Critério IV: "Não foi possível avaliar com as informações apresentadas" ══
 
     [Fact]
-    public void CriterioIV_TemANovaRespostaPorUltimo_EIIeVIContinuamComQuatro()
+    public void CriterioIV_TemANovaRespostaPorUltimo_EVIContinuaComQuatro()
     {
         Assert.Equal("Não foi possível avaliar com as informações apresentadas", NaoAvaliou);
         Assert.Equal(new[]
@@ -688,8 +688,15 @@ public class CtrValorHospedagemGdfnetTest : CtrTestBase
             CtrDominios.CriterioCriticidade.Nenhum, CtrDominios.CriterioCriticidade.Baixo,
             CtrDominios.CriterioCriticidade.Medio, CtrDominios.CriterioCriticidade.Alto
         };
-        Assert.Equal(grau, CtrDominios.CriterioCriticidade.RespostasDe(CtrDominios.CriterioCriticidade.ImpactoServicos));
         Assert.Equal(grau, CtrDominios.CriterioCriticidade.RespostasDe(CtrDominios.CriterioCriticidade.RiscosSeguranca));
+        // O II deixou de ser graduado em 2026-09-24 (CtrCriticidadeRegraNovaTest)
+        Assert.Equal(
+            new[]
+            {
+                CtrDominios.CriterioCriticidade.Sim, CtrDominios.CriterioCriticidade.Nao,
+                CtrDominios.CriterioCriticidade.Desconhecido
+            },
+            CtrDominios.CriterioCriticidade.RespostasDe(CtrDominios.CriterioCriticidade.ProjetoTransformacaoDigital));
 
         // O padrão do IV continua "Nenhum"
         Assert.Equal(CtrDominios.CriterioCriticidade.Nenhum,
@@ -702,7 +709,9 @@ public class CtrValorHospedagemGdfnetTest : CtrTestBase
         Assert.Equal(0, CtrCriticidade.Pontos(CtrDominios.CriterioCriticidade.ImpactoArquitetura, NaoAvaliou));
 
         var respostas = CtrCriticidade.Normalizar(new Dictionary<string, string> { ["IV"] = NaoAvaliou });
-        Assert.Equal(0, CtrCriticidade.PontosTotais(respostas));
+        // Só os padrões do II (Desconhecido) e do III (Não) somam: o IV não soma nada
+        Assert.Equal(0, CtrCriticidade.PontosPorCriterio(respostas)[CtrDominios.CriterioCriticidade.ImpactoArquitetura]);
+        Assert.Equal(2, CtrCriticidade.PontosTotais(respostas));
         Assert.Equal(CtrDominios.Criticidade.Baixa, CtrCriticidade.Calcular(respostas));
     }
 
@@ -737,14 +746,16 @@ public class CtrValorHospedagemGdfnetTest : CtrTestBase
     }
 
     [Theory]
-    // 3 (II Alto) + 0 + 3 (V Sim) = 6, Alta; com o IV em "Alto" seriam 9
-    [InlineData("II=Alto,IV=" + NaoAvaliou + ",V=Sim", CtrDominios.Criticidade.Alta, 6)]
-    // 2 (II Médio) + 1 (III Sim) + 0 = 3, Média
-    [InlineData("II=Médio,III=Sim,IV=" + NaoAvaliou, CtrDominios.Criticidade.Media, 3)]
-    // 0 + 2 (VI Médio) = 2, Baixa; se contasse como "Alto" seriam 5 (Média)
-    [InlineData("IV=" + NaoAvaliou + ",VI=Médio", CtrDominios.Criticidade.Baixa, 2)]
-    // O alinhamento à EGD/DF continua descontando: 3 + 0 - 1 = 2, Baixa
-    [InlineData("I=Sim,II=Alto,IV=" + NaoAvaliou, CtrDominios.Criticidade.Baixa, 2)]
+    // Regra de 2026-09-24: II Sim 0 e os demais 1 (a resposta à pergunta anterior, como
+    // "Alto" e "Médio" abaixo, conta como Desconhecido); III Sim 0 e Não 1 (o padrão).
+    // 1 (II) + 1 (III) + 0 + 3 (V Sim) = 5, Média; com o IV em "Alto" seriam 8 (Alta)
+    [InlineData("II=Alto,IV=" + NaoAvaliou + ",V=Sim", CtrDominios.Criticidade.Media, 5)]
+    // 1 (II) + 0 (III Sim) + 0 = 1, Baixa
+    [InlineData("II=Médio,III=Sim,IV=" + NaoAvaliou, CtrDominios.Criticidade.Baixa, 1)]
+    // 1 + 1 + 0 + 2 (VI Médio) = 4, Média; se contasse como "Alto" seriam 7 (Alta)
+    [InlineData("IV=" + NaoAvaliou + ",VI=Médio", CtrDominios.Criticidade.Media, 4)]
+    // O alinhamento à EGD/DF continua descontando: -1 + 1 + 1 + 0 = 1, Baixa
+    [InlineData("I=Sim,II=Alto,IV=" + NaoAvaliou, CtrDominios.Criticidade.Baixa, 1)]
     public void CriterioIV_NaoAvaliou_SomaExatamenteComoNenhum(string texto, string criticidade, int pontos)
     {
         var comNaoAvaliou = CtrCriticidade.Normalizar(Respostas(texto));
@@ -764,13 +775,15 @@ public class CtrValorHospedagemGdfnetTest : CtrTestBase
         var dto = NovoProcessoDto(Numero);
         dto.CriteriosCriticidade = new Dictionary<string, string>
         {
-            ["II"] = "Alto",
+            ["II"] = "Não",
             ["IV"] = "nao foi possivel avaliar",
-            ["V"] = "Sim"
+            ["V"] = "Sim",
+            ["VI"] = "Baixo"
         };
 
         var resposta = await _processos.CriarAsync(dto, ctx);
 
+        // 1 (II Não) + 1 (III Não) + 0 (IV) + 3 (V Sim) + 1 (VI Baixo) = 6, Alta
         Assert.Equal(NaoAvaliou, resposta.CriteriosCriticidade![CtrDominios.CriterioCriticidade.ImpactoArquitetura]);
         Assert.Equal(6, resposta.PontosCriticidade);
         Assert.Equal(CtrDominios.Criticidade.Alta, resposta.Criticidade);
@@ -810,8 +823,9 @@ public class CtrValorHospedagemGdfnetTest : CtrTestBase
         SemearProcesso(Numero, p =>
         {
             p.ChegadaSgdi = DiasAtras(10);
+            // 1 (II Não) + 1 (III) + 0 (IV) + 3 (V Sim) + 1 (VI Baixo) = 6, Alta pela regra de 2026-09-24
             p.CriteriosCriticidade = CtrCriticidade.Serializar(
-                CtrCriticidade.Normalizar(Respostas("II=Alto,IV=" + NaoAvaliou + ",V=Sim")));
+                CtrCriticidade.Normalizar(Respostas("II=Não,IV=" + NaoAvaliou + ",V=Sim,VI=Baixo")));
             p.Criticidade = CtrDominios.Criticidade.Alta;
         });
 

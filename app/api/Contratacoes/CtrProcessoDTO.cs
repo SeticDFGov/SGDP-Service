@@ -23,7 +23,11 @@ public class CtrProcessoFiltro : PagedRequest
     /// <summary>CtrDominios.Criticidade (art. 11 da IN), agora atributo do processo.</summary>
     public string? Criticidade { get; set; }
 
-    /// <summary>CtrDominios.Origem (Órgão comunicante / TCDF).</summary>
+    /// <summary>
+    /// CtrDominios.Origem (Órgão comunicante / TCDF). Desde 2026-09-24 é o que separa as duas
+    /// listas do front: "Processos de supervisão contínua" (Órgão comunicante) e
+    /// "Comunicações do TCDF" (os processos que nasceram de uma comunicação do Tribunal).
+    /// </summary>
     public string? Origem { get; set; }
 
     /// <summary>true = só os que aguardam esclarecimento; false = só os sem pendência; null = todos.</summary>
@@ -58,6 +62,13 @@ public class CtrProcessoCreateDTO
     [StringLength(25)]
     public string NumeroProcesso { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Nº SEI do Formulário: opcional, no formato SEI (00000-00000000/AAAA-DD). Vazio =
+    /// não informado; na EDIÇÃO, nulo ou vazio LIMPA (o formulário manda sempre).
+    /// </summary>
+    [StringLength(25)]
+    public string? NumeroSeiFormulario { get; set; }
+
     [StringLength(200)]
     public string OrgaoNome { get; set; } = string.Empty;
 
@@ -87,6 +98,26 @@ public class CtrProcessoCreateDTO
     /// <summary>O processo não é devolvido ao órgão comunicante (etapa pulada).</summary>
     public bool RetornoOrgaoNaoSeAplica { get; set; }
 
+    /// <summary>
+    /// Encaminhamento para análise técnica (fora da cronologia do trâmite; não pode ser
+    /// futuro). Na EDIÇÃO, os quatro campos da análise técnica seguem o corpo (nulo limpa).
+    /// </summary>
+    public DateOnly? AnaliseTecnicaEncaminhadaEm { get; set; }
+
+    /// <summary>
+    /// CtrDominios.AreaTecnica (SUBSIS ou SUBINFRA), sem diferença de caixa. Exigida com a
+    /// data do encaminhamento; sem ela, é anulada.
+    /// </summary>
+    [StringLength(10)]
+    public string? AnaliseTecnicaArea { get; set; }
+
+    /// <summary>Retorno da área técnica: exige o encaminhamento e não pode ser anterior a ele.</summary>
+    public DateOnly? AnaliseTecnicaRetornoEm { get; set; }
+
+    /// <summary>Resumo curto do que a área técnica respondeu; sem a data do retorno, é anulado.</summary>
+    [StringLength(1000)]
+    public string? AnaliseTecnicaRetornoResumo { get; set; }
+
     /// <summary>CtrDominios.EtapaPlanejamento (DFD/ETP/TR); nula = não informada.</summary>
     [StringLength(10)]
     public string? EtapaPlanejamento { get; set; }
@@ -107,9 +138,11 @@ public class CtrProcessoCreateDTO
 
     /// <summary>
     /// Respostas aos critérios do art. 11, § 3º, da IN: chave = código do critério
-    /// (CtrDominios.CriterioCriticidade.Todos), valor = resposta (Sim/Não ou Nenhum/Baixo/
-    /// Médio/Alto). Critério ausente recebe a resposta padrão. Na EDIÇÃO, nula PRESERVA as
-    /// respostas gravadas (e a criticidade calculada delas).
+    /// (CtrDominios.CriterioCriticidade.Todos), valor = resposta (Sim/Não; Sim/Não/Desconhecido
+    /// no II; Nenhum/Baixo/Médio/Alto no IV e no VI). Critério ausente recebe a resposta
+    /// padrão (Desconhecido no II). No II a resposta à pergunta anterior (Nenhum a Alto) é
+    /// aceita e guardada; na EDIÇÃO, II sem resposta mantém a anterior que estiver gravada.
+    /// Na EDIÇÃO, nula PRESERVA as respostas gravadas (e a criticidade calculada delas).
     /// </summary>
     public Dictionary<string, string>? CriteriosCriticidade { get; set; }
 
@@ -145,9 +178,20 @@ public class CtrProcessoCreateDTO
     [StringLength(4000)]
     public string? EsclarecimentoDescricao { get; set; }
 
+    /// <summary>
+    /// Nº do documento SEI pelo qual a SGDI pediu os esclarecimentos ou as informações
+    /// complementares. Opcional, texto livre; sem a data do pedido é anulado. Na EDIÇÃO, nulo LIMPA.
+    /// </summary>
+    [StringLength(60)]
+    public string? EsclarecimentoDocumentoSei { get; set; }
+
     /// <summary>Data da resposta do órgão; enquanto nula, o processo fica sinalizado.</summary>
     public DateOnly? EsclarecimentoRespondidoEm { get; set; }
 
+    /// <summary>
+    /// Restituição ao órgão. As telas deixaram de pedi-la em 2026-09-24; o formulário devolve
+    /// o que estava gravado, e a validação é a de sempre.
+    /// </summary>
     public bool Restituido { get; set; }
 
     public DateOnly? RestituidoEm { get; set; }
@@ -257,6 +301,9 @@ public class CtrProcessoResponse
 
     public string NumeroProcesso { get; set; } = string.Empty;
 
+    /// <summary>Nº SEI do Formulário; nulo = não informado.</summary>
+    public string? NumeroSeiFormulario { get; set; }
+
     public string OrgaoNome { get; set; } = string.Empty;
 
     public string OrgaoSigla { get; set; } = string.Empty;
@@ -281,17 +328,44 @@ public class CtrProcessoResponse
 
     public bool RetornoOrgaoNaoSeAplica { get; set; }
 
+    public DateOnly? AnaliseTecnicaEncaminhadaEm { get; set; }
+
+    /// <summary>CtrDominios.AreaTecnica (SUBSIS ou SUBINFRA); nula sem encaminhamento.</summary>
+    public string? AnaliseTecnicaArea { get; set; }
+
+    public DateOnly? AnaliseTecnicaRetornoEm { get; set; }
+
+    public string? AnaliseTecnicaRetornoResumo { get; set; }
+
     public string? EtapaPlanejamento { get; set; }
 
     public DateOnly? DataAssinaturaContrato { get; set; }
 
     public string? Criticidade { get; set; }
 
-    /// <summary>Respostas aos critérios do art. 11, § 3º, da IN; nulas quando ainda não avaliados.</summary>
+    /// <summary>
+    /// Respostas aos critérios do art. 11, § 3º, da IN; nulas quando ainda não avaliados. No II
+    /// pode vir a resposta à pergunta anterior (ver <see cref="RespostaPerguntaAnteriorII"/>).
+    /// </summary>
     public Dictionary<string, string>? CriteriosCriticidade { get; set; }
 
-    /// <summary>Derivado: soma dos pontos das respostas (CtrCriticidade); nulo sem respostas.</summary>
+    /// <summary>Derivado: soma dos pontos das respostas (CtrCriticidade), nunca negativa; nulo sem respostas.</summary>
     public int? PontosCriticidade { get; set; }
+
+    /// <summary>
+    /// Derivado: a composição da soma, os pontos de cada critério de I a VII, na ordem dos
+    /// incisos (o VII vem com 0: não soma, decide Alta sozinho quando é Sim). A soma destes
+    /// valores só difere de <see cref="PontosCriticidade"/> quando fica negativa (o total para
+    /// em zero). Nulo sem respostas.
+    /// </summary>
+    public Dictionary<string, int>? PontosPorCriterio { get; set; }
+
+    /// <summary>
+    /// Derivado: a resposta à pergunta ANTERIOR do critério II (Nenhum, Baixo, Médio ou Alto)
+    /// quando é ela que continua gravada; conta como Desconhecido até alguém responder à
+    /// pergunta nova. Nulo quando o II já foi respondido à pergunta nova ou não há respostas.
+    /// </summary>
+    public string? RespostaPerguntaAnteriorII { get; set; }
 
     public string Origem { get; set; } = string.Empty;
 
@@ -307,6 +381,9 @@ public class CtrProcessoResponse
     public DateOnly? EsclarecimentoSolicitadoEm { get; set; }
 
     public string? EsclarecimentoDescricao { get; set; }
+
+    /// <summary>Nº do documento SEI do pedido de esclarecimentos; nulo = não informado.</summary>
+    public string? EsclarecimentoDocumentoSei { get; set; }
 
     public DateOnly? EsclarecimentoRespondidoEm { get; set; }
 
@@ -330,7 +407,17 @@ public class CtrProcessoResponse
     /// </summary>
     public string Situacao { get; set; } = string.Empty;
 
-    /// <summary>Maior data entre os cinco checkpoints e a restituição.</summary>
+    /// <summary>
+    /// Derivado (CtrProcessoService.CalcularStatusSupervisao; CtrDominios.StatusSupervisao):
+    /// "Concluída" com o contrato assinado (a regra de conclusão do módulo) e "Em regime de
+    /// supervisão" nos demais. Nunca gravado.
+    /// </summary>
+    public string StatusSupervisao { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Maior data entre os cinco checkpoints, a restituição, o esclarecimento e a análise
+    /// técnica (encaminhamento e retorno).
+    /// </summary>
     public DateOnly? UltimaMovimentacao { get; set; }
 
     public int DiasSemMovimento { get; set; }

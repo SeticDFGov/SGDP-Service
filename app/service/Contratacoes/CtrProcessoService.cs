@@ -92,6 +92,20 @@ public class CtrProcessoService : ICtrProcessoService
     }
 
     /// <summary>
+    /// Status da contratação na supervisão contínua (coluna STATUS das listas): FONTE
+    /// ÚNICA, nunca gravado. Segue a regra de conclusão que o módulo já tem: contrato
+    /// assinado = processo Concluído = supervisão "Concluída"; o resto está "Em regime de
+    /// supervisão" (inclusive análise concluída e restituído, que seguem acompanhados).
+    /// </summary>
+    public static string CalcularStatusSupervisao(CtrProcesso p) => CalcularStatusSupervisao(p.DataAssinaturaContrato);
+
+    /// <inheritdoc cref="CalcularStatusSupervisao(CtrProcesso)"/>
+    public static string CalcularStatusSupervisao(DateOnly? dataAssinaturaContrato) =>
+        dataAssinaturaContrato != null
+            ? CtrDominios.StatusSupervisao.Concluida
+            : CtrDominios.StatusSupervisao.EmRegimeSupervisao;
+
+    /// <summary>
     /// Pedido de esclarecimento feito e ainda sem resposta — DERIVADO, nunca gravado.
     /// Sinal paralelo ao trâmite: não entra na situação.
     /// </summary>
@@ -116,12 +130,14 @@ public class CtrProcessoService : ICtrProcessoService
     }
 
     /// <summary>
-    /// Maior data entre os cinco checkpoints, a restituição e o esclarecimento;
-    /// null sem nenhuma. Pedir e responder esclarecimento É movimentação do processo.
+    /// Maior data entre os cinco checkpoints, a restituição, o esclarecimento e a análise
+    /// técnica; null sem nenhuma. Pedir e responder esclarecimento, encaminhar para análise
+    /// técnica e receber o retorno dela É movimentação do processo.
     /// </summary>
     public static DateOnly? CalcularUltimaMovimentacao(CtrProcesso p) => CalcularUltimaMovimentacao(
         p.ChegadaSgdi, p.ChegadaSubgd, p.ChegadaUgtic, p.RetornoGabSgdi, p.RetornoOrgao, p.RestituidoEm,
-        p.EsclarecimentoSolicitadoEm, p.EsclarecimentoRespondidoEm);
+        p.EsclarecimentoSolicitadoEm, p.EsclarecimentoRespondidoEm,
+        p.AnaliseTecnicaEncaminhadaEm, p.AnaliseTecnicaRetornoEm);
 
     /// <inheritdoc cref="CalcularUltimaMovimentacao(CtrProcesso)"/>
     public static DateOnly? CalcularUltimaMovimentacao(params DateOnly?[] datas)
@@ -197,13 +213,15 @@ public class CtrProcessoService : ICtrProcessoService
 
     /// <summary>
     /// Normaliza (trim, sigla em caixa alta, restituição limpa quando desmarcada, hospedagem
-    /// na grafia do domínio, valor estimado em centavos) e valida o processo.
+    /// e área técnica na grafia do domínio, valor estimado em centavos, campos que dependem
+    /// de uma data anulados sem ela) e valida o processo.
     /// <paramref name="numeroDuplicado"/> vem de quem chama (consulta ao banco no CRUD,
     /// dicionário em memória na importação).
     /// </summary>
     public static void ValidarProcesso(CtrProcesso p, bool numeroDuplicado)
     {
         p.NumeroProcesso = (p.NumeroProcesso ?? string.Empty).Trim();
+        p.NumeroSeiFormulario = Limpar(p.NumeroSeiFormulario);
         p.OrgaoNome = (p.OrgaoNome ?? string.Empty).Trim();
         p.OrgaoSigla = (p.OrgaoSigla ?? string.Empty).Trim().ToUpperInvariant();
         p.ComplementoArea = Limpar(p.ComplementoArea);
@@ -214,12 +232,21 @@ public class CtrProcessoService : ICtrProcessoService
         p.EtapaPlanejamento = Limpar(p.EtapaPlanejamento);
         p.Criticidade = Limpar(p.Criticidade);
         p.EsclarecimentoDescricao = Limpar(p.EsclarecimentoDescricao);
+        p.EsclarecimentoDocumentoSei = Limpar(p.EsclarecimentoDocumentoSei);
+        p.AnaliseTecnicaRetornoResumo = Limpar(p.AnaliseTecnicaRetornoResumo);
 
         // Hospedagem comparada sem caixa nem acento (o normalizador da categoria e dos
         // critérios) e gravada na grafia do domínio; o que não casar é recusado abaixo
         p.HospedagemCetic = Limpar(p.HospedagemCetic);
         if (p.HospedagemCetic != null)
             p.HospedagemCetic = CtrCsv.ResolverHospedagemCetic(p.HospedagemCetic) ?? p.HospedagemCetic;
+
+        // Área técnica na grafia do domínio (SUBSIS/SUBINFRA), pela mesma comparação sem caixa
+        p.AnaliseTecnicaArea = Limpar(p.AnaliseTecnicaArea);
+        if (p.AnaliseTecnicaArea != null)
+            p.AnaliseTecnicaArea = CtrDominios.AreaTecnica.Todos
+                .FirstOrDefault(a => CtrCsv.Normalizar(a) == CtrCsv.Normalizar(p.AnaliseTecnicaArea))
+                ?? p.AnaliseTecnicaArea;
 
         // Valor em centavos, como a coluna numeric(18,2) guarda (a resposta sai igual ao
         // gravado). Negativo não é arredondado: é recusado abaixo como veio
@@ -237,12 +264,22 @@ public class CtrProcessoService : ICtrProcessoService
             p.Criticidade = CtrCriticidade.Calcular(normalizados);
         }
 
-        // Limpar a data do pedido ANULA a descrição (normalização, como a restituição:
-        // é gesto explícito do usuário, não erro). A RESPOSTA não entra aqui: ela é
-        // fato datado, e apagá-la em silêncio esconderia perda de dado — na importação
-        // a linha passaria como "Atualizar" sem nada aparecer na prévia. Vira erro,
-        // logo abaixo.
-        if (p.EsclarecimentoSolicitadoEm == null) p.EsclarecimentoDescricao = null;
+        // Limpar a data do pedido ANULA a descrição e o documento SEI do pedido
+        // (normalização, como a restituição: é gesto explícito do usuário, não erro). A
+        // RESPOSTA não entra aqui: ela é fato datado, e apagá-la em silêncio esconderia
+        // perda de dado (na importação a linha passaria como "Atualizar" sem nada aparecer
+        // na prévia). Vira erro, logo abaixo.
+        if (p.EsclarecimentoSolicitadoEm == null)
+        {
+            p.EsclarecimentoDescricao = null;
+            p.EsclarecimentoDocumentoSei = null;
+        }
+
+        // Análise técnica, com a mesma disciplina: sem a data do encaminhamento a área é
+        // anulada, e sem a data do retorno o resumo dele também; o RETORNO sem encaminhamento
+        // é fato datado e vira erro abaixo
+        if (p.AnaliseTecnicaEncaminhadaEm == null) p.AnaliseTecnicaArea = null;
+        if (p.AnaliseTecnicaRetornoEm == null) p.AnaliseTecnicaRetornoResumo = null;
         // Origem vazia = o caminho normal (o processo veio do órgão comunicante)
         p.Origem = Limpar(p.Origem) ?? CtrDominios.Origem.OrgaoComunicante;
 
@@ -263,6 +300,11 @@ public class CtrProcessoService : ICtrProcessoService
         if (numeroDuplicado)
             throw new ApiException(ErrorCode.CtrProcessoDuplicado,
                 $"Já existe processo ativo com o número {p.NumeroProcesso}.");
+
+        // Opcional, mas no mesmo formato do número do processo (e com a mesma máscara na tela)
+        if (p.NumeroSeiFormulario != null && !FormatoSei.IsMatch(p.NumeroSeiFormulario))
+            throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                $"Nº SEI do Formulário fora do formato SEI (00000-00000000/AAAA-DD): {p.NumeroSeiFormulario}");
 
         if (string.IsNullOrWhiteSpace(p.OrgaoNome))
             // Neutra: vale para o órgão comunicante e para o órgão auditado da comunicação do TCDF
@@ -299,6 +341,21 @@ public class CtrProcessoService : ICtrProcessoService
         if (p.HospedagemCetic != null && !CtrDominios.HospedagemCetic.Todos.Contains(p.HospedagemCetic))
             throw new ApiException(ErrorCode.CtrDominioInvalido,
                 $"Hospedagem no CeTIC-DF inválida: {p.HospedagemCetic}");
+
+        if (p.AnaliseTecnicaArea != null && !CtrDominios.AreaTecnica.Todos.Contains(p.AnaliseTecnicaArea))
+            throw new ApiException(ErrorCode.CtrDominioInvalido,
+                $"Área técnica inválida: {p.AnaliseTecnicaArea} (use {string.Join(" ou ", CtrDominios.AreaTecnica.Todos)}).");
+
+        // Retorno sem encaminhamento é RECUSADO (não normalizado), como a resposta ao
+        // esclarecimento sem o pedido
+        if (p.AnaliseTecnicaEncaminhadaEm == null && p.AnaliseTecnicaRetornoEm != null)
+            throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                "Informe a data do encaminhamento para análise técnica antes de registrar o retorno da área técnica.");
+
+        if (p.AnaliseTecnicaEncaminhadaEm != null && p.AnaliseTecnicaArea == null)
+            throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                $"Informe a área técnica ({string.Join(" ou ", CtrDominios.AreaTecnica.Todos)}) para onde o processo "
+                + "foi encaminhado.");
 
         if (p.ValorEstimado < 0)
             throw new ApiException(ErrorCode.CtrProcessoInvalido,
@@ -379,6 +436,23 @@ public class CtrProcessoService : ICtrProcessoService
             throw new ApiException(ErrorCode.CtrDatasIncoerentes,
                 $"A data da resposta ao esclarecimento ({p.EsclarecimentoRespondidoEm.Value:dd/MM/yyyy}) não pode "
                 + $"ser anterior à data do pedido ({p.EsclarecimentoSolicitadoEm.Value:dd/MM/yyyy}).");
+
+        // Análise técnica: também fora da cronologia do trâmite (a SGDI encaminha à área
+        // técnica quando precisa), com as duas datas coerentes entre si e nenhuma futura
+        if (p.AnaliseTecnicaEncaminhadaEm != null && p.AnaliseTecnicaEncaminhadaEm.Value > hoje)
+            throw new ApiException(ErrorCode.CtrDatasIncoerentes,
+                $"A data do encaminhamento para análise técnica ({p.AnaliseTecnicaEncaminhadaEm.Value:dd/MM/yyyy}) "
+                + "não pode ser futura.");
+
+        if (p.AnaliseTecnicaRetornoEm != null && p.AnaliseTecnicaRetornoEm.Value > hoje)
+            throw new ApiException(ErrorCode.CtrDatasIncoerentes,
+                $"A data do retorno da área técnica ({p.AnaliseTecnicaRetornoEm.Value:dd/MM/yyyy}) não pode ser futura.");
+
+        if (p.AnaliseTecnicaRetornoEm != null && p.AnaliseTecnicaEncaminhadaEm != null
+            && p.AnaliseTecnicaRetornoEm.Value < p.AnaliseTecnicaEncaminhadaEm.Value)
+            throw new ApiException(ErrorCode.CtrDatasIncoerentes,
+                $"A data do retorno da área técnica ({p.AnaliseTecnicaRetornoEm.Value:dd/MM/yyyy}) não pode ser "
+                + $"anterior à data do encaminhamento ({p.AnaliseTecnicaEncaminhadaEm.Value:dd/MM/yyyy}).");
 
         // Cada etapa preenchida deve ser >= todas as anteriores preenchidas (lacunas são permitidas)
         for (var atual = 1; atual < etapas.Length; atual++)
@@ -636,8 +710,12 @@ public class CtrProcessoService : ICtrProcessoService
 
         // Respostas aos critérios ausentes no corpo PRESERVAM as gravadas (o front só as
         // manda quando o usuário as avaliou); com elas gravadas a criticidade é recalculada
-        // na validação, e o Criticidade do corpo só vale para processo ainda sem respostas
-        if (dto.CriteriosCriticidade == null) candidato.CriteriosCriticidade = processo.CriteriosCriticidade;
+        // na validação, e o Criticidade do corpo só vale para processo ainda sem respostas.
+        // Enviadas sem responder ao II, a resposta gravada à pergunta ANTERIOR dele fica
+        // (é a referência que a tela mostra até alguém responder à pergunta nova)
+        candidato.CriteriosCriticidade = dto.CriteriosCriticidade == null
+            ? processo.CriteriosCriticidade
+            : CtrCriticidade.ManterRespostaPerguntaAnteriorII(candidato.CriteriosCriticidade, processo.CriteriosCriticidade);
 
         ValidarProcesso(candidato, await _repositorio.NumeroDuplicadoAsync(candidato.NumeroProcesso, processo.Id));
         ValidarCriticidadeNaoRemovida(processo.Criticidade, candidato.Criticidade,
@@ -776,6 +854,7 @@ public class CtrProcessoService : ICtrProcessoService
     public static void AplicarDto(CtrProcesso processo, CtrProcessoCreateDTO dto)
     {
         processo.NumeroProcesso = dto.NumeroProcesso;
+        processo.NumeroSeiFormulario = dto.NumeroSeiFormulario;
         processo.OrgaoNome = dto.OrgaoNome;
         processo.OrgaoSigla = dto.OrgaoSigla;
         processo.ComplementoArea = dto.ComplementoArea;
@@ -788,6 +867,12 @@ public class CtrProcessoService : ICtrProcessoService
         processo.RetornoGabSgdi = dto.RetornoGabSgdi;
         processo.RetornoOrgao = dto.RetornoOrgao;
         processo.RetornoOrgaoNaoSeAplica = dto.RetornoOrgaoNaoSeAplica;
+        // A análise técnica segue o corpo (nulo limpa), como os dados da contratação: o
+        // formulário manda os quatro; o checkpoint passa o DtoDe do próprio processo
+        processo.AnaliseTecnicaEncaminhadaEm = dto.AnaliseTecnicaEncaminhadaEm;
+        processo.AnaliseTecnicaArea = dto.AnaliseTecnicaArea;
+        processo.AnaliseTecnicaRetornoEm = dto.AnaliseTecnicaRetornoEm;
+        processo.AnaliseTecnicaRetornoResumo = dto.AnaliseTecnicaRetornoResumo;
         processo.EtapaPlanejamento = dto.EtapaPlanejamento;
         processo.DataAssinaturaContrato = dto.DataAssinaturaContrato;
         processo.Criticidade = dto.Criticidade;
@@ -802,6 +887,7 @@ public class CtrProcessoService : ICtrProcessoService
         processo.UsaGdfnet = dto.UsaGdfnet;
         processo.EsclarecimentoSolicitadoEm = dto.EsclarecimentoSolicitadoEm;
         processo.EsclarecimentoDescricao = dto.EsclarecimentoDescricao;
+        processo.EsclarecimentoDocumentoSei = dto.EsclarecimentoDocumentoSei;
         processo.EsclarecimentoRespondidoEm = dto.EsclarecimentoRespondidoEm;
         processo.Restituido = dto.Restituido;
         processo.RestituidoEm = dto.RestituidoEm;
@@ -813,6 +899,7 @@ public class CtrProcessoService : ICtrProcessoService
     public static CtrProcessoCreateDTO DtoDe(CtrProcesso p) => new()
     {
         NumeroProcesso = p.NumeroProcesso,
+        NumeroSeiFormulario = p.NumeroSeiFormulario,
         OrgaoNome = p.OrgaoNome,
         OrgaoSigla = p.OrgaoSigla,
         ComplementoArea = p.ComplementoArea,
@@ -825,6 +912,10 @@ public class CtrProcessoService : ICtrProcessoService
         RetornoGabSgdi = p.RetornoGabSgdi,
         RetornoOrgao = p.RetornoOrgao,
         RetornoOrgaoNaoSeAplica = p.RetornoOrgaoNaoSeAplica,
+        AnaliseTecnicaEncaminhadaEm = p.AnaliseTecnicaEncaminhadaEm,
+        AnaliseTecnicaArea = p.AnaliseTecnicaArea,
+        AnaliseTecnicaRetornoEm = p.AnaliseTecnicaRetornoEm,
+        AnaliseTecnicaRetornoResumo = p.AnaliseTecnicaRetornoResumo,
         EtapaPlanejamento = p.EtapaPlanejamento,
         DataAssinaturaContrato = p.DataAssinaturaContrato,
         Criticidade = p.Criticidade,
@@ -835,6 +926,7 @@ public class CtrProcessoService : ICtrProcessoService
         UsaGdfnet = p.UsaGdfnet,
         EsclarecimentoSolicitadoEm = p.EsclarecimentoSolicitadoEm,
         EsclarecimentoDescricao = p.EsclarecimentoDescricao,
+        EsclarecimentoDocumentoSei = p.EsclarecimentoDocumentoSei,
         EsclarecimentoRespondidoEm = p.EsclarecimentoRespondidoEm,
         Restituido = p.Restituido,
         RestituidoEm = p.RestituidoEm,
@@ -884,6 +976,8 @@ public class CtrProcessoService : ICtrProcessoService
                 RestituidoEm = p.RestituidoEm,
                 EsclarecimentoSolicitadoEm = p.EsclarecimentoSolicitadoEm,
                 EsclarecimentoRespondidoEm = p.EsclarecimentoRespondidoEm,
+                AnaliseTecnicaEncaminhadaEm = p.AnaliseTecnicaEncaminhadaEm,
+                AnaliseTecnicaRetornoEm = p.AnaliseTecnicaRetornoEm,
                 CriadoEm = p.CriadoEm
             })
             .ToListAsync();
@@ -902,7 +996,8 @@ public class CtrProcessoService : ICtrProcessoService
             Dias = CalcularDiasSemMovimento(
                 CalcularUltimaMovimentacao(r.ChegadaSgdi, r.ChegadaSubgd, r.ChegadaUgtic,
                     r.RetornoGabSgdi, r.RetornoOrgao, r.RestituidoEm,
-                    r.EsclarecimentoSolicitadoEm, r.EsclarecimentoRespondidoEm),
+                    r.EsclarecimentoSolicitadoEm, r.EsclarecimentoRespondidoEm,
+                    r.AnaliseTecnicaEncaminhadaEm, r.AnaliseTecnicaRetornoEm),
                 r.CriadoEm, hoje)
         }).ToList();
 
@@ -1135,6 +1230,7 @@ public class CtrProcessoService : ICtrProcessoService
         {
             Id = p.Id,
             NumeroProcesso = p.NumeroProcesso,
+            NumeroSeiFormulario = p.NumeroSeiFormulario,
             OrgaoNome = p.OrgaoNome,
             OrgaoSigla = p.OrgaoSigla,
             ComplementoArea = p.ComplementoArea,
@@ -1147,17 +1243,24 @@ public class CtrProcessoService : ICtrProcessoService
             RetornoGabSgdi = p.RetornoGabSgdi,
             RetornoOrgao = p.RetornoOrgao,
             RetornoOrgaoNaoSeAplica = p.RetornoOrgaoNaoSeAplica,
+            AnaliseTecnicaEncaminhadaEm = p.AnaliseTecnicaEncaminhadaEm,
+            AnaliseTecnicaArea = p.AnaliseTecnicaArea,
+            AnaliseTecnicaRetornoEm = p.AnaliseTecnicaRetornoEm,
+            AnaliseTecnicaRetornoResumo = p.AnaliseTecnicaRetornoResumo,
             EtapaPlanejamento = p.EtapaPlanejamento,
             DataAssinaturaContrato = p.DataAssinaturaContrato,
             Criticidade = p.Criticidade,
             CriteriosCriticidade = criterios,
             PontosCriticidade = criterios == null ? null : CtrCriticidade.PontosTotais(criterios),
+            PontosPorCriterio = criterios == null ? null : CtrCriticidade.PontosPorCriterio(criterios),
+            RespostaPerguntaAnteriorII = CtrCriticidade.RespostaPerguntaAnteriorII(criterios),
             Origem = p.Origem,
             ValorEstimado = p.ValorEstimado,
             HospedagemCetic = p.HospedagemCetic,
             UsaGdfnet = p.UsaGdfnet,
             EsclarecimentoSolicitadoEm = p.EsclarecimentoSolicitadoEm,
             EsclarecimentoDescricao = p.EsclarecimentoDescricao,
+            EsclarecimentoDocumentoSei = p.EsclarecimentoDocumentoSei,
             EsclarecimentoRespondidoEm = p.EsclarecimentoRespondidoEm,
             EsclarecimentoPendente = CalcularEsclarecimentoPendente(p),
             DiasEsclarecimentoPendente = CalcularDiasEsclarecimentoPendente(
@@ -1167,6 +1270,7 @@ public class CtrProcessoService : ICtrProcessoService
             RestituidoMotivo = p.RestituidoMotivo,
             Observacao = p.Observacao,
             Situacao = CalcularSituacao(p),
+            StatusSupervisao = CalcularStatusSupervisao(p),
             UltimaMovimentacao = ultimaMovimentacao,
             DiasSemMovimento = CalcularDiasSemMovimento(ultimaMovimentacao, p.CriadoEm, hoje),
             // O nível máximo e os riscos aninhados dependem dos riscos: quem chama resolve
@@ -1194,6 +1298,8 @@ public class CtrProcessoService : ICtrProcessoService
         public DateOnly? RestituidoEm { get; set; }
         public DateOnly? EsclarecimentoSolicitadoEm { get; set; }
         public DateOnly? EsclarecimentoRespondidoEm { get; set; }
+        public DateOnly? AnaliseTecnicaEncaminhadaEm { get; set; }
+        public DateOnly? AnaliseTecnicaRetornoEm { get; set; }
         public DateTime CriadoEm { get; set; }
     }
 }

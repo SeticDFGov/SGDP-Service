@@ -51,6 +51,19 @@ public static class CtrModelConfiguration
                     "(esclarecimento_solicitado_em IS NULL AND esclarecimento_descricao IS NULL "
                     + "AND esclarecimento_respondido_em IS NULL) OR "
                     + "(esclarecimento_solicitado_em IS NOT NULL AND esclarecimento_descricao IS NOT NULL)");
+                // O documento SEI do pedido faz parte do pedido (CHECK próprio: o de cima não muda)
+                t.HasCheckConstraint("ck_ctr_processo_esclarecimento_documento",
+                    "esclarecimento_documento_sei IS NULL OR esclarecimento_solicitado_em IS NOT NULL");
+                t.HasCheckConstraint("ck_ctr_processo_analise_tecnica_area",
+                    "analise_tecnica_area IS NULL OR " + EmLista("analise_tecnica_area", CtrDominios.AreaTecnica.Todos));
+                // Análise técnica: nada, ou o encaminhamento com a área; o retorno exige o
+                // encaminhamento e não o antecede; o resumo acompanha a data do retorno
+                t.HasCheckConstraint("ck_ctr_processo_analise_tecnica",
+                    "(analise_tecnica_encaminhada_em IS NULL AND analise_tecnica_area IS NULL "
+                    + "AND analise_tecnica_retorno_em IS NULL AND analise_tecnica_retorno_resumo IS NULL) OR "
+                    + "(analise_tecnica_encaminhada_em IS NOT NULL AND analise_tecnica_area IS NOT NULL "
+                    + "AND (analise_tecnica_retorno_em IS NULL OR analise_tecnica_retorno_em >= analise_tecnica_encaminhada_em) "
+                    + "AND (analise_tecnica_retorno_resumo IS NULL OR analise_tecnica_retorno_em IS NOT NULL))");
                 // Os dois CHECKs abaixo são das colunas LEGADAS do questionário do PGIA (sem
                 // uso desde 2026-09-21, ver CtrProcesso); ficam até a migration que as remover.
                 // Mesmos quatro resultados do PGIA (fonte única: PgiaDominios.ResultadoRisco)
@@ -69,6 +82,7 @@ public static class CtrModelConfiguration
             entity.HasKey(p => p.Id).HasName("pk_ctr_processo");
             entity.Property(p => p.Id).HasColumnName("id").UseIdentityByDefaultColumn();
             entity.Property(p => p.NumeroProcesso).HasColumnName("numero_processo").HasMaxLength(25).IsRequired();
+            entity.Property(p => p.NumeroSeiFormulario).HasColumnName("numero_sei_formulario").HasMaxLength(25);
             entity.Property(p => p.OrgaoNome).HasColumnName("orgao_nome").HasMaxLength(200).IsRequired();
             entity.Property(p => p.OrgaoSigla).HasColumnName("orgao_sigla").HasMaxLength(20).IsRequired();
             entity.Property(p => p.ComplementoArea).HasColumnName("complemento_area").HasMaxLength(200);
@@ -82,6 +96,11 @@ public static class CtrModelConfiguration
             entity.Property(p => p.RetornoOrgao).HasColumnName("retorno_orgao");
             entity.Property(p => p.RetornoOrgaoNaoSeAplica)
                 .HasColumnName("retorno_orgao_nao_se_aplica").HasDefaultValue(false);
+            entity.Property(p => p.AnaliseTecnicaEncaminhadaEm).HasColumnName("analise_tecnica_encaminhada_em");
+            entity.Property(p => p.AnaliseTecnicaArea).HasColumnName("analise_tecnica_area").HasMaxLength(10);
+            entity.Property(p => p.AnaliseTecnicaRetornoEm).HasColumnName("analise_tecnica_retorno_em");
+            entity.Property(p => p.AnaliseTecnicaRetornoResumo)
+                .HasColumnName("analise_tecnica_retorno_resumo").HasMaxLength(1000);
             entity.Property(p => p.EtapaPlanejamento).HasColumnName("etapa_planejamento").HasMaxLength(10);
             entity.Property(p => p.DataAssinaturaContrato).HasColumnName("data_assinatura_contrato");
             entity.Property(p => p.Criticidade).HasColumnName("criticidade").HasMaxLength(10);
@@ -93,6 +112,7 @@ public static class CtrModelConfiguration
             entity.Property(p => p.UsaGdfnet).HasColumnName("usa_gdfnet");
             entity.Property(p => p.EsclarecimentoSolicitadoEm).HasColumnName("esclarecimento_solicitado_em");
             entity.Property(p => p.EsclarecimentoDescricao).HasColumnName("esclarecimento_descricao");
+            entity.Property(p => p.EsclarecimentoDocumentoSei).HasColumnName("esclarecimento_documento_sei").HasMaxLength(60);
             entity.Property(p => p.EsclarecimentoRespondidoEm).HasColumnName("esclarecimento_respondido_em");
             entity.Property(p => p.ChecklistRisco).HasColumnName("checklist_risco").HasColumnType("jsonb");
             entity.Property(p => p.RiscoClassificado).HasColumnName("risco_classificado").HasMaxLength(20);
