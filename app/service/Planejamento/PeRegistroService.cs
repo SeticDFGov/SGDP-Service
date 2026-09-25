@@ -715,6 +715,113 @@ public class PeRegistroService : IPeRegistroService
         return await ResponderAsync(secao, gravados);
     }
 
+    /// <summary>
+    /// Os 11 princípios do art. 4º do Decreto nº 48.900/2026 na seção dos princípios e diretrizes
+    /// (passo 1.8) do PDTIC que acabou de abrir (F2), um por linha, na ordem do catálogo do DF (os
+    /// registros do sistema da seção "principio"):
+    /// <list type="bullet">
+    /// <item>o texto do princípio, sem a pontuação da enumeração do decreto (<see cref="TextoDoPrincipio"/>);</item>
+    /// <item>a origem "art. 4º" (a opção art4, quando está ativa): é ela que diz de onde a linha veio;</item>
+    /// <item>o documento de origem, o fundamento do catálogo ("art. 4º, I, do Decreto nº 48.900/2026");</item>
+    /// <item>"serve de critério de priorização" como o "pode ser critério" do catálogo.</item>
+    /// </list>
+    /// São sugestões: registros comuns (não do sistema), que o órgão muda e apaga, com os códigos da
+    /// sequência do PDTIC (PD01 a PD11). Os campos que o nível do órgão esconde também recebem o
+    /// valor e aparecem quando um nível ou um ajuste os ligar (decisão 13). Não grava nada quando a
+    /// seção não aparece para o órgão, quando o catálogo ainda não tem os princípios ou quando a
+    /// seção já tem linhas. Quem chama conferiu a permissão (é a abertura do PDTIC) e cuida da
+    /// transação; o PDTIC não é marcado como alterado (as linhas nascem com ele).
+    /// </summary>
+    public async Task<int> SugerirPrincipiosDoArt4Async(PePdtic pdtic, PeUserContext ctx)
+    {
+        var trilha = await PeTrilhaOrgao.DoPdticAsync(_context, pdtic);
+        if (trilha.Secao(PeDominios.ChavePdtic.SecaoPrincipiosDiretrizes) is not { } visivel) return 0;
+        var secao = trilha.Montar(visivel.Secao);
+        if (secao.EhFormulario) return 0;
+
+        var catalogo = trilha.Dados.SecaoPorChave(PeDominios.Catalogo.SecaoDoCatalogo[PeDominios.Catalogo.Principio]);
+        if (catalogo == null || catalogo.Escopo != PeDominios.Escopo.Df) return 0;
+        var catalogoId = catalogo.Id;
+        var principios = await _context.PeRegistros.AsNoTracking()
+            .Where(r => r.SecaoId == catalogoId && r.PeticId == null && r.PdticId == null && r.Sistema)
+            .OrderBy(r => r.Ordem).ThenBy(r => r.Id)
+            .ToListAsync();
+        if (principios.Count == 0) return 0;
+
+        var dono = PeDono.DoPdtic(pdtic.Id);
+        var secaoId = secao.Secao.Id;
+        if (await RegistrosDo(dono).AnyAsync(r => r.SecaoId == secaoId)) return 0;
+
+        // Os campos da seção pela chave (inclusive os que o nível esconde; os apagados, não)
+        var campos = secao.Campos.Where(c => c.ExcluidoEm == null).ToDictionary(c => c.Chave);
+        PeCampo? CampoDe(string chave, params string[] tipos) =>
+            campos.TryGetValue(chave, out var campo) && tipos.Contains(campo.Tipo) ? campo : null;
+        var campoPrincipio = CampoDe(PeDominios.ChavePdtic.CampoPrincipio, PeDominios.TipoCampo.TextoLongo, PeDominios.TipoCampo.TextoCurto);
+        if (campoPrincipio == null) return 0;
+        var campoOrigem = CampoDe(PeDominios.ChavePdtic.CampoOrigem, PeDominios.TipoCampo.Lista);
+        var origemArt4 = campoOrigem != null
+            && secao.OpcoesDe(campoOrigem).Any(o => o.Valor == PeDominios.ChavePdtic.OrigemArt4 && o.Ativa);
+        // O documento de origem só recebe o fundamento quando o campo aceita texto livre (sem formato de SEI ou de endereço)
+        var campoFonte = CampoDe(PeDominios.ChavePdtic.CampoFonte, PeDominios.TipoCampo.TextoCurto, PeDominios.TipoCampo.TextoLongo);
+        if (campoFonte != null && PeValores.Texto(campoFonte.Config, "formato") != null) campoFonte = null;
+        var campoCriterio = CampoDe(PeDominios.ChavePdtic.CampoCriterioPriorizacao, PeDominios.TipoCampo.SimNao);
+
+        var agora = DateTime.UtcNow;
+        var sequencia = await SequenciaAsync(secaoId, dono);
+        var ordem = 0;
+        foreach (var principio in principios)
+        {
+            var valores = PeRegistroDados.Ler(principio.Dados);
+            var texto = TextoDoPrincipio(PeRegistroDados.Texto(valores[PeDominios.Catalogo.CampoTextoPrincipio]));
+            if (texto.Length == 0) continue;
+
+            var dados = new JsonObject { [campoPrincipio.Chave] = Cortado(texto, campoPrincipio) };
+            if (origemArt4) dados[campoOrigem!.Chave] = PeDominios.ChavePdtic.OrigemArt4;
+            if (campoFonte != null && PeRegistroDados.Texto(valores[PeDominios.Catalogo.CampoFundamentoPrincipio])?.Trim() is { Length: > 0 } fundamento)
+                dados[campoFonte.Chave] = Cortado(fundamento, campoFonte);
+            if (campoCriterio != null && valores[PeDominios.Catalogo.CampoCriterioPrincipio] is JsonValue criterio && criterio.TryGetValue<bool>(out var serve))
+                dados[campoCriterio.Chave] = serve;
+
+            sequencia.Ultimo++;
+            _context.PeRegistros.Add(new PeRegistro
+            {
+                SecaoId = secaoId,
+                PdticId = pdtic.Id,
+                Codigo = CodigoDe(secao, sequencia.Ultimo),
+                Ordem = ++ordem,
+                Dados = dados.ToJsonString(PeModeloService.JsonHistorico),
+                Sistema = false,
+                CriadoEm = agora,
+                CriadoPor = ctx.Email
+            });
+        }
+        if (ordem == 0) return 0;
+        await _context.SaveChangesAsync();
+        return ordem;
+    }
+
+    /// <summary>
+    /// O texto de um princípio do art. 4º como linha da tabela do PDTIC: sem a pontuação que o
+    /// encadeia aos outros incisos no decreto (o ";" e o "; e" do fim viram ponto final) e com a
+    /// primeira letra maiúscula (o inciso X começa em minúscula). O conteúdo não muda.
+    /// </summary>
+    public static string TextoDoPrincipio(string? texto)
+    {
+        var t = (texto ?? string.Empty).Trim();
+        if (t.EndsWith("; e", StringComparison.Ordinal)) t = t[..^3];
+        t = t.TrimEnd().TrimEnd(';', ',').TrimEnd();
+        if (t.Length == 0) return t;
+        if (!t.EndsWith('.') && !t.EndsWith('!') && !t.EndsWith('?')) t += ".";
+        return char.ToUpperInvariant(t[0]) + t[1..];
+    }
+
+    /// <summary>O texto no tamanho máximo do campo (o do config ou o padrão do tipo).</summary>
+    private static string Cortado(string texto, PeCampo campo)
+    {
+        var maximo = PeValores.Inteiro(campo.Config, "max") ?? (campo.Tipo == PeDominios.TipoCampo.TextoCurto ? 1000 : 50000);
+        return texto.Length > maximo ? texto[..maximo].TrimEnd() : texto;
+    }
+
     public async Task<PeRegistrosResponse> OrdenarAsync(PeDono dono, string secaoChave, PeOrdemDTO dto, PeUserContext ctx, long? cicloId = null)
     {
         var aberto = await AbrirAsync(dono, ctx, escrita: true);

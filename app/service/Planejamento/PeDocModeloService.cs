@@ -56,6 +56,25 @@ public class PeDocModeloService : IPeDocModeloService
             .Where(c => c.Secao!.Chave == PeDominios.DicionarioNomes.Secao)
             .ToListAsync();
 
+        // Onde cada marcador se preenche (F2): o passo das seções que dão valor aos marcadores e o
+        // primeiro passo da deliberação do CGTIC, pelo modelo (sem órgão, sem o número)
+        var secoes = PeDocMarcadores.SecoesDosMarcadores;
+        var passosDasSecoes = (await (from s in _context.PeSecoes.AsNoTracking()
+                                      join p in _context.PePassos.AsNoTracking() on s.PassoId equals (long?)p.Id
+                                      where s.ExcluidoEm == null && p.ExcluidoEm == null && secoes.Contains(s.Chave)
+                                      select new { Secao = s.Chave, Passo = p.Chave })
+                .ToListAsync())
+            .GroupBy(x => x.Secao)
+            .ToDictionary(g => g.Key, g => g.First().Passo);
+        var passosPorTipo = (await (from p in _context.PePassos.AsNoTracking()
+                                    join e in _context.PeEtapas.AsNoTracking() on p.EtapaId equals e.Id
+                                    where p.ExcluidoEm == null && p.Tipo == PeDominios.TipoPasso.Deliberacao
+                                    orderby e.Ordem, p.Ordem, p.Id
+                                    select new { p.Tipo, p.Chave })
+                .ToListAsync())
+            .GroupBy(x => x.Tipo)
+            .ToDictionary(g => g.Key, g => g.First().Chave);
+
         return new PeDocModeloResponse
         {
             Id = modelo.Id,
@@ -64,9 +83,9 @@ public class PeDocModeloService : IPeDocModeloService
             Capitulos = PeDocumentoService.Arvore(capitulos)
                 .Select(x => Capitulo(x.Capitulo, blocos.Where(b => b.CapituloId == x.Capitulo.Id)))
                 .ToList(),
-            Marcadores = PeDocMarcadores.Lista(dicionario, modelo.Tipo)
-                .Select(m => new PeDocMarcadorResponse { Chave = m.Chave, Descricao = m.Descricao, Exemplo = m.Exemplo })
-                .ToList()
+            Marcadores = PeDocMarcadores.Respostas(PeDocMarcadores.Lista(dicionario, modelo.Tipo),
+                secao => passosDasSecoes.TryGetValue(secao, out var passo) ? new PeDocMarcadores.PassoDoMarcador(passo, null) : null,
+                tipo => passosPorTipo.TryGetValue(tipo, out var passo) ? new PeDocMarcadores.PassoDoMarcador(passo, null) : null)
         };
     }
 

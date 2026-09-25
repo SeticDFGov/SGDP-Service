@@ -140,8 +140,14 @@ public class PePdticService : IPePdticService
             CriadoEm = agora,
             CriadoPor = ctx.Email
         };
+
+        // O PDTIC e os princípios do art. 4º (as sugestões do passo 1.8, F2) numa transação: a
+        // sequência dos códigos precisa do id do PDTIC, então são duas gravações
+        await using var transacao = _context.Database.IsRelational() ? await _context.Database.BeginTransactionAsync() : null;
         _context.PePdtics.Add(pdtic);
         await _context.SaveChangesAsync();
+        await _registros.SugerirPrincipiosDoArt4Async(pdtic, ctx);
+        if (transacao != null) await transacao.CommitAsync();
         return await RespostaAsync(pdtic, ctx);
     }
 
@@ -176,11 +182,16 @@ public class PePdticService : IPePdticService
 
         var query = from p in _context.PePdtics.AsNoTracking()
                     join o in _context.PgiaOrgaos.AsNoTracking() on p.OrgaoId equals o.Id
-                    where !PeDominios.SituacaoPdtic.Encerradas.Contains(p.Situacao)
                     select new { Pdtic = p, Orgao = o };
-        if (!string.IsNullOrWhiteSpace(consulta.Situacao))
+        if (string.IsNullOrWhiteSpace(consulta.Situacao))
         {
-            // Fora do domínio: lista vazia, nunca "todos" em silêncio
+            // Sem filtro, os atuais (os encerrados e os substituídos só com o filtro deles)
+            query = query.Where(x => !PeDominios.SituacaoPdtic.Encerradas.Contains(x.Pdtic.Situacao));
+        }
+        else
+        {
+            // Fora do domínio: lista vazia, nunca "todos" em silêncio. Encerrado e substituído
+            // também valem (F2: antes a lista cortava os dois antes do filtro e voltava vazia)
             var situacao = consulta.Situacao.Trim();
             query = PeDominios.SituacaoPdtic.Todas.Contains(situacao)
                 ? query.Where(x => x.Pdtic.Situacao == situacao)

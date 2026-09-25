@@ -164,6 +164,11 @@ public static class PeDominios
             [Principio] = "principio"
         };
 
+        // Os campos da seção dos princípios do catálogo do DF (os 11 do art. 4º são registros do sistema)
+        public const string CampoTextoPrincipio = "texto";
+        public const string CampoFundamentoPrincipio = "fundamento";
+        public const string CampoCriterioPrincipio = "criterio_priorizacao";
+
         /// <summary>Catálogo que sai do PETIC-DF vigente (sem vigente, a ligação fica opcional).</summary>
         public static bool DoPetic(string? catalogo) => catalogo is PeticObjetivo or PeticEixo;
 
@@ -384,6 +389,15 @@ public static class PeDominios
         public const string SecaoAmeacas = "swot_ameacas";
         public const string SecaoRiscos = "riscos";
         public const string CampoAmeaca = "ameaca";
+
+        // Princípios e diretrizes do PDTIC (passo 1.8): os princípios do art. 4º entram como
+        // sugestão quando o PDTIC é aberto (F2), com a origem "art4"
+        public const string SecaoPrincipiosDiretrizes = "principios_diretrizes";
+        public const string CampoPrincipio = "principio";
+        public const string CampoOrigem = "origem";
+        public const string CampoFonte = "fonte";
+        public const string CampoCriterioPriorizacao = "criterio_priorizacao";
+        public const string OrigemArt4 = "art4";
 
         // Aprovação e publicação (E7): as seções formulário que a E2 semeou e os campos delas
         public const string SecaoAprovacaoSgtic = "aprovacao_sgtic";
@@ -994,6 +1008,30 @@ public static class PeDominios
             Media => "Média",
             Baixa => "Baixa",
             _ => grupo
+        };
+    }
+
+    /// <summary>
+    /// Os alertas que a conformidade filtra (GET conformidade?Alerta=; F2): os três do painel que
+    /// levam à conformidade, pelas marcas da linha que o painel conta, e a notificação ou
+    /// inadimplência em aberto (a linha tem Inadimplencia). Os valores são os da tela (?alerta=).
+    /// </summary>
+    public static class AlertaConformidade
+    {
+        public const string Vigencia = "vigencia";
+        public const string Revisao = "revisao";
+        public const string Ciclo = "ciclo";
+        public const string Inadimplencia = "inadimplencia";
+
+        public static readonly string[] Todos = { Vigencia, Revisao, Ciclo, Inadimplencia };
+
+        public static string Rotulo(string alerta) => alerta switch
+        {
+            Vigencia => "PDTIC publicado com a vigência vencida",
+            Revisao => "Revisão do PDTIC vencida",
+            Ciclo => "Ciclo de monitoramento atrasado",
+            Inadimplencia => "Notificação ou inadimplência em aberto",
+            _ => alerta
         };
     }
 

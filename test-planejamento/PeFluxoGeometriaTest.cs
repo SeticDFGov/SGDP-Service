@@ -410,7 +410,7 @@ public class PeFluxoGeometriaTest : PeFluxoTestBase
         yield return new object[] { "raia longa", JsonSerializer.Serialize(D(new[] { T("a") }, raias: new[] { R("r1", new string('r', 121)) })), "passa de 120 caracteres." };
         yield return new object[] { "rótulo longo", JsonSerializer.Serialize(D(new[] { T("a"), T("b") }, new[] { L("l1", "a", "b", new string('s', 61)) })), "\" da ligação da tarefa \"Tarefa\" para a tarefa \"Tarefa\" passa de 60 caracteres." };
         yield return new object[] { "artefatos demais", JsonSerializer.Serialize(D(new[] { T("a", "Muitos", artefatos: new[] { "1", "2", "3", "4", "5", "6", "7" }) })), "A tarefa \"Muitos\": tem artefatos demais (até 6)." };
-        yield return new object[] { "artefato longo", JsonSerializer.Serialize(D(new[] { T("a", artefatos: new[] { new string('d', 121) }) })), "passa de 120 caracteres." };
+        yield return new object[] { "artefato longo", JsonSerializer.Serialize(D(new[] { T("a", artefatos: new[] { new string('d', 201) }) })), "passa de 200 caracteres." };
         yield return new object[] { "artefatos sem lista", JsonSerializer.Serialize(D(new[] { T("a", artefatos: "Ata") })), "A tarefa \"Tarefa\": os artefatos vêm numa lista de nomes." };
         yield return new object[] { "raias demais", JsonSerializer.Serialize(D(new[] { T("a") }, raias: Enumerable.Range(1, 13).Select(i => R($"r{i}")).ToArray())), "O fluxo aceita até 12 raias." };
         yield return new object[] { "passos demais", JsonSerializer.Serialize(D(Enumerable.Range(1, 121).Select(i => T($"t{i}")).ToArray())), "O fluxo aceita até 120 passos." };

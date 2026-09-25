@@ -294,11 +294,12 @@ public class PeConformidadeTest : PePaineisTestBase
         DataDoAto(id, HojeData().AddMonths(-14));
         Assert.EndsWith("; a revisão 1.1 está em elaboração", Item(await LinhaAsync(OrgaoSes), "revisao_em_dia").Detalhe);
 
-        // Sem vigente nem elaboração (as duas versões encerradas), o órgão fica sem PDTIC: 0% e baixa
+        // Sem vigente nem elaboração (as duas versões encerradas), nenhum item atende: 0% e baixa. A
+        // linha mostra a versão de referência, como o painel (F2): a mais recente, encerrada
         Situacao(revisao.Id, PeDominios.SituacaoPdtic.Encerrado);
         Situacao(id, PeDominios.SituacaoPdtic.Encerrado);
         var encerrado = await LinhaAsync(OrgaoSes);
-        Assert.Null(encerrado.PdticId);
+        Assert.Equal((revisao.Id, "1.1", "encerrado"), (encerrado.PdticId!.Value, encerrado.PdticVersao, encerrado.PdticSituacao));
         Assert.Equal((0, "baixa"), (encerrado.Percentual, encerrado.Grupo));
         Assert.StartsWith("O PDTIC 1.1 foi encerrado em ", Item(encerrado, "aprovado_cgtic").Detalhe);
         Assert.EndsWith(" e o próximo ainda não foi aberto", Item(encerrado, "aprovado_cgtic").Detalhe);

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using api.Planejamento;
 using Models.Planejamento;
 
 namespace service.Planejamento;
@@ -101,6 +102,56 @@ public static partial class PeDocMarcadores
         }
         return lista;
     }
+
+    /// <summary>O passo onde se preenche o valor de um marcador: a chave no modelo e, na trilha do órgão, o número.</summary>
+    public sealed record PassoDoMarcador(string Chave, string? Numero);
+
+    /// <summary>As seções que dão valor aos marcadores (o passo de cada uma é onde o marcador se preenche).</summary>
+    public static readonly string[] SecoesDosMarcadores =
+    {
+        PeDominios.DicionarioNomes.Secao, PeDominios.ChavePdtic.SecaoAbrangencia,
+        PeDominios.ChavePdtic.SecaoAprovacaoSgtic, PeDominios.ChavePdtic.SecaoPublicacao
+    };
+
+    /// <summary>
+    /// Onde o valor de um marcador se preenche (F2), para o link "preencha no passo N.M" da prévia:
+    /// a seção do PDTIC (o dicionário de nomes, a abrangência, a aprovação do SGTIC e a publicação;
+    /// o passo é o da seção) ou, na aprovação do CGTIC, o passo da deliberação (sem seção: quem
+    /// registra a decisão é a Secretaria do CGTIC). Os dois nulos quando o valor vem do sistema: o
+    /// nome do órgão (do cadastro), a versão, a data de hoje e o ciclo.
+    /// </summary>
+    public static (string? Secao, string? TipoPasso) Origem(string chave)
+    {
+        if (chave.StartsWith("nomes.", StringComparison.Ordinal) || chave == "orgao.sigla") return (PeDominios.DicionarioNomes.Secao, null);
+        if (chave.StartsWith("vigencia.", StringComparison.Ordinal)) return (PeDominios.ChavePdtic.SecaoAbrangencia, null);
+        if (chave.StartsWith("aprovacao.sgtic.", StringComparison.Ordinal)) return (PeDominios.ChavePdtic.SecaoAprovacaoSgtic, null);
+        if (chave.StartsWith("aprovacao.cgtic.", StringComparison.Ordinal)) return (null, PeDominios.TipoPasso.Deliberacao);
+        if (chave.StartsWith("publicacao.", StringComparison.Ordinal)) return (PeDominios.ChavePdtic.SecaoPublicacao, null);
+        return (null, null);
+    }
+
+    /// <summary>
+    /// A resposta de cada marcador com o lugar onde o valor se preenche (F2): a seção (SecaoChave), a
+    /// chave do passo (PassoChave) e o número dele na trilha do órgão (PassoNumero; nulo no modelo do
+    /// documento e quando o passo não aparece para o órgão). passoDaSecao dá o passo de uma seção e
+    /// passoDoTipo, o primeiro passo de um tipo (ou nulo).
+    /// </summary>
+    public static List<PeDocMarcadorResponse> Respostas(IEnumerable<Marcador> marcadores,
+        Func<string, PassoDoMarcador?> passoDaSecao, Func<string, PassoDoMarcador?> passoDoTipo) =>
+        marcadores.Select(m =>
+        {
+            var (secao, tipo) = Origem(m.Chave);
+            var passo = secao != null ? passoDaSecao(secao) : tipo != null ? passoDoTipo(tipo) : null;
+            return new PeDocMarcadorResponse
+            {
+                Chave = m.Chave,
+                Descricao = m.Descricao,
+                Exemplo = m.Exemplo,
+                SecaoChave = secao,
+                PassoChave = passo?.Chave,
+                PassoNumero = passo?.Numero
+            };
+        }).ToList();
 
     /// <summary>Campo do dicionário que vira marcador: o que tem texto para mostrar (não arquivo nem ligação).</summary>
     public static bool EhDeTexto(PeCampo campo) =>

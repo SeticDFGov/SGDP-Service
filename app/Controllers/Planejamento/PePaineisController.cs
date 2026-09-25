@@ -32,12 +32,15 @@ public class PePaineisController : ControllerBase
     public Task<IActionResult> Painel([FromQuery] PePainelConsulta consulta) =>
         Executar(async ctx => Ok(await _paineis.PainelAsync(consulta, ctx)));
 
-    /// <summary>A conformidade de cada órgão (só itens de TIC): ?Grupo=&amp;NivelId=&amp;Filtro=.</summary>
+    /// <summary>A conformidade de cada órgão (só itens de TIC): ?Grupo=&amp;NivelId=&amp;Filtro=&amp;Situacao=&amp;Alerta=.</summary>
     [HttpGet("conformidade")]
     public Task<IActionResult> Conformidade([FromQuery] PeConformidadeConsulta consulta) =>
         Executar(async ctx => Ok(await _paineis.ConformidadeAsync(consulta, ctx)));
 
-    /// <summary>A conformidade numa planilha (?formato=csv ou xlsx; padrão xlsx): PDTIC_conformidade_aaaa-mm-dd.</summary>
+    /// <summary>
+    /// A conformidade numa planilha (?formato=csv ou xlsx; padrão xlsx): PDTIC_conformidade_aaaa-mm-dd,
+    /// com os mesmos filtros da tela (Grupo, NivelId, Filtro, Situacao e Alerta; F2).
+    /// </summary>
     [HttpGet("conformidade/planilha")]
     public Task<IActionResult> ConformidadePlanilha([FromQuery] PeConformidadeConsulta consulta, [FromQuery] string? formato) =>
         Executar(async ctx =>

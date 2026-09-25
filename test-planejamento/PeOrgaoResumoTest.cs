@@ -122,13 +122,15 @@ public class PeOrgaoResumoTest : PePaineisTestBase
         Assert.Equal(("Básico", true), (semPdtic.Nivel.Nome, semPdtic.Nivel.Padrao));
         Assert.Empty(semPdtic.Nivel.Historico);
 
-        // O PDTIC encerrado continua sendo o da página, mas a conformidade fica sem PDTIC em vigor
+        // O PDTIC encerrado continua sendo o da página, e a conformidade não tem PDTIC em vigor para
+        // avaliar: a linha mostra o encerrado, como o painel (F2), com nenhum item atendido
         var id = await PublicadoHojeAsync();
         Situacao(id, PeDominios.SituacaoPdtic.Encerrado);
         var encerrado = await ResumoAsync(OrgaoSes);
         Assert.Equal((id, "encerrado"), (encerrado.Pdtic!.Id, encerrado.Pdtic.Situacao));
         Assert.Null(encerrado.ProximoPasso);
-        Assert.Null(encerrado.Conformidade.PdticId);
+        Assert.Equal((id, "encerrado"), (encerrado.Conformidade.PdticId!.Value, encerrado.Conformidade.PdticSituacao));
+        Assert.Equal((0, 0), (encerrado.Conformidade.Atendidos, encerrado.Conformidade.Percentual));
         Assert.NotEmpty(encerrado.Andamento);
         Assert.Single(encerrado.Deliberacoes);
     }

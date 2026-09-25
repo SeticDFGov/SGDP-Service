@@ -107,7 +107,11 @@ public class PePainelExecucaoResponse
     public int Quantidade { get; set; }
 }
 
-/// <summary>Os alertas do painel, em número de órgãos (as deliberações, em número de deliberações).</summary>
+/// <summary>
+/// Os alertas do painel, em número de órgãos (as deliberações, em número de deliberações). Os três
+/// primeiros contam as linhas da conformidade com a marca de mesmo nome (Alertas da linha; F2), com
+/// os mesmos filtros: GET conformidade?Alerta=vigencia, revisao ou ciclo devolve exatamente esses órgãos.
+/// </summary>
 public class PePainelAlertasResponse
 {
     // O PDTIC vigente passou do fim da vigência e não foi encerrado
@@ -122,7 +126,9 @@ public class PePainelAlertasResponse
     // Órgãos com inadimplência registrada (situação inadimplente)
     public int Inadimplentes { get; set; }
 
-    // Deliberações do CGTIC aguardando, dos PDTICs dos órgãos
+    // Deliberações aguardando a decisão do CGTIC. Sem filtro de nível nem de situação, todas as da
+    // fila (a fila da Secretaria: os PDTICs de qualquer órgão e o PETIC-DF; F2); com filtro, só as
+    // dos PDTICs dos órgãos filtrados
     public int DeliberacoesAguardando { get; set; }
 }
 
@@ -158,8 +164,8 @@ public class PePainelConsulta
 // ── Conformidade (E8) ────────────────────────────────────────────────────────
 
 /// <summary>
-/// GET conformidade?Grupo=&amp;NivelId=&amp;Filtro=: os itens (só de TIC), o resumo dos grupos (com o
-/// nível e a busca, sem o grupo) e uma linha por órgão, pela sigla.
+/// GET conformidade?Grupo=&amp;NivelId=&amp;Filtro=&amp;Situacao=&amp;Alerta=: os itens (só de TIC), o resumo
+/// dos grupos (com os outros filtros, sem o grupo) e uma linha por órgão, pela sigla.
 /// </summary>
 public class PeConformidadeResponse
 {
@@ -193,8 +199,9 @@ public class PeConformidadeResumoResponse
 }
 
 /// <summary>
-/// A linha de um órgão: o PDTIC avaliado (o vigente; sem ele, o da elaboração; sem os dois, nulo),
-/// cada item pela chave (Atende nulo = não se aplica e sai da conta), o percentual e o grupo, e a
+/// A linha de um órgão: o PDTIC de referência (a versão e a situação, as mesmas do painel), cada
+/// item pela chave (Atende nulo = não se aplica e sai da conta; os itens avaliam só a versão
+/// vigente ou a da elaboração), o percentual e o grupo, as marcas dos alertas do painel e a
 /// inadimplência vigente (notificada ou inadimplente).
 /// </summary>
 public class PeConformidadeOrgaoResponse
@@ -207,13 +214,20 @@ public class PeConformidadeOrgaoResponse
 
     public string? NivelNome { get; set; }
 
+    // O PDTIC de referência do órgão (F2, a regra do painel): a versão vigente; sem ela, a da
+    // elaboração; sem as duas, a mais recente (encerrada). Nulo só quando o órgão nunca abriu um PDTIC
     public long? PdticId { get; set; }
 
     public string? PdticVersao { get; set; }
 
+    // A chave do painel (PorSituacao): a situação do PDTIC de referência, com a substituída como
+    // "encerrado"; nulo = sem PDTIC ("sem_pdtic" no painel)
     public string? PdticSituacao { get; set; }
 
     public Dictionary<string, PeConformidadeAtendeResponse> Itens { get; set; } = new();
+
+    // F2: as marcas dos alertas do painel; o painel conta exatamente as linhas com cada marca
+    public PeConformidadeAlertasResponse Alertas { get; set; } = new();
 
     public int Atendidos { get; set; }
 
@@ -226,6 +240,24 @@ public class PeConformidadeOrgaoResponse
     public string Grupo { get; set; } = string.Empty;
 
     public PeConformidadeInadimplenciaResponse? Inadimplencia { get; set; }
+}
+
+/// <summary>
+/// As marcas dos alertas do painel numa linha da conformidade (F2). O painel conta exatamente as
+/// linhas marcadas (Alertas.VigenciaVencida, RevisaoVencida e CicloAtrasado do painel), e
+/// GET conformidade?Alerta= filtra por elas: é a mesma regra nos dois lados.
+/// </summary>
+public class PeConformidadeAlertasResponse
+{
+    // O PDTIC está publicado (ou em acompanhamento) e a vigência já terminou (?Alerta=vigencia)
+    public bool VigenciaVencida { get; set; }
+
+    // A última aprovação do CGTIC (no PDTIC registrado fora do sistema, a publicação) mais a
+    // periodicidade de revisão já passou (?Alerta=revisao). Sem aprovação ainda, não há revisão vencida
+    public bool RevisaoVencida { get; set; }
+
+    // Um ciclo de monitoramento começado passou do prazo de fechamento sem ser fechado (?Alerta=ciclo)
+    public bool CicloAtrasado { get; set; }
 }
 
 public class PeConformidadeAtendeResponse
@@ -247,16 +279,28 @@ public class PeConformidadeInadimplenciaResponse
     public DateOnly Prazo { get; set; }
 }
 
-/// <summary>GET conformidade (e a planilha): os filtros, todos opcionais.</summary>
+/// <summary>
+/// GET conformidade e GET conformidade/planilha: os filtros da tela, todos opcionais, aplicados do
+/// mesmo jeito nas duas rotas (a planilha sai com a lista que a tela mostra). Valor fora do
+/// domínio: lista vazia, nunca "todos" em silêncio.
+/// </summary>
 public class PeConformidadeConsulta
 {
-    // alta, media ou baixa
+    // alta, media ou baixa (o resumo dos grupos não sofre este filtro)
     public string? Grupo { get; set; }
 
     public long? NivelId { get; set; }
 
-    // Sigla ou nome do órgão
+    // Sigla ou nome do órgão, sem diferenciar maiúsculas nem acentos ("saude" acha "Saúde"), como a tela
     public string? Filtro { get; set; }
+
+    // F2: as chaves do painel separadas por vírgula (sem_pdtic, em_elaboracao, em_aprovacao,
+    // devolvido, aprovado, publicado, em_acompanhamento, encerrado), a situação da linha (PdticSituacao)
+    public string? Situacao { get; set; }
+
+    // F2: vigencia, revisao ou ciclo (as marcas de Alertas da linha, as mesmas que o painel conta) ou
+    // inadimplencia (notificação ou inadimplência em aberto: a linha tem Inadimplencia)
+    public string? Alerta { get; set; }
 }
 
 // ── Inadimplência (E8; art. 7º, § 3º, e art. 11 do Decreto nº 48.899/2026) ────

@@ -43,6 +43,11 @@ public class PeDocumentoResponse
 
     // Da mais nova para a mais antiga
     public List<PeDocVersaoResponse> Versoes { get; set; } = new();
+
+    // F2: os marcadores deste documento (os mesmos do modelo do tipo), cada um com onde o valor se
+    // preenche: SecaoChave, PassoChave e o PassoNumero na trilha do órgão (o link "preencha no passo
+    // N.M" dos MarcadoresSemValor de cada bloco)
+    public List<PeDocMarcadorResponse> Marcadores { get; set; } = new();
 }
 
 public class PeDocCapituloResponse
@@ -352,6 +357,19 @@ public class PeDocMarcadorResponse
     public string Descricao { get; set; } = string.Empty;
 
     public string Exemplo { get; set; } = string.Empty;
+
+    // F2: onde o valor se preenche, para o link "preencha no passo N.M" da prévia. A seção do PDTIC
+    // (nomes, abrangencia, aprovacao_sgtic, publicacao) ou nulo (a aprovação do CGTIC não tem seção;
+    // o nome do órgão, a versão, a data e o ciclo vêm do sistema)
+    public string? SecaoChave { get; set; }
+
+    // F2: a chave do passo no modelo ("planejamento.aprovacao-sgtic", "planejamento.deliberacao-cgtic",
+    // "planejamento.publicacao", "preparacao.nomes", "preparacao.abrangencia"), ou nulo
+    public string? PassoChave { get; set; }
+
+    // F2: o número do passo na trilha do órgão ("3.11"): só na resposta do documento de um PDTIC,
+    // e nulo quando o passo não aparece para o órgão (sem link); no modelo do documento, nulo
+    public string? PassoNumero { get; set; }
 }
 
 /// <summary>POST modelo/documento/capitulos.</summary>

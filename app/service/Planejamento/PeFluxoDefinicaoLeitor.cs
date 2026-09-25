@@ -66,7 +66,9 @@ public static partial class PeFluxoDefinicaoLeitor
     public const int MaximoArtefatos = 6;
     public const int MaximoNomeRaia = 120;
     public const int MaximoNome = 200;
-    public const int MaximoArtefato = 120;
+    // O nome do documento que o passo gera (o artefato): 200 desde a F2, o limite da tela (fica no
+    // jsonb da definição, sem coluna); no desenho, o nome passa de 4 linhas com reticências
+    public const int MaximoArtefato = 200;
     public const int MaximoRotulo = 60;
     public const int MaximoId = 40;
     public const int MaximoErros = 25;

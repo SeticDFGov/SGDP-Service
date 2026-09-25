@@ -174,22 +174,28 @@ public sealed class PeBaseDosPaineis
 /// </list>
 /// Percentual = atendidos / aplicáveis, arredondado; o grupo sai do percentual
 /// (<see cref="PeDominios.GrupoConformidade"/>). Órgão sem PDTIC em vigor: nada atendido, 0% e
-/// grupo baixa.
+/// grupo baixa. Desde a F2, a versão e a situação da linha são as do PDTIC de referência (as do
+/// painel: o encerrado aparece como encerrado) e a linha traz as marcas dos alertas que o painel
+/// conta (vigência vencida, revisão vencida e ciclo atrasado).
 /// </summary>
 public static class PeConformidadeRegras
 {
     public static PeAvaliacaoDeConformidade Avaliar(PeRetratoDoOrgao retrato, PeLeituraDaSituacao? leitura, bool acompanhamentoAtivo, DateOnly hoje)
     {
         var pdtic = retrato.EmVigor;
+        var referencia = retrato.Referencia;
         var linha = new PeConformidadeOrgaoResponse
         {
             OrgaoId = retrato.Orgao.Id,
             Sigla = retrato.Orgao.Sigla,
             Nome = retrato.Orgao.Nome,
             NivelNome = retrato.Nivel?.Nome,
-            PdticId = pdtic?.Id,
-            PdticVersao = pdtic?.Versao,
-            PdticSituacao = pdtic?.Situacao
+            // A versão e a situação de referência, as mesmas do painel (F2): o órgão com o PDTIC
+            // encerrado aparece como encerrado, e "sem PDTIC" é só quem nunca abriu um. Os itens
+            // continuam avaliando só a versão vigente ou a da elaboração
+            PdticId = referencia?.Id,
+            PdticVersao = referencia?.Versao,
+            PdticSituacao = referencia == null ? null : retrato.SituacaoNoPainel
         };
         var vigenciaVencida = false;
         var revisaoVencida = false;
@@ -221,6 +227,14 @@ public static class PeConformidadeRegras
         linha.Aplicaveis = linha.Itens.Values.Count(i => i.Atende != null);
         linha.Percentual = Percentual(linha.Atendidos, linha.Aplicaveis);
         linha.Grupo = PeDominios.GrupoConformidade.De(linha.Percentual);
+        // As marcas que o painel conta (F2): a tela filtra a lista por elas, não pelo "Não" do item
+        // (o item também é "Não" antes da primeira aprovação, e a vigência que ainda não começou)
+        linha.Alertas = new PeConformidadeAlertasResponse
+        {
+            VigenciaVencida = vigenciaVencida,
+            RevisaoVencida = revisaoVencida,
+            CicloAtrasado = cicloAtrasado
+        };
         var vigente = retrato.Inadimplencias
             .OrderBy(i => i.Situacao == PeDominios.SituacaoInadimplencia.Inadimplente ? 0 : 1)
             .ThenByDescending(i => i.Id)

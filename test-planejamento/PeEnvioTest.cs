@@ -27,11 +27,13 @@ public class PeEnvioTest : PeAprovacaoTestBase
         var situacao = await SituacaoAsync(pdtic.Id);
         string Numero(string chave) => situacao.Passos.Single(p => p.Chave == chave).Numero;
 
-        // Os obrigatórios das etapas 1 a 3 antes do envio que não estão feitos, e a aprovação do SGTIC
+        // Os obrigatórios das etapas 1 a 3 antes do envio que não estão feitos, e a aprovação do SGTIC.
+        // Os princípios não faltam: o PDTIC nasce com os do art. 4º na seção (F2)
+        Assert.Equal("feito", situacao.Passos.Single(p => p.Chave == "preparacao.principios").Situacao);
         Assert.Equal(new[]
         {
             Numero("preparacao.abrangencia"), Numero("preparacao.nomes"), Numero("preparacao.sgtic"), Numero("preparacao.equipe"),
-            Numero("preparacao.metodologia"), Numero("preparacao.estrategias"), Numero("preparacao.principios"),
+            Numero("preparacao.metodologia"), Numero("preparacao.estrategias"),
             Numero("diagnostico.ambiente-tecnologico"), Numero("diagnostico.ativos"), Numero("diagnostico.necessidades-tic"),
             Numero("planejamento.metas-acoes"), Numero("planejamento.acoes-tematicas"), Numero("planejamento.contratacoes"),
             Numero("planejamento.documento"), Numero("planejamento.aprovacao-sgtic")

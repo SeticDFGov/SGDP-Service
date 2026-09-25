@@ -27,10 +27,16 @@ public interface IPePdticService
     /// <summary>A resposta do PDTIC sem conferir quem lê (quem chama já conferiu; o caminho da aprovação usa).</summary>
     Task<PePdticResponse> ResponderAsync(long id, PeUserContext ctx);
 
-    /// <summary>Abre o PDTIC (versão 1.0, em elaboração); 409 se o órgão já tem um em andamento (em elaboração ou vigente).</summary>
+    /// <summary>
+    /// Abre o PDTIC (versão 1.0, em elaboração), já com os princípios do art. 4º como sugestão no
+    /// passo 1.8 (F2); 409 se o órgão já tem um em andamento (em elaboração ou vigente).
+    /// </summary>
     Task<PePdticResponse> AbrirAsync(PePdticCriarDTO dto, PeUserContext ctx);
 
-    /// <summary>Os PDTICs atuais de todos os órgãos (papéis globais e admin geral), por sigla.</summary>
+    /// <summary>
+    /// Os PDTICs de todos os órgãos (papéis globais e admin geral), por sigla: sem filtro de
+    /// situação, os atuais; com ele, os daquela situação, inclusive encerrado e substituído (F2).
+    /// </summary>
     Task<PagedResponse<PePdticResponse>> ListarAsync(PePdticConsulta consulta, PeUserContext ctx);
 
     Task<PePdticSituacaoResponse> SituacaoAsync(long id, PeUserContext ctx);

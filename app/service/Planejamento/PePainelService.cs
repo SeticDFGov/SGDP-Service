@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using api.Planejamento;
 using demanda_service.Helpers;
 using Microsoft.EntityFrameworkCore;
@@ -84,7 +85,7 @@ public class PePainelService : IPePainelService
             AcoesPorTema = AcoesPorTema(dados, comDados, base_.Leitura!),
             RiscosPorNivel = RiscosPorNivel(dados, comDados, base_.Leitura!),
             ExecucaoUltimoCiclo = ExecucaoUltimoCiclo(dados, comDados, base_.Leitura!),
-            Alertas = await AlertasAsync(filtrados),
+            Alertas = await AlertasAsync(filtrados, semFiltro: consulta.NivelId == null && situacaoFiltro == null),
             Filtros = new PePainelFiltrosResponse
             {
                 Niveis = dados.Niveis.Select(n => new PePainelFiltroNivelResponse { Id = n.Id, Nome = n.Nome }).ToList(),
@@ -254,22 +255,37 @@ public class PePainelService : IPePainelService
             .ToList();
     }
 
-    private async Task<PePainelAlertasResponse> AlertasAsync(IReadOnlyList<PeRetratoDoOrgao> filtrados)
+    /// <summary>
+    /// Os alertas, com a regra das listas para onde levam (F2): vigência vencida, revisão vencida e
+    /// ciclo atrasado contam as linhas da conformidade com a marca (GET conformidade?Alerta= devolve
+    /// os mesmos órgãos); inadimplentes, os órgãos com inadimplência registrada; as deliberações
+    /// aguardando, sem filtro, a fila inteira da Secretaria do CGTIC (os PDTICs de qualquer órgão e o
+    /// PETIC-DF, como GET deliberacoes?Situacao=aguardando) e, com filtro, só as dos PDTICs dos
+    /// órgãos filtrados (a revisão em aprovação inclusive).
+    /// </summary>
+    private async Task<PePainelAlertasResponse> AlertasAsync(IReadOnlyList<PeRetratoDoOrgao> filtrados, bool semFiltro)
     {
-        // As deliberações aguardando de qualquer versão dos órgãos filtrados (a revisão em aprovação inclusive)
-        var pdtics = filtrados.SelectMany(r => r.Pdtics).Select(p => p.Id).ToHashSet();
-        var aguardando = pdtics.Count == 0
-            ? 0
-            : (await _context.PeDeliberacoes.AsNoTracking()
-                .Where(d => d.ObjetoTipo == PeDominios.ObjetoDeliberacao.Pdtic && d.Situacao == PeDominios.SituacaoDeliberacao.Aguardando)
-                .Select(d => d.ObjetoId)
-                .ToListAsync())
-            .Count(pdtics.Contains);
+        int aguardando;
+        if (semFiltro)
+        {
+            aguardando = await _context.PeDeliberacoes.AsNoTracking().CountAsync(d => d.Situacao == PeDominios.SituacaoDeliberacao.Aguardando);
+        }
+        else
+        {
+            var pdtics = filtrados.SelectMany(r => r.Pdtics).Select(p => p.Id).ToHashSet();
+            aguardando = pdtics.Count == 0
+                ? 0
+                : (await _context.PeDeliberacoes.AsNoTracking()
+                    .Where(d => d.ObjetoTipo == PeDominios.ObjetoDeliberacao.Pdtic && d.Situacao == PeDominios.SituacaoDeliberacao.Aguardando)
+                    .Select(d => d.ObjetoId)
+                    .ToListAsync())
+                .Count(pdtics.Contains);
+        }
         return new PePainelAlertasResponse
         {
-            VigenciaVencida = filtrados.Count(r => r.Conformidade?.VigenciaVencida == true),
-            RevisaoVencida = filtrados.Count(r => r.Conformidade?.RevisaoVencida == true),
-            CicloAtrasado = filtrados.Count(r => r.Conformidade?.CicloAtrasado == true),
+            VigenciaVencida = filtrados.Count(r => r.Conformidade?.Linha.Alertas.VigenciaVencida == true),
+            RevisaoVencida = filtrados.Count(r => r.Conformidade?.Linha.Alertas.RevisaoVencida == true),
+            CicloAtrasado = filtrados.Count(r => r.Conformidade?.Linha.Alertas.CicloAtrasado == true),
             Inadimplentes = filtrados.Count(r => r.Inadimplencias.Any(i => i.Situacao == PeDominios.SituacaoInadimplencia.Inadimplente)),
             DeliberacoesAguardando = aguardando
         };
@@ -393,13 +409,19 @@ public class PePainelService : IPePainelService
         ConferirPaineis(ctx, "A conformidade é da SGDI, da Secretaria do CGTIC e do administrador do módulo.");
         var base_ = await PeBaseDosPaineis.CarregarAsync(_context, await PeBaseDosPaineis.OrgaosAtivosAsync(_context), comSituacao: true);
 
-        var filtro = string.IsNullOrWhiteSpace(consulta.Filtro) ? null : consulta.Filtro.Trim().ToLowerInvariant();
+        // Os filtros da tela (F2: a planilha passa pelo mesmo caminho). A busca não diferencia
+        // maiúsculas nem acentos, como a tela; situação e alerta com a regra do painel
+        var busca = string.IsNullOrWhiteSpace(consulta.Filtro) ? null : ParaBusca(consulta.Filtro);
+        var situacoes = ListaDoFiltro(consulta.Situacao);
+        var alerta = string.IsNullOrWhiteSpace(consulta.Alerta) ? null : consulta.Alerta.Trim();
         var linhas = base_.Orgaos
             .Where(r => consulta.NivelId == null || r.Nivel?.Id == consulta.NivelId)
-            .Where(r => filtro == null || r.Orgao.Sigla.ToLowerInvariant().Contains(filtro) || r.Orgao.Nome.ToLowerInvariant().Contains(filtro))
+            .Where(r => busca == null || ParaBusca(r.Orgao.Sigla).Contains(busca) || ParaBusca(r.Orgao.Nome).Contains(busca))
+            .Where(r => situacoes == null || situacoes.Contains(r.SituacaoNoPainel))
+            .Where(r => alerta == null || TemAlerta(r.Conformidade!, alerta))
             .Select(r => r.Conformidade!.Linha)
             .ToList();
-        // O resumo conta os grupos com o nível e a busca, sem o filtro do grupo
+        // O resumo conta os grupos com os outros filtros, sem o do grupo
         var resumo = new PeConformidadeResumoResponse
         {
             Alta = linhas.Count(l => l.Grupo == PeDominios.GrupoConformidade.Alta),
@@ -422,6 +444,51 @@ public class PePainelService : IPePainelService
             Orgaos = linhas
         };
     }
+
+    /// <summary>Texto para comparar na busca: sem espaço nas pontas, em minúsculas e sem acento (a mesma regra da tela).</summary>
+    internal static string ParaBusca(string? texto)
+    {
+        var decomposto = (texto ?? string.Empty).Trim().ToLowerInvariant().Normalize(NormalizationForm.FormD);
+        var saida = new StringBuilder(decomposto.Length);
+        foreach (var c in decomposto)
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark) saida.Append(c);
+        return saida.ToString().Normalize(NormalizationForm.FormC);
+    }
+
+    /// <summary>Os valores de um filtro separado por vírgula (sem os vazios nem os repetidos, na ordem), ou nulo sem filtro; valor fora do domínio não acha nada.</summary>
+    private static List<string>? ListaDoFiltro(string? valor)
+    {
+        if (string.IsNullOrWhiteSpace(valor)) return null;
+        return valor.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>Os filtros da planilha em texto, para a aba Leia-me (F2): "Grupo: Alta · Nível: Básico · Busca: saúde".</summary>
+    private async Task<string> DescricaoDosFiltrosAsync(PeConformidadeConsulta consulta)
+    {
+        var partes = new List<string>();
+        if (!string.IsNullOrWhiteSpace(consulta.Grupo)) partes.Add($"Grupo: {PeDominios.GrupoConformidade.Rotulo(consulta.Grupo.Trim())}");
+        if (consulta.NivelId is long nivelId)
+        {
+            var nome = await _context.PeNiveis.AsNoTracking().Where(n => n.Id == nivelId).Select(n => n.Nome).FirstOrDefaultAsync();
+            partes.Add($"Nível: {nome ?? "não encontrado"}");
+        }
+        if (!string.IsNullOrWhiteSpace(consulta.Filtro)) partes.Add($"Busca: {consulta.Filtro.Trim()}");
+        if (ListaDoFiltro(consulta.Situacao) is { } situacoes)
+            partes.Add($"Situação: {string.Join(", ", situacoes.Select(PeDominios.SituacaoPainel.Rotulo))}");
+        if (!string.IsNullOrWhiteSpace(consulta.Alerta)) partes.Add($"Alerta: {PeDominios.AlertaConformidade.Rotulo(consulta.Alerta.Trim())}");
+        return partes.Count == 0 ? "Nenhum: todos os órgãos ativos" : string.Join(" · ", partes);
+    }
+
+    /// <summary>A linha entra no filtro do alerta (F2): as marcas que o painel conta, ou a notificação ou inadimplência em aberto.</summary>
+    private static bool TemAlerta(PeAvaliacaoDeConformidade conformidade, string alerta) => alerta switch
+    {
+        PeDominios.AlertaConformidade.Vigencia => conformidade.Linha.Alertas.VigenciaVencida,
+        PeDominios.AlertaConformidade.Revisao => conformidade.Linha.Alertas.RevisaoVencida,
+        PeDominios.AlertaConformidade.Ciclo => conformidade.Linha.Alertas.CicloAtrasado,
+        PeDominios.AlertaConformidade.Inadimplencia => conformidade.Linha.Inadimplencia != null,
+        // Fora do domínio: lista vazia, nunca "todos" em silêncio
+        _ => false
+    };
 
     public async Task<PePlanilhaArquivo> ConformidadePlanilhaAsync(PeConformidadeConsulta consulta, string? formato, PeUserContext ctx)
     {
@@ -462,8 +529,8 @@ public class PePainelService : IPePainelService
             new() { Titulo = "Órgão", Largura = 40, Ajuda = "Nome do órgão ou entidade." },
             new() { Titulo = "Sigla", Largura = 10, Ajuda = "Sigla do órgão." },
             new() { Titulo = "Nível", Largura = 16, Ajuda = "Nível de maturidade do órgão hoje." },
-            new() { Titulo = "Versão do PDTIC", Largura = 12, Ajuda = "A versão avaliada: a vigente; sem ela, a da elaboração." },
-            new() { Titulo = "Situação do PDTIC", Largura = 20, Ajuda = "Situação da versão avaliada; sem PDTIC em vigor nem em andamento, \"Sem PDTIC\"." }
+            new() { Titulo = "Versão do PDTIC", Largura = 12, Ajuda = "A versão de referência do órgão: a vigente; sem ela, a da elaboração; sem as duas, a mais recente (encerrada)." },
+            new() { Titulo = "Situação do PDTIC", Largura = 20, Ajuda = "Situação da versão de referência, a mesma do painel (a substituída conta como encerrada); \"Sem PDTIC\" quando o órgão nunca abriu um." }
         };
         colunas.AddRange(itens.Select(i => new PeXlsxColuna
         {
@@ -499,6 +566,7 @@ public class PePainelService : IPePainelService
         var leiaMe = new List<(string, string)>
         {
             ("Conteúdo", "Conformidade dos PDTICs dos órgãos com os itens de TIC acompanhados pela SGDI"),
+            ("Filtros", await DescricaoDosFiltrosAsync(consulta)),
             ("Órgãos", conformidade.Orgaos.Count == 1 ? "1 órgão" : $"{conformidade.Orgaos.Count} órgãos"),
             ("Resumo", $"Alta: {conformidade.Resumo.Alta} · Média: {conformidade.Resumo.Media} · Baixa: {conformidade.Resumo.Baixa}"),
             ("Extraído em", PePlanilhaService.Agora()),

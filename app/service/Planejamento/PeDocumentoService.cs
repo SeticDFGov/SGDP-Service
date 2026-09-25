@@ -847,6 +847,29 @@ public partial class PeDocumentoService : IPeDocumentoService
         return saida;
     }
 
+    /// <summary>
+    /// Os marcadores do documento (os do modelo do tipo) com o passo onde cada um se preenche na
+    /// trilha do órgão (F2): a chave do passo no modelo e o número dele quando o órgão o vê (senão
+    /// nulo: o link não aparece). A aprovação do SGTIC vem do passo do envio, a do CGTIC do passo da
+    /// deliberação e a publicação do passo dela (3.11, 3.12 e 3.13 no Avançado).
+    /// </summary>
+    internal static List<PeDocMarcadorResponse> MarcadoresDoDocumento(PeTrilhaOrgao trilha, string tipo)
+    {
+        var dados = trilha.Dados;
+        var dicionario = dados.SecaoPorChave(PeDominios.DicionarioNomes.Secao) is { } nomes
+            ? dados.CamposDaSecao(nomes.Id, incluirExcluidos: false).ToList()
+            : new List<PeCampo>();
+        PeDocMarcadores.PassoDoMarcador? DoModelo(PePasso? passo) =>
+            passo == null || passo.ExcluidoEm != null ? null : new PeDocMarcadores.PassoDoMarcador(passo.Chave, trilha.Passo(passo.Id)?.Numero);
+        return PeDocMarcadores.Respostas(PeDocMarcadores.Lista(dicionario, tipo),
+            secao => dados.SecaoPorChave(secao) is { PassoId: long passoId, ExcluidoEm: null }
+                ? DoModelo(dados.Passos.FirstOrDefault(p => p.Id == passoId))
+                : null,
+            tipoPasso => DoModelo(dados.Etapas
+                .SelectMany(e => dados.PassosDaEtapa(e.Id, incluirExcluidos: false))
+                .FirstOrDefault(p => p.Tipo == tipoPasso)));
+    }
+
     /// <summary>O documento resolvido e o que o PDF usa a mais.</summary>
     internal sealed class Resolvido
     {
@@ -961,7 +984,8 @@ public partial class PeDocumentoService : IPeDocumentoService
             CicloRotulo = documento.Ciclo?.Rotulo,
             PodeEditar = _permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId) && RecusaDaEdicao(pdtic, documento) == null,
             Logotipo = logotipo is long logo ? $"api/planejamento/arquivos/{logo.ToString(CultureInfo.InvariantCulture)}" : null,
-            Versoes = await VersoesDoDocumentoAsync(documento)
+            Versoes = await VersoesDoDocumentoAsync(documento),
+            Marcadores = MarcadoresDoDocumento(trilha, base_.Modelo.Tipo)
         };
         var resolvido = new Resolvido { Orgao = base_.Orgao, Resposta = resposta, Marcadores = marcadores, LogotipoId = logotipo };
         var nomes = await PeNomes.CarregarAsync(_context, base_.CopiaBlocos.Values.Select(c => c.EditadoPor));

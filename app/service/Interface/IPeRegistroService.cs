@@ -1,4 +1,5 @@
 using api.Planejamento;
+using Models.Planejamento;
 using service.Planejamento;
 
 namespace service.Interface;
@@ -47,6 +48,16 @@ public interface IPeRegistroService
     /// Tabela com linhas: 409 PeCronogramaPreenchido.
     /// </summary>
     Task<List<PeRegistroResponse>> CriarSugeridosAsync(PeDono dono, string secaoChave, IReadOnlyList<PeRegistroSugerido> linhas, PeUserContext ctx);
+
+    /// <summary>
+    /// Os princípios do art. 4º do Decreto nº 48.900/2026 como sugestão na seção dos princípios e
+    /// diretrizes (passo 1.8) do PDTIC que acabou de abrir (F2): registros comuns, que o órgão muda
+    /// e apaga, com a origem "art. 4º". Quem chama já conferiu a permissão (é a abertura do PDTIC) e
+    /// abre a transação que junta o PDTIC e as linhas. Devolve quantos entraram (zero quando a seção
+    /// não aparece para o órgão, quando o catálogo do DF ainda não tem os princípios ou quando a
+    /// seção já tem linhas).
+    /// </summary>
+    Task<int> SugerirPrincipiosDoArt4Async(PePdtic pdtic, PeUserContext ctx);
 
     /// <summary>
     /// Itens de um catálogo (petic_objetivo e petic_eixo da vigente; principio do DF;
