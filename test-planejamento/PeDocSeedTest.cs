@@ -24,7 +24,12 @@ public class PeDocSeedTest : PeDocumentoTestBase
         "riscos", "revisao_acompanhamento", "fatores_criticos", "conclusao", "anexos"
     };
 
-    private List<PeDocCapitulo> Capitulos() => Context.PeDocCapitulos.AsNoTracking().ToList();
+    // Os capítulos do modelo do PDTIC (desde a E7, rodada B, o RA e o RR têm os seus)
+    private List<PeDocCapitulo> Capitulos()
+    {
+        var modelo = Context.PeDocModelos.AsNoTracking().Single(m => m.Tipo == PeDominios.TipoDocumento.Pdtic).Id;
+        return Context.PeDocCapitulos.AsNoTracking().Where(c => c.ModeloId == modelo).ToList();
+    }
 
     private List<PeDocBloco> BlocosDe(string capitulo)
     {
@@ -35,9 +40,11 @@ public class PeDocSeedTest : PeDocumentoTestBase
     [Fact]
     public void Modelo_UmPorTipo_ComOsCapitulosDaSecao9_NaOrdem()
     {
-        var modelo = Assert.Single(Context.PeDocModelos.AsNoTracking().ToList());
-        Assert.Equal("pdtic", modelo.Tipo);
-        Assert.True(modelo.Ativo);
+        // Um modelo ativo por tipo: o PDTIC (E5) e, desde a versão 6 (E7, rodada B), o RA e o RR
+        var modelos = Context.PeDocModelos.AsNoTracking().ToList();
+        Assert.Equal(new[] { "pdtic", "ra", "rr" }, modelos.Select(m => m.Tipo).OrderBy(t => t));
+        Assert.All(modelos, m => Assert.True(m.Ativo));
+        var modelo = modelos.Single(m => m.Tipo == "pdtic");
 
         var capitulos = Capitulos();
         Assert.All(capitulos, c =>
@@ -212,7 +219,8 @@ public class PeDocSeedTest : PeDocumentoTestBase
 
         Assert.True(resultado.Executou);
         Assert.Equal(2, resultado.VersaoAnterior);
-        Assert.Equal(1, resultado.Documentos);
+        // O do PDTIC e, desde a versão 6, o RA e o RR
+        Assert.Equal(3, resultado.Documentos);
         Assert.Equal(vazio.Context.PeDocCapitulos.Count(), resultado.Capitulos);
         Assert.True(resultado.Capitulos >= 38);
         Assert.Equal(vazio.Context.PeDocBlocos.Count(), resultado.Blocos);

@@ -124,6 +124,9 @@ public class PeSecaoResponse
 
     public string? IncisoDecreto { get; set; }
 
+    // Desde a E7 (rodada B): a seção é por ciclo (monitoramento ou avaliacao), ou nulo
+    public string? PorCiclo { get; set; }
+
     public bool Sistema { get; set; }
 
     public bool Excluido { get; set; }
@@ -294,6 +297,10 @@ public class PeTrilhaSecao
     public string Situacao { get; set; } = string.Empty;
 
     public bool Travada { get; set; }
+
+    // Desde a E7 (rodada B): monitoramento ou avaliacao quando os registros são de um ciclo
+    // (as rotas de registros pedem ?cicloId=), ou nulo
+    public string? PorCiclo { get; set; }
 
     public List<PeTrilhaCampo> Campos { get; set; } = new();
 }

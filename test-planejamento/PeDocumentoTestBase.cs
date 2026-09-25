@@ -43,11 +43,16 @@ public abstract class PeDocumentoTestBase : PePdticTestBase
     protected static PeDocBlocoResponse TabelaDe(PeDocumentoResponse documento, string capitulo, string secao) =>
         Cap(documento, capitulo).Blocos.Single(b => b.Tabela?.SecaoChave == secao);
 
-    protected PeDocCapitulo CapituloDoModelo(string chave) => Context.PeDocCapitulos.AsNoTracking().Single(c => c.Chave == chave);
-
-    protected PeDocBloco BlocoDoModelo(string capitulo, string tipo = PeDominios.TipoBloco.Texto)
+    /// <summary>O capítulo do modelo ativo do documento (o do PDTIC; o RA e o RR, desde a E7, repetem as chaves).</summary>
+    protected PeDocCapitulo CapituloDoModelo(string chave, string documento = PeDominios.TipoDocumento.Pdtic)
     {
-        var id = CapituloDoModelo(capitulo).Id;
+        var modelo = Context.PeDocModelos.AsNoTracking().Where(m => m.Tipo == documento && m.Ativo).Select(m => m.Id).Single();
+        return Context.PeDocCapitulos.AsNoTracking().Single(c => c.Chave == chave && c.ModeloId == modelo);
+    }
+
+    protected PeDocBloco BlocoDoModelo(string capitulo, string tipo = PeDominios.TipoBloco.Texto, string documento = PeDominios.TipoDocumento.Pdtic)
+    {
+        var id = CapituloDoModelo(capitulo, documento).Id;
         return Context.PeDocBlocos.AsNoTracking().Where(b => b.CapituloId == id && b.Tipo == tipo).OrderBy(b => b.Ordem).First();
     }
 

@@ -66,32 +66,37 @@ public class PeRegistrosController : ControllerBase
 
     // ── PDTIC de um órgão (E4) ──────────────────────────────────────────────
 
-    /// <summary>A seção (campos visíveis no nível do órgão) e os registros do PDTIC.</summary>
+    /// <summary>
+    /// A seção (campos visíveis no nível do órgão) e os registros do PDTIC. Seção por ciclo (E7,
+    /// rodada B): ?cicloId= obrigatório (os registros daquele ciclo); nas outras, ignorado.
+    /// </summary>
     [HttpGet("pdtic/{pdticId:long}/secoes/{secaoChave}/registros")]
-    public Task<IActionResult> ListarDoPdtic(long pdticId, string secaoChave) =>
-        Executar(async ctx => Ok(await _registros.ListarAsync(PeDono.DoPdtic(pdticId), secaoChave, ctx)));
+    public Task<IActionResult> ListarDoPdtic(long pdticId, string secaoChave, [FromQuery] long? cicloId = null) =>
+        Executar(async ctx => Ok(await _registros.ListarAsync(PeDono.DoPdtic(pdticId), secaoChave, ctx, cicloId)));
 
     /// <summary>Inclui um registro ({ Dados, Vinculos }); devolve 201 com o registro criado.</summary>
     [HttpPost("pdtic/{pdticId:long}/secoes/{secaoChave}/registros")]
-    public Task<IActionResult> CriarNoPdtic(long pdticId, string secaoChave, [FromBody] JsonElement corpo) =>
-        Executar(async ctx => Criado(await _registros.CriarAsync(PeDono.DoPdtic(pdticId), secaoChave, PeRegistroSalvarDTO.Ler(corpo), ctx)));
+    public Task<IActionResult> CriarNoPdtic(long pdticId, string secaoChave, [FromBody] JsonElement corpo, [FromQuery] long? cicloId = null) =>
+        Executar(async ctx => Criado(await _registros.CriarAsync(PeDono.DoPdtic(pdticId), secaoChave, PeRegistroSalvarDTO.Ler(corpo), ctx, cicloId)));
 
     [HttpPut("pdtic/{pdticId:long}/secoes/{secaoChave}/registros/{id:long}")]
-    public Task<IActionResult> AtualizarNoPdtic(long pdticId, string secaoChave, long id, [FromBody] JsonElement corpo) =>
-        Executar(async ctx => Ok(await _registros.AtualizarAsync(PeDono.DoPdtic(pdticId), secaoChave, id, PeRegistroSalvarDTO.Ler(corpo), ctx)));
+    public Task<IActionResult> AtualizarNoPdtic(long pdticId, string secaoChave, long id, [FromBody] JsonElement corpo,
+        [FromQuery] long? cicloId = null) =>
+        Executar(async ctx => Ok(await _registros.AtualizarAsync(PeDono.DoPdtic(pdticId), secaoChave, id, PeRegistroSalvarDTO.Ler(corpo), ctx,
+            cicloId)));
 
     [HttpDelete("pdtic/{pdticId:long}/secoes/{secaoChave}/registros/{id:long}")]
-    public Task<IActionResult> ExcluirDoPdtic(long pdticId, string secaoChave, long id) =>
+    public Task<IActionResult> ExcluirDoPdtic(long pdticId, string secaoChave, long id, [FromQuery] long? cicloId = null) =>
         Executar(async ctx =>
         {
-            await _registros.ExcluirAsync(PeDono.DoPdtic(pdticId), secaoChave, id, ctx);
+            await _registros.ExcluirAsync(PeDono.DoPdtic(pdticId), secaoChave, id, ctx, cicloId);
             return NoContent();
         });
 
     /// <summary>Nova ordem ({ Ids }, todos os registros da seção); devolve a lista.</summary>
     [HttpPut("pdtic/{pdticId:long}/secoes/{secaoChave}/registros/ordem")]
-    public Task<IActionResult> OrdenarNoPdtic(long pdticId, string secaoChave, [FromBody] PeOrdemDTO dto) =>
-        Executar(async ctx => Ok(await _registros.OrdenarAsync(PeDono.DoPdtic(pdticId), secaoChave, dto, ctx)));
+    public Task<IActionResult> OrdenarNoPdtic(long pdticId, string secaoChave, [FromBody] PeOrdemDTO dto, [FromQuery] long? cicloId = null) =>
+        Executar(async ctx => Ok(await _registros.OrdenarAsync(PeDono.DoPdtic(pdticId), secaoChave, dto, ctx, cicloId)));
 
     // ── Catálogo do DF ──────────────────────────────────────────────────────
 

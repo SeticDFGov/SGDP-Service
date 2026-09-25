@@ -321,8 +321,9 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
                 $"O órgão já tem a versão {emAndamento.Versao} em andamento ({PeDominios.SituacaoPdtic.Rotulo(emAndamento.Situacao).ToLowerInvariant()}). "
                 + "Termine aquela antes de abrir outra revisão.");
 
-        // A decisão do comitê (6.3) libera a revisão; sem o passo na trilha, a justificativa.
-        // Rodada A: a seção avaliacao_comite do PDTIC, como seção comum (na rodada B, a da avaliação mais recente)
+        // A decisão do comitê (6.3) libera a revisão; sem o passo na trilha, a justificativa. Com a
+        // seção por ciclo (a versão 6 carregada), vale a decisão da avaliação intermediária mais
+        // recente que já tem decisão; antes, a seção como seção comum (rodada A)
         var trilha = await PeTrilhaOrgao.DoPdticAsync(_context, atual);
         var comite = trilha.Passos.FirstOrDefault(p => p.Chave == PeDominios.ChavePdtic.PassoAvaliacaoComite);
         if (comite != null && PePdticService.RecusaDoNaoSeAplica(comite) == null
@@ -331,12 +332,11 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
         if (comite != null)
         {
             var secao = comite.Secoes.FirstOrDefault(s => s.Chave == PeDominios.ChavePdtic.SecaoAvaliacaoComite);
-            var decisao = secao == null
-                ? null
-                : PePdticService.Decisao((await _registros.AnalisarAsync(PeDono.DoPdtic(atual.Id), new[] { trilha.Montar(secao) })).Secoes[0]);
+            var decisao = secao == null ? null : await DecisaoDoComiteAsync(atual, trilha, secao);
             if (decisao != PeDominios.Decisao.Revisar)
-                throw new ApiException(ErrorCode.PeRevisaoRecusada,
-                    $"Para abrir a revisão, registre no passo {comite.Numero} a avaliação do comitê com a decisão \"Revisar o PDTIC\".");
+                throw new ApiException(ErrorCode.PeRevisaoRecusada, secao?.PorCiclo == PeDominios.TipoCiclo.Avaliacao
+                    ? $"Para abrir a revisão, registre na avaliação intermediária (passo {comite.Numero}) a avaliação do comitê com a decisão \"Revisar o PDTIC\"."
+                    : $"Para abrir a revisão, registre no passo {comite.Numero} a avaliação do comitê com a decisão \"Revisar o PDTIC\".");
         }
         else if (justificativa == null)
         {
@@ -374,23 +374,61 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
     }
 
     /// <summary>
+    /// A decisão do comitê na seção avaliacao_comite: com a seção por ciclo (E7, rodada B), a da
+    /// avaliação intermediária mais recente que já tem decisão (a aberta sem decisão não apaga a
+    /// anterior); senão, a da seção comum.
+    /// </summary>
+    private async Task<string?> DecisaoDoComiteAsync(PePdtic pdtic, PeTrilhaOrgao trilha, PeTrilhaSecao secao)
+    {
+        var dono = PeDono.DoPdtic(pdtic.Id);
+        var montada = trilha.Montar(secao);
+        if (montada.PorCiclo != PeDominios.TipoCiclo.Avaliacao)
+            return PePdticService.Decisao((await _registros.AnalisarAsync(dono, new[] { montada })).Secoes[0]);
+
+        var avaliacoes = await _context.PeCiclos.AsNoTracking()
+            .Where(c => c.PdticId == pdtic.Id && c.Tipo == PeDominios.TipoCiclo.Avaliacao)
+            .OrderByDescending(c => c.Numero)
+            .Select(c => c.Id)
+            .ToListAsync();
+        foreach (var cicloId in avaliacoes)
+        {
+            var decisao = PePdticService.Decisao((await _registros.AnalisarAsync(dono, new[] { montada }, cicloId)).Secoes[0]);
+            if (decisao != null) return decisao;
+        }
+        return null;
+    }
+
+    /// <summary>
     /// A cópia da revisão: os registros (menos os das seções dos passos de aprovação, de envio e
-    /// de publicação), com os mesmos códigos e a mesma ordem, e as ligações entre eles refeitas
-    /// para as cópias (a ligação com um catálogo continua no mesmo item; a ligação com um registro
-    /// que não foi copiado sai); os fluxos adaptados; os capítulos e os textos do documento; e os
-    /// "não se aplica" marcados. As imagens e os arquivos ficam com o dono de antes e servem às
+    /// de publicação e, desde a E7 rodada B, os das seções por ciclo: o acompanhamento recomeça na
+    /// versão nova), com os mesmos códigos e a mesma ordem, e as ligações entre eles refeitas para
+    /// as cópias (a ligação com um catálogo continua no mesmo item; a ligação com um registro que
+    /// não foi copiado sai); os fluxos adaptados; os capítulos e os textos do documento do PDTIC
+    /// (os do RA e do RR, não); e os "não se aplica" marcados. Os ciclos, as versões e os
+    /// relatórios não são copiados. As imagens e os arquivos ficam com o dono de antes e servem às
     /// duas versões (mesmo órgão).
     /// </summary>
     private async Task CopiarAsync(PePdtic atual, PePdtic nova, PeModeloDados modelo, string autor, DateTime agora)
     {
         var tiposSemCopia = new[] { PeDominios.TipoPasso.Aprovacao, PeDominios.TipoPasso.Envio, PeDominios.TipoPasso.Publicacao };
         var passosSemCopia = modelo.Passos.Where(p => tiposSemCopia.Contains(p.Tipo)).Select(p => p.Id).ToHashSet();
-        var secoesSemCopia = modelo.Secoes.Where(s => s.PassoId != null && passosSemCopia.Contains(s.PassoId.Value)).Select(s => s.Id).ToHashSet();
+        var secoesSemCopia = modelo.Secoes
+            .Where(s => (s.PassoId != null && passosSemCopia.Contains(s.PassoId.Value)) || modelo.PorCicloDe(s.Id) != null)
+            .Select(s => s.Id)
+            .ToHashSet();
+        var ativo = modelo.Acompanhamento.Ativo;
 
         var registros = await _context.PeRegistros.AsNoTracking().Where(r => r.PdticId == atual.Id).ToListAsync();
+        // Registro de um ciclo: fica na versão de antes, como os ciclos
+        var doCiclo = new HashSet<long>();
+        if (ativo)
+        {
+            var ids = registros.Select(r => r.Id).ToList();
+            doCiclo = (await _context.PeRegistrosCiclo.AsNoTracking().Where(c => ids.Contains(c.Id)).Select(c => c.Id).ToListAsync()).ToHashSet();
+        }
         var todos = registros.Select(r => r.Id).ToHashSet();
         var copias = new Dictionary<long, PeRegistro>();
-        foreach (var registro in registros.Where(r => !secoesSemCopia.Contains(r.SecaoId)))
+        foreach (var registro in registros.Where(r => !secoesSemCopia.Contains(r.SecaoId) && !doCiclo.Contains(r.Id)))
         {
             var copia = new PeRegistro
             {
@@ -432,7 +470,8 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
                 CriadoPor = autor
             });
 
-        foreach (var capitulo in await _context.PeDocOrgaos.AsNoTracking().Where(o => o.PdticId == atual.Id).ToListAsync())
+        var doPdtic = PeDocAlvo.DoPdtic(atual.Id);
+        foreach (var capitulo in await PeDocLinhas.Capitulos(_context, doPdtic, ativo).AsNoTracking().ToListAsync())
             _context.PeDocOrgaos.Add(new PeDocOrgao
             {
                 Pdtic = nova,
@@ -443,7 +482,7 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
                 CriadoPor = autor
             });
 
-        foreach (var texto in await _context.PeDocOrgaoBlocos.AsNoTracking().Where(o => o.PdticId == atual.Id).ToListAsync())
+        foreach (var texto in await PeDocLinhas.Blocos(_context, doPdtic, ativo).AsNoTracking().ToListAsync())
             _context.PeDocOrgaoBlocos.Add(new PeDocOrgaoBloco
             {
                 Pdtic = nova,

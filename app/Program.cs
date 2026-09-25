@@ -169,6 +169,9 @@ builder.Services.AddScoped<IPeFluxoService, service.Planejamento.PeFluxoService>
 // Aprovação (E7): o envio ao CGTIC, a publicação, o encerramento, a revisão e o PDTIC
 // aprovado fora do sistema (a decisão do CGTIC fica no serviço das deliberações)
 builder.Services.AddScoped<IPePdticAprovacaoService, service.Planejamento.PePdticAprovacaoService>();
+// Acompanhamento (E7, rodada B): os ciclos de monitoramento e de avaliação, as grades das ações
+// e das medições e o painel do PDTIC (os relatórios RA e RR ficam no serviço do documento)
+builder.Services.AddScoped<IPeAcompanhamentoService, service.Planejamento.PeAcompanhamentoService>();
 // Modelo inicial (trilha e campos do PDTIC, e os referenciais do DF e do PETIC-DF, com os
 // princípios do art. 4º): carregado ao subir, fora das requisições.
 // Sem as tabelas (intervalo entre o PR e a migration do merge) só registra no log e

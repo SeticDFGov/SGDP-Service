@@ -79,7 +79,8 @@ public sealed class PeTrilhaOrgao
             Opcoes = Dados.Opcoes.Where(o => ids.Contains(o.CampoId))
                 .GroupBy(o => o.CampoId)
                 .ToDictionary(g => g.Key, g => g.ToList()),
-            Obrigatoria = visivel.Situacao == PeDominios.Situacao.Obrigatorio
+            Obrigatoria = visivel.Situacao == PeDominios.Situacao.Obrigatorio,
+            PorCiclo = Dados.PorCicloDe(secao.Id)
         };
     }
 

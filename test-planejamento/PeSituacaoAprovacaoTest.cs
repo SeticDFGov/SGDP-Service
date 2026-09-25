@@ -10,9 +10,9 @@ namespace test.planejamento;
 /// A situação dos passos no caminho da aprovação (E7, rodada A): o documento (feito com um
 /// PDF), a aprovação (feito com a decisão tomada; devolvido pende com o aviso), o envio, a
 /// deliberação (aguardando o CGTIC, com o motivo e a data), a publicação (aguardando a
-/// aprovação), as etapas 4 a 7 aguardando a publicação, o monitoramento contínuo, e o próximo
-/// passo (atrasado, atenção, pendente; aguardando e externo nunca; o pendente de uma etapa
-/// fechada também não).
+/// aprovação), as etapas 4 a 7 aguardando a publicação (desde a rodada B, o monitoramento pelo
+/// ciclo e a etapa 7 esperando os dias antes do fim da vigência), e o próximo passo (atrasado,
+/// atenção, pendente; aguardando e externo nunca; o pendente de uma etapa fechada também não).
 /// </summary>
 public class PeSituacaoAprovacaoTest : PeAprovacaoTestBase
 {
@@ -59,11 +59,15 @@ public class PeSituacaoAprovacaoTest : PeAprovacaoTestBase
         var pdtic = await AbrirSesAsync();
         Situacao(pdtic.Id, PeDominios.SituacaoPdtic.Publicado);
         const string chave = "avaliacao-intermediaria.avaliacao-comite";
+        // Sem avaliação intermediária, o passo espera (E7, rodada B: a seção é por ciclo de avaliação)
+        var antes = await PassoDaSituacaoAsync(pdtic.Id, chave);
+        Assert.Equal((PeDominios.SituacaoPasso.Aguardando, PePdticService.MotivoSemAvaliacao), (antes.Situacao, antes.Motivo));
 
-        var registro = await IncluirNoPdticAsync(pdtic.Id, "avaliacao_comite", new { decisao = "seguir", data = "2027-06-30" });
+        var avaliacao = await Acompanhamento.CriarCicloAsync(pdtic.Id, new PeCicloCriarDTO { Tipo = "avaliacao" }, await Orgao());
+        var registro = await IncluirNoPdticAsync(pdtic.Id, "avaliacao_comite", new { decisao = "seguir", data = "2027-06-30" }, cicloId: avaliacao.Id);
         Assert.Equal(PeDominios.SituacaoPasso.Feito, (await PassoDaSituacaoAsync(pdtic.Id, chave)).Situacao);
         await Registros.AtualizarAsync(PeDono.DoPdtic(pdtic.Id), "avaliacao_comite", registro.Id,
-            Salvar(new { decisao = "revisar", data = "2027-06-30" }), await Orgao());
+            Salvar(new { decisao = "revisar", data = "2027-06-30" }), await Orgao(), avaliacao.Id);
         Assert.Equal(PeDominios.SituacaoPasso.Feito, (await PassoDaSituacaoAsync(pdtic.Id, chave)).Situacao);
     }
 
@@ -105,14 +109,16 @@ public class PeSituacaoAprovacaoTest : PeAprovacaoTestBase
         Assert.True(De("planejamento.publicacao").PodeEditar);
         Assert.Equal(De("planejamento.publicacao").Numero, situacao.ProximoPasso);
 
-        // Publicado: a publicação feita; as etapas 4 a 7 abertas (o monitoramento, contínuo até a rodada B)
+        // Publicado: a publicação feita; as etapas 4 a 7 abertas: o monitoramento pelo ciclo que
+        // começou na publicação (rodada B) e a etapa 7 esperando os 90 dias antes do fim da vigência
         await PublicarAsync(pdtic.Id);
         situacao = await SituacaoAsync(pdtic.Id);
         Assert.Equal(PeDominios.SituacaoPasso.Feito, De("planejamento.publicacao").Situacao);
         Assert.Equal(PeDominios.SituacaoPasso.Pendente, De("plano-acompanhamento.quem-acompanha").Situacao);
         Assert.True(De("plano-acompanhamento.quem-acompanha").PodeEditar);
-        Assert.Equal(PeDominios.SituacaoPasso.Continuo, De("monitoramento.ciclo-monitoramento").Situacao);
-        Assert.Equal(PeDominios.SituacaoPasso.Pendente, De("fechamento.aprovacao-autoridade").Situacao);
+        Assert.Equal(PeDominios.SituacaoPasso.Pendente, De("monitoramento.ciclo-monitoramento").Situacao);
+        Assert.Equal((PeDominios.SituacaoPasso.Aguardando, "Disponível a partir de 02/10/2029, 90 dias antes do fim da vigência (31/12/2029)"),
+            (De("fechamento.aprovacao-autoridade").Situacao, De("fechamento.aprovacao-autoridade").Motivo));
         Assert.Equal(De("plano-acompanhamento.quem-acompanha").Numero, situacao.ProximoPasso);
         Assert.All(situacao.Passos.Where(p => p.Situacao is "feito" or "pendente" or "continuo"), p => Assert.Null(p.Motivo));
     }

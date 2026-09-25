@@ -2,13 +2,22 @@ namespace Models.Planejamento;
 
 /// <summary>
 /// Configurações gerais do módulo, uma por chave, com o valor em jsonb: a versão do
-/// modelo inicial já carregada (seed_modelo_versao) e a periodicidade padrão do
-/// monitoramento (periodicidade_monitoramento_padrao). Tabela pe_configuracao.
+/// modelo inicial já carregada (seed_modelo_versao), a periodicidade padrão do
+/// monitoramento (periodicidade_monitoramento_padrao) e, desde a E7 (rodada B), os dias de
+/// prazo para fechar um ciclo depois do fim dele (prazo_fechamento_ciclo_dias, 15) e quantos
+/// dias antes do fim da vigência a etapa 7 fica disponível (dias_avaliacao_final, 90). Tabela
+/// pe_configuracao.
 /// </summary>
 public class PeConfiguracao : IPeAuditavel
 {
     public const string ChaveVersaoModelo = "seed_modelo_versao";
     public const string ChavePeriodicidadeMonitoramento = "periodicidade_monitoramento_padrao";
+    public const string ChavePrazoFechamentoCiclo = "prazo_fechamento_ciclo_dias";
+    public const string ChaveDiasAvaliacaoFinal = "dias_avaliacao_final";
+
+    // Os valores quando a configuração não existe (antes de o carregador trazer a versão 6)
+    public const int PrazoFechamentoCicloPadrao = 15;
+    public const int DiasAvaliacaoFinalPadrao = 90;
 
     public string Chave { get; set; } = string.Empty;
 

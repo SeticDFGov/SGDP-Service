@@ -23,7 +23,16 @@ public class PeDocumentoResponse
 
     public string Titulo { get; set; } = string.Empty;
 
-    // Quem chama edita os textos, esconde e renomeia capítulos e gera o PDF (equipe do órgão com o PDTIC aberto)
+    // A mais que o contrato (E7, rodada B): pdtic, ra (relatório de acompanhamento de um ciclo) ou rr (relatório de resultados)
+    public string DocTipo { get; set; } = "pdtic";
+
+    // A mais que o contrato: no RA, o ciclo do relatório (id e rótulo); nulo no PDTIC e no RR
+    public long? CicloId { get; set; }
+
+    public string? CicloRotulo { get; set; }
+
+    // Quem chama edita os textos, esconde e renomeia capítulos e gera o PDF (a equipe do órgão; no
+    // PDTIC, com a elaboração aberta; no RA e no RR, com o PDTIC vigente e, no RA, o ciclo começado)
     public bool PodeEditar { get; set; }
 
     // A mais que o contrato: o endereço do logotipo do órgão (campo logotipo do dicionário de nomes), ou nulo
@@ -69,6 +78,10 @@ public class PeDocCapituloResponse
     // O número do passo na trilha do órgão ("2.3"), para o link "editar os dados no passo"
     public string? PassoNumero { get; set; }
 
+    // A mais que o contrato (E7, rodada B): o capítulo sai em branco, com este aviso (no RA de um
+    // ciclo de monitoramento, os capítulos da avaliação intermediária: o guia manda deixar em branco)
+    public string? Aviso { get; set; }
+
     public List<PeDocBlocoResponse> Blocos { get; set; } = new();
 }
 
@@ -111,6 +124,30 @@ public class PeDocBlocoResponse
     public PeDocSwotResponse? Swot { get; set; }
 
     public PeDocFluxoResponse? Fluxo { get; set; }
+
+    // Os blocos do acompanhamento (E7, rodada B: acoes_por_situacao, metas_por_resultado,
+    // riscos_ocorridos e medicoes): sempre em Grupos, e Tabela nula (um grupo só nos riscos e
+    // nas medições)
+    public List<PeDocGrupoResponse>? Grupos { get; set; }
+}
+
+/// <summary>
+/// Um grupo de um bloco do acompanhamento: o título ("Ações atrasadas"), uma frase curta que
+/// explica o grupo (ou nulo) e a tabela, na mesma forma da tabela de uma seção.
+/// </summary>
+public class PeDocGrupoResponse
+{
+    // Ações no RA: em_dia, atrasadas, nao_iniciadas, canceladas e sem_registro; no RR: concluidas,
+    // em_andamento, nao_iniciadas, canceladas e sem_registro. Metas: alcancadas, em_andamento (só
+    // no RA), nao_alcancadas, canceladas e sem_registro. Riscos: riscos. Medições: medicoes.
+    // O grupo sem_registro só vem quando tem linha.
+    public string Chave { get; set; } = string.Empty;
+
+    public string Titulo { get; set; } = string.Empty;
+
+    public string? Texto { get; set; }
+
+    public PeDocTabelaResponse Tabela { get; set; } = new();
 }
 
 public class PeDocTabelaResponse

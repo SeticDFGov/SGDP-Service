@@ -611,6 +611,388 @@
           ]
         }
       ]
+    },
+    {
+      "tipo": "ra",
+      "nome": "Modelo da SGDI para o relatório de acompanhamento do PDTIC",
+      "capitulos": [
+        {
+          "chave": "capa",
+          "titulo": "Capa",
+          "numerado": false,
+          "obrigatorio": true,
+          "blocos": [
+            {
+              "tipo": "texto",
+              "texto": [
+                "Ciclo {ciclo.rotulo}",
+                "Período do ciclo: de {ciclo.inicio} a {ciclo.fim}",
+                "Vigência do PDTIC: de {vigencia.inicio} a {vigencia.fim}",
+                "PDTIC versão {pdtic.versao}"
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "folha_rosto",
+          "titulo": "Folha de rosto",
+          "numerado": false,
+          "obrigatorio": true,
+          "blocos": [
+            {
+              "tipo": "texto",
+              "texto": [
+                "**{orgao.nome}**",
+                "{nomes.autoridade_cargo}: {nomes.autoridade}",
+                "",
+                "**Comitê interno de TIC**",
+                "{nomes.comite}",
+                "",
+                "**Equipe de acompanhamento**",
+                "{nomes.equipe_acompanhamento}"
+              ]
+            },
+            {"tipo": "tabela_secao", "secao": "responsavel_acompanhamento"}
+          ]
+        },
+        {
+          "chave": "historico_versoes",
+          "titulo": "Histórico de versões",
+          "numerado": false,
+          "obrigatorio": true,
+          "blocos": []
+        },
+        {
+          "chave": "sumario",
+          "titulo": "Sumário",
+          "numerado": false,
+          "obrigatorio": true,
+          "blocos": []
+        },
+        {
+          "chave": "apresentacao",
+          "titulo": "Apresentação",
+          "numerado": false,
+          "obrigatorio": true,
+          "blocos": [
+            {
+              "tipo": "texto",
+              "texto": [
+                "Este é o relatório de acompanhamento do Plano Diretor de Tecnologia da Informação e Comunicação (PDTIC) do órgão {orgao.nome}, no ciclo {ciclo.rotulo}.",
+                "O relatório mostra como as ações andaram no período, o que atrasou e por quê, os valores medidos dos indicadores e os riscos que ocorreram. Com ele, o comitê interno de TIC acompanha o plano e decide os ajustes.",
+                "O ciclo vai de {ciclo.inicio} a {ciclo.fim}. O PDTIC vale de {vigencia.inicio} a {vigencia.fim}."
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "introducao",
+          "titulo": "Introdução",
+          "obrigatorio": true,
+          "blocos": [
+            {
+              "tipo": "texto",
+              "texto": [
+                "O PDTIC é acompanhado durante toda a vigência. Este relatório registra o acompanhamento do período, para o comitê ver se o plano segue o que foi planejado e, quando preciso, corrigir o rumo.",
+                "O acompanhamento segue o plano de acompanhamento aprovado pelo comitê e as estratégias do órgão."
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "metodologia",
+          "titulo": "Metodologia",
+          "blocos": [
+            {
+              "tipo": "texto",
+              "texto": [
+                "A equipe de acompanhamento reuniu a situação de cada ação, a execução física e a orçamentária, os valores medidos dos indicadores e os riscos que ocorreram no período.",
+                "Os dados vêm dos passos do monitoramento do PDTIC, registrados no sistema."
+              ]
+            },
+            {"tipo": "fluxo", "fluxo": "monitoramento"}
+          ]
+        },
+        {
+          "chave": "monitoramento_acoes",
+          "titulo": "Monitoramento das ações",
+          "obrigatorio": true,
+          "passo": "monitoramento.ciclo-monitoramento",
+          "blocos": [
+            {
+              "tipo": "texto",
+              "texto": [
+                "As ações do PDTIC, agrupadas pela situação no ciclo: em dia, atrasadas, não iniciadas e canceladas. O resumo do ciclo explica os atrasos e as ações que ainda não começaram."
+              ]
+            },
+            {"tipo": "acoes_por_situacao", "paginaDeitada": true},
+            {"tipo": "medicoes"},
+            {"tipo": "tabela_secao", "secao": "relatorio_ciclo"}
+          ]
+        },
+        {
+          "chave": "avaliacao_metas",
+          "titulo": "Avaliação intermediária das metas e ações",
+          "passo": "avaliacao-intermediaria.resultados-intermediarios",
+          "blocos": [
+            {
+              "tipo": "texto",
+              "texto": [
+                "Os resultados intermediários comparados com as metas. Para a meta não alcançada, o motivo e o que se propõe fazer. Cancelar ou excluir uma meta ou uma ação é decisão do comitê."
+              ]
+            },
+            {"tipo": "metas_por_resultado"},
+            {"tipo": "tabela_secao", "secao": "analise_intermediaria", "colunas": ["metas_nao_atingidas", "ajustes_propostos"]}
+          ]
+        },
+        {
+          "chave": "execucao_orcamentaria",
+          "titulo": "Avaliação da execução orçamentária",
+          "passo": "avaliacao-intermediaria.comparacao-metas",
+          "blocos": [
+            {"tipo": "texto", "texto": ["O parecer da equipe de acompanhamento sobre a execução física e orçamentária das ações."]},
+            {"tipo": "tabela_secao", "secao": "analise_intermediaria", "colunas": ["parecer_execucao"]}
+          ]
+        },
+        {
+          "chave": "riscos",
+          "titulo": "Avaliação do plano de gestão de riscos",
+          "passo": "planejamento.riscos",
+          "blocos": [
+            {"tipo": "texto", "texto": ["Os riscos que ocorreram no período, o que foi feito e o resultado."]},
+            {"tipo": "riscos_ocorridos", "paginaDeitada": true},
+            {"tipo": "tabela_secao", "secao": "analise_intermediaria", "colunas": ["parecer_riscos"]}
+          ]
+        },
+        {
+          "chave": "alinhamento",
+          "titulo": "Alinhamento com a estratégia da organização",
+          "blocos": [
+            {
+              "tipo": "texto",
+              "texto": ["Como a execução do PDTIC contribui para os objetivos estratégicos do órgão e do Plano Estratégico de TIC do Distrito Federal (PETIC-DF)."]
+            },
+            {"tipo": "tabela_secao", "secao": "analise_intermediaria", "colunas": ["parecer_alinhamento"]}
+          ]
+        },
+        {
+          "chave": "pessoas",
+          "titulo": "Avaliação do plano de gestão de pessoas",
+          "passo": "avaliacao-intermediaria.comparacao-metas",
+          "blocos": [
+            {"tipo": "texto", "texto": ["O parecer sobre as ações de pessoas do PDTIC: o quadro, as capacitações e a contratação de serviços."]},
+            {"tipo": "tabela_secao", "secao": "analise_intermediaria", "colunas": ["parecer_pessoas"]}
+          ]
+        },
+        {
+          "chave": "conclusao",
+          "titulo": "Conclusão",
+          "obrigatorio": true,
+          "blocos": [
+            {"tipo": "texto", "texto": ["O parecer geral da equipe de acompanhamento sobre a execução do PDTIC no período."]},
+            {"tipo": "tabela_secao", "secao": "avaliacao_comite", "colunas": ["decisao", "data", "ato_tipo", "ato_numero", "observacao"]}
+          ]
+        },
+        {
+          "chave": "anexos",
+          "titulo": "Anexos",
+          "blocos": [
+            {"tipo": "texto", "texto": ["Documentos que ajudam o comitê a avaliar o período, como o plano de acompanhamento."]}
+          ]
+        }
+      ]
+    },
+    {
+      "tipo": "rr",
+      "nome": "Modelo da SGDI para o relatório de resultados do PDTIC",
+      "capitulos": [
+        {
+          "chave": "capa",
+          "titulo": "Capa",
+          "numerado": false,
+          "obrigatorio": true,
+          "blocos": [
+            {
+              "tipo": "texto",
+              "texto": [
+                "Vigência do PDTIC: de {vigencia.inicio} a {vigencia.fim}",
+                "PDTIC versão {pdtic.versao}"
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "folha_rosto",
+          "titulo": "Folha de rosto",
+          "numerado": false,
+          "obrigatorio": true,
+          "blocos": [
+            {
+              "tipo": "texto",
+              "texto": [
+                "**{orgao.nome}**",
+                "{nomes.autoridade_cargo}: {nomes.autoridade}",
+                "",
+                "**Comitê interno de TIC**",
+                "{nomes.comite}",
+                "",
+                "**Equipe de acompanhamento**",
+                "{nomes.equipe_acompanhamento}"
+              ]
+            },
+            {"tipo": "tabela_secao", "secao": "responsavel_acompanhamento"}
+          ]
+        },
+        {
+          "chave": "historico_versoes",
+          "titulo": "Histórico de versões",
+          "numerado": false,
+          "obrigatorio": true,
+          "blocos": []
+        },
+        {
+          "chave": "sumario",
+          "titulo": "Sumário",
+          "numerado": false,
+          "obrigatorio": true,
+          "blocos": []
+        },
+        {
+          "chave": "apresentacao",
+          "titulo": "Apresentação",
+          "numerado": false,
+          "obrigatorio": true,
+          "blocos": [
+            {
+              "tipo": "texto",
+              "texto": [
+                "Este é o relatório de resultados do Plano Diretor de Tecnologia da Informação e Comunicação (PDTIC) do órgão {orgao.nome}, versão {pdtic.versao}, que valeu de {vigencia.inicio} a {vigencia.fim}.",
+                "O relatório registra e avalia os resultados alcançados na vigência e serve de base para o próximo PDTIC. Ele passa pelo comitê interno de TIC e é aprovado pela autoridade máxima do órgão."
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "introducao",
+          "titulo": "Introdução",
+          "obrigatorio": true,
+          "blocos": [
+            {
+              "tipo": "texto",
+              "texto": [
+                "No fim da vigência, o órgão presta contas do que o PDTIC entregou: as metas alcançadas, as que não foram e por quê, e o que aprendeu para o próximo plano."
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "metodologia",
+          "titulo": "Metodologia",
+          "blocos": [
+            {
+              "tipo": "texto",
+              "texto": [
+                "A equipe de acompanhamento reuniu os valores finais dos indicadores, os relatórios de acompanhamento dos ciclos e as avaliações do comitê."
+              ]
+            },
+            {"tipo": "fluxo", "fluxo": "avaliacao_final"}
+          ]
+        },
+        {
+          "chave": "avaliacao_metas",
+          "titulo": "Avaliação das metas e ações",
+          "obrigatorio": true,
+          "passo": "fechamento.licoes-aprendidas",
+          "blocos": [
+            {
+              "tipo": "texto",
+              "texto": [
+                "As metas agrupadas pelo resultado: alcançadas, não alcançadas e canceladas, com o motivo. Em seguida, a situação final de cada ação e os valores finais dos indicadores."
+              ]
+            },
+            {"tipo": "metas_por_resultado"},
+            {"tipo": "acoes_por_situacao", "paginaDeitada": true},
+            {"tipo": "tabela_secao", "secao": "indicadores_finais", "paginaDeitada": true},
+            {"tipo": "riscos_ocorridos", "paginaDeitada": true},
+            {"tipo": "tabela_secao", "secao": "avaliacao_final", "colunas": ["parecer_riscos"]}
+          ]
+        },
+        {
+          "chave": "alinhamento",
+          "titulo": "Alinhamento com a estratégia da organização",
+          "blocos": [
+            {
+              "tipo": "texto",
+              "texto": ["Se as metas alcançadas resolveram as necessidades e contribuíram para as estratégias do órgão e do PETIC-DF."]
+            },
+            {"tipo": "tabela_secao", "secao": "avaliacao_final", "colunas": ["parecer_alinhamento"]}
+          ]
+        },
+        {
+          "chave": "nao_priorizadas",
+          "titulo": "Lista atualizada de necessidades não priorizadas",
+          "passo": "planejamento.criterios-priorizacao",
+          "blocos": [
+            {
+              "tipo": "texto",
+              "texto": [
+                "As necessidades levantadas e não priorizadas na vigência. Elas voltam às áreas demandantes, que decidem se entram no próximo PDTIC."
+              ]
+            },
+            {
+              "tipo": "tabela_secao",
+              "secao": "necessidades",
+              "colunas": ["descricao", "tipo", "areas", "prioridade", "valor_estimado"],
+              "filtro": {"Campo": "priorizada", "Valor": false}
+            },
+            {"tipo": "tabela_secao", "secao": "avaliacao_final", "colunas": ["nao_priorizadas"]}
+          ]
+        },
+        {
+          "chave": "execucao_orcamentaria",
+          "titulo": "Avaliação da execução orçamentária",
+          "blocos": [
+            {"tipo": "texto", "texto": ["O orçamento planejado na elaboração e o parecer sobre o que foi de fato executado."]},
+            {"tipo": "tabela_secao", "secao": "orcamento_acoes"},
+            {"tipo": "tabela_secao", "secao": "avaliacao_final", "colunas": ["parecer_execucao"]}
+          ]
+        },
+        {
+          "chave": "pessoas",
+          "titulo": "Avaliação do plano de gestão de pessoas",
+          "blocos": [
+            {"tipo": "texto", "texto": ["As competências e os quantitativos de pessoas atendidos e não atendidos, com a justificativa."]},
+            {"tipo": "tabela_secao", "secao": "avaliacao_final", "colunas": ["parecer_pessoas"]}
+          ]
+        },
+        {
+          "chave": "licoes_aprendidas",
+          "titulo": "Lições aprendidas",
+          "obrigatorio": true,
+          "blocos": [
+            {"tipo": "texto", "texto": ["O que deu certo e o que evitar no próximo PDTIC."]},
+            {"tipo": "tabela_secao", "secao": "avaliacao_final", "colunas": ["licoes_aprendidas"]}
+          ]
+        },
+        {
+          "chave": "conclusao",
+          "titulo": "Conclusão",
+          "obrigatorio": true,
+          "blocos": [
+            {"tipo": "texto", "texto": ["Como os resultados da TIC contribuíram para os objetivos do órgão e os impactos das ações."]},
+            {"tipo": "tabela_secao", "secao": "avaliacao_final", "colunas": ["conclusao"]},
+            {"tipo": "tabela_secao", "secao": "aprovacao_resultados_comite", "colunas": ["decisao", "data", "ato_tipo", "ato_numero"]},
+            {"tipo": "tabela_secao", "secao": "aprovacao_resultados_autoridade", "colunas": ["decisao", "data", "ato_tipo", "ato_numero"]}
+          ]
+        },
+        {
+          "chave": "anexos",
+          "titulo": "Anexos",
+          "blocos": [
+            {"tipo": "texto", "texto": ["Documentos que ajudam a preparar o próximo PDTIC, como os relatórios de acompanhamento dos ciclos."]}
+          ]
+        }
+      ]
     }
   ]
 }

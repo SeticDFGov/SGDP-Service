@@ -429,7 +429,7 @@ public class PeDocumentoResolucaoTest : PeDocumentoTestBase
     public async Task SemModeloAtivo_409()
     {
         var pdtic = await AbrirSesAsync();
-        var modelo = Context.PeDocModelos.Single();
+        var modelo = Context.PeDocModelos.Single(m => m.Tipo == PeDominios.TipoDocumento.Pdtic);
         modelo.Ativo = false;
         await Context.SaveChangesAsync();
 

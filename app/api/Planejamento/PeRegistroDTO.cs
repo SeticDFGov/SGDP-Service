@@ -36,6 +36,9 @@ public class PeRegistroSecaoResponse
 
     public string? PrefixoCodigo { get; set; }
 
+    // Desde a E7 (rodada B): monitoramento ou avaliacao quando os registros são de um ciclo, ou nulo
+    public string? PorCiclo { get; set; }
+
     // Mesma forma dos campos da trilha (Obrigatorio já resolvido; Opcoes só as ativas)
     public List<PeTrilhaCampo> Campos { get; set; } = new();
 }

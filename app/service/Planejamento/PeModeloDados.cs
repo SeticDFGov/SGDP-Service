@@ -28,6 +28,13 @@ public sealed class PeModeloDados
     // Órgãos por nível escolhido
     public Dictionary<long, int> OrgaosPorNivel { get; private init; } = new();
 
+    // Seções por ciclo (E7, rodada B): id da seção → monitoramento ou avaliacao. Vazio antes de o
+    // carregador trazer a versão 6 (e no intervalo do deploy, quando a coluna ainda não existe)
+    public Dictionary<long, string> PorCiclo { get; private init; } = new();
+
+    // As configurações do acompanhamento e se ele já está ligado (versão 6 carregada)
+    public PeAcompanhamentoAtivo Acompanhamento { get; private init; } = new(false, 0, 0, PeDominios.Periodicidade.Padrao);
+
     public static async Task<PeModeloDados> CarregarAsync(AppDbContext context)
     {
         var passoNivel = await context.PePassosNivel.AsNoTracking().ToListAsync();
@@ -37,9 +44,16 @@ public sealed class PeModeloDados
             .GroupBy(c => c.NivelId)
             .Select(g => new { NivelId = g.Key, Total = g.Count() })
             .ToListAsync();
+        // A coluna por_ciclo só é lida com a versão 6 carregada (que só carrega com a migration aplicada)
+        var acompanhamento = await PeAcompanhamentoAtivo.LerAsync(context);
+        var porCiclo = acompanhamento.Ativo
+            ? await context.PeSecoesCiclo.AsNoTracking().ToDictionaryAsync(s => s.Id, s => s.PorCiclo)
+            : new Dictionary<long, string>();
 
         return new PeModeloDados
         {
+            PorCiclo = porCiclo,
+            Acompanhamento = acompanhamento,
             Niveis = await context.PeNiveis.AsNoTracking().OrderBy(n => n.Ordem).ThenBy(n => n.Id).ToListAsync(),
             Etapas = await context.PeEtapas.AsNoTracking().OrderBy(e => e.Ordem).ThenBy(e => e.Id).ToListAsync(),
             Passos = await context.PePassos.AsNoTracking().OrderBy(p => p.Ordem).ThenBy(p => p.Id).ToListAsync(),
@@ -70,6 +84,9 @@ public sealed class PeModeloDados
     public IEnumerable<PeOpcao> OpcoesDoCampo(long campoId) => Opcoes.Where(o => o.CampoId == campoId);
 
     public PeSecao? SecaoPorChave(string chave) => Secoes.FirstOrDefault(s => s.Chave == chave);
+
+    /// <summary>O tipo de ciclo da seção (monitoramento ou avaliacao), ou nulo quando ela não é por ciclo.</summary>
+    public string? PorCicloDe(long secaoId) => PorCiclo.GetValueOrDefault(secaoId);
 
     /// <summary>Campo travado ou principal de seção travada: não desliga.</summary>
     public bool CampoTravado(PeCampo campo) =>
@@ -152,6 +169,7 @@ public sealed class PeModeloDados
             NaPlanilha = s.NaPlanilha,
             Travada = s.Travada,
             IncisoDecreto = s.IncisoDecreto,
+            PorCiclo = PorCicloDe(s.Id),
             Sistema = s.Sistema,
             Excluido = s.ExcluidoEm != null,
             SituacaoGeral = doPdtic ? null : s.SituacaoGeral,
@@ -333,6 +351,7 @@ public static class PeTrilhaResolver
             PrefixoCodigo = secao.PrefixoCodigo,
             Situacao = situacao,
             Travada = secao.Travada,
+            PorCiclo = dados.PorCicloDe(secao.Id),
             Campos = campos
         };
     }

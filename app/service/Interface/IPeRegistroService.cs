@@ -15,18 +15,31 @@ namespace service.Interface;
 /// </summary>
 public interface IPeRegistroService
 {
-    Task<PeRegistrosResponse> ListarAsync(PeDono dono, string secaoChave, PeUserContext ctx);
+    // Desde a E7 (rodada B), o cicloId: obrigatório nas seções por ciclo do PDTIC (400
+    // PeCicloObrigatorio sem ele) e ignorado nas outras. Gravar exige o ciclo começado e aberto.
+
+    Task<PeRegistrosResponse> ListarAsync(PeDono dono, string secaoChave, PeUserContext ctx, long? cicloId = null);
 
     /// <summary>Inclui (tabela) ou preenche pela primeira vez (formulário; já preenchido: 409).</summary>
-    Task<PeRegistroResponse> CriarAsync(PeDono dono, string secaoChave, PeRegistroSalvarDTO dto, PeUserContext ctx);
+    Task<PeRegistroResponse> CriarAsync(PeDono dono, string secaoChave, PeRegistroSalvarDTO dto, PeUserContext ctx, long? cicloId = null);
 
-    Task<PeRegistroResponse> AtualizarAsync(PeDono dono, string secaoChave, long id, PeRegistroSalvarDTO dto, PeUserContext ctx);
+    Task<PeRegistroResponse> AtualizarAsync(PeDono dono, string secaoChave, long id, PeRegistroSalvarDTO dto, PeUserContext ctx,
+        long? cicloId = null);
 
     /// <summary>Apaga; ligado por outro registro ou do sistema: 409.</summary>
-    Task ExcluirAsync(PeDono dono, string secaoChave, long id, PeUserContext ctx);
+    Task ExcluirAsync(PeDono dono, string secaoChave, long id, PeUserContext ctx, long? cicloId = null);
 
     /// <summary>Nova ordem ({ Ids }, todos os registros da seção); devolve a lista.</summary>
-    Task<PeRegistrosResponse> OrdenarAsync(PeDono dono, string secaoChave, PeOrdemDTO dto, PeUserContext ctx);
+    Task<PeRegistrosResponse> OrdenarAsync(PeDono dono, string secaoChave, PeOrdemDTO dto, PeUserContext ctx, long? cicloId = null);
+
+    /// <summary>
+    /// Grava de uma vez as linhas de uma seção por ciclo (as grades do ciclo, E7 rodada B), com a
+    /// validação de sempre em cada linha e os erros de todas juntos (chave "prefixo.campo").
+    /// </summary>
+    Task SalvarNoCicloAsync(PeDono dono, string secaoChave, long cicloId, IReadOnlyList<PeLinhaDoCiclo> linhas, PeUserContext ctx);
+
+    /// <summary>O ciclo (id e rótulo) de cada registro de uma seção por ciclo (as planilhas mostram o ciclo).</summary>
+    Task<Dictionary<long, (long CicloId, string Rotulo)>> CiclosDosRegistrosAsync(IReadOnlyCollection<long> registroIds);
 
     /// <summary>
     /// Linhas sugeridas pelo sistema numa tabela vazia (o cronograma que vem dos fluxos, E6), só
@@ -50,8 +63,9 @@ public interface IPeRegistroService
     /// <summary>
     /// Os registros das seções dadas e o que falta em cada um, mais as ligações que saem deles
     /// (situação dos passos e avisos do PDTIC). Não confere quem chama: quem chama já conferiu.
+    /// Seção por ciclo: só os registros do cicloId (sem ele, nenhum).
     /// </summary>
-    Task<PeAnaliseDono> AnalisarAsync(PeDono dono, IReadOnlyList<PeSecaoDoDono> secoes);
+    Task<PeAnaliseDono> AnalisarAsync(PeDono dono, IReadOnlyList<PeSecaoDoDono> secoes, long? cicloId = null);
 
     /// <summary>Uma seção para a planilha: as colunas (visíveis e marcadas "na planilha") e os registros.</summary>
     Task<PeSecaoExportada> ExportarSecaoAsync(PeDono dono, string secaoChave, PeUserContext ctx);
@@ -69,9 +83,10 @@ public interface IPeRegistroService
     /// <summary>
     /// Os registros de várias seções do dono de uma vez (o documento do PDTIC, E5), cada seção
     /// com todos os campos visíveis como colunas e os registros com os rótulos. Não confere quem
-    /// chama: quem chama já conferiu.
+    /// chama: quem chama já conferiu. Seção por ciclo (E7, rodada B): com cicloId, só os registros
+    /// dele (o RA); sem, os de todos os ciclos (o PDTIC e o RR), com o ciclo de cada um.
     /// </summary>
-    Task<List<PeSecaoExportada>> ExportarAsync(PeDono dono, IReadOnlyList<PeSecaoDoDono> secoes);
+    Task<List<PeSecaoExportada>> ExportarAsync(PeDono dono, IReadOnlyList<PeSecaoDoDono> secoes, long? cicloId = null);
 }
 
 /// <summary>

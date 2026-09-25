@@ -22,6 +22,8 @@ public abstract class PePdticTestBase : PeReferenciaisTestBase
     // O documento (E5) e o caminho da aprovação (E7), que gera o PDF enviado ao CGTIC
     protected readonly PeDocumentoService Documentos;
     protected readonly PePdticAprovacaoService Aprovacao;
+    // O acompanhamento (E7, rodada B): ciclos, grades e painel
+    protected readonly PeAcompanhamentoService Acompanhamento;
 
     // pe_orgao na SEEC (o outro órgão da base)
     protected readonly User UserOrgaoSeec;
@@ -32,6 +34,7 @@ public abstract class PePdticTestBase : PeReferenciaisTestBase
         Comentarios = new PeComentarioService(Context, Permissoes);
         Documentos = new PeDocumentoService(Context, Registros, Permissoes);
         Aprovacao = new PePdticAprovacaoService(Context, Registros, Permissoes, Pdtics, Documentos);
+        Acompanhamento = new PeAcompanhamentoService(Context, Registros, Permissoes, Documentos);
 
         UserOrgaoSeec = NovoUser("olga@economia.df.gov.br", "Olga da Economia", Perfis.Basico, UnidadeSeec);
         DarPapel(UserOrgaoSeec, PapeisPlanejamento.Orgao);
@@ -45,9 +48,10 @@ public abstract class PePdticTestBase : PeReferenciaisTestBase
     /// <summary>O PDTIC da SEEC, aberto pela equipe da SEEC.</summary>
     protected async Task<PePdticResponse> AbrirSeecAsync() => await Pdtics.AbrirAsync(new PePdticCriarDTO(), await ContextoDe(UserOrgaoSeec));
 
+    /// <summary>Inclui um registro no PDTIC (na seção por ciclo, E7 rodada B, no ciclo dado).</summary>
     protected async Task<PeRegistroResponse> IncluirNoPdticAsync(long pdticId, string secao, object? dados = null, object? vinculos = null,
-        User? user = null) =>
-        await Registros.CriarAsync(PeDono.DoPdtic(pdticId), secao, Salvar(dados, vinculos), await ContextoDe(user ?? UserOrgaoSes));
+        User? user = null, long? cicloId = null) =>
+        await Registros.CriarAsync(PeDono.DoPdtic(pdticId), secao, Salvar(dados, vinculos), await ContextoDe(user ?? UserOrgaoSes), cicloId);
 
     protected async Task<PePdticSituacaoResponse> SituacaoAsync(long pdticId, User? user = null) =>
         await Pdtics.SituacaoAsync(pdticId, await ContextoDe(user ?? UserOrgaoSes));

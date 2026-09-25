@@ -24,7 +24,9 @@ namespace service.Planejamento;
 /// <item>aprovação e publicação (E7): {aprovacao.sgtic.data} e {aprovacao.sgtic.ato} (a
 /// seção da aprovação do SGTIC, com a decisão "aprovado"), {aprovacao.cgtic.data} e
 /// {aprovacao.cgtic.ato} (a deliberação aprovada do CGTIC) e {publicacao.data} e
-/// {publicacao.endereco} (a seção da publicação).</item>
+/// {publicacao.endereco} (a seção da publicação);</item>
+/// <item>ciclo (E7, rodada B): {ciclo.rotulo}, {ciclo.inicio} e {ciclo.fim}, do ciclo do
+/// relatório de acompanhamento (RA); no PDTIC e no RR, sem valor.</item>
 /// </list>
 /// </summary>
 public static partial class PeDocMarcadores
@@ -51,8 +53,14 @@ public static partial class PeDocMarcadores
         new Marcador("aprovacao.cgtic.data", "Data do ato do CGTIC que aprovou o PDTIC", "20/04/2027"),
         new Marcador("aprovacao.cgtic.ato", "Ato do CGTIC que aprovou o PDTIC: tipo e número", "Resolução nº 12/2027"),
         new Marcador("publicacao.data", "Data da publicação do PDTIC (passo da publicação)", "30/04/2027"),
-        new Marcador("publicacao.endereco", "Endereço da íntegra do PDTIC na internet (passo da publicação)", "https://www.saude.df.gov.br/pdtic")
+        new Marcador("publicacao.endereco", "Endereço da íntegra do PDTIC na internet (passo da publicação)", "https://www.saude.df.gov.br/pdtic"),
+        new Marcador("ciclo.rotulo", "Nome do ciclo do relatório de acompanhamento (só no RA)", "2027 · 1º trimestre"),
+        new Marcador("ciclo.inicio", "Início do ciclo do relatório de acompanhamento (só no RA)", "01/01/2027"),
+        new Marcador("ciclo.fim", "Fim do ciclo do relatório de acompanhamento (só no RA; na avaliação aberta, sem valor)", "31/03/2027")
     };
+
+    /// <summary>Os marcadores do ciclo (E7, rodada B): com valor só no relatório de acompanhamento (RA) de um ciclo.</summary>
+    public static readonly string[] DoCiclo = { "ciclo.rotulo", "ciclo.inicio", "ciclo.fim" };
 
     /// <summary>Os marcadores de aprovação e de publicação (E7), sem valor até cada momento do caminho.</summary>
     public static readonly string[] DaAprovacao =

@@ -279,9 +279,10 @@ public static class PeDominios
     /// Situação de cada passo da trilha do PDTIC (GET pdtic/{id}/situacao), calculada no
     /// servidor. Desde a E7: "aguardando" (o passo ainda não pode ser feito: as etapas 4 a 7
     /// antes da publicação, a publicação antes da aprovação, a deliberação enquanto o CGTIC
-    /// decide), "atrasado" (ciclo vencido, rodada B) e "externo" (feito fora do sistema, no
-    /// PDTIC registrado externamente), com o Motivo em texto. "continuo" fica para o
-    /// monitoramento até a rodada B e para o tipo fluxo.
+    /// decide), "atrasado" (o ciclo de monitoramento passou do prazo sem fechar, rodada B) e
+    /// "externo" (feito fora do sistema, no PDTIC registrado externamente), com o Motivo em
+    /// texto. "continuo" fica para o tipo fluxo e, antes de o carregador trazer a versão 6 do
+    /// modelo inicial, para o monitoramento.
     /// </summary>
     public static class SituacaoPasso
     {
@@ -521,18 +522,34 @@ public static class PeDominios
 
     // ── Documento do PDTIC (E5) ────────────────────────────────────────────────
 
-    /// <summary>Tipo do modelo de documento (pe_doc_modelo.tipo). A E7 acrescenta ra e rr.</summary>
+    /// <summary>
+    /// Tipo do modelo de documento (pe_doc_modelo.tipo) e do documento de cada linha da cópia do
+    /// órgão e das versões (doc_tipo): o PDTIC (E5) e, desde a E7 (rodada B), o relatório de
+    /// acompanhamento de um ciclo (RA, Anexo XIV do guia) e o relatório de resultados (RR, Anexo XV).
+    /// </summary>
     public static class TipoDocumento
     {
         public const string Pdtic = "pdtic";
+        public const string Ra = "ra";
+        public const string Rr = "rr";
 
-        public static readonly string[] Todos = { Pdtic };
+        public static readonly string[] Todos = { Pdtic, Ra, Rr };
 
         /// <summary>O título do documento, como sai na capa e na prévia.</summary>
         public static string Titulo(string tipo) => tipo switch
         {
             Pdtic => "Plano Diretor de Tecnologia da Informação e Comunicação",
+            Ra => "Relatório de Acompanhamento do PDTIC",
+            Rr => "Relatório de Resultados do PDTIC",
             _ => tipo
+        };
+
+        /// <summary>O nome curto do documento, no rodapé e nas mensagens.</summary>
+        public static string NomeCurto(string tipo) => tipo switch
+        {
+            Ra => "Relatório de acompanhamento",
+            Rr => "Relatório de resultados",
+            _ => "PDTIC"
         };
     }
 
@@ -549,8 +566,19 @@ public static class PeDominios
         public const string MatrizSwot = "matriz_swot";
         public const string Fluxo = "fluxo";
         public const string QuebraPagina = "quebra_pagina";
+        // Os blocos de dados do acompanhamento (E7, rodada B), para os relatórios RA e RR
+        public const string AcoesPorSituacao = "acoes_por_situacao";
+        public const string MetasPorResultado = "metas_por_resultado";
+        public const string RiscosOcorridos = "riscos_ocorridos";
+        public const string Medicoes = "medicoes";
 
-        public static readonly string[] Todos = { Texto, TabelaSecao, ListaTema, MatrizSwot, Fluxo, QuebraPagina };
+        public static readonly string[] Todos =
+        {
+            Texto, TabelaSecao, ListaTema, MatrizSwot, Fluxo, QuebraPagina, AcoesPorSituacao, MetasPorResultado, RiscosOcorridos, Medicoes
+        };
+
+        /// <summary>Os blocos do acompanhamento: saem em grupos de tabelas (Grupos) e não têm configuração além da página deitada.</summary>
+        public static readonly string[] DoAcompanhamento = { AcoesPorSituacao, MetasPorResultado, RiscosOcorridos, Medicoes };
     }
 
     /// <summary>
@@ -680,5 +708,165 @@ public static class PeDominios
         public const string CampoTexto = "descricao";
 
         public static readonly string[] Todas = { Forcas, Fraquezas, Oportunidades, Ameacas };
+    }
+
+    // ── Acompanhamento (E7, rodada B) ──────────────────────────────────────────
+
+    /// <summary>
+    /// Tipo do ciclo (pe_ciclo.tipo) e das seções por ciclo (pe_secao.por_ciclo): o ciclo de
+    /// monitoramento (criado sozinho pela periodicidade, depois da publicação) e a avaliação
+    /// intermediária (aberta pela equipe do órgão quando o comitê pede).
+    /// </summary>
+    public static class TipoCiclo
+    {
+        public const string Monitoramento = "monitoramento";
+        public const string Avaliacao = "avaliacao";
+
+        public static readonly string[] Todos = { Monitoramento, Avaliacao };
+    }
+
+    /// <summary>Situação guardada do ciclo (pe_ciclo.situacao; token de concorrência).</summary>
+    public static class SituacaoCiclo
+    {
+        public const string Aberto = "aberto";
+        public const string Fechado = "fechado";
+
+        public static readonly string[] Todas = { Aberto, Fechado };
+    }
+
+    /// <summary>
+    /// A situação que a tela mostra, calculada: futuro (ainda não começou; não aceita dados),
+    /// aberto, atrasado (o prazo de fechamento venceu sem fechar) e fechado.
+    /// </summary>
+    public static class SituacaoCicloExibida
+    {
+        public const string Futuro = "futuro";
+        public const string Aberto = "aberto";
+        public const string Atrasado = "atrasado";
+        public const string Fechado = "fechado";
+
+        public static readonly string[] Todas = { Futuro, Aberto, Atrasado, Fechado };
+    }
+
+    /// <summary>
+    /// Periodicidade do monitoramento (opções do campo periodicidade da seção
+    /// periodicidade_monitoramento, passo 4.3, e o padrão em pe_configuracao): quantos meses tem
+    /// cada ciclo. Os ciclos seguem o calendário (1º trimestre = janeiro a março).
+    /// </summary>
+    public static class Periodicidade
+    {
+        public const string Mensal = "mensal";
+        public const string Bimestral = "bimestral";
+        public const string Trimestral = "trimestral";
+        public const string Semestral = "semestral";
+        public const string Anual = "anual";
+
+        public const string Padrao = Trimestral;
+
+        /// <summary>Meses de cada ciclo, ou nulo para um valor que o módulo não conhece.</summary>
+        public static int? Meses(string? valor) => valor switch
+        {
+            Mensal => 1,
+            Bimestral => 2,
+            Trimestral => 3,
+            Semestral => 6,
+            Anual => 12,
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Situação física de uma ação no painel do PDTIC (AC-PDTIC, Anexo XIII) e nos grupos do
+    /// relatório de acompanhamento: pela situação registrada no ciclo e pelas datas previstas.
+    /// </summary>
+    public static class SituacaoFisica
+    {
+        public const string EmDia = "em_dia";
+        public const string Atrasada = "atrasada";
+        public const string Concluida = "concluida";
+        public const string Cancelada = "cancelada";
+        public const string SemRegistro = "sem_registro";
+
+        public static readonly string[] Todas = { EmDia, Atrasada, Concluida, Cancelada, SemRegistro };
+    }
+
+    /// <summary>
+    /// Chaves das seções, dos campos e dos passos do acompanhamento que o código usa (itens do
+    /// sistema, semeados na E2: não mudam de chave nem de tipo). As seções por ciclo são marcadas
+    /// pelo carregador (versão 6): o monitoramento em 5.1 e 5.2 e a avaliação em 6.1 a 6.3.
+    /// </summary>
+    public static class ChaveAcompanhamento
+    {
+        // Passos da etapa 5 (monitoramento): a grade do ciclo (5.1) e o fechamento (5.2)
+        public const string PassoCicloMonitoramento = "monitoramento.ciclo-monitoramento";
+        public const string PassoRelatorioAcompanhamento = "monitoramento.relatorio-acompanhamento";
+
+        // Plano de acompanhamento (etapa 4)
+        public const string SecaoPeriodicidade = "periodicidade_monitoramento";
+        public const string CampoPeriodicidade = "periodicidade";
+        public const string SecaoIndicadoresMonitoramento = "indicadores_monitoramento";
+        public const string CampoIndicador = "indicador";
+        public const string CampoValoresReferencia = "valores_referencia";
+        public const string SecaoProjetos = "projetos";
+        public const string CampoAcao = "acao";
+        public const string CampoPesoDaAcaoNaMeta = "peso_da_acao_na_meta";
+
+        // Monitoramento (por ciclo de monitoramento)
+        public const string SecaoMonitoramentoAcoes = "monitoramento_acoes";
+        public const string CampoSituacao = "situacao";
+        public const string CampoExecucaoFisica = "execucao_fisica";
+        public const string CampoExecucaoOrcamentaria = "execucao_orcamentaria";
+        public const string CampoObservacao = "observacao";
+        public const string SecaoMedicoes = "medicoes_indicadores";
+        public const string CampoValorApurado = "valor_apurado";
+        public const string CampoData = "data";
+        public const string SecaoRiscosOcorridos = "riscos_ocorridos";
+        public const string CampoRisco = "risco";
+        public const string CampoAcoesRealizadas = "acoes_realizadas";
+        public const string CampoResponsavel = "responsavel";
+        public const string CampoResultado = "resultado";
+        public const string SecaoRelatorioCiclo = "relatorio_ciclo";
+
+        // Avaliação intermediária (por ciclo de avaliação) e avaliação final
+        public const string SecaoResultadosIntermediarios = "resultados_intermediarios";
+        public const string CampoMeta = "meta";
+        public const string CampoValorAlcancado = "valor_alcancado";
+        public const string SecaoAnaliseIntermediaria = "analise_intermediaria";
+        public const string SecaoResultadosMetas = "resultados_metas";
+        public const string CampoMotivo = "motivo";
+
+        // Plano: metas, ações e riscos (etapa 3)
+        public const string SecaoMetas = "metas";
+        public const string CampoDescricao = "descricao";
+        public const string CampoValorDaMeta = "valor";
+        public const string CampoPrazo = "prazo";
+        public const string CampoNecessidades = "necessidades";
+        public const string CampoMetas = "metas";
+        public const string CampoInicio = "inicio";
+        public const string CampoConclusao = "conclusao";
+        public const string CampoInvestimento = "investimento";
+        public const string CampoCusteio = "custeio";
+        public const string CampoNivelRisco = "nivel";
+        public const string CampoNivelRiscoSimples = "nivel_simples";
+
+        // Valores das listas do sistema (situação da ação e do risco, resultado da meta)
+        public const string AcaoNaoIniciada = "nao_iniciada";
+        public const string AcaoEmAndamento = "em_andamento";
+        public const string AcaoConcluida = "concluida";
+        public const string AcaoCancelada = "cancelada";
+        public const string RiscoAberto = "aberto";
+        public const string RiscoFechado = "fechado";
+        public const string RiscoExcluido = "excluido";
+        public const string SemOcorrencia = "sem_ocorrencia";
+        public const string MetaAlcancada = "alcancada";
+        public const string MetaNaoAlcancada = "nao_alcancada";
+        public const string MetaCancelada = "cancelada";
+        public const string MetaEmAndamento = "em_andamento";
+        public const string NivelAlto = "alto";
+        public const string NivelMedio = "medio";
+        public const string NivelBaixo = "baixo";
+
+        public static readonly string[] SituacoesDoRisco = { RiscoAberto, RiscoFechado, RiscoExcluido, SemOcorrencia };
+        public static readonly string[] NiveisDoRisco = { NivelAlto, NivelMedio, NivelBaixo };
     }
 }

@@ -169,4 +169,11 @@ public enum ErrorCode
     PeRevisaoRecusada = 1105,           // 409: o passo 6.3 está ligado e a avaliação do comitê não decidiu "revisar"
     PeRegistroExternoInvalido = 1106,   // 400: dados do PDTIC aprovado fora do sistema; o corpo traz Campos (pelo nome do campo do corpo)
     PeVersaoPdticDuplicada = 1107,      // 409: o órgão já tem um PDTIC com esta versão
+    // Acompanhamento (E7, rodada B): ciclos de monitoramento e de avaliação, grades, painel e relatórios RA e RR
+    PeCicloNaoEncontrado = 1120,        // 404: ciclo inexistente ou de outro PDTIC
+    PeCicloObrigatorio = 1121,          // 400: seção por ciclo sem o ?cicloId=
+    PeCicloInvalido = 1122,             // 400: ciclo do tipo errado para a seção, a grade ou o pedido (criar monitoramento, avaliação num ciclo de monitoramento)
+    PeCicloFechado = 1123,              // 409: o ciclo não aceita a operação agora (gravar num ciclo fechado ou que ainda não começou, fechar o fechado, reabrir o aberto)
+    PeCicloComPendencias = 1124,        // 400: fechar o ciclo com pendências; o corpo traz Pendencias [{ PassoId, PassoNumero, PassoTitulo, Motivo }]
+    PeAvaliacaoAberta = 1125,           // 409: já há uma avaliação intermediária aberta (uma por vez)
 }

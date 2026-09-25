@@ -13,32 +13,98 @@ using service.Interface;
 namespace service.Planejamento;
 
 /// <summary>
-/// O documento do PDTIC de um órgão (E5): o modelo da SGDI resolvido para o órgão, a cópia do
-/// órgão (só o que ele mudou), a edição dos textos e dos capítulos e o PDF com as versões.
+/// O documento de um PDTIC (o alvo das rotas do documento): o próprio PDTIC (E5), o relatório de
+/// acompanhamento (RA) de um ciclo ou o relatório de resultados (RR), desde a E7 (rodada B).
+/// </summary>
+public sealed record PeDocAlvo(long PdticId, string Tipo, long? CicloId)
+{
+    public static PeDocAlvo DoPdtic(long pdticId) => new(pdticId, PeDominios.TipoDocumento.Pdtic, null);
+
+    public static PeDocAlvo Ra(long pdticId, long cicloId) => new(pdticId, PeDominios.TipoDocumento.Ra, cicloId);
+
+    public static PeDocAlvo Rr(long pdticId) => new(pdticId, PeDominios.TipoDocumento.Rr, null);
+
+    public bool EhPdtic => Tipo == PeDominios.TipoDocumento.Pdtic;
+}
+
+/// <summary>
+/// As linhas de cada documento na cópia do órgão e nas versões (E7, rodada B). O documento de
+/// uma linha (o tipo e o ciclo do RA) fica numa entidade à parte que divide a tabela (table
+/// splitting): a linha sem essa parte é do PDTIC (a coluna tem o padrão pdtic). Antes de o
+/// carregador trazer a versão 6 (e no intervalo do deploy, quando a coluna ainda não existe),
+/// só o PDTIC tem linhas, e a consulta não olha a coluna nova.
+/// </summary>
+internal static class PeDocLinhas
+{
+    public static IQueryable<PeDocOrgao> Capitulos(AppDbContext context, PeDocAlvo alvo, bool ativo)
+    {
+        var linhas = context.PeDocOrgaos.Where(o => o.PdticId == alvo.PdticId);
+        if (!ativo) return linhas;
+        if (alvo.EhPdtic)
+            return linhas.Where(o => !context.PeDocOrgaosDocumento.Any(d => d.Id == o.Id && d.DocTipo != PeDominios.TipoDocumento.Pdtic));
+        var tipo = alvo.Tipo;
+        var ciclo = alvo.CicloId;
+        return linhas.Where(o => context.PeDocOrgaosDocumento.Any(d => d.Id == o.Id && d.DocTipo == tipo && d.CicloId == ciclo));
+    }
+
+    public static IQueryable<PeDocOrgaoBloco> Blocos(AppDbContext context, PeDocAlvo alvo, bool ativo)
+    {
+        var linhas = context.PeDocOrgaoBlocos.Where(o => o.PdticId == alvo.PdticId);
+        if (!ativo) return linhas;
+        if (alvo.EhPdtic)
+            return linhas.Where(o => !context.PeDocOrgaoBlocosDocumento.Any(d => d.Id == o.Id && d.DocTipo != PeDominios.TipoDocumento.Pdtic));
+        var tipo = alvo.Tipo;
+        var ciclo = alvo.CicloId;
+        return linhas.Where(o => context.PeDocOrgaoBlocosDocumento.Any(d => d.Id == o.Id && d.DocTipo == tipo && d.CicloId == ciclo));
+    }
+
+    public static IQueryable<PeDocVersao> Versoes(AppDbContext context, PeDocAlvo alvo, bool ativo)
+    {
+        var linhas = context.PeDocVersoes.Where(v => v.PdticId == alvo.PdticId);
+        if (!ativo) return linhas;
+        if (alvo.EhPdtic)
+            return linhas.Where(v => !context.PeDocVersoesDocumento.Any(d => d.Id == v.Id && d.DocTipo != PeDominios.TipoDocumento.Pdtic));
+        var tipo = alvo.Tipo;
+        var ciclo = alvo.CicloId;
+        return linhas.Where(v => context.PeDocVersoesDocumento.Any(d => d.Id == v.Id && d.DocTipo == tipo && d.CicloId == ciclo));
+    }
+}
+
+/// <summary>
+/// O documento de um PDTIC (E5): o modelo da SGDI resolvido para o órgão, a cópia do órgão (só o
+/// que ele mudou), a edição dos textos e dos capítulos e o PDF com as versões. Desde a E7 (rodada
+/// B), o mesmo motor serve os relatórios do acompanhamento: o RA de cada ciclo (Anexo XIV) e o RR
+/// (Anexo XV), cada um com o seu modelo, a sua cópia e as suas versões.
 /// <list type="bullet">
 /// <item>Capítulo: aparece quando o passo dele (passo_chave) está na trilha do órgão (nível e
 /// ajustes) e o capítulo pai aparece; o travado e o obrigatório não se escondem; o oculto vem
 /// só com o título (sem número e sem blocos) e os subcapítulos dele não vêm; o número é pela
-/// posição entre os visíveis (6, 6.1).</item>
+/// posição entre os visíveis (6, 6.1). No RA de um ciclo de monitoramento, o capítulo cujo passo
+/// é da avaliação intermediária sai em branco, com o aviso (o guia manda assim).</item>
 /// <item>Texto: o do órgão, quando ele editou; senão o do modelo, na hora (decisão 14). Se o
 /// modelo mudar depois da edição, ModeloMudou e o texto novo do modelo ao lado.</item>
 /// <item>Marcadores: <see cref="PeDocMarcadores"/>; sem valor, continua escrito na prévia e sai
-/// em branco no PDF.</item>
+/// em branco no PDF. No RA, os do ciclo ({ciclo.rotulo}, {ciclo.inicio}, {ciclo.fim}).</item>
 /// <item>Dados: tabela de uma seção (os campos visíveis do nível, com os rótulos prontos, e o
-/// filtro do bloco), ações de um tema, matriz SWOT, inventário de IA do PGIA e fluxo (a E6
-/// desenha); bloco de seção que o órgão não vê (ou que o administrador tirou do documento)
-/// não aparece.</item>
-/// <item>Ler: quem vê o órgão. Editar e gerar o PDF: a equipe do órgão (e o admin geral) com o
-/// PDTIC em elaboração ou devolvido.</item>
+/// filtro do bloco; a seção por ciclo filtrada pelo ciclo do documento), ações de um tema, matriz
+/// SWOT, inventário de IA do PGIA, fluxo (a E6 desenha) e, na rodada B, os blocos do
+/// acompanhamento (<see cref="BlocoDoAcompanhamento"/>); bloco de seção que o órgão não vê (ou
+/// que o administrador tirou do documento) não aparece.</item>
+/// <item>Ler: quem vê o órgão. Editar e gerar o PDF: a equipe do órgão (e o admin geral); no
+/// PDTIC, com a elaboração aberta; no RA e no RR, com o PDTIC vigente (no RA, o ciclo começado).</item>
 /// </list>
 /// Nada aqui está no caminho de cada requisição: só as actions do documento leem as tabelas.
 /// </summary>
-public class PeDocumentoService : IPeDocumentoService
+public partial class PeDocumentoService : IPeDocumentoService
 {
     public const string MimePdf = "application/pdf";
 
     /// <summary>O texto guardado quando o órgão deixa o bloco em branco (o TipTap vazio).</summary>
     public const string TextoVazio = "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\"}]}";
+
+    /// <summary>O aviso do capítulo da avaliação intermediária no RA de um ciclo de monitoramento.</summary>
+    public const string AvisoSoNaAvaliacao =
+        "Este capítulo fica em branco no relatório de um ciclo de monitoramento: ele é preenchido na avaliação intermediária.";
 
     private const string PassoDosSistemasDeIa = "diagnostico.sistemas-ia";
 
@@ -71,46 +137,181 @@ public class PeDocumentoService : IPeDocumentoService
         _permissoes = permissoes;
     }
 
+    // ── O documento (alvo) ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// O documento pedido e o que a resolução usa dele: o ciclo do RA (e, no RA de uma avaliação,
+    /// o ciclo de monitoramento de referência) e se o acompanhamento está ligado (a versão 6
+    /// carregada: só então as colunas novas existem e as linhas do RA e do RR são separadas).
+    /// </summary>
+    internal sealed class PeDocContexto
+    {
+        public required PeDocAlvo Alvo { get; init; }
+
+        public required bool Ativo { get; init; }
+
+        // No RA: o ciclo do relatório
+        public PeCiclo? Ciclo { get; init; }
+
+        // No RA de uma avaliação: o último ciclo de monitoramento com dado até ela (os blocos do monitoramento vêm dele)
+        public PeCiclo? CicloDeMonitoramento { get; init; }
+
+        // Os ciclos do PDTIC pelo id (rótulos e ordem)
+        public Dictionary<long, PeCiclo> Ciclos { get; init; } = new();
+
+        public bool EhRaDeMonitoramento => Alvo.Tipo == PeDominios.TipoDocumento.Ra && Ciclo?.Tipo == PeDominios.TipoCiclo.Monitoramento;
+
+        public bool EhRaDeAvaliacao => Alvo.Tipo == PeDominios.TipoDocumento.Ra && Ciclo?.Tipo == PeDominios.TipoCiclo.Avaliacao;
+
+        /// <summary>
+        /// Os registros de uma seção por ciclo que o documento mostra: todos os ciclos (o PDTIC e o
+        /// RR), um ciclo (o do RA; no RA de uma avaliação, as seções do monitoramento vêm do ciclo de
+        /// monitoramento de referência) ou nenhum (a seção da avaliação no RA de um monitoramento: o
+        /// bloco não aparece).
+        /// </summary>
+        public (bool Todos, long? CicloId, bool Esconde) CicloPara(string? porCiclo)
+        {
+            if (porCiclo == null || Alvo.Tipo != PeDominios.TipoDocumento.Ra) return (true, null, false);
+            if (Ciclo == null) return (false, null, true);
+            if (porCiclo == Ciclo.Tipo) return (false, Ciclo.Id, false);
+            if (porCiclo == PeDominios.TipoCiclo.Monitoramento) return (false, CicloDeMonitoramento?.Id, false);
+            return (false, null, true);
+        }
+
+        /// <summary>O ciclo de monitoramento cujos dados o documento mostra (o do RA ou o de referência), ou nulo.</summary>
+        public PeCiclo? MonitoramentoDoRelatorio => EhRaDeMonitoramento ? Ciclo : EhRaDeAvaliacao ? CicloDeMonitoramento : null;
+    }
+
+    /// <summary>
+    /// Confere o documento pedido: o RA e o RR só com o acompanhamento ligado (senão 409) e depois
+    /// da publicação (senão 409 PePdticSituacaoInvalida); o ciclo do RA é do PDTIC (senão 404).
+    /// </summary>
+    internal async Task<PeDocContexto> DocumentoAsync(PePdtic pdtic, PeDocAlvo alvo)
+    {
+        var acompanhamento = await PeAcompanhamentoAtivo.LerAsync(_context);
+        if (alvo.EhPdtic)
+            return new PeDocContexto
+            {
+                Alvo = alvo,
+                Ativo = acompanhamento.Ativo,
+                // A tabela de uma seção por ciclo no PDTIC mostra o ciclo de cada linha
+                Ciclos = acompanhamento.Ativo
+                    ? await _context.PeCiclos.AsNoTracking().Where(c => c.PdticId == pdtic.Id).ToDictionaryAsync(c => c.Id)
+                    : new Dictionary<long, PeCiclo>()
+            };
+
+        acompanhamento.Exigir();
+        if (pdtic.PublicadoEm == null && !PeDominios.SituacaoPdtic.Vigentes.Contains(pdtic.Situacao))
+            throw new ApiException(ErrorCode.PePdticSituacaoInvalida,
+                $"O {PeDominios.TipoDocumento.NomeCurto(alvo.Tipo).ToLowerInvariant()} fica disponível depois da publicação do PDTIC.");
+        var ciclos = await _context.PeCiclos.AsNoTracking().Where(c => c.PdticId == pdtic.Id).ToDictionaryAsync(c => c.Id);
+        if (alvo.Tipo == PeDominios.TipoDocumento.Rr) return new PeDocContexto { Alvo = alvo, Ativo = true, Ciclos = ciclos };
+
+        var ciclo = alvo.CicloId is long id && ciclos.TryGetValue(id, out var achado) ? achado : throw PeCiclos.NaoEncontrado();
+        PeCiclo? referencia = null;
+        if (ciclo.Tipo == PeDominios.TipoCiclo.Avaliacao)
+        {
+            // O último ciclo de monitoramento com dado até o fim da avaliação (ou até hoje, com ela aberta)
+            var ate = ciclo.Fim ?? PeCiclos.Hoje();
+            var candidatos = ciclos.Values
+                .Where(c => c.Tipo == PeDominios.TipoCiclo.Monitoramento && c.Inicio <= ate)
+                .Select(c => c.Id)
+                .ToList();
+            var comDado = candidatos.Count == 0
+                ? new HashSet<long>()
+                : (await _context.PeRegistrosCiclo.AsNoTracking().Where(r => candidatos.Contains(r.CicloId)).Select(r => r.CicloId).Distinct().ToListAsync())
+                .ToHashSet();
+            referencia = ciclos.Values.Where(c => comDado.Contains(c.Id)).OrderByDescending(c => c.Inicio).FirstOrDefault();
+        }
+        return new PeDocContexto { Alvo = alvo, Ativo = true, Ciclo = ciclo, CicloDeMonitoramento = referencia, Ciclos = ciclos };
+    }
+
+    /// <summary>
+    /// Por que o documento não aceita edição agora (a mensagem do 409), ou nulo: o PDTIC com a
+    /// elaboração aberta; o RA e o RR com o PDTIC vigente (o RA, com o ciclo começado).
+    /// </summary>
+    internal static string? RecusaDaEdicao(PePdtic pdtic, PeDocContexto documento)
+    {
+        if (documento.Alvo.EhPdtic)
+            return PeEdicaoPdtic.ElaboracaoAberta(pdtic)
+                ? null
+                : PeEdicaoPdtic.Recusa(pdtic, PeEdicaoPdtic.Grupo.Elaboracao, string.Empty) ?? "Este PDTIC não muda na situação em que está.";
+        if (!PeDominios.SituacaoPdtic.Vigentes.Contains(pdtic.Situacao))
+            return $"O {PeDominios.TipoDocumento.NomeCurto(documento.Alvo.Tipo).ToLowerInvariant()} muda enquanto o PDTIC está vigente "
+                   + "(publicado ou em acompanhamento).";
+        if (documento.Ciclo is { } ciclo && ciclo.Inicio > PeCiclos.Hoje())
+            return $"O ciclo {ciclo.Rotulo} começa em {PeCiclos.Data(ciclo.Inicio)}. O relatório dele é editado a partir do início do ciclo.";
+        return null;
+    }
+
     // ── Leitura ─────────────────────────────────────────────────────────────
 
-    public async Task<PeDocumentoResponse> ObterAsync(long pdticId, PeUserContext ctx)
+    public Task<PeDocumentoResponse> ObterAsync(long pdticId, PeUserContext ctx) => ObterAsync(PeDocAlvo.DoPdtic(pdticId), ctx);
+
+    public async Task<PeDocumentoResponse> ObterAsync(PeDocAlvo alvo, PeUserContext ctx)
     {
-        var pdtic = await PePdticService.LerAsync(_context, _permissoes, pdticId, ctx);
-        return (await ResolverAsync(pdtic, ctx)).Resposta;
+        var pdtic = await PePdticService.LerAsync(_context, _permissoes, alvo.PdticId, ctx);
+        var documento = await DocumentoAsync(pdtic, alvo);
+        return (await ResolverAsync(pdtic, documento, ctx)).Resposta;
     }
 
-    public async Task<List<PeDocVersaoResponse>> VersoesAsync(long pdticId, PeUserContext ctx)
+    public Task<List<PeDocVersaoResponse>> VersoesAsync(long pdticId, PeUserContext ctx) => VersoesAsync(PeDocAlvo.DoPdtic(pdticId), ctx);
+
+    public async Task<List<PeDocVersaoResponse>> VersoesAsync(PeDocAlvo alvo, PeUserContext ctx)
     {
-        var pdtic = await PePdticService.LerAsync(_context, _permissoes, pdticId, ctx);
-        return await VersoesDoPdticAsync(pdtic.Id);
+        var pdtic = await PePdticService.LerAsync(_context, _permissoes, alvo.PdticId, ctx);
+        var documento = await DocumentoAsync(pdtic, alvo);
+        return await VersoesDoDocumentoAsync(documento);
     }
 
-    public async Task<PeDocArquivo> ArquivoDaVersaoAsync(long pdticId, int numero, PeUserContext ctx)
+    public Task<PeDocArquivo> ArquivoDaVersaoAsync(long pdticId, int numero, PeUserContext ctx) =>
+        ArquivoDaVersaoAsync(PeDocAlvo.DoPdtic(pdticId), numero, ctx);
+
+    public async Task<PeDocArquivo> ArquivoDaVersaoAsync(PeDocAlvo alvo, int numero, PeUserContext ctx)
     {
-        var pdtic = await PePdticService.LerAsync(_context, _permissoes, pdticId, ctx);
-        var versao = await _context.PeDocVersoes.AsNoTracking().FirstOrDefaultAsync(v => v.PdticId == pdtic.Id && v.Numero == numero)
+        var pdtic = await PePdticService.LerAsync(_context, _permissoes, alvo.PdticId, ctx);
+        var documento = await DocumentoAsync(pdtic, alvo);
+        var versao = await PeDocLinhas.Versoes(_context, alvo, documento.Ativo).AsNoTracking().FirstOrDefaultAsync(v => v.Numero == numero)
                      ?? throw new ApiException(ErrorCode.PeDocVersaoNaoEncontrada, "Versão do documento não encontrada. Atualize a tela.");
         var conteudo = await _context.PeArquivosConteudo.AsNoTracking()
             .Where(c => c.Id == versao.ArquivoId)
             .Select(c => c.Conteudo)
             .FirstAsync();
         var sigla = await _context.PgiaOrgaos.AsNoTracking().Where(o => o.Id == pdtic.OrgaoId).Select(o => o.Sigla).FirstAsync();
-        return new PeDocArquivo(conteudo, NomeDoArquivo(sigla, pdtic.Versao, versao.Numero));
+        return new PeDocArquivo(conteudo, NomeDoArquivo(documento, sigla, pdtic.Versao, versao.Numero));
     }
 
     /// <summary>PDTIC_SIGLA_v1.0_3.pdf (sigla só com letras, números, hífen e sublinhado).</summary>
-    public static string NomeDoArquivo(string sigla, string versao, int numero)
+    public static string NomeDoArquivo(string sigla, string versao, int numero) =>
+        $"PDTIC_{SiglaSegura(sigla)}_v{versao}_{numero.ToString(CultureInfo.InvariantCulture)}.pdf";
+
+    /// <summary>O nome do PDF: PDTIC_SIGLA_v1.0_3.pdf, RA_SIGLA_v1.0_2027-T1_1.pdf ou RR_SIGLA_v1.0_2.pdf.</summary>
+    internal static string NomeDoArquivo(PeDocContexto documento, string sigla, string versao, int numero)
+    {
+        var n = numero.ToString(CultureInfo.InvariantCulture);
+        return documento.Alvo.Tipo switch
+        {
+            PeDominios.TipoDocumento.Ra => $"RA_{SiglaSegura(sigla)}_v{versao}_{(documento.Ciclo == null ? "ciclo" : PeCiclos.RotuloCurto(documento.Ciclo))}_{n}.pdf",
+            PeDominios.TipoDocumento.Rr => $"RR_{SiglaSegura(sigla)}_v{versao}_{n}.pdf",
+            _ => NomeDoArquivo(sigla, versao, numero)
+        };
+    }
+
+    private static string SiglaSegura(string? sigla)
     {
         var limpa = new string((sigla ?? string.Empty).Trim().Select(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' ? c : '_').ToArray());
-        return $"PDTIC_{(limpa.Length == 0 ? "orgao" : limpa)}_v{versao}_{numero.ToString(CultureInfo.InvariantCulture)}.pdf";
+        return limpa.Length == 0 ? "orgao" : limpa;
     }
 
     // ── Edição pela equipe do órgão ─────────────────────────────────────────
 
-    public async Task<PeDocBlocoResponse> SalvarTextoAsync(long pdticId, long blocoId, JsonElement texto, PeUserContext ctx)
+    public Task<PeDocBlocoResponse> SalvarTextoAsync(long pdticId, long blocoId, JsonElement texto, PeUserContext ctx) =>
+        SalvarTextoAsync(PeDocAlvo.DoPdtic(pdticId), blocoId, texto, ctx);
+
+    public async Task<PeDocBlocoResponse> SalvarTextoAsync(PeDocAlvo alvo, long blocoId, JsonElement texto, PeUserContext ctx)
     {
-        var pdtic = await PdticParaEditarAsync(pdticId, ctx);
-        var (bloco, _) = await BlocoDoOrgaoAsync(pdtic, blocoId);
+        var (pdtic, documento) = await PdticParaEditarAsync(alvo, ctx);
+        var (bloco, _) = await BlocoDoOrgaoAsync(pdtic, documento, blocoId);
         if (bloco.Tipo != PeDominios.TipoBloco.Texto)
             throw new ApiException(ErrorCode.PeDocBlocoNaoEditavel, "Só o texto do documento é editado aqui. Os dados das tabelas são editados nos passos da trilha.");
 
@@ -128,14 +329,14 @@ public class PeDocumentoService : IPeDocumentoService
         var novo = rico.Documento ?? JsonNode.Parse(TextoVazio)!;
         var textoDoModelo = PeDocConfig.TextoDoBloco(PeDocConfig.Ler(bloco.Config));
         var agora = DateTime.UtcNow;
-        var copia = await _context.PeDocOrgaoBlocos.FirstOrDefaultAsync(o => o.PdticId == pdtic.Id && o.BlocoId == bloco.Id);
+        var copia = await PeDocLinhas.Blocos(_context, alvo, documento.Ativo).FirstOrDefaultAsync(o => o.BlocoId == bloco.Id);
 
         var igualAoModelo = PeDocMarcadores.Canonico(novo) == PeDocMarcadores.Canonico(textoDoModelo)
                             || (!PeTextoRico.TemConteudo(novo) && !PeTextoRico.TemConteudo(textoDoModelo));
         if (igualAoModelo)
         {
             // Igual ao texto do modelo: não é edição; o bloco volta a seguir o modelo
-            if (copia != null) _context.PeDocOrgaoBlocos.Remove(copia);
+            if (copia != null) await RemoverTextoAsync(copia, alvo);
         }
         else
         {
@@ -143,6 +344,8 @@ public class PeDocumentoService : IPeDocumentoService
             {
                 copia = new PeDocOrgaoBloco { PdticId = pdtic.Id, BlocoId = bloco.Id };
                 _context.PeDocOrgaoBlocos.Add(copia);
+                if (!alvo.EhPdtic)
+                    _context.PeDocOrgaoBlocosDocumento.Add(new PeDocOrgaoBlocoDocumento { Linha = copia, DocTipo = alvo.Tipo, CicloId = alvo.CicloId });
             }
             copia.Texto = novo.ToJsonString(PeModeloService.JsonHistorico);
             copia.ModeloHash = PeDocMarcadores.Hash(textoDoModelo);
@@ -160,35 +363,49 @@ public class PeDocumentoService : IPeDocumentoService
         }
         Tocar(pdtic, ctx, agora);
         await _context.SaveChangesAsync();
-        return await BlocoResolvidoAsync(pdtic.Id, bloco.Id, ctx);
+        return await BlocoResolvidoAsync(pdtic.Id, documento, bloco.Id, ctx);
     }
 
-    public async Task<PeDocBlocoResponse> RestaurarTextoAsync(long pdticId, long blocoId, PeUserContext ctx)
+    public Task<PeDocBlocoResponse> RestaurarTextoAsync(long pdticId, long blocoId, PeUserContext ctx) =>
+        RestaurarTextoAsync(PeDocAlvo.DoPdtic(pdticId), blocoId, ctx);
+
+    public async Task<PeDocBlocoResponse> RestaurarTextoAsync(PeDocAlvo alvo, long blocoId, PeUserContext ctx)
     {
-        var pdtic = await PdticParaEditarAsync(pdticId, ctx);
-        var (bloco, _) = await BlocoDoOrgaoAsync(pdtic, blocoId);
+        var (pdtic, documento) = await PdticParaEditarAsync(alvo, ctx);
+        var (bloco, _) = await BlocoDoOrgaoAsync(pdtic, documento, blocoId);
         if (bloco.Tipo != PeDominios.TipoBloco.Texto)
             throw new ApiException(ErrorCode.PeDocBlocoNaoEditavel, "Só o texto do documento volta ao texto do modelo.");
 
-        var copia = await _context.PeDocOrgaoBlocos.FirstOrDefaultAsync(o => o.PdticId == pdtic.Id && o.BlocoId == bloco.Id);
+        var copia = await PeDocLinhas.Blocos(_context, alvo, documento.Ativo).FirstOrDefaultAsync(o => o.BlocoId == bloco.Id);
         if (copia != null)
         {
-            _context.PeDocOrgaoBlocos.Remove(copia);
+            await RemoverTextoAsync(copia, alvo);
             Tocar(pdtic, ctx, DateTime.UtcNow);
             await _context.SaveChangesAsync();
         }
-        return await BlocoResolvidoAsync(pdtic.Id, bloco.Id, ctx);
+        return await BlocoResolvidoAsync(pdtic.Id, documento, bloco.Id, ctx);
     }
 
-    public async Task<PeDocCapituloResponse> AtualizarCapituloAsync(long pdticId, long capituloId, PeDocCapituloOrgaoDTO dto, PeUserContext ctx)
+    /// <summary>Tira o texto do órgão (no RA e no RR, também a parte com o documento, que divide a linha).</summary>
+    private async Task RemoverTextoAsync(PeDocOrgaoBloco copia, PeDocAlvo alvo)
     {
-        var pdtic = await PdticParaEditarAsync(pdticId, ctx);
-        var base_ = await BaseAsync(pdtic);
+        if (!alvo.EhPdtic && await _context.PeDocOrgaoBlocosDocumento.FirstOrDefaultAsync(d => d.Id == copia.Id) is { } documento)
+            _context.PeDocOrgaoBlocosDocumento.Remove(documento);
+        _context.PeDocOrgaoBlocos.Remove(copia);
+    }
+
+    public Task<PeDocCapituloResponse> AtualizarCapituloAsync(long pdticId, long capituloId, PeDocCapituloOrgaoDTO dto, PeUserContext ctx) =>
+        AtualizarCapituloAsync(PeDocAlvo.DoPdtic(pdticId), capituloId, dto, ctx);
+
+    public async Task<PeDocCapituloResponse> AtualizarCapituloAsync(PeDocAlvo alvo, long capituloId, PeDocCapituloOrgaoDTO dto, PeUserContext ctx)
+    {
+        var (pdtic, documento) = await PdticParaEditarAsync(alvo, ctx);
+        var base_ = await BaseAsync(pdtic, documento);
         var capitulo = base_.Capitulos.FirstOrDefault(c => c.Id == capituloId);
         if (capitulo == null || !base_.Presente(capitulo))
             throw new ApiException(ErrorCode.PeDocCapituloNaoEncontrado, "Este capítulo não está no documento do órgão. Atualize a tela.");
 
-        var copia = await _context.PeDocOrgaos.FirstOrDefaultAsync(o => o.PdticId == pdtic.Id && o.CapituloId == capitulo.Id);
+        var copia = await PeDocLinhas.Capitulos(_context, alvo, documento.Ativo).FirstOrDefaultAsync(o => o.CapituloId == capitulo.Id);
         var oculto = copia?.Oculto ?? false;
         var tituloProprio = copia?.TituloProprio;
 
@@ -213,7 +430,7 @@ public class PeDocumentoService : IPeDocumentoService
         {
             if (oculto || tituloProprio != null)
             {
-                _context.PeDocOrgaos.Add(new PeDocOrgao
+                var linha = new PeDocOrgao
                 {
                     PdticId = pdtic.Id,
                     CapituloId = capitulo.Id,
@@ -221,7 +438,10 @@ public class PeDocumentoService : IPeDocumentoService
                     TituloProprio = tituloProprio,
                     CriadoEm = agora,
                     CriadoPor = ctx.Email
-                });
+                };
+                _context.PeDocOrgaos.Add(linha);
+                if (!alvo.EhPdtic)
+                    _context.PeDocOrgaosDocumento.Add(new PeDocOrgaoDocumento { Linha = linha, DocTipo = alvo.Tipo, CicloId = alvo.CicloId });
                 Tocar(pdtic, ctx, agora);
                 await _context.SaveChangesAsync();
             }
@@ -237,34 +457,47 @@ public class PeDocumentoService : IPeDocumentoService
         }
 
         var pdticLido = await _context.PePdtics.AsNoTracking().FirstAsync(p => p.Id == pdtic.Id);
-        var resolvido = await ResolverAsync(pdticLido, ctx, soCapitulo: capitulo.Id);
+        var resolvido = await ResolverAsync(pdticLido, documento, ctx, soCapitulo: capitulo.Id);
         return resolvido.Capitulos[capitulo.Id];
     }
 
     // ── PDF ─────────────────────────────────────────────────────────────────
 
-    public async Task<PeDocVersaoResponse> GerarPdfAsync(long pdticId, PeUserContext ctx)
-    {
-        var pdtic = await PePdticService.LerAsync(_context, _permissoes, pdticId, ctx);
-        if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
-            throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do órgão gera o PDF do documento.");
-        if (!PeEdicaoPdtic.ElaboracaoAberta(pdtic)) throw PePdticService.Fechado(pdtic);
+    public Task<PeDocVersaoResponse> GerarPdfAsync(long pdticId, PeUserContext ctx) => GerarPdfAsync(PeDocAlvo.DoPdtic(pdticId), ctx);
 
-        var (versao, tamanho) = await GerarVersaoAsync(pdtic, ctx, PeDominios.SituacaoVersaoDoc.Minuta);
+    public async Task<PeDocVersaoResponse> GerarPdfAsync(PeDocAlvo alvo, PeUserContext ctx)
+    {
+        var pdtic = await PePdticService.LerAsync(_context, _permissoes, alvo.PdticId, ctx);
+        if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
+            throw new ApiException(ErrorCode.PeSemPermissao, alvo.EhPdtic
+                ? "Só a equipe do órgão gera o PDF do documento."
+                : $"Só a equipe do órgão gera o PDF do {PeDominios.TipoDocumento.NomeCurto(alvo.Tipo).ToLowerInvariant()}.");
+        var documento = await DocumentoAsync(pdtic, alvo);
+        if (RecusaDaEdicao(pdtic, documento) is string recusa) throw PeEdicaoPdtic.Fechado(recusa);
+
+        var (versao, tamanho) = await GerarVersaoAsync(pdtic, documento, ctx, PeDominios.SituacaoVersaoDoc.Minuta);
         await _context.SaveChangesAsync();
         return Versao(versao, tamanho);
     }
 
+    public Task<(PeDocVersao Versao, long Tamanho)> GerarVersaoAsync(PePdtic pdtic, PeUserContext ctx, string situacao) =>
+        GerarVersaoAsync(pdtic, PeDocAlvo.DoPdtic(pdtic.Id), ctx, situacao);
+
+    public async Task<(PeDocVersao Versao, long Tamanho)> GerarVersaoAsync(PePdtic pdtic, PeDocAlvo alvo, PeUserContext ctx, string situacao) =>
+        await GerarVersaoAsync(pdtic, await DocumentoAsync(pdtic, alvo), ctx, situacao);
+
     /// <summary>
     /// Gera o PDF do documento e deixa a versão pronta no contexto, sem gravar (quem chama grava:
-    /// a minuta sozinha; a versão enviada ao CGTIC, na mesma gravação do envio e da deliberação).
-    /// O PDF fica em pe_arquivo (dono o PDTIC), com o número seguinte e o hash; o rodapé diz a
-    /// situação da versão.
+    /// a minuta sozinha; a versão enviada ao CGTIC, na mesma gravação do envio e da deliberação; o
+    /// RA do ciclo, na mesma gravação do fechamento). O PDF fica em pe_arquivo (dono o PDTIC), com
+    /// o número seguinte do documento e o hash; o rodapé diz o documento e a situação da versão.
     /// </summary>
-    public async Task<(PeDocVersao Versao, long Tamanho)> GerarVersaoAsync(PePdtic pdtic, PeUserContext ctx, string situacao)
+    internal async Task<(PeDocVersao Versao, long Tamanho)> GerarVersaoAsync(PePdtic pdtic, PeDocContexto documento, PeUserContext ctx,
+        string situacao)
     {
-        var resolvido = await ResolverAsync(pdtic, ctx);
-        var anteriores = await _context.PeDocVersoes.AsNoTracking().Where(v => v.PdticId == pdtic.Id).OrderBy(v => v.Numero).ToListAsync();
+        var alvo = documento.Alvo;
+        var resolvido = await ResolverAsync(pdtic, documento, ctx);
+        var anteriores = await PeDocLinhas.Versoes(_context, alvo, documento.Ativo).AsNoTracking().OrderBy(v => v.Numero).ToListAsync();
         var numero = anteriores.Select(v => v.Numero).DefaultIfEmpty(0).Max() + 1;
         var agora = DateTime.UtcNow;
         var agoraBrasilia = DateTimeHelper.ToBrasilia(agora);
@@ -291,7 +524,7 @@ public class PeDocumentoService : IPeDocumentoService
             Imagens = await ImagensDoDocumentoAsync(resolvido, pdtic),
             Logotipo = resolvido.LogotipoId is long logo ? (await ImagensAsync(new[] { logo }, pdtic, soDoRegistro: true)).GetValueOrDefault(logo) : null,
             Historico = historico,
-            Rodape = Rodape(resolvido.Orgao.Sigla, pdtic.Versao, numero, situacao),
+            Rodape = Rodape(resolvido.Orgao.Sigla, pdtic.Versao, numero, situacao, alvo.Tipo, documento.Ciclo?.Rotulo),
             GeradoEm = agoraBrasilia
         };
 
@@ -310,7 +543,7 @@ public class PeDocumentoService : IPeDocumentoService
         var hash = Convert.ToHexString(SHA256.HashData(pdf.Pdf)).ToLowerInvariant();
         var arquivo = new PeArquivo
         {
-            Nome = NomeDoArquivo(resolvido.Orgao.Sigla, pdtic.Versao, numero),
+            Nome = NomeDoArquivo(documento, resolvido.Orgao.Sigla, pdtic.Versao, numero),
             TipoMime = MimePdf,
             Tamanho = pdf.Pdf.Length,
             Hash = hash,
@@ -332,6 +565,8 @@ public class PeDocumentoService : IPeDocumentoService
             GeradoPor = ctx.Email
         };
         _context.PeDocVersoes.Add(versao);
+        if (!alvo.EhPdtic)
+            _context.PeDocVersoesDocumento.Add(new PeDocVersaoDocumento { Linha = versao, DocTipo = alvo.Tipo, CicloId = alvo.CicloId });
         return (versao, arquivo.Tamanho);
     }
 
@@ -348,6 +583,19 @@ public class PeDocumentoService : IPeDocumentoService
         return $"{sigla} · PDTIC versão {versaoPdtic} · nº {numeroTexto}, {char.ToLowerInvariant(rotulo[0])}{rotulo[1..]}";
     }
 
+    /// <summary>
+    /// O rodapé dos relatórios (E7, rodada B): "SES · Relatório de acompanhamento, 2027 · 1º
+    /// trimestre · PDTIC versão 1.0 · minuta nº 1" e "SES · Relatório de resultados · PDTIC versão
+    /// 1.0 · minuta nº 2"; no PDTIC, o de sempre.
+    /// </summary>
+    public static string Rodape(string sigla, string versaoPdtic, int numero, string situacao, string tipo, string? ciclo)
+    {
+        var doPdtic = Rodape(sigla, versaoPdtic, numero, situacao);
+        if (tipo == PeDominios.TipoDocumento.Pdtic) return doPdtic;
+        var nome = PeDominios.TipoDocumento.NomeCurto(tipo) + (tipo == PeDominios.TipoDocumento.Ra && !string.IsNullOrWhiteSpace(ciclo) ? $", {ciclo}" : string.Empty);
+        return $"{sigla} · {nome} · {doPdtic[(sigla.Length + 3)..]}";
+    }
+
     private static PeDocumentoPdf.LinhaHistorico LinhaDoHistorico(string versaoPdtic, int numero, string situacao, DateTime quando, string autor) =>
         new(quando.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
             $"{versaoPdtic} · nº {numero.ToString(CultureInfo.InvariantCulture)}",
@@ -361,16 +609,19 @@ public class PeDocumentoService : IPeDocumentoService
             },
             autor);
 
-    private async Task<List<PeDocVersaoResponse>> VersoesDoPdticAsync(long pdticId)
+    private async Task<List<PeDocVersaoResponse>> VersoesDoDocumentoAsync(PeDocContexto documento)
     {
-        var versoes = await (from v in _context.PeDocVersoes.AsNoTracking()
+        var versoes = await (from v in PeDocLinhas.Versoes(_context, documento.Alvo, documento.Ativo).AsNoTracking()
                              join a in _context.PeArquivos.AsNoTracking() on v.ArquivoId equals a.Id
-                             where v.PdticId == pdticId
                              orderby v.Numero descending
                              select new { Versao = v, a.Tamanho })
             .ToListAsync();
         return versoes.Select(x => Versao(x.Versao, x.Tamanho)).ToList();
     }
+
+    /// <summary>O documento do PDTIC tem alguma versão gerada (o passo do documento, 3.10).</summary>
+    internal static async Task<bool> TemVersaoDoPdticAsync(AppDbContext context, long pdticId, bool ativo) =>
+        await PeDocLinhas.Versoes(context, PeDocAlvo.DoPdtic(pdticId), ativo).AnyAsync();
 
     private static PeDocVersaoResponse Versao(PeDocVersao v, long tamanho) => new()
     {
@@ -465,19 +716,22 @@ public class PeDocumentoService : IPeDocumentoService
 
     // ── Apoio da edição ─────────────────────────────────────────────────────
 
-    private async Task<PePdtic> PdticParaEditarAsync(long pdticId, PeUserContext ctx)
+    private async Task<(PePdtic Pdtic, PeDocContexto Documento)> PdticParaEditarAsync(PeDocAlvo alvo, PeUserContext ctx)
     {
-        var pdtic = await PePdticService.LerAsync(_context, _permissoes, pdticId, ctx, rastrear: true);
+        var pdtic = await PePdticService.LerAsync(_context, _permissoes, alvo.PdticId, ctx, rastrear: true);
         if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
-            throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do órgão edita o documento do PDTIC.");
-        if (!PeEdicaoPdtic.ElaboracaoAberta(pdtic)) throw PePdticService.Fechado(pdtic);
-        return pdtic;
+            throw new ApiException(ErrorCode.PeSemPermissao, alvo.EhPdtic
+                ? "Só a equipe do órgão edita o documento do PDTIC."
+                : $"Só a equipe do órgão edita o {PeDominios.TipoDocumento.NomeCurto(alvo.Tipo).ToLowerInvariant()}.");
+        var documento = await DocumentoAsync(pdtic, alvo);
+        if (RecusaDaEdicao(pdtic, documento) is string recusa) throw PeEdicaoPdtic.Fechado(recusa);
+        return (pdtic, documento);
     }
 
     /// <summary>O bloco do modelo ativo que está no documento do órgão (capítulo presente e não oculto).</summary>
-    private async Task<(PeDocBloco Bloco, Base Base)> BlocoDoOrgaoAsync(PePdtic pdtic, long blocoId)
+    private async Task<(PeDocBloco Bloco, Base Base)> BlocoDoOrgaoAsync(PePdtic pdtic, PeDocContexto documento, long blocoId)
     {
-        var base_ = await BaseAsync(pdtic);
+        var base_ = await BaseAsync(pdtic, documento);
         var bloco = base_.Blocos.FirstOrDefault(b => b.Id == blocoId);
         var capitulo = bloco == null ? null : base_.Capitulos.FirstOrDefault(c => c.Id == bloco.CapituloId);
         if (bloco == null || capitulo == null || !base_.Presente(capitulo) || base_.Oculto(capitulo))
@@ -492,10 +746,10 @@ public class PeDocumentoService : IPeDocumentoService
         pdtic.AlteradoPor = ctx.Email;
     }
 
-    private async Task<PeDocBlocoResponse> BlocoResolvidoAsync(long pdticId, long blocoId, PeUserContext ctx)
+    private async Task<PeDocBlocoResponse> BlocoResolvidoAsync(long pdticId, PeDocContexto documento, long blocoId, PeUserContext ctx)
     {
         var pdtic = await _context.PePdtics.AsNoTracking().FirstAsync(p => p.Id == pdticId);
-        var resolvido = await ResolverAsync(pdtic, ctx, soBloco: blocoId);
+        var resolvido = await ResolverAsync(pdtic, documento, ctx, soBloco: blocoId);
         return resolvido.Blocos[blocoId];
     }
 
@@ -535,12 +789,25 @@ public class PeDocumentoService : IPeDocumentoService
         /// <summary>Oculto pelo órgão (só vale no capítulo opcional; o obrigatório sempre aparece).</summary>
         public bool Oculto(PeDocCapitulo capitulo) =>
             !capitulo.Obrigatorio && !capitulo.Travado && CopiaCapitulos.TryGetValue(capitulo.Id, out var copia) && copia.Oculto;
+
+        /// <summary>O capítulo (ou o pai dele) é de um passo da avaliação intermediária (etapa 6).</summary>
+        public bool DaAvaliacao(PeDocCapitulo capitulo)
+        {
+            bool DoPasso(string? chave) => chave != null
+                && Trilha.Etapas.Any(e => e.Chave == PeDominios.EtapaPdtic.AvaliacaoIntermediaria && e.Passos.Any(p => p.Chave == chave));
+            if (DoPasso(capitulo.PassoChave)) return true;
+            var pai = capitulo.PaiId == null ? null : Capitulos.FirstOrDefault(c => c.Id == capitulo.PaiId);
+            return pai != null && DoPasso(pai.PassoChave);
+        }
     }
 
-    internal async Task<Base> BaseAsync(PePdtic pdtic)
+    internal async Task<Base> BaseAsync(PePdtic pdtic, PeDocContexto documento)
     {
         var orgao = await _context.PgiaOrgaos.AsNoTracking().FirstAsync(o => o.Id == pdtic.OrgaoId);
-        var modelo = await ModeloAtivoAsync(_context, PeDominios.TipoDocumento.Pdtic) ?? throw ModeloDoDocumentoIndisponivel();
+        var modelo = await ModeloAtivoAsync(_context, documento.Alvo.Tipo)
+                     ?? throw (documento.Alvo.EhPdtic
+                         ? ModeloDoDocumentoIndisponivel()
+                         : new ApiException(ErrorCode.PeModeloIndisponivel, "O modelo do relatório ainda não foi carregado. Tente de novo em alguns minutos."));
         var trilha = await PeTrilhaOrgao.CarregarAsync(_context, pdtic.OrgaoId, soAtivo: false);
         var capitulos = await _context.PeDocCapitulos.AsNoTracking()
             .Where(c => c.ModeloId == modelo.Id && c.ExcluidoEm == null)
@@ -559,8 +826,8 @@ public class PeDocumentoService : IPeDocumentoService
             Arvore = Arvore(capitulos),
             Capitulos = capitulos,
             Blocos = blocos,
-            CopiaCapitulos = await _context.PeDocOrgaos.AsNoTracking().Where(o => o.PdticId == pdtic.Id).ToDictionaryAsync(o => o.CapituloId),
-            CopiaBlocos = await _context.PeDocOrgaoBlocos.AsNoTracking().Where(o => o.PdticId == pdtic.Id).ToDictionaryAsync(o => o.BlocoId)
+            CopiaCapitulos = await PeDocLinhas.Capitulos(_context, documento.Alvo, documento.Ativo).AsNoTracking().ToDictionaryAsync(o => o.CapituloId),
+            CopiaBlocos = await PeDocLinhas.Blocos(_context, documento.Alvo, documento.Ativo).AsNoTracking().ToDictionaryAsync(o => o.BlocoId)
         };
     }
 
@@ -588,16 +855,21 @@ public class PeDocumentoService : IPeDocumentoService
         public Dictionary<long, PeDocBlocoResponse> Blocos { get; } = new();
     }
 
+    /// <summary>O documento do PDTIC resolvido (o de sempre; a E7 e os testes usam).</summary>
+    internal async Task<Resolvido> ResolverAsync(PePdtic pdtic, PeUserContext ctx, long? soBloco = null, long? soCapitulo = null) =>
+        await ResolverAsync(pdtic, await DocumentoAsync(pdtic, PeDocAlvo.DoPdtic(pdtic.Id)), ctx, soBloco, soCapitulo);
+
     /// <summary>
     /// Resolve o documento do órgão. Com soBloco ou soCapitulo, só aquele bloco (ou os blocos
     /// daquele capítulo) é resolvido com os dados; a numeração considera o documento inteiro.
     /// </summary>
-    internal async Task<Resolvido> ResolverAsync(PePdtic pdtic, PeUserContext ctx, long? soBloco = null, long? soCapitulo = null)
+    internal async Task<Resolvido> ResolverAsync(PePdtic pdtic, PeDocContexto documento, PeUserContext ctx, long? soBloco = null,
+        long? soCapitulo = null)
     {
-        var base_ = await BaseAsync(pdtic);
+        var base_ = await BaseAsync(pdtic, documento);
         var trilha = base_.Trilha;
         var (dicionario, logotipo) = await DicionarioAsync(_registros, pdtic, trilha);
-        var marcadores = Marcadores(pdtic, base_.Orgao, dicionario, await AprovacoesAsync(_context, _registros, pdtic, trilha));
+        var marcadores = Marcadores(pdtic, base_.Orgao, dicionario, await AprovacoesAsync(_context, _registros, pdtic, trilha), documento.Ciclo);
 
         bool Resolve(PeDocBloco bloco) =>
             (soBloco == null || bloco.Id == soBloco) && (soCapitulo == null || bloco.CapituloId == soCapitulo);
@@ -626,9 +898,12 @@ public class PeDocumentoService : IPeDocumentoService
             numeros[capitulo.Id] = numero;
         }
 
+        // No RA de um ciclo de monitoramento, os capítulos da avaliação intermediária saem em branco
+        bool EmBranco(PeDocCapitulo capitulo) => documento.EhRaDeMonitoramento && base_.DaAvaliacao(capitulo);
+
         // Os dados de uma vez: as seções que os blocos a resolver usam e que o órgão vê
         var aResolver = presentes
-            .Where(x => !base_.Oculto(x.Capitulo))
+            .Where(x => !base_.Oculto(x.Capitulo) && !EmBranco(x.Capitulo))
             .SelectMany(x => base_.Blocos.Where(b => b.CapituloId == x.Capitulo.Id))
             .Where(Resolve)
             .ToList();
@@ -654,6 +929,9 @@ public class PeDocumentoService : IPeDocumentoService
                 case PeDominios.TipoBloco.MatrizSwot:
                     foreach (var swot in PeDominios.SecoesSwot.Todas) chaves.Add(swot);
                     break;
+                default:
+                    foreach (var secao in SecoesDoBlocoDoAcompanhamento(bloco.Tipo)) chaves.Add(secao);
+                    break;
             }
         }
         var montadas = chaves.Select(c => trilha.Secao(c)).Where(s => s != null).Select(s => trilha.Montar(s!.Value.Secao)).ToList();
@@ -675,11 +953,15 @@ public class PeDocumentoService : IPeDocumentoService
             OrgaoSigla = base_.Orgao.Sigla,
             OrgaoNome = base_.Orgao.Nome,
             Titulo = PeDominios.TipoDocumento.Titulo(base_.Modelo.Tipo),
-            PodeEditar = _permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId) && PeEdicaoPdtic.ElaboracaoAberta(pdtic),
+            DocTipo = documento.Alvo.Tipo,
+            CicloId = documento.Ciclo?.Id,
+            CicloRotulo = documento.Ciclo?.Rotulo,
+            PodeEditar = _permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId) && RecusaDaEdicao(pdtic, documento) == null,
             Logotipo = logotipo is long logo ? $"api/planejamento/arquivos/{logo.ToString(CultureInfo.InvariantCulture)}" : null,
-            Versoes = await VersoesDoPdticAsync(pdtic.Id)
+            Versoes = await VersoesDoDocumentoAsync(documento)
         };
         var resolvido = new Resolvido { Orgao = base_.Orgao, Resposta = resposta, Marcadores = marcadores, LogotipoId = logotipo };
+        var contexto = new ContextoDosBlocos(base_, documento, marcadores, dados, sistemasIa, fluxos);
 
         foreach (var (capitulo, nivel) in presentes)
         {
@@ -700,13 +982,14 @@ public class PeDocumentoService : IPeDocumentoService
                 Travado = capitulo.Travado,
                 IncisoDecreto = capitulo.IncisoDecreto,
                 PassoChave = capitulo.PassoChave,
-                PassoNumero = passo?.Numero
+                PassoNumero = passo?.Numero,
+                Aviso = !oculto && EmBranco(capitulo) ? AvisoSoNaAvaliacao : null
             };
-            if (!oculto)
+            if (!oculto && !EmBranco(capitulo))
             {
                 foreach (var bloco in base_.Blocos.Where(b => b.CapituloId == capitulo.Id && Resolve(b)))
                 {
-                    var resolvidoDoBloco = Bloco(bloco, base_, marcadores, dados, sistemasIa, fluxos);
+                    var resolvidoDoBloco = Bloco(bloco, contexto);
                     if (resolvidoDoBloco == null) continue;
                     item.Blocos.Add(resolvidoDoBloco);
                     resolvido.Blocos[bloco.Id] = resolvidoDoBloco;
@@ -753,10 +1036,11 @@ public class PeDocumentoService : IPeDocumentoService
 
     /// <summary>
     /// Todos os marcadores conhecidos com o valor para o órgão (nulo = sem valor). Os de
-    /// aprovação e de publicação (E7) vêm em aprovacoes (sem ele, ficam sem valor).
+    /// aprovação e de publicação (E7) vêm em aprovacoes (sem ele, ficam sem valor); os do ciclo
+    /// (rodada B), do ciclo do RA (no PDTIC e no RR, sem valor).
     /// </summary>
     public static Dictionary<string, string?> Marcadores(PePdtic pdtic, PgiaOrgao orgao, IReadOnlyDictionary<string, string?> dicionario,
-        IReadOnlyDictionary<string, string?>? aprovacoes = null)
+        IReadOnlyDictionary<string, string?>? aprovacoes = null, PeCiclo? ciclo = null)
     {
         var valores = new Dictionary<string, string?>(dicionario);
         foreach (var marcador in PeDocMarcadores.Fixos) valores.TryAdd(marcador.Chave, null);
@@ -770,6 +1054,9 @@ public class PeDocumentoService : IPeDocumentoService
         valores["pdtic.versao"] = pdtic.Versao;
         valores["hoje"] = PeFormato.Data(DateOnly.FromDateTime(DateTimeHelper.TodayBrasilia()));
         foreach (var chave in PeDocMarcadores.DaAprovacao) valores[chave] = aprovacoes?.GetValueOrDefault(chave);
+        valores["ciclo.rotulo"] = ciclo?.Rotulo;
+        valores["ciclo.inicio"] = ciclo == null ? null : PeFormato.Data(ciclo.Inicio);
+        valores["ciclo.fim"] = ciclo?.Fim is DateOnly fimDoCiclo ? PeFormato.Data(fimDoCiclo) : null;
         return valores;
     }
 
@@ -856,9 +1143,12 @@ public class PeDocumentoService : IPeDocumentoService
 
     // ── Blocos ──────────────────────────────────────────────────────────────
 
-    private static PeDocBlocoResponse? Bloco(PeDocBloco bloco, Base base_, IReadOnlyDictionary<string, string?> marcadores,
-        IReadOnlyDictionary<string, PeSecaoExportada> dados, IReadOnlyList<PgiaSistemaIa> sistemasIa,
-        IReadOnlyDictionary<string, PeFluxoService.ParaDocumento> fluxos)
+    /// <summary>O que a resolução de um bloco usa: a base, o documento, os marcadores e os dados lidos de uma vez.</summary>
+    private sealed record ContextoDosBlocos(Base Base, PeDocContexto Documento, IReadOnlyDictionary<string, string?> Marcadores,
+        IReadOnlyDictionary<string, PeSecaoExportada> Dados, IReadOnlyList<PgiaSistemaIa> SistemasIa,
+        IReadOnlyDictionary<string, PeFluxoService.ParaDocumento> Fluxos);
+
+    private static PeDocBlocoResponse? Bloco(PeDocBloco bloco, ContextoDosBlocos ctx)
     {
         var config = PeDocConfig.Ler(bloco.Config);
         var resposta = new PeDocBlocoResponse
@@ -872,26 +1162,26 @@ public class PeDocumentoService : IPeDocumentoService
         switch (bloco.Tipo)
         {
             case PeDominios.TipoBloco.Texto:
-                Texto(resposta, bloco, config, base_, marcadores);
+                Texto(resposta, bloco, config, ctx.Base, ctx.Marcadores);
                 break;
             case PeDominios.TipoBloco.TabelaSecao:
                 resposta.Tabela = PeDocConfig.Secao(config) == PeDocConfig.SecaoPgia
-                    ? TabelaDoPgia(config, base_.Trilha, sistemasIa)
-                    : Tabela(config, base_.Trilha, dados);
+                    ? TabelaDoPgia(config, ctx.Base.Trilha, ctx.SistemasIa)
+                    : Tabela(config, ctx.Base.Trilha, ctx.Dados, ctx.Documento);
                 if (resposta.Tabela == null) return null;
                 break;
             case PeDominios.TipoBloco.ListaTema:
-                resposta.Lista = Lista(config, base_.Trilha, dados);
+                resposta.Lista = Lista(config, ctx.Base.Trilha, ctx.Dados);
                 if (resposta.Lista == null) return null;
                 break;
             case PeDominios.TipoBloco.MatrizSwot:
-                resposta.Swot = Swot(dados);
+                resposta.Swot = Swot(ctx.Dados);
                 if (resposta.Swot == null) return null;
                 break;
             case PeDominios.TipoBloco.Fluxo:
             {
                 var chave = PeDocConfig.Fluxo(config) ?? string.Empty;
-                if (fluxos.TryGetValue(chave, out var desenho))
+                if (ctx.Fluxos.TryGetValue(chave, out var desenho))
                 {
                     resposta.Fluxo = new PeDocFluxoResponse
                     {
@@ -910,6 +1200,11 @@ public class PeDocumentoService : IPeDocumentoService
                 }
                 break;
             }
+            default:
+                if (!PeDominios.TipoBloco.DoAcompanhamento.Contains(bloco.Tipo)) break;
+                resposta.Grupos = BlocoDoAcompanhamento(bloco.Tipo, ctx.Base.Trilha, ctx.Dados, ctx.Documento);
+                if (resposta.Grupos == null) return null;
+                break;
         }
         return resposta;
     }
@@ -938,14 +1233,19 @@ public class PeDocumentoService : IPeDocumentoService
     /// <summary>
     /// A tabela de uma seção que o órgão vê e que vai para o documento: as colunas escolhidas no
     /// bloco (entre as visíveis) ou todas as visíveis marcadas "no documento", e as linhas que
-    /// passam no filtro, com o texto pronto ("-" quando vazio).
+    /// passam no filtro, com o texto pronto ("-" quando vazio). Seção por ciclo (E7, rodada B): no
+    /// RA, as linhas do ciclo do relatório (a seção de outro tipo de ciclo não aparece); no PDTIC e
+    /// no RR, as de todos os ciclos, com a coluna do ciclo.
     /// </summary>
-    private static PeDocTabelaResponse? Tabela(JsonObject config, PeTrilhaOrgao trilha, IReadOnlyDictionary<string, PeSecaoExportada> dados)
+    private static PeDocTabelaResponse? Tabela(JsonObject config, PeTrilhaOrgao trilha, IReadOnlyDictionary<string, PeSecaoExportada> dados,
+        PeDocContexto documento)
     {
         var chave = PeDocConfig.Secao(config);
         if (chave == null) return null;
         var visivel = trilha.Secao(chave);
         if (visivel == null || !dados.TryGetValue(chave, out var exportada) || !exportada.Modelo.Secao.NoDocumento) return null;
+        var (todos, cicloId, esconde) = documento.CicloPara(exportada.Modelo.PorCiclo);
+        if (esconde) return null;
 
         var escolhidas = PeDocConfig.Colunas(config);
         var colunas = escolhidas == null
@@ -954,6 +1254,8 @@ public class PeDocumentoService : IPeDocumentoService
                 .Where(c => c != null).Select(c => c!).ToList();
 
         IEnumerable<PeRegistroResponse> registros = exportada.Registros;
+        if (exportada.Modelo.PorCiclo != null && !todos)
+            registros = registros.Where(r => exportada.CicloDoRegistro.TryGetValue(r.Id, out var c) && c == cicloId);
         if (PeDocConfig.Filtro(config) is { } filtro)
         {
             var campoVisivel = exportada.Colunas.Any(v => v.Campo.Chave == filtro.Campo);
@@ -965,9 +1267,14 @@ public class PeDocumentoService : IPeDocumentoService
             });
         }
 
+        var comCiclo = exportada.Modelo.PorCiclo != null && todos;
         var linhas = registros.Select(r =>
         {
             var linha = new PeDocLinhaResponse { Codigo = r.Codigo };
+            if (comCiclo)
+                linha.Celulas[ColunaDoCiclo] = exportada.CicloDoRegistro.TryGetValue(r.Id, out var c) && documento.Ciclos.TryGetValue(c, out var ciclo)
+                    ? ciclo.Rotulo
+                    : "-";
             foreach (var campo in colunas)
             {
                 linha.Celulas[campo.Chave] = r.Rotulos.TryGetValue(campo.Chave, out var texto) && !string.IsNullOrWhiteSpace(texto) ? texto : "-";
@@ -977,17 +1284,23 @@ public class PeDocumentoService : IPeDocumentoService
             return linha;
         }).ToList();
 
+        var colunasDaResposta = colunas.Select(c => new PeDocColunaResponse { Chave = c.Chave, Rotulo = c.Rotulo }).ToList();
+        if (comCiclo) colunasDaResposta.Insert(0, new PeDocColunaResponse { Chave = ColunaDoCiclo, Rotulo = "Ciclo" });
         return new PeDocTabelaResponse
         {
             SecaoChave = chave,
             SecaoTitulo = exportada.Modelo.Secao.Titulo,
-            SecaoTipo = exportada.Modelo.Secao.Tipo,
+            // O formulário por ciclo com os registros de todos os ciclos sai como tabela (uma linha por ciclo)
+            SecaoTipo = comCiclo ? PeDominios.TipoSecao.Tabela : exportada.Modelo.Secao.Tipo,
             PassoNumero = visivel.Value.Passo.Numero,
-            Colunas = colunas.Select(c => new PeDocColunaResponse { Chave = c.Chave, Rotulo = c.Rotulo }).ToList(),
+            Colunas = colunasDaResposta,
             Linhas = linhas,
             Vazia = linhas.Count == 0
         };
     }
+
+    /// <summary>A chave da coluna do ciclo nas tabelas das seções por ciclo (no PDTIC e no RR).</summary>
+    public const string ColunaDoCiclo = "_ciclo";
 
     /// <summary>O inventário de IA do PGIA do órgão (só leitura), com as colunas escolhidas no bloco.</summary>
     private static PeDocTabelaResponse TabelaDoPgia(JsonObject config, PeTrilhaOrgao trilha, IReadOnlyList<PgiaSistemaIa> sistemas)

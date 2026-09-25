@@ -1,5 +1,5 @@
 {
-  "versao": 5,
+  "versao": 6,
   "niveis": [
     {
       "codigo": "basico",
@@ -17,7 +17,7 @@
       "descricao": "Para o órgão maduro: segue o Guia de PDTIC do SISP por inteiro, com plano de trabalho, aprovações intermediárias e avaliação."
     }
   ],
-  "configuracoes": {"periodicidade_monitoramento_padrao": "trimestral"},
+  "configuracoes": {"periodicidade_monitoramento_padrao": "trimestral", "prazo_fechamento_ciclo_dias": 15, "dias_avaliacao_final": 90},
   "etapas": [
     {
       "chave": "preparacao",
@@ -2885,6 +2885,7 @@
           "secoes": [
             {
               "chave": "monitoramento_acoes",
+              "porCiclo": "monitoramento",
               "titulo": "Situação das ações no ciclo",
               "tipo": "tabela",
               "niveis": "obrigatorio",
@@ -2935,6 +2936,7 @@
             },
             {
               "chave": "medicoes_indicadores",
+              "porCiclo": "monitoramento",
               "titulo": "Medições dos indicadores",
               "tipo": "tabela",
               "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
@@ -2960,6 +2962,7 @@
             },
             {
               "chave": "riscos_ocorridos",
+              "porCiclo": "monitoramento",
               "titulo": "Riscos que ocorreram",
               "tipo": "tabela",
               "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
@@ -3017,6 +3020,7 @@
           "secoes": [
             {
               "chave": "relatorio_ciclo",
+              "porCiclo": "monitoramento",
               "titulo": "Resumo do ciclo",
               "tipo": "formulario",
               "niveis": "obrigatorio",
@@ -3058,6 +3062,7 @@
           "secoes": [
             {
               "chave": "resultados_intermediarios",
+              "porCiclo": "avaliacao",
               "titulo": "Resultados intermediários das metas",
               "tipo": "tabela",
               "niveis": "obrigatorio",
@@ -3106,6 +3111,7 @@
           "secoes": [
             {
               "chave": "analise_intermediaria",
+              "porCiclo": "avaliacao",
               "titulo": "Análise dos resultados",
               "tipo": "formulario",
               "niveis": "obrigatorio",
@@ -3157,6 +3163,7 @@
           "secoes": [
             {
               "chave": "avaliacao_comite",
+              "porCiclo": "avaliacao",
               "titulo": "Avaliação do comitê",
               "tipo": "formulario",
               "niveis": "obrigatorio",

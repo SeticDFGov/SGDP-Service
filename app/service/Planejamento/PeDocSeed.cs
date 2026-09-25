@@ -146,6 +146,7 @@ public static class PeDocSeed
                         PeDominios.TipoBloco.ListaTema => bloco.Tema == null,
                         PeDominios.TipoBloco.Fluxo => bloco.Fluxo == null,
                         PeDominios.TipoBloco.MatrizSwot or PeDominios.TipoBloco.QuebraPagina => false,
+                        _ when PeDominios.TipoBloco.DoAcompanhamento.Contains(bloco.Tipo) => false,
                         _ => true
                     };
                     if (falta) Falha($"bloco \"{bloco.Tipo}\" do capítulo \"{capitulo.Chave}\" fora do domínio ou sem o que precisa.");

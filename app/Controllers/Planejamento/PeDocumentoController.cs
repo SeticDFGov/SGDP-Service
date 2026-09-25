@@ -12,7 +12,8 @@ namespace Controllers.Planejamento;
 /// <summary>
 /// Documento do PDTIC (E5): a estrutura resolvida para a prévia, a edição dos textos e dos
 /// capítulos pela equipe do órgão, o PDF com as versões e o modelo do documento (capítulos e
-/// blocos) do administrador do módulo. Ler o documento: quem vê o órgão. Editar e gerar o PDF:
+/// blocos) do administrador do módulo; desde a E7 (rodada B), os relatórios do acompanhamento
+/// (o RA de cada ciclo e o RR), com as mesmas sub-rotas e formas. Ler o documento: quem vê o órgão. Editar e gerar o PDF:
 /// a equipe do órgão (e o admin geral) com o PDTIC em elaboração ou devolvido. Ler o modelo:
 /// qualquer papel do módulo; alterar: pe_admin e admin geral. Sem as tabelas pe_doc (o PR
 /// publica o código antes da migration), 409 com corpo. Erros como { Code, Message }
@@ -74,6 +75,91 @@ public class PeDocumentoController : ControllerBase
         Executar(async ctx =>
         {
             var arquivo = await _documentos.ArquivoDaVersaoAsync(id, numero, ctx);
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
+            return File(arquivo.Conteudo, PeDocumentoService.MimePdf, arquivo.NomeArquivo);
+        });
+
+    // ── Relatórios do acompanhamento (E7, rodada B) ─────────────────────────
+    // As mesmas formas do documento do PDTIC: o RA de um ciclo e o RR, cada um com o seu modelo
+    // (tipo ra ou rr), a sua cópia do órgão e as suas versões. Ler: quem vê o órgão. Editar e
+    // gerar o PDF: a equipe do órgão (e o admin geral) com o PDTIC vigente (no RA, o ciclo
+    // começado). Antes da publicação, 409; sem a versão 6 do modelo carregada, 409 com corpo.
+
+    /// <summary>O relatório de acompanhamento (RA) do ciclo, resolvido para a prévia.</summary>
+    [HttpGet("pdtic/{id:long}/ciclos/{cicloId:long}/relatorio")]
+    public Task<IActionResult> ObterRa(long id, long cicloId) => ObterDoAlvo(PeDocAlvo.Ra(id, cicloId));
+
+    [HttpPut("pdtic/{id:long}/ciclos/{cicloId:long}/relatorio/blocos/{blocoId:long}")]
+    public Task<IActionResult> SalvarTextoDoRa(long id, long cicloId, long blocoId, [FromBody] JsonElement corpo) =>
+        SalvarTextoDoAlvo(PeDocAlvo.Ra(id, cicloId), blocoId, corpo);
+
+    [HttpDelete("pdtic/{id:long}/ciclos/{cicloId:long}/relatorio/blocos/{blocoId:long}")]
+    public Task<IActionResult> RestaurarTextoDoRa(long id, long cicloId, long blocoId) =>
+        RestaurarTextoDoAlvo(PeDocAlvo.Ra(id, cicloId), blocoId);
+
+    [HttpPut("pdtic/{id:long}/ciclos/{cicloId:long}/relatorio/capitulos/{capituloId:long}")]
+    public Task<IActionResult> AtualizarCapituloDoRa(long id, long cicloId, long capituloId, [FromBody] JsonElement corpo) =>
+        AtualizarCapituloDoAlvo(PeDocAlvo.Ra(id, cicloId), capituloId, corpo);
+
+    /// <summary>Gera o PDF do RA e guarda a versão minuta; 201 com a versão.</summary>
+    [HttpPost("pdtic/{id:long}/ciclos/{cicloId:long}/relatorio/pdf")]
+    public Task<IActionResult> GerarPdfDoRa(long id, long cicloId) => GerarPdfDoAlvo(PeDocAlvo.Ra(id, cicloId));
+
+    [HttpGet("pdtic/{id:long}/ciclos/{cicloId:long}/relatorio/versoes")]
+    public Task<IActionResult> VersoesDoRa(long id, long cicloId) => VersoesDoAlvo(PeDocAlvo.Ra(id, cicloId));
+
+    /// <summary>O PDF de uma versão do RA (RA_SIGLA_vVERSAO_CICLO_NUMERO.pdf, nosniff).</summary>
+    [HttpGet("pdtic/{id:long}/ciclos/{cicloId:long}/relatorio/versoes/{numero:int}/arquivo")]
+    public Task<IActionResult> ArquivoDoRa(long id, long cicloId, int numero) => ArquivoDoAlvo(PeDocAlvo.Ra(id, cicloId), numero);
+
+    /// <summary>O relatório de resultados (RR) do PDTIC, resolvido para a prévia.</summary>
+    [HttpGet("pdtic/{id:long}/relatorio-resultados")]
+    public Task<IActionResult> ObterRr(long id) => ObterDoAlvo(PeDocAlvo.Rr(id));
+
+    [HttpPut("pdtic/{id:long}/relatorio-resultados/blocos/{blocoId:long}")]
+    public Task<IActionResult> SalvarTextoDoRr(long id, long blocoId, [FromBody] JsonElement corpo) =>
+        SalvarTextoDoAlvo(PeDocAlvo.Rr(id), blocoId, corpo);
+
+    [HttpDelete("pdtic/{id:long}/relatorio-resultados/blocos/{blocoId:long}")]
+    public Task<IActionResult> RestaurarTextoDoRr(long id, long blocoId) => RestaurarTextoDoAlvo(PeDocAlvo.Rr(id), blocoId);
+
+    [HttpPut("pdtic/{id:long}/relatorio-resultados/capitulos/{capituloId:long}")]
+    public Task<IActionResult> AtualizarCapituloDoRr(long id, long capituloId, [FromBody] JsonElement corpo) =>
+        AtualizarCapituloDoAlvo(PeDocAlvo.Rr(id), capituloId, corpo);
+
+    /// <summary>Gera o PDF do RR e guarda a versão minuta; 201 com a versão.</summary>
+    [HttpPost("pdtic/{id:long}/relatorio-resultados/pdf")]
+    public Task<IActionResult> GerarPdfDoRr(long id) => GerarPdfDoAlvo(PeDocAlvo.Rr(id));
+
+    [HttpGet("pdtic/{id:long}/relatorio-resultados/versoes")]
+    public Task<IActionResult> VersoesDoRr(long id) => VersoesDoAlvo(PeDocAlvo.Rr(id));
+
+    /// <summary>O PDF de uma versão do RR (RR_SIGLA_vVERSAO_NUMERO.pdf, nosniff).</summary>
+    [HttpGet("pdtic/{id:long}/relatorio-resultados/versoes/{numero:int}/arquivo")]
+    public Task<IActionResult> ArquivoDoRr(long id, int numero) => ArquivoDoAlvo(PeDocAlvo.Rr(id), numero);
+
+    private Task<IActionResult> ObterDoAlvo(PeDocAlvo alvo) =>
+        Executar(async ctx => Ok(await _documentos.ObterAsync(alvo, ctx)));
+
+    private Task<IActionResult> SalvarTextoDoAlvo(PeDocAlvo alvo, long blocoId, JsonElement corpo) =>
+        Executar(async ctx => Ok(await _documentos.SalvarTextoAsync(alvo, blocoId, PeDocTextoDTO.Ler(corpo), ctx)));
+
+    private Task<IActionResult> RestaurarTextoDoAlvo(PeDocAlvo alvo, long blocoId) =>
+        Executar(async ctx => Ok(await _documentos.RestaurarTextoAsync(alvo, blocoId, ctx)));
+
+    private Task<IActionResult> AtualizarCapituloDoAlvo(PeDocAlvo alvo, long capituloId, JsonElement corpo) =>
+        Executar(async ctx => Ok(await _documentos.AtualizarCapituloAsync(alvo, capituloId, PeCorpoParcial.Ler<PeDocCapituloOrgaoDTO>(corpo), ctx)));
+
+    private Task<IActionResult> GerarPdfDoAlvo(PeDocAlvo alvo) =>
+        Executar(async ctx => StatusCode(StatusCodes.Status201Created, await _documentos.GerarPdfAsync(alvo, ctx)));
+
+    private Task<IActionResult> VersoesDoAlvo(PeDocAlvo alvo) =>
+        Executar(async ctx => Ok(await _documentos.VersoesAsync(alvo, ctx)));
+
+    private Task<IActionResult> ArquivoDoAlvo(PeDocAlvo alvo, int numero) =>
+        Executar(async ctx =>
+        {
+            var arquivo = await _documentos.ArquivoDaVersaoAsync(alvo, numero, ctx);
             Response.Headers["X-Content-Type-Options"] = "nosniff";
             return File(arquivo.Conteudo, PeDocumentoService.MimePdf, arquivo.NomeArquivo);
         });

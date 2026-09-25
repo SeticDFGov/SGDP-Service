@@ -21,7 +21,9 @@ namespace service.Planejamento;
 /// <item>capítulos com o número pela posição (6, 6.1); texto rico pelo conversor único
 /// (<see cref="PeTextoRicoPdf"/>); marcador sem valor sai em branco;</item>
 /// <item>tabelas de dados com o cabeçalho repetido em cada página; formulários como rótulo e
-/// valor; ações do tema; matriz SWOT em quatro quadrantes; fluxo em SVG (a partir da E6);</item>
+/// valor; ações do tema; matriz SWOT em quatro quadrantes; fluxo em SVG (a partir da E6); os
+/// blocos do acompanhamento em grupos de tabelas e o aviso do capítulo em branco (E7, rodada B,
+/// nos relatórios RA e RR, que usam o mesmo PDF);</item>
 /// <item>bloco com página deitada abre páginas A4 deitadas só para ele; a quebra de página
 /// começa uma página nova; os anexos começam numa página nova;</item>
 /// <item>rodapé com o órgão, a versão e "Página N de M" (menos na capa).</item>
@@ -83,7 +85,7 @@ public static partial class PeDocumentoPdf
 
     // ── Roteiro ─────────────────────────────────────────────────────────────
 
-    public enum TipoPeca { Capa, Quebra, Titulo, TituloSimples, Bloco, Historico, Sumario }
+    public enum TipoPeca { Capa, Quebra, Titulo, TituloSimples, Bloco, Historico, Sumario, Aviso }
 
     /// <summary>Um pedaço do documento: título de capítulo, bloco, quebra ou página especial.</summary>
     public sealed record Peca(TipoPeca Tipo, bool Deitada, PeDocCapituloResponse? Capitulo = null, PeDocBlocoResponse? Bloco = null,
@@ -148,8 +150,11 @@ public static partial class PeDocumentoPdf
                     var secao = NomeDaSecao(capitulo);
                     var deitados = Orientacoes(blocos);
                     var primeiro = blocos.FindIndex(Aparece);
-                    pecas.Add(new Peca(TipoPeca.Titulo, primeiro >= 0 && deitados[primeiro], capitulo, Secao: secao));
+                    var tituloDeitado = primeiro >= 0 && deitados[primeiro];
+                    pecas.Add(new Peca(TipoPeca.Titulo, tituloDeitado, capitulo, Secao: secao));
                     sumario.Add(new ItemSumario(secao, capitulo.Numero, capitulo.Titulo, capitulo.Nivel));
+                    // O capítulo em branco no relatório (E7, rodada B): o aviso logo abaixo do título
+                    if (!string.IsNullOrWhiteSpace(capitulo.Aviso)) pecas.Add(new Peca(TipoPeca.Aviso, tituloDeitado, capitulo));
                     for (var i = 0; i < blocos.Count; i++)
                     {
                         var peca = PecaDoBloco(capitulo, blocos[i]);
@@ -354,8 +359,9 @@ public static partial class PeDocumentoPdf
     }
 
     /// <summary>
-    /// Onde termina o começo de um capítulo (o que não se separa do título): os títulos e os
-    /// textos seguidos, até o primeiro bloco que não é texto (inclusive); para na quebra de página.
+    /// Onde termina o começo de um capítulo (o que não se separa do título): os títulos, os avisos
+    /// e os textos seguidos, até o primeiro bloco que não é texto (inclusive); para na quebra de
+    /// página.
     /// </summary>
     public static int FimDoComeco(IReadOnlyList<Peca> pecas, int titulo)
     {
@@ -363,7 +369,7 @@ public static partial class PeDocumentoPdf
         while (fim + 1 < pecas.Count)
         {
             var seguinte = pecas[fim + 1];
-            if (seguinte.Tipo == TipoPeca.Titulo)
+            if (seguinte.Tipo is TipoPeca.Titulo or TipoPeca.Aviso)
             {
                 fim++;
                 continue;
@@ -485,6 +491,9 @@ public static partial class PeDocumentoPdf
                 break;
             case TipoPeca.Bloco:
                 Bloco(col.Item(), peca.Bloco!, ctx);
+                break;
+            case TipoPeca.Aviso:
+                col.Item().Text(peca.Capitulo!.Aviso!).FontSize(9.5f).Italic().FontColor(PeTextoRicoPdf.CorSuave);
                 break;
         }
     }
@@ -615,7 +624,24 @@ public static partial class PeDocumentoPdf
             case PeDominios.TipoBloco.Fluxo when bloco.Fluxo?.Svg != null:
                 Fluxo(container, bloco);
                 break;
+            case var tipo when bloco.Grupos != null && PeDominios.TipoBloco.DoAcompanhamento.Contains(tipo):
+                GruposDoAcompanhamento(container, bloco.Grupos, ctx);
+                break;
         }
+    }
+
+    /// <summary>
+    /// Os blocos do acompanhamento (E7, rodada B): cada grupo com o título, a frase que o explica
+    /// (quando há) e a tabela; o grupo sem linha diz que não há nenhum item.
+    /// </summary>
+    private static void GruposDoAcompanhamento(IContainer container, IReadOnlyList<PeDocGrupoResponse> grupos, Contexto ctx)
+    {
+        container.Column(col =>
+        {
+            col.Spacing(10);
+            foreach (var grupo in grupos)
+                col.Item().Element(c => TabelaDeDados(c, grupo.Tabela, ctx, grupo.Titulo, grupo.Texto, "Nenhum item neste grupo."));
+        });
     }
 
     /// <summary>
@@ -636,12 +662,15 @@ public static partial class PeDocumentoPdf
     private static void Vazio(ColumnDescriptor col, string texto) =>
         col.Item().Text(texto).FontSize(9).Italic().FontColor(PeTextoRicoPdf.CorSuave);
 
-    private static void TabelaDeDados(IContainer container, PeDocTabelaResponse tabela, Contexto ctx)
+    private static void TabelaDeDados(IContainer container, PeDocTabelaResponse tabela, Contexto ctx, string? legenda = null,
+        string? explicacao = null, string vazia = "Nenhum item registrado.")
     {
         container.Column(col =>
         {
             col.Spacing(4);
-            Legenda(col, tabela.SecaoTitulo);
+            Legenda(col, legenda ?? tabela.SecaoTitulo);
+            if (!string.IsNullOrWhiteSpace(explicacao))
+                col.Item().Text(explicacao).FontSize(9).FontColor(PeTextoRicoPdf.CorSuave);
             if (tabela.SecaoTipo == PeDominios.TipoSecao.Formulario)
             {
                 Formulario(col, tabela, ctx);
@@ -649,7 +678,7 @@ public static partial class PeDocumentoPdf
             }
             if (tabela.Vazia || tabela.Colunas.Count == 0)
             {
-                Vazio(col, "Nenhum item registrado.");
+                Vazio(col, vazia);
                 return;
             }
 

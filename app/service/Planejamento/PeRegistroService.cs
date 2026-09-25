@@ -17,6 +17,30 @@ public sealed class PeSecaoExportada
     public required List<PeCampoVisivel> Colunas { get; init; }
 
     public required List<PeRegistroResponse> Registros { get; init; }
+
+    // Seção por ciclo (E7, rodada B): o ciclo de cada registro (id do registro → id do ciclo)
+    public Dictionary<long, long> CicloDoRegistro { get; init; } = new();
+
+    // Seção por ciclo: os ciclos dos registros, pelo id (o rótulo e a ordem, nas planilhas)
+    public Dictionary<long, PeCiclo> Ciclos { get; init; } = new();
+
+    /// <summary>O ciclo de um registro da seção por ciclo, ou nulo.</summary>
+    public PeCiclo? CicloDe(long registroId) =>
+        CicloDoRegistro.TryGetValue(registroId, out var ciclo) ? Ciclos.GetValueOrDefault(ciclo) : null;
+}
+
+/// <summary>
+/// Uma linha das grades do ciclo (E7, rodada B), gravada pelo motor: o prefixo das chaves dos
+/// erros ("12" vira "12.situacao"), o registro que ela muda (nulo = um novo) e os dados (nulo =
+/// apagar o registro).
+/// </summary>
+public sealed class PeLinhaDoCiclo
+{
+    public required string Prefixo { get; init; }
+
+    public long? RegistroId { get; init; }
+
+    public PeRegistroSalvarDTO? Dados { get; init; }
 }
 
 /// <summary>Uma seção do dono com os registros e o que falta em cada um, pelo modelo de hoje.</summary>
@@ -108,11 +132,12 @@ public class PeRegistroService : IPeRegistroService
 
     // ── Leitura ─────────────────────────────────────────────────────────────
 
-    public async Task<PeRegistrosResponse> ListarAsync(PeDono dono, string secaoChave, PeUserContext ctx)
+    public async Task<PeRegistrosResponse> ListarAsync(PeDono dono, string secaoChave, PeUserContext ctx, long? cicloId = null)
     {
         var aberto = await AbrirAsync(dono, ctx, escrita: false);
         var secao = await SecaoAsync(aberto, secaoChave);
-        return await RespostaDaSecaoAsync(aberto, secao);
+        var ciclo = await CicloDaSecaoAsync(aberto, secao, cicloId, escrita: false);
+        return await RespostaDaSecaoAsync(aberto, secao, ciclo);
     }
 
     public async Task<List<PeCatalogoItemResponse>> CatalogoAsync(string catalogo, PeUserContext ctx, long? pdticId = null)
@@ -174,7 +199,7 @@ public class PeRegistroService : IPeRegistroService
         return pendencias;
     }
 
-    public async Task<PeAnaliseDono> AnalisarAsync(PeDono dono, IReadOnlyList<PeSecaoDoDono> secoes)
+    public async Task<PeAnaliseDono> AnalisarAsync(PeDono dono, IReadOnlyList<PeSecaoDoDono> secoes, long? cicloId = null)
     {
         var ids = secoes.Select(s => s.Secao.Id).ToList();
         var registros = ids.Count == 0
@@ -183,6 +208,9 @@ public class PeRegistroService : IPeRegistroService
                 .Where(r => ids.Contains(r.SecaoId))
                 .OrderBy(r => r.Ordem).ThenBy(r => r.Id)
                 .ToListAsync();
+        // Seção por ciclo: só os registros do ciclo dado (sem ciclo, nenhum)
+        var (doCiclo, _) = await FiltrarPorCicloAsync(secoes, registros, cicloId, todos: false);
+        registros = doCiclo;
         var idsRegistros = registros.Select(r => r.Id).ToList();
         var vinculos = idsRegistros.Count == 0
             ? new List<PeVinculo>()
@@ -268,7 +296,7 @@ public class PeRegistroService : IPeRegistroService
         });
     }
 
-    public async Task<List<PeSecaoExportada>> ExportarAsync(PeDono dono, IReadOnlyList<PeSecaoDoDono> secoes)
+    public async Task<List<PeSecaoExportada>> ExportarAsync(PeDono dono, IReadOnlyList<PeSecaoDoDono> secoes, long? cicloId = null)
     {
         var ids = secoes.Select(s => s.Secao.Id).Distinct().ToList();
         var registros = ids.Count == 0
@@ -277,6 +305,10 @@ public class PeRegistroService : IPeRegistroService
                 .Where(r => ids.Contains(r.SecaoId))
                 .OrderBy(r => r.Ordem).ThenBy(r => r.Id)
                 .ToListAsync();
+        // Seção por ciclo: com cicloId, só os registros dele; sem, os de todos os ciclos (o RR e o PDTIC)
+        var (filtrados, ciclos) = await FiltrarPorCicloAsync(secoes, registros, cicloId, todos: cicloId == null);
+        registros = filtrados;
+        var dosCiclos = await CiclosAsync(ciclos.Values);
 
         // Poucas consultas para todas as seções: ligações, resumos dos ligados e sistemas do PGIA
         var idsRegistros = registros.Select(r => r.Id).ToList();
@@ -298,17 +330,65 @@ public class PeRegistroService : IPeRegistroService
         {
             Modelo = secao,
             Colunas = secao.Visiveis.ToList(),
-            Registros = porSecao[secao.Secao.Id].Select(r => Resposta(secao, r, porOrigem[r.Id], destinos, sistemas)).ToList()
+            Registros = porSecao[secao.Secao.Id].Select(r => Resposta(secao, r, porOrigem[r.Id], destinos, sistemas)).ToList(),
+            CicloDoRegistro = secao.PorCiclo == null
+                ? new Dictionary<long, long>()
+                : porSecao[secao.Secao.Id].Where(r => ciclos.ContainsKey(r.Id)).ToDictionary(r => r.Id, r => ciclos[r.Id]),
+            Ciclos = secao.PorCiclo == null ? new Dictionary<long, PeCiclo>() : dosCiclos
         }).ToList();
+    }
+
+    /// <summary>Os ciclos pelo id (só lê quando há algum).</summary>
+    private async Task<Dictionary<long, PeCiclo>> CiclosAsync(IEnumerable<long> ids)
+    {
+        var lista = ids.Distinct().ToList();
+        return lista.Count == 0
+            ? new Dictionary<long, PeCiclo>()
+            : await _context.PeCiclos.AsNoTracking().Where(c => lista.Contains(c.Id)).ToDictionaryAsync(c => c.Id);
+    }
+
+    /// <summary>
+    /// O ciclo de cada registro das seções por ciclo e o filtro: com cicloId, só os registros dele;
+    /// com todos, os de qualquer ciclo; sem nenhum dos dois, nenhum (o registro sem ciclo de uma
+    /// seção por ciclo, de antes da rodada B, também fica de fora). As outras seções não mudam. Só
+    /// lê o ciclo dos registros quando alguma seção é por ciclo (a versão 6 carregada).
+    /// </summary>
+    private async Task<(List<PeRegistro> Registros, Dictionary<long, long> Ciclos)> FiltrarPorCicloAsync(
+        IReadOnlyList<PeSecaoDoDono> secoes, List<PeRegistro> registros, long? cicloId, bool todos)
+    {
+        var porCiclo = secoes.Where(s => s.PorCiclo != null).Select(s => s.Secao.Id).ToHashSet();
+        if (porCiclo.Count == 0) return (registros, new Dictionary<long, long>());
+        var ids = registros.Where(r => porCiclo.Contains(r.SecaoId)).Select(r => r.Id).ToList();
+        var ciclos = ids.Count == 0
+            ? new Dictionary<long, long>()
+            : await _context.PeRegistrosCiclo.AsNoTracking().Where(c => ids.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.CicloId);
+        var filtrados = registros
+            .Where(r => !porCiclo.Contains(r.SecaoId)
+                        || (ciclos.TryGetValue(r.Id, out var ciclo) && (todos || ciclo == cicloId)))
+            .ToList();
+        return (filtrados, ciclos);
+    }
+
+    public async Task<Dictionary<long, (long CicloId, string Rotulo)>> CiclosDosRegistrosAsync(IReadOnlyCollection<long> registroIds)
+    {
+        if (registroIds.Count == 0) return new Dictionary<long, (long, string)>();
+        var ids = registroIds.Distinct().ToList();
+        var linhas = await (from r in _context.PeRegistrosCiclo.AsNoTracking()
+                            join c in _context.PeCiclos.AsNoTracking() on r.CicloId equals c.Id
+                            where ids.Contains(r.Id)
+                            select new { r.Id, CicloId = c.Id, c.Rotulo })
+            .ToListAsync();
+        return linhas.ToDictionary(l => l.Id, l => (l.CicloId, l.Rotulo));
     }
 
     // ── Escrita ─────────────────────────────────────────────────────────────
 
-    public async Task<PeRegistroResponse> CriarAsync(PeDono dono, string secaoChave, PeRegistroSalvarDTO dto, PeUserContext ctx)
+    public async Task<PeRegistroResponse> CriarAsync(PeDono dono, string secaoChave, PeRegistroSalvarDTO dto, PeUserContext ctx, long? cicloId = null)
     {
         var aberto = await AbrirAsync(dono, ctx, escrita: true);
         var secao = await SecaoParaEscritaAsync(aberto, secaoChave);
-        var doDono = RegistrosDo(dono).Where(r => r.SecaoId == secao.Secao.Id);
+        var ciclo = await CicloDaSecaoAsync(aberto, secao, cicloId, escrita: true);
+        var doDono = DaSecao(dono, secao, ciclo);
         if (secao.EhFormulario && await doDono.AnyAsync())
             throw new ApiException(ErrorCode.PeFormularioJaPreenchido,
                 "Este formulário já foi preenchido. Atualize a tela e salve por cima.");
@@ -330,8 +410,9 @@ public class PeRegistroService : IPeRegistroService
             CriadoPor = ctx.Email
         };
         _context.PeRegistros.Add(registro);
+        if (ciclo != null) _context.PeRegistrosCiclo.Add(new PeRegistroCiclo { Registro = registro, CicloId = ciclo.Id });
         Aplicar(registro, gravacao);
-        Tocar(aberto, ctx, agora);
+        Tocar(aberto, ctx, agora, ciclo);
         CopiarVigencia(aberto, secao, gravacao.Dados);
         IniciarAcompanhamento(aberto, secao, gravacao.Dados);
 
@@ -348,11 +429,13 @@ public class PeRegistroService : IPeRegistroService
         return await UmaRespostaAsync(secao, registro.Id);
     }
 
-    public async Task<PeRegistroResponse> AtualizarAsync(PeDono dono, string secaoChave, long id, PeRegistroSalvarDTO dto, PeUserContext ctx)
+    public async Task<PeRegistroResponse> AtualizarAsync(PeDono dono, string secaoChave, long id, PeRegistroSalvarDTO dto, PeUserContext ctx,
+        long? cicloId = null)
     {
         var aberto = await AbrirAsync(dono, ctx, escrita: true);
         var secao = await SecaoParaEscritaAsync(aberto, secaoChave);
-        var registro = await RegistroParaEscritaAsync(dono, secao, id);
+        var ciclo = await CicloDaSecaoAsync(aberto, secao, cicloId, escrita: true);
+        var registro = await RegistroParaEscritaAsync(dono, secao, id, ciclo);
 
         var gravacao = await ValidarAsync(aberto, secao, registro, dto, ctx);
 
@@ -361,7 +444,7 @@ public class PeRegistroService : IPeRegistroService
         DarDono(gravacao, registro.Id, ctx, agora);
         registro.AlteradoEm = agora;
         registro.AlteradoPor = ctx.Email;
-        Tocar(aberto, ctx, agora);
+        Tocar(aberto, ctx, agora, ciclo);
         CopiarVigencia(aberto, secao, gravacao.Dados);
         IniciarAcompanhamento(aberto, secao, gravacao.Dados);
         await _context.SaveChangesAsync();
@@ -369,11 +452,12 @@ public class PeRegistroService : IPeRegistroService
         return await UmaRespostaAsync(secao, registro.Id);
     }
 
-    public async Task ExcluirAsync(PeDono dono, string secaoChave, long id, PeUserContext ctx)
+    public async Task ExcluirAsync(PeDono dono, string secaoChave, long id, PeUserContext ctx, long? cicloId = null)
     {
         var aberto = await AbrirAsync(dono, ctx, escrita: true);
         var secao = await SecaoParaEscritaAsync(aberto, secaoChave);
-        var registro = await RegistroParaEscritaAsync(dono, secao, id);
+        var ciclo = await CicloDaSecaoAsync(aberto, secao, cicloId, escrita: true);
+        var registro = await RegistroParaEscritaAsync(dono, secao, id, ciclo);
 
         var ligadoPor = await _context.PeVinculos.AsNoTracking()
             .Where(v => v.RegistroDestinoId == id)
@@ -384,10 +468,116 @@ public class PeRegistroService : IPeRegistroService
             throw new ApiException(ErrorCode.PeRegistroLigado, await MensagemLigadoPorAsync(ligadoPor));
 
         _context.PeVinculos.RemoveRange(await _context.PeVinculos.Where(v => v.RegistroOrigemId == id).ToListAsync());
-        _context.PeRegistros.Remove(registro);
-        Tocar(aberto, ctx, DateTime.UtcNow);
+        await RemoverAsync(registro, ciclo);
+        Tocar(aberto, ctx, DateTime.UtcNow, ciclo);
         CopiarVigencia(aberto, secao, null);
         await _context.SaveChangesAsync();
+    }
+
+    /// <summary>Tira o registro (e, na seção por ciclo, a parte com o ciclo, que divide a mesma linha).</summary>
+    private async Task RemoverAsync(PeRegistro registro, PeCiclo? ciclo)
+    {
+        if (ciclo != null && await _context.PeRegistrosCiclo.FirstOrDefaultAsync(c => c.Id == registro.Id) is { } doCiclo)
+            _context.PeRegistrosCiclo.Remove(doCiclo);
+        _context.PeRegistros.Remove(registro);
+    }
+
+    /// <summary>
+    /// Grava de uma vez as linhas de uma seção por ciclo (as grades da situação das ações e das
+    /// medições, E7 rodada B): cada linha passa pela mesma validação de uma gravação avulsa (tipo,
+    /// obrigatório no nível, opção, ligação), os erros de todas voltam juntos com o prefixo da linha
+    /// ("12.situacao") e, sem erro, cria, atualiza e apaga tudo numa gravação só.
+    /// </summary>
+    public async Task SalvarNoCicloAsync(PeDono dono, string secaoChave, long cicloId, IReadOnlyList<PeLinhaDoCiclo> linhas, PeUserContext ctx)
+    {
+        var aberto = await AbrirAsync(dono, ctx, escrita: true);
+        var secao = await SecaoParaEscritaAsync(aberto, secaoChave);
+        var ciclo = await CicloDaSecaoAsync(aberto, secao, cicloId, escrita: true)
+                    ?? throw new ApiException(ErrorCode.PeCicloInvalido, "Esta seção não é registrada por ciclo.");
+        var existentes = await DaSecao(dono, secao, ciclo).ToListAsync();
+
+        var erros = new Dictionary<string, string>();
+        var validadas = new List<(PeRegistro? Atual, PeGravacao? Gravacao)>();
+        foreach (var linha in linhas)
+        {
+            PeRegistro? atual = null;
+            if (linha.RegistroId is long registroId)
+            {
+                atual = existentes.FirstOrDefault(r => r.Id == registroId);
+                if (atual == null)
+                {
+                    erros[$"{linha.Prefixo}.registro"] = "Este registro não é deste ciclo. Atualize a tela.";
+                    continue;
+                }
+            }
+            if (linha.Dados == null)
+            {
+                if (atual != null) validadas.Add((atual, null));
+                continue;
+            }
+            try
+            {
+                validadas.Add((atual, await ValidarAsync(aberto, secao, atual, linha.Dados, ctx)));
+            }
+            catch (PeValidacaoException ex)
+            {
+                foreach (var (chave, mensagem) in ex.Campos) erros[$"{linha.Prefixo}.{chave}"] = mensagem;
+            }
+        }
+        if (erros.Count > 0) throw new PeValidacaoException(erros);
+
+        if (validadas.Count == 0) return;
+        var agora = DateTime.UtcNow;
+        var ordem = existentes.Select(r => r.Ordem).DefaultIfEmpty(0).Max();
+        PeRegistroSequencia? sequencia = null;
+        var novos = new List<(PeRegistro Registro, PeGravacao Gravacao)>();
+        foreach (var (atual, gravacao) in validadas)
+        {
+            if (gravacao == null)
+            {
+                _context.PeVinculos.RemoveRange(await _context.PeVinculos.Where(v => v.RegistroOrigemId == atual!.Id).ToListAsync());
+                await RemoverAsync(atual!, ciclo);
+                continue;
+            }
+            var registro = atual;
+            if (registro == null)
+            {
+                sequencia ??= await SequenciaAsync(secao.Secao.Id, dono);
+                sequencia.Ultimo++;
+                registro = new PeRegistro
+                {
+                    SecaoId = secao.Secao.Id,
+                    PdticId = dono.PdticId,
+                    Codigo = CodigoDe(secao, sequencia.Ultimo),
+                    Ordem = ++ordem,
+                    Sistema = false,
+                    CriadoEm = agora,
+                    CriadoPor = ctx.Email
+                };
+                _context.PeRegistros.Add(registro);
+                _context.PeRegistrosCiclo.Add(new PeRegistroCiclo { Registro = registro, CicloId = ciclo.Id });
+                novos.Add((registro, gravacao));
+            }
+            else
+            {
+                registro.AlteradoEm = agora;
+                registro.AlteradoPor = ctx.Email;
+                DarDono(gravacao, registro.Id, ctx, agora);
+            }
+            Aplicar(registro, gravacao);
+            IniciarAcompanhamento(aberto, secao, gravacao.Dados);
+        }
+        Tocar(aberto, ctx, agora, ciclo);
+
+        // Como na inclusão avulsa: o id do registro novo sai na primeira gravação e os arquivos ganham o dono na segunda
+        await using var transacao = _context.Database.IsRelational() ? await _context.Database.BeginTransactionAsync() : null;
+        await _context.SaveChangesAsync();
+        if (novos.Any(n => n.Gravacao.Arquivos.Count > 0))
+        {
+            foreach (var (registro, gravacao) in novos) DarDono(gravacao, registro.Id, ctx, agora);
+            await _context.SaveChangesAsync();
+        }
+        if (transacao != null) await transacao.CommitAsync();
     }
 
     /// <summary>
@@ -460,11 +650,12 @@ public class PeRegistroService : IPeRegistroService
         return await ResponderAsync(secao, gravados);
     }
 
-    public async Task<PeRegistrosResponse> OrdenarAsync(PeDono dono, string secaoChave, PeOrdemDTO dto, PeUserContext ctx)
+    public async Task<PeRegistrosResponse> OrdenarAsync(PeDono dono, string secaoChave, PeOrdemDTO dto, PeUserContext ctx, long? cicloId = null)
     {
         var aberto = await AbrirAsync(dono, ctx, escrita: true);
         var secao = await SecaoParaEscritaAsync(aberto, secaoChave);
-        var registros = await RegistrosDo(dono).Where(r => r.SecaoId == secao.Secao.Id).ToListAsync();
+        var ciclo = await CicloDaSecaoAsync(aberto, secao, cicloId, escrita: true);
+        var registros = await DaSecao(dono, secao, ciclo).ToListAsync();
 
         var ids = dto.Ids ?? new List<long>();
         if (ids.Count != registros.Count || ids.Distinct().Count() != ids.Count || !registros.Select(r => r.Id).ToHashSet().SetEquals(ids))
@@ -472,10 +663,10 @@ public class PeRegistroService : IPeRegistroService
 
         for (var i = 0; i < ids.Count; i++)
             registros.Single(r => r.Id == ids[i]).Ordem = i + 1;
-        Tocar(aberto, ctx, DateTime.UtcNow);
+        Tocar(aberto, ctx, DateTime.UtcNow, ciclo);
         await _context.SaveChangesAsync();
 
-        return await RespostaDaSecaoAsync(aberto, secao);
+        return await RespostaDaSecaoAsync(aberto, secao, ciclo);
     }
 
     // ── Validação de uma gravação ───────────────────────────────────────────
@@ -748,8 +939,12 @@ public class PeRegistroService : IPeRegistroService
         }
     }
 
-    /// <summary>Gravar um registro da versão do PETIC-DF ou do PDTIC marca o dono como alterado (e confere a situação).</summary>
-    private static void Tocar(PeDonoAberto aberto, PeUserContext ctx, DateTime agora)
+    /// <summary>
+    /// Gravar um registro da versão do PETIC-DF ou do PDTIC marca o dono como alterado (e confere
+    /// a situação); na seção por ciclo, também o ciclo (a situação dele é token de concorrência:
+    /// gravar um dado e fechar o ciclo ao mesmo tempo não passam os dois).
+    /// </summary>
+    private static void Tocar(PeDonoAberto aberto, PeUserContext ctx, DateTime agora, PeCiclo? ciclo = null)
     {
         if (aberto.Petic != null)
         {
@@ -761,21 +956,26 @@ public class PeRegistroService : IPeRegistroService
             aberto.Pdtic.AlteradoEm = agora;
             aberto.Pdtic.AlteradoPor = ctx.Email;
         }
+        if (ciclo != null)
+        {
+            ciclo.AlteradoEm = agora;
+            ciclo.AlteradoPor = ctx.Email;
+        }
     }
 
     /// <summary>
-    /// O acompanhamento começa (E7): gravar a aprovação do plano de acompanhamento (passo 4.6)
-    /// com a decisão "aprovado" num PDTIC publicado o põe em acompanhamento (a rodada B
-    /// acrescenta o outro gatilho, o primeiro ciclo de monitoramento com dado gravado). A
-    /// situação é token de concorrência: a mudança vai na mesma gravação do registro.
+    /// O acompanhamento começa (E7): num PDTIC publicado, o primeiro dado gravado num ciclo de
+    /// monitoramento (rodada B) ou a aprovação do plano de acompanhamento (passo 4.6) gravada com
+    /// a decisão "aprovado", o que vier primeiro, o põe em acompanhamento. A situação é token de
+    /// concorrência: a mudança vai na mesma gravação do registro.
     /// </summary>
     private static void IniciarAcompanhamento(PeDonoAberto aberto, PeSecaoDoDono secao, JsonObject dados)
     {
-        if (aberto.Pdtic is not { Situacao: PeDominios.SituacaoPdtic.Publicado } pdtic
-            || secao.Secao.Chave != PeDominios.ChavePdtic.SecaoAprovacaoPlanoAcompanhamento
-            || PeRegistroDados.Texto(dados[PeDominios.ChavePdtic.CampoDecisao]) != PeDominios.Decisao.Aprovado)
-            return;
-        pdtic.Situacao = PeDominios.SituacaoPdtic.EmAcompanhamento;
+        if (aberto.Pdtic is not { Situacao: PeDominios.SituacaoPdtic.Publicado } pdtic) return;
+        var doMonitoramento = secao.PorCiclo == PeDominios.TipoCiclo.Monitoramento;
+        var planoAprovado = secao.Secao.Chave == PeDominios.ChavePdtic.SecaoAprovacaoPlanoAcompanhamento
+                            && PeRegistroDados.Texto(dados[PeDominios.ChavePdtic.CampoDecisao]) == PeDominios.Decisao.Aprovado;
+        if (doMonitoramento || planoAprovado) pdtic.Situacao = PeDominios.SituacaoPdtic.EmAcompanhamento;
     }
 
     /// <summary>
@@ -905,14 +1105,48 @@ public class PeRegistroService : IPeRegistroService
         _ => _context.PeRegistros.Where(r => r.PeticId == null && r.PdticId == null)
     };
 
-    private async Task<PeRegistro> RegistroParaEscritaAsync(PeDono dono, PeSecaoDoDono secao, long id)
+    private async Task<PeRegistro> RegistroParaEscritaAsync(PeDono dono, PeSecaoDoDono secao, long id, PeCiclo? ciclo = null)
     {
-        var registro = await RegistrosDo(dono).FirstOrDefaultAsync(r => r.Id == id && r.SecaoId == secao.Secao.Id)
+        var registro = await DaSecao(dono, secao, ciclo).FirstOrDefaultAsync(r => r.Id == id)
             ?? throw new ApiException(ErrorCode.PeRegistroNaoEncontrado, "Registro não encontrado. Atualize a tela.");
         if (registro.Sistema)
             throw new ApiException(ErrorCode.PeRegistroDoSistema,
                 "Este registro veio do decreto (registro do sistema) e não pode ser mudado nem apagado.");
         return registro;
+    }
+
+    /// <summary>Os registros do dono numa seção; na seção por ciclo, só os do ciclo.</summary>
+    private IQueryable<PeRegistro> DaSecao(PeDono dono, PeSecaoDoDono secao, PeCiclo? ciclo)
+    {
+        var secaoId = secao.Secao.Id;
+        var registros = RegistrosDo(dono).Where(r => r.SecaoId == secaoId);
+        if (ciclo == null) return registros;
+        var cicloId = ciclo.Id;
+        return registros.Where(r => _context.PeRegistrosCiclo.Any(c => c.Id == r.Id && c.CicloId == cicloId));
+    }
+
+    /// <summary>
+    /// O ciclo de uma seção por ciclo (E7, rodada B): o cicloId é obrigatório (400
+    /// PeCicloObrigatorio), do mesmo PDTIC (404) e do tipo da seção (400 PeCicloInvalido); para
+    /// gravar, o ciclo precisa ter começado e não estar fechado (409 PeCicloFechado). Seção que
+    /// não é por ciclo: nulo, e o cicloId é ignorado.
+    /// </summary>
+    private async Task<PeCiclo?> CicloDaSecaoAsync(PeDonoAberto aberto, PeSecaoDoDono secao, long? cicloId, bool escrita)
+    {
+        if (secao.PorCiclo == null || aberto.Pdtic == null) return null;
+        if (cicloId == null)
+            throw new ApiException(ErrorCode.PeCicloObrigatorio,
+                $"\"{secao.Secao.Titulo}\" é registrada a cada ciclo: escolha o ciclo (cicloId).");
+        var pdticId = aberto.Pdtic.Id;
+        var consulta = escrita ? _context.PeCiclos : _context.PeCiclos.AsNoTracking();
+        var ciclo = await consulta.FirstOrDefaultAsync(c => c.Id == cicloId && c.PdticId == pdticId) ?? throw PeCiclos.NaoEncontrado();
+        if (ciclo.Tipo != secao.PorCiclo)
+            throw new ApiException(ErrorCode.PeCicloInvalido, secao.PorCiclo == PeDominios.TipoCiclo.Monitoramento
+                ? $"\"{secao.Secao.Titulo}\" é do monitoramento: escolha um ciclo de monitoramento."
+                : $"\"{secao.Secao.Titulo}\" é da avaliação intermediária: escolha uma avaliação.");
+        if (escrita && PeCiclos.RecusaDeDados(ciclo, PeCiclos.Hoje()) is string recusa)
+            throw new ApiException(ErrorCode.PeCicloFechado, recusa);
+        return ciclo;
     }
 
     /// <summary>
@@ -1113,10 +1347,9 @@ public class PeRegistroService : IPeRegistroService
 
     // ── Respostas ───────────────────────────────────────────────────────────
 
-    private async Task<PeRegistrosResponse> RespostaDaSecaoAsync(PeDonoAberto aberto, PeSecaoDoDono secao)
+    private async Task<PeRegistrosResponse> RespostaDaSecaoAsync(PeDonoAberto aberto, PeSecaoDoDono secao, PeCiclo? ciclo = null)
     {
-        var registros = await RegistrosDo(aberto.Dono).AsNoTracking()
-            .Where(r => r.SecaoId == secao.Secao.Id)
+        var registros = await DaSecao(aberto.Dono, secao, ciclo).AsNoTracking()
             .OrderBy(r => r.Ordem).ThenBy(r => r.Id)
             .ToListAsync();
         var semVigente = await SemVigenteAsync(secao);
@@ -1131,6 +1364,7 @@ public class PeRegistroService : IPeRegistroService
                 Ajuda = secao.Secao.Ajuda,
                 Tipo = secao.Secao.Tipo,
                 PrefixoCodigo = secao.Secao.PrefixoCodigo,
+                PorCiclo = secao.PorCiclo,
                 Campos = secao.Visiveis.Select(v => new PeTrilhaCampo
                 {
                     Id = v.Campo.Id,
@@ -1148,8 +1382,9 @@ public class PeRegistroService : IPeRegistroService
                 }).ToList()
             },
             Registros = await ResponderAsync(secao, registros),
-            // No PDTIC, pela situação e pela etapa do passo da seção (E7)
+            // No PDTIC, pela situação e pela etapa do passo da seção (E7); na seção por ciclo, e o ciclo aceitando dados
             PodeEditar = aberto.PodeEditar && RecusaDaSecao(aberto, secao) == null
+                         && (ciclo == null || PeCiclos.RecusaDeDados(ciclo, PeCiclos.Hoje()) == null)
         };
     }
 
@@ -1159,11 +1394,15 @@ public class PeRegistroService : IPeRegistroService
             .Where(r => r.SecaoId == secao.Secao.Id)
             .OrderBy(r => r.Ordem).ThenBy(r => r.Id)
             .ToListAsync();
+        // Seção por ciclo: os registros de todos os ciclos, com o ciclo de cada um (a planilha mostra)
+        var (filtrados, ciclos) = await FiltrarPorCicloAsync(new[] { secao }, registros, null, todos: true);
         return new PeSecaoExportada
         {
             Modelo = secao,
             Colunas = secao.Visiveis.Where(v => v.Campo.NaPlanilha).ToList(),
-            Registros = await ResponderAsync(secao, registros)
+            Registros = await ResponderAsync(secao, filtrados),
+            CicloDoRegistro = ciclos,
+            Ciclos = await CiclosAsync(ciclos.Values)
         };
     }
 

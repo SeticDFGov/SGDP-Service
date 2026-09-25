@@ -197,19 +197,23 @@ public class PeRevisaoTest : PeAprovacaoTestBase
 
         var ex = await Assert.ThrowsAsync<ApiException>(() => RevisarAsync(pdtic.Id));
         Assert.Equal((int)ErrorCode.PeRevisaoRecusada, ex.Error.Code);
-        Assert.Equal($"Para abrir a revisão, registre no passo {numero} a avaliação do comitê com a decisão \"Revisar o PDTIC\".", ex.Error.Message);
+        Assert.Equal($"Para abrir a revisão, registre na avaliação intermediária (passo {numero}) a avaliação do comitê com a decisão \"Revisar o PDTIC\".",
+            ex.Error.Message);
 
-        var registro = await IncluirNoPdticAsync(pdtic.Id, "avaliacao_comite", new { decisao = "seguir", data = "2027-06-30" });
+        // A decisão é a da avaliação intermediária (E7, rodada B: a seção é por ciclo de avaliação)
+        var avaliacao = await Acompanhamento.CriarCicloAsync(pdtic.Id, new PeCicloCriarDTO { Tipo = "avaliacao" }, await Orgao());
+        var registro = await IncluirNoPdticAsync(pdtic.Id, "avaliacao_comite", new { decisao = "seguir", data = "2027-06-30" }, cicloId: avaliacao.Id);
         Assert.Equal(Codigo(ErrorCode.PeRevisaoRecusada), await ErroAsync(() => RevisarAsync(pdtic.Id)));
         await Registros.AtualizarAsync(PeDono.DoPdtic(pdtic.Id), "avaliacao_comite", registro.Id,
-            Salvar(new { decisao = "revisar", data = "2027-06-30" }), await Orgao());
+            Salvar(new { decisao = "revisar", data = "2027-06-30" }), await Orgao(), avaliacao.Id);
 
         // Com a decisão do comitê, a justificativa é opcional
         var nova = await RevisarAsync(pdtic.Id, null);
         Assert.Equal("1.1", nova.Versao);
         Assert.Null(nova.Revisao!.Justificativa);
-        // A avaliação do comitê é uma seção do passo de aprovação: não vai para a revisão
+        // A avaliação do comitê é de um ciclo (e do passo de aprovação): não vai para a revisão, nem o ciclo
         Assert.Empty(RegistrosDe(nova.Id).Where(r => r.SecaoId == Secao("avaliacao_comite").Id));
+        Assert.Empty(Context.PeCiclos.Where(c => c.PdticId == nova.Id));
     }
 
     [Fact]

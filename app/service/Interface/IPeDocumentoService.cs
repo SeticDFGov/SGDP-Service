@@ -7,12 +7,33 @@ namespace service.Interface;
 /// <summary>
 /// O documento do PDTIC de um órgão (E5): a estrutura resolvida (modelo da SGDI, cópia do
 /// órgão, trilha do nível, marcadores e dados), a edição dos textos e dos capítulos pela
-/// equipe do órgão e a geração do PDF com as versões. Autorização aqui, pelo
-/// IPePermissionService; erros como ApiException (1070 a 1089 e os anteriores do módulo).
+/// equipe do órgão e a geração do PDF com as versões. Desde a E7 (rodada B), o mesmo para os
+/// relatórios do acompanhamento: o RA de um ciclo e o RR (as sobrecargas com o
+/// <see cref="PeDocAlvo"/>; as com o id do PDTIC são o documento do PDTIC). Autorização aqui,
+/// pelo IPePermissionService; erros como ApiException (1070 a 1089, 1120 a 1139 e os
+/// anteriores do módulo).
 /// </summary>
 public interface IPeDocumentoService
 {
     Task<PeDocumentoResponse> ObterAsync(long pdticId, PeUserContext ctx);
+
+    Task<PeDocumentoResponse> ObterAsync(PeDocAlvo alvo, PeUserContext ctx);
+
+    Task<PeDocBlocoResponse> SalvarTextoAsync(PeDocAlvo alvo, long blocoId, JsonElement texto, PeUserContext ctx);
+
+    Task<PeDocBlocoResponse> RestaurarTextoAsync(PeDocAlvo alvo, long blocoId, PeUserContext ctx);
+
+    Task<PeDocCapituloResponse> AtualizarCapituloAsync(PeDocAlvo alvo, long capituloId, PeDocCapituloOrgaoDTO dto, PeUserContext ctx);
+
+    Task<PeDocVersaoResponse> GerarPdfAsync(PeDocAlvo alvo, PeUserContext ctx);
+
+    /// <summary>Como a outra sobrecarga, para o documento dado (o RA do ciclo sai assim no fechamento).</summary>
+    Task<(Models.Planejamento.PeDocVersao Versao, long Tamanho)> GerarVersaoAsync(Models.Planejamento.PePdtic pdtic, PeDocAlvo alvo,
+        PeUserContext ctx, string situacao);
+
+    Task<List<PeDocVersaoResponse>> VersoesAsync(PeDocAlvo alvo, PeUserContext ctx);
+
+    Task<PeDocArquivo> ArquivoDaVersaoAsync(PeDocAlvo alvo, int numero, PeUserContext ctx);
 
     /// <summary>Grava o texto do órgão num bloco de texto; devolve o bloco resolvido.</summary>
     Task<PeDocBlocoResponse> SalvarTextoAsync(long pdticId, long blocoId, JsonElement texto, PeUserContext ctx);

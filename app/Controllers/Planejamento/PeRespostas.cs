@@ -16,9 +16,10 @@ namespace Controllers.Planejamento;
 /// indisponível, conflito, registro ligado ou do sistema, versão fechada ou já enviada,
 /// deliberação decidida, capítulo obrigatório que o órgão tenta esconder, PDF que não pôde
 /// ser montado e, desde a E7, transição que não vale na situação do PDTIC, encerramento ou
-/// revisão recusados, versão em elaboração e versão repetida; 400 para o resto). A
-/// validação de registro, da publicação e do registro externo (PeValidacaoException)
-/// leva também Campos, com a mensagem de cada campo; o envio com pendências
+/// revisão recusados, versão em elaboração e versão repetida e, na rodada B, ciclo que não
+/// aceita a operação e avaliação já aberta; 400 para o resto). A validação de registro (e das
+/// grades do ciclo), da publicação e do registro externo (PeValidacaoException) leva também
+/// Campos, com a mensagem de cada campo; o envio e o fechamento do ciclo com pendências
 /// (PePendenciasException), a lista Pendencias;</item>
 /// <item>tabela ou coluna pe_ que ainda não existe (o PR publica o código antes da
 /// migration, que só roda no merge; desde a E4, a coluna pdtic_id de pe_registro): 409
@@ -60,7 +61,8 @@ internal static class PeRespostas
                 or ErrorCode.PePeticNaoEncontrado or ErrorCode.PeDeliberacaoNaoEncontrada or ErrorCode.PeArquivoNaoEncontrado
                 or ErrorCode.PeCatalogoNaoEncontrado or ErrorCode.PePdticNaoEncontrado or ErrorCode.PePassoIndisponivel
                 or ErrorCode.PeComentarioNaoEncontrado or ErrorCode.PeDocCapituloNaoEncontrado or ErrorCode.PeDocBlocoNaoEncontrado
-                or ErrorCode.PeDocVersaoNaoEncontrada or ErrorCode.PeFluxoNaoEncontrado => StatusCodes.Status404NotFound,
+                or ErrorCode.PeDocVersaoNaoEncontrada or ErrorCode.PeFluxoNaoEncontrado
+                or ErrorCode.PeCicloNaoEncontrado => StatusCodes.Status404NotFound,
             ErrorCode.PeSemPermissao => StatusCodes.Status403Forbidden,
             ErrorCode.PeAutoRebaixamento or ErrorCode.PeItemTravado or ErrorCode.PeItemDoSistema or ErrorCode.PeChaveDuplicada
                 or ErrorCode.PeNivelInativo or ErrorCode.PeUltimoNivelAtivo or ErrorCode.PeItemExcluido or ErrorCode.PeItemEmUso
@@ -72,7 +74,8 @@ internal static class PeRespostas
                 or ErrorCode.PeDocCapituloObrigatorio or ErrorCode.PeDocGeracaoFalhou
                 or ErrorCode.PeCronogramaPreenchido or ErrorCode.PeCronogramaSemTarefas
                 or ErrorCode.PePdticSituacaoInvalida or ErrorCode.PeEncerramentoRecusado or ErrorCode.PeRevisaoEmAndamento
-                or ErrorCode.PeRevisaoRecusada or ErrorCode.PeVersaoPdticDuplicada => StatusCodes.Status409Conflict,
+                or ErrorCode.PeRevisaoRecusada or ErrorCode.PeVersaoPdticDuplicada
+                or ErrorCode.PeCicloFechado or ErrorCode.PeAvaliacaoAberta => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
         // Validação de registro: a mensagem de cada campo, pela chave

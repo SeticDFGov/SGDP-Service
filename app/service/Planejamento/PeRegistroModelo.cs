@@ -53,6 +53,9 @@ public sealed class PeSecaoDoDono
     // A seção é obrigatória para o dono (situação geral fora do PDTIC; no PDTIC, a da trilha do órgão)
     public bool Obrigatoria { get; init; }
 
+    // Só no PDTIC, desde a E7 (rodada B): os registros são de um ciclo (monitoramento ou avaliacao), ou nulo
+    public string? PorCiclo { get; init; }
+
     public IReadOnlyList<PeOpcao> OpcoesDe(PeCampo campo) =>
         Opcoes.TryGetValue(campo.Id, out var lista) ? lista : Array.Empty<PeOpcao>();
 
@@ -95,7 +98,8 @@ public sealed class PeValidacaoException : ApiException
 
 /// <summary>
 /// Envio ao CGTIC com pendências (E7): 400 PePdticComPendencias com { Code, Message,
-/// Pendencias }, a mesma lista da prévia (GET pdtic/{id}/envio).
+/// Pendencias }, a mesma lista da prévia (GET pdtic/{id}/envio). Na rodada B, também o
+/// fechamento de um ciclo com pendências (PeCicloComPendencias), com a mesma forma.
 /// </summary>
 public sealed class PePendenciasException : ApiException
 {
@@ -105,6 +109,12 @@ public sealed class PePendenciasException : ApiException
         : base(ErrorCode.PePdticComPendencias, pendencias.Count == 1
             ? "Falta um passo para enviar o PDTIC ao CGTIC. Confira a lista."
             : $"Faltam {pendencias.Count} passos para enviar o PDTIC ao CGTIC. Confira a lista.")
+    {
+        Pendencias = pendencias;
+    }
+
+    public PePendenciasException(ErrorCode codigo, string mensagem, IReadOnlyList<api.Planejamento.PePendenciaResponse> pendencias)
+        : base(codigo, mensagem)
     {
         Pendencias = pendencias;
     }

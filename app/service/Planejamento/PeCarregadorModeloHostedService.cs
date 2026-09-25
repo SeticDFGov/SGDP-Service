@@ -60,11 +60,11 @@ public sealed class PeCarregadorModeloHostedService : BackgroundService
                 _logger.LogInformation(
                     "Governança Estratégica: modelo inicial versão {Versao} carregado (antes: {Anterior}). Novos: {Niveis} níveis, "
                     + "{Etapas} etapas, {Passos} passos, {Secoes} seções, {Campos} campos, {Opcoes} opções, {Configuracoes} configurações, "
-                    + "{Registros} registros do sistema, {Documentos} modelos de documento, {Capitulos} capítulos, {Blocos} blocos "
-                    + "e {Fluxos} fluxos do guia.",
+                    + "{Registros} registros do sistema, {Documentos} modelos de documento, {Capitulos} capítulos, {Blocos} blocos, "
+                    + "{Fluxos} fluxos do guia e {SecoesPorCiclo} seções marcadas por ciclo.",
                     resultado.Versao, resultado.VersaoAnterior, resultado.Niveis, resultado.Etapas, resultado.Passos,
                     resultado.Secoes, resultado.Campos, resultado.Opcoes, resultado.Configuracoes, resultado.Registros,
-                    resultado.Documentos, resultado.Capitulos, resultado.Blocos, resultado.Fluxos);
+                    resultado.Documentos, resultado.Capitulos, resultado.Blocos, resultado.Fluxos, resultado.SecoesPorCiclo);
             return true;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)

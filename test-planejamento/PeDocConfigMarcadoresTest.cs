@@ -164,8 +164,8 @@ public class PeDocConfigMarcadoresTest
 
         var lista = PeDocMarcadores.Lista(campos);
 
-        // 12 da E5 e os 6 de aprovação e de publicação da E7
-        Assert.Equal(18, PeDocMarcadores.Fixos.Count);
+        // 12 da E5, os 6 de aprovação e de publicação da E7 e os 3 do ciclo (rodada B)
+        Assert.Equal(21, PeDocMarcadores.Fixos.Count);
         Assert.Equal(PeDocMarcadores.Fixos.Select(m => m.Chave).Append("nomes.ouvidoria"), lista.Select(m => m.Chave));
     }
 

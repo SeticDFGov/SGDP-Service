@@ -75,6 +75,7 @@ public static class PeModelConfiguration
         modelBuilder.ApplyPePdticConfiguration();
         modelBuilder.ApplyPeDocumentoConfiguration();
         modelBuilder.ApplyPeFluxoConfiguration();
+        modelBuilder.ApplyPeAcompanhamentoConfiguration();
     }
 
     // ── Modelo configurável e níveis de maturidade (E2) ──────────────────────
@@ -956,7 +957,11 @@ public static class PeModelConfiguration
             entity.Property(o => o.TituloProprio).HasColumnName("titulo_proprio").HasMaxLength(200);
             Auditoria(entity);
 
-            entity.HasIndex(o => new { o.PdticId, o.CapituloId }).IsUnique().HasDatabaseName("ux_pe_doc_orgao");
+            // Uma linha por documento e capítulo. O capítulo é de um modelo (PDTIC, RA ou RR): no
+            // PDTIC e no RR, o par PDTIC e capítulo basta; no RA (um documento por ciclo), o índice
+            // ux_pe_doc_orgao_ciclo (ciclo_id, capitulo_id) vem da migration (E7, rodada B)
+            entity.HasIndex(o => new { o.PdticId, o.CapituloId }).IsUnique().HasFilter("doc_tipo <> 'ra'")
+                .HasDatabaseName("ux_pe_doc_orgao");
             entity.HasIndex(o => o.CapituloId).HasDatabaseName("ix_pe_doc_orgao_capitulo");
 
             entity.HasOne(o => o.Pdtic)
@@ -985,7 +990,9 @@ public static class PeModelConfiguration
             entity.Property(o => o.EditadoEm).HasColumnName("editado_em");
             entity.Property(o => o.EditadoPor).HasColumnName("editado_por").HasMaxLength(200).IsRequired();
 
-            entity.HasIndex(o => new { o.PdticId, o.BlocoId }).IsUnique().HasDatabaseName("ux_pe_doc_orgao_bloco");
+            // Uma linha por documento e bloco (no RA, o ux_pe_doc_orgao_bloco_ciclo da migration)
+            entity.HasIndex(o => new { o.PdticId, o.BlocoId }).IsUnique().HasFilter("doc_tipo <> 'ra'")
+                .HasDatabaseName("ux_pe_doc_orgao_bloco");
             entity.HasIndex(o => o.BlocoId).HasDatabaseName("ix_pe_doc_orgao_bloco_bloco");
 
             entity.HasOne(o => o.Pdtic)
@@ -1021,8 +1028,10 @@ public static class PeModelConfiguration
             entity.Property(v => v.GeradoEm).HasColumnName("gerado_em");
             entity.Property(v => v.GeradoPor).HasColumnName("gerado_por").HasMaxLength(200).IsRequired();
 
-            // Número sequencial no PDTIC: duas gerações ao mesmo tempo não dão o mesmo número
-            entity.HasIndex(v => new { v.PdticId, v.Numero }).IsUnique().HasDatabaseName("ux_pe_doc_versao_numero");
+            // Número sequencial em cada documento: duas gerações ao mesmo tempo não dão o mesmo
+            // número. O PDTIC e o RR numeram à parte; o RA, por ciclo (ux_pe_doc_versao_ciclo, da migration)
+            entity.HasIndex(v => new { v.PdticId, v.Numero }, "ux_pe_doc_versao_numero").IsUnique().HasFilter("doc_tipo = 'pdtic'");
+            entity.HasIndex(v => new { v.PdticId, v.Numero }, "ux_pe_doc_versao_numero_rr").IsUnique().HasFilter("doc_tipo = 'rr'");
             entity.HasIndex(v => v.ArquivoId).HasDatabaseName("ix_pe_doc_versao_arquivo");
 
             entity.HasOne(v => v.Pdtic)
@@ -1091,6 +1100,147 @@ public static class PeModelConfiguration
                 .HasForeignKey(f => f.ModeloId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_pe_fluxo_modelo");
+        });
+    }
+
+    // ── Acompanhamento (E7, rodada B) ─────────────────────────────────────────
+
+    // O documento de cada linha da cópia do órgão e das versões: sempre com tipo (a coluna é
+    // anulável no banco por ser de uma entidade à parte, então o CHECK exige), e o ciclo só no RA
+    private static readonly string DocumentoDaLinha =
+        $"doc_tipo IS NOT NULL AND {EmLista("doc_tipo", PeDominios.TipoDocumento.Todos)} "
+        + $"AND (doc_tipo = '{PeDominios.TipoDocumento.Ra}') = (ciclo_id IS NOT NULL)";
+
+    private static void ApplyPeAcompanhamentoConfiguration(this ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PeCiclo>(entity =>
+        {
+            entity.ToTable("pe_ciclo", t =>
+            {
+                t.HasCheckConstraint("ck_pe_ciclo_tipo", EmLista("tipo", PeDominios.TipoCiclo.Todos));
+                t.HasCheckConstraint("ck_pe_ciclo_situacao", EmLista("situacao", PeDominios.SituacaoCiclo.Todas));
+                t.HasCheckConstraint("ck_pe_ciclo_numero", "numero >= 1");
+                // O monitoramento tem fim e prazo; o fim não vem antes do início, nem o prazo antes do fim
+                t.HasCheckConstraint("ck_pe_ciclo_periodo",
+                    $"(tipo <> '{PeDominios.TipoCiclo.Monitoramento}' OR (fim IS NOT NULL AND prazo IS NOT NULL)) "
+                    + "AND (fim IS NULL OR fim >= inicio) AND (prazo IS NULL OR fim IS NULL OR prazo >= fim)");
+                // Fechado tem a data e quem fechou; aberto, não
+                t.HasCheckConstraint("ck_pe_ciclo_fechado",
+                    $"(situacao = '{PeDominios.SituacaoCiclo.Fechado}') = (fechado_em IS NOT NULL) AND (fechado_em IS NULL) = (fechado_por IS NULL)");
+                t.HasCheckConstraint("ck_pe_ciclo_reaberto", "(reaberto_em IS NULL) = (reaberto_por IS NULL)");
+            });
+
+            entity.HasKey(c => c.Id).HasName("pk_pe_ciclo");
+            entity.Property(c => c.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(c => c.PdticId).HasColumnName("pdtic_id");
+            entity.Property(c => c.Tipo).HasColumnName("tipo").HasMaxLength(20).IsRequired();
+            entity.Property(c => c.Numero).HasColumnName("numero");
+            entity.Property(c => c.Rotulo).HasColumnName("rotulo").HasMaxLength(100).IsRequired();
+            entity.Property(c => c.Inicio).HasColumnName("inicio");
+            entity.Property(c => c.Fim).HasColumnName("fim");
+            entity.Property(c => c.Prazo).HasColumnName("prazo");
+            // Token de concorrência: gravar um dado do ciclo e fechar ao mesmo tempo não passam os dois
+            entity.Property(c => c.Situacao).HasColumnName("situacao").HasMaxLength(20).IsRequired().IsConcurrencyToken();
+            entity.Property(c => c.FechadoEm).HasColumnName("fechado_em");
+            entity.Property(c => c.FechadoPor).HasColumnName("fechado_por").HasMaxLength(200);
+            entity.Property(c => c.ReabertoEm).HasColumnName("reaberto_em");
+            entity.Property(c => c.ReabertoPor).HasColumnName("reaberto_por").HasMaxLength(200);
+            Auditoria(entity);
+
+            // Número sequencial por PDTIC e tipo (duas leituras simultâneas da lista não criam dois)
+            entity.HasIndex(c => new { c.PdticId, c.Tipo, c.Numero }).IsUnique().HasDatabaseName("ux_pe_ciclo_numero");
+            // Uma avaliação intermediária aberta por vez em cada PDTIC
+            entity.HasIndex(c => c.PdticId, "ux_pe_ciclo_avaliacao_aberta").IsUnique()
+                .HasFilter($"tipo = '{PeDominios.TipoCiclo.Avaliacao}' AND situacao = '{PeDominios.SituacaoCiclo.Aberto}'");
+
+            entity.HasOne(c => c.Pdtic)
+                .WithMany()
+                .HasForeignKey(c => c.PdticId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_ciclo_pdtic");
+        });
+
+        // pe_registro.ciclo_id (os registros das seções por ciclo)
+        modelBuilder.Entity<PeRegistroCiclo>(entity =>
+        {
+            entity.ToTable("pe_registro");
+            entity.HasKey(c => c.Id).HasName("pk_pe_registro");
+            entity.Property(c => c.Id).HasColumnName("id");
+            entity.Property(c => c.CicloId).HasColumnName("ciclo_id").IsRequired();
+
+            // Os registros de um ciclo (a grade, o resumo e o fechamento partem do ciclo)
+            entity.HasIndex(c => c.CicloId).HasDatabaseName("ix_pe_registro_ciclo");
+
+            entity.HasOne(c => c.Registro).WithOne().HasForeignKey<PeRegistroCiclo>(c => c.Id);
+            // Apagar o ciclo (só o que não tem registro é apagado pela troca da periodicidade) leva os registros dele
+            entity.HasOne(c => c.Ciclo)
+                .WithMany()
+                .HasForeignKey(c => c.CicloId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_registro_ciclo");
+        });
+
+        // pe_secao.por_ciclo (as seções do monitoramento e da avaliação intermediária)
+        modelBuilder.Entity<PeSecaoCiclo>(entity =>
+        {
+            entity.ToTable("pe_secao", t =>
+                t.HasCheckConstraint("ck_pe_secao_por_ciclo", $"por_ciclo IS NULL OR {EmLista("por_ciclo", PeDominios.TipoCiclo.Todos)}"));
+            entity.HasKey(s => s.Id).HasName("pk_pe_secao");
+            entity.Property(s => s.Id).HasColumnName("id");
+            entity.Property(s => s.PorCiclo).HasColumnName("por_ciclo").HasMaxLength(20).IsRequired();
+            entity.HasOne(s => s.Secao).WithOne().HasForeignKey<PeSecaoCiclo>(s => s.Id);
+        });
+
+        // pe_doc_orgao, pe_doc_orgao_bloco e pe_doc_versao: o documento (PDTIC, RA ou RR) e o ciclo do RA
+        modelBuilder.Entity<PeDocOrgaoDocumento>(entity =>
+        {
+            entity.ToTable("pe_doc_orgao", t => t.HasCheckConstraint("ck_pe_doc_orgao_documento", DocumentoDaLinha));
+            entity.HasKey(d => d.Id).HasName("pk_pe_doc_orgao");
+            entity.Property(d => d.Id).HasColumnName("id");
+            entity.Property(d => d.DocTipo).HasColumnName("doc_tipo").HasMaxLength(10).IsRequired()
+                .HasDefaultValue(PeDominios.TipoDocumento.Pdtic);
+            entity.Property(d => d.CicloId).HasColumnName("ciclo_id");
+            entity.HasIndex(d => d.CicloId).HasDatabaseName("ix_pe_doc_orgao_ciclo");
+            entity.HasOne(d => d.Linha).WithOne().HasForeignKey<PeDocOrgaoDocumento>(d => d.Id);
+            entity.HasOne(d => d.Ciclo)
+                .WithMany()
+                .HasForeignKey(d => d.CicloId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_doc_orgao_ciclo");
+        });
+
+        modelBuilder.Entity<PeDocOrgaoBlocoDocumento>(entity =>
+        {
+            entity.ToTable("pe_doc_orgao_bloco", t => t.HasCheckConstraint("ck_pe_doc_orgao_bloco_documento", DocumentoDaLinha));
+            entity.HasKey(d => d.Id).HasName("pk_pe_doc_orgao_bloco");
+            entity.Property(d => d.Id).HasColumnName("id");
+            entity.Property(d => d.DocTipo).HasColumnName("doc_tipo").HasMaxLength(10).IsRequired()
+                .HasDefaultValue(PeDominios.TipoDocumento.Pdtic);
+            entity.Property(d => d.CicloId).HasColumnName("ciclo_id");
+            entity.HasIndex(d => d.CicloId).HasDatabaseName("ix_pe_doc_orgao_bloco_ciclo");
+            entity.HasOne(d => d.Linha).WithOne().HasForeignKey<PeDocOrgaoBlocoDocumento>(d => d.Id);
+            entity.HasOne(d => d.Ciclo)
+                .WithMany()
+                .HasForeignKey(d => d.CicloId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_doc_orgao_bloco_ciclo");
+        });
+
+        modelBuilder.Entity<PeDocVersaoDocumento>(entity =>
+        {
+            entity.ToTable("pe_doc_versao", t => t.HasCheckConstraint("ck_pe_doc_versao_documento", DocumentoDaLinha));
+            entity.HasKey(d => d.Id).HasName("pk_pe_doc_versao");
+            entity.Property(d => d.Id).HasColumnName("id");
+            entity.Property(d => d.DocTipo).HasColumnName("doc_tipo").HasMaxLength(10).IsRequired()
+                .HasDefaultValue(PeDominios.TipoDocumento.Pdtic);
+            entity.Property(d => d.CicloId).HasColumnName("ciclo_id");
+            entity.HasIndex(d => d.CicloId).HasDatabaseName("ix_pe_doc_versao_ciclo");
+            entity.HasOne(d => d.Linha).WithOne().HasForeignKey<PeDocVersaoDocumento>(d => d.Id);
+            entity.HasOne(d => d.Ciclo)
+                .WithMany()
+                .HasForeignKey(d => d.CicloId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_pe_doc_versao_ciclo");
         });
     }
 }

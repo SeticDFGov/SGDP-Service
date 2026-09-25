@@ -274,10 +274,12 @@ public class PeCarregadorModeloTest : PeModeloTestBase
     [Fact]
     public void Configuracoes_VersaoDoModeloEPeriodicidadeTrimestral()
     {
-        // Versão 5 (E7, rodada A): o documento com a aprovação na folha de rosto e os fluxos das etapas
-        Assert.Equal("5", Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChaveVersaoModelo).Valor);
+        // Versão 6 (E7, rodada B): as seções por ciclo, os modelos do RA e do RR e as configurações do acompanhamento
+        Assert.Equal("6", Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChaveVersaoModelo).Valor);
         Assert.Equal("\"trimestral\"",
             Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChavePeriodicidadeMonitoramento).Valor);
+        Assert.Equal("15", Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChavePrazoFechamentoCiclo).Valor);
+        Assert.Equal("90", Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChaveDiasAvaliacaoFinal).Valor);
     }
 
     [Fact]
@@ -289,7 +291,7 @@ public class PeCarregadorModeloTest : PeModeloTestBase
 
         Assert.DoesNotContain('\u2014', texto);
         Assert.DoesNotContain('\u2013', texto);
-        Assert.Equal(5, PeCarregadorModelo.LerSeed(texto).Versao);
+        Assert.Equal(6, PeCarregadorModelo.LerSeed(texto).Versao);
     }
 
     // ── Idempotência e "nunca sobrescreve" ────────────────────────────────────
@@ -300,7 +302,7 @@ public class PeCarregadorModeloTest : PeModeloTestBase
         var resultado = await new PeCarregadorModelo(Context).CarregarAsync();
 
         Assert.False(resultado.Executou);
-        Assert.Equal(5, resultado.VersaoAnterior);
+        Assert.Equal(6, resultado.VersaoAnterior);
         Assert.Equal(50, Context.PePassos.Count());
         // 346 do PDTIC (com o logotipo da versão 3) e 33 do DF e do PETIC-DF (versão 2)
         Assert.Equal(379, Context.PeCampos.Count());

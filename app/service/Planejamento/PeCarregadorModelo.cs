@@ -76,6 +76,8 @@ public sealed class PeSeedSecao
     public JsonElement Niveis { get; set; }
     // Situação geral (só fora do PDTIC)
     public string? Situacao { get; set; }
+    // Seção por ciclo (só no PDTIC, desde a versão 6): monitoramento ou avaliacao
+    public string? PorCiclo { get; set; }
     public List<PeSeedCampo> Campos { get; set; } = new();
     // Registros do sistema (só no catálogo do DF)
     public List<PeSeedRegistro> Registros { get; set; } = new();
@@ -118,7 +120,7 @@ public sealed class PeSeedOpcao
 public sealed record PeCarregamentoResultado(
     int VersaoAnterior, int Versao, bool Executou,
     int Niveis, int Etapas, int Passos, int Secoes, int Campos, int Opcoes, int Configuracoes, int Registros = 0,
-    int Documentos = 0, int Capitulos = 0, int Blocos = 0, int Fluxos = 0);
+    int Documentos = 0, int Capitulos = 0, int Blocos = 0, int Fluxos = 0, int SecoesPorCiclo = 0);
 
 /// <summary>
 /// Carregador do modelo inicial do módulo Governança Estratégica: a trilha da seção 7 do
@@ -133,7 +135,11 @@ public sealed record PeCarregamentoResultado(
 /// (figuras 4 a 22, em fluxos-inicial.json); na versão 5 (E7, rodada A), o documento do PDTIC
 /// ganhou a aprovação e a publicação na folha de rosto e os blocos de fluxo das etapas na
 /// metodologia e na revisão e acompanhamento (como bloco só entra com o capítulo novo, só o
-/// banco novo recebe esses blocos). O conteúdo fica em JSON embutido na aplicação.
+/// banco novo recebe esses blocos); na versão 6 (E7, rodada B), as seções por ciclo (o
+/// monitoramento em 5.1 e 5.2 e a avaliação intermediária em 6.1 a 6.3, marcadas também nas
+/// seções que já existiam, porque a coluna é nova), as configurações do prazo de fechamento do
+/// ciclo e da avaliação final e os modelos do relatório de acompanhamento (RA, Anexo XIV) e do
+/// relatório de resultados (RR, Anexo XV). O conteúdo fica em JSON embutido na aplicação.
 /// <list type="bullet">
 /// <item>Idempotente: se a versão gravada em pe_configuracao (seed_modelo_versao) já é a do
 /// JSON, não faz nada; senão insere só o que falta, achando cada item pela chave (nível
@@ -167,6 +173,14 @@ public sealed class PeCarregadorModelo
     /// publicação na folha de rosto e os fluxos das etapas nos capítulos (só em banco novo).
     /// </summary>
     public const int VersaoDaAprovacao = 5;
+
+    /// <summary>
+    /// Versão do modelo inicial da E7, rodada B: as seções por ciclo, as configurações do
+    /// acompanhamento e os modelos do RA e do RR. Só carrega com a migration PeAcompanhamento
+    /// aplicada (ela lê pe_secao.por_ciclo); é o que liga os ciclos e os relatórios na API
+    /// (<see cref="PeAcompanhamentoAtivo"/>).
+    /// </summary>
+    public const int VersaoDoAcompanhamento = 6;
 
     // Trava do carregador no PostgreSQL: segura até o fim da transação
     private const string SqlTrava = "SELECT pg_advisory_xact_lock(4890020260924)";
@@ -248,6 +262,8 @@ public sealed class PeCarregadorModelo
                     var sitSecao = Situacoes(secao.Niveis, codigos, null, $"seção {secao.Chave}");
                     if (secao.Travada && sitSecao.ContainsValue(PeDominios.Situacao.Desligado)) Falha($"seção travada \"{secao.Chave}\" desligada.");
                     if (secao.Campos.Count(c => c.Principal) != 1) Falha($"a seção \"{secao.Chave}\" precisa de exatamente um campo principal.");
+                    if (secao.PorCiclo != null && !PeDominios.TipoCiclo.Todos.Contains(secao.PorCiclo))
+                        Falha($"porCiclo da seção \"{secao.Chave}\" (monitoramento ou avaliacao).");
 
                     var campos = new HashSet<string>();
                     foreach (var campo in secao.Campos)
@@ -270,8 +286,9 @@ public sealed class PeCarregadorModelo
             if (secao.Escopo is not (PeDominios.Escopo.Petic or PeDominios.Escopo.Df))
                 Falha($"escopo da seção \"{secao.Chave}\" (petic ou df).");
             if (!PeDominios.TipoSecao.Todos.Contains(secao.Tipo)) Falha($"tipo da seção \"{secao.Chave}\".");
-            if (secao.Travada || secao.Inciso != null || secao.Niveis.ValueKind is not (JsonValueKind.Undefined or JsonValueKind.Null))
-                Falha($"a seção \"{secao.Chave}\" é fora do PDTIC: sem trava, inciso nem níveis.");
+            if (secao.Travada || secao.Inciso != null || secao.PorCiclo != null
+                || secao.Niveis.ValueKind is not (JsonValueKind.Undefined or JsonValueKind.Null))
+                Falha($"a seção \"{secao.Chave}\" é fora do PDTIC: sem trava, inciso, ciclo nem níveis.");
             if (secao.Situacao == null || !PeDominios.Situacao.Todas.Contains(secao.Situacao))
                 Falha($"situação da seção \"{secao.Chave}\".");
             if (secao.Prefixo != null && !System.Text.RegularExpressions.Regex.IsMatch(secao.Prefixo, "^[A-Z][A-Z0-9]{0,4}$"))
@@ -675,6 +692,27 @@ public sealed class PeCarregadorModelo
             }
         }
 
+        // Seções por ciclo (versão 6, E7 rodada B): a marca entra também na seção que já existia
+        // (a coluna pe_secao.por_ciclo é nova, então não há o que o administrador tenha mudado);
+        // marca que já existe não muda. Ler as marcas é o que falha no intervalo do deploy (a
+        // coluna ainda não existe): nada é gravado e o carregador tenta de novo
+        var nPorCiclo = 0;
+        var comCiclo = seed.Etapas.SelectMany(e => e.Passos).SelectMany(p => p.Secoes).Where(s => s.PorCiclo != null).ToList();
+        if (comCiclo.Count > 0)
+        {
+            var marcadas = await _context.PeSecoesCiclo.ToListAsync(ct);
+            foreach (var ss in comCiclo)
+            {
+                var secao = secoes.First(s => s.Chave == ss.Chave);
+                if (secao.Id != 0 && marcadas.Any(m => m.Id == secao.Id)) continue;
+                var marca = new PeSecaoCiclo { Secao = secao, PorCiclo = ss.PorCiclo! };
+                if (secao.Id != 0) marca.Id = secao.Id;
+                _context.PeSecoesCiclo.Add(marca);
+                marcadas.Add(marca);
+                nPorCiclo++;
+            }
+        }
+
         // Modelo do documento do PDTIC (versão 3, E5): o que falta, achado pelo tipo do modelo e
         // pela chave do capítulo; os blocos entram com o capítulo novo (capítulo que já existe não
         // é tocado, nem os blocos dele)
@@ -710,7 +748,7 @@ public sealed class PeCarregadorModelo
         if (transacao != null) await transacao.CommitAsync(ct);
 
         return new PeCarregamentoResultado(versaoAnterior, seed.Versao, true, nNiveis, nEtapas, nPassos, nSecoes, nCampos, nOpcoes, nConfig,
-            nRegistros, nDocumentos, nCapitulos, nBlocos, nFluxos);
+            nRegistros, nDocumentos, nCapitulos, nBlocos, nFluxos, nPorCiclo);
     }
 
     /// <summary>

@@ -128,7 +128,9 @@ public class PePlanilhaService : IPePlanilhaService
     private sealed record PeSecaoConsolidada(
         PeSecaoDoDono Modelo,
         List<PeCampo> Colunas,
-        List<(PePdtic Pdtic, PeTrilhaOrgao Trilha, HashSet<long> Visiveis, PeRegistroResponse Registro)> Linhas);
+        List<(PePdtic Pdtic, PeTrilhaOrgao Trilha, HashSet<long> Visiveis, PeRegistroResponse Registro)> Linhas,
+        // Seção por ciclo (E7, rodada B): o rótulo do ciclo de cada registro; nulo nas outras
+        Dictionary<long, string>? Ciclos = null);
 
     public async Task<PePlanilhaArquivo> ConsolidadoSecaoAsync(string secaoChave, string? formato, PeUserContext ctx)
     {
@@ -241,14 +243,22 @@ public class PePlanilhaService : IPePlanilhaService
             .ToList();
         var registros = await _registros.ExportarDosPdticsAsync(secao.Id, dosOrgaos.Select(p => (p.Pdtic.Id, p.Secao)).ToList());
 
+        // Seção por ciclo: só os registros com ciclo, com o rótulo dele
+        Dictionary<long, string>? ciclos = null;
+        if (dados.PorCicloDe(secao.Id) != null)
+            ciclos = (await _registros.CiclosDosRegistrosAsync(registros.Values.SelectMany(r => r).Select(r => r.Id).ToList()))
+                .ToDictionary(c => c.Key, c => c.Value.Rotulo);
+
         var linhas = new List<(PePdtic, PeTrilhaOrgao, HashSet<long>, PeRegistroResponse)>();
         foreach (var (pdtic, trilha, doOrgao) in dosOrgaos)
         {
             var visiveis = doOrgao.Visiveis.Select(v => v.Campo.Id).ToHashSet();
-            linhas.AddRange(registros.GetValueOrDefault(pdtic.Id, new List<PeRegistroResponse>()).Select(r => (pdtic, trilha, visiveis, r)));
+            linhas.AddRange(registros.GetValueOrDefault(pdtic.Id, new List<PeRegistroResponse>())
+                .Where(r => ciclos == null || ciclos.ContainsKey(r.Id))
+                .Select(r => (pdtic, trilha, visiveis, r)));
         }
 
-        return new PeSecaoConsolidada(modelo, modelo.Visiveis.Select(v => v.Campo).Where(c => c.NaPlanilha).ToList(), linhas);
+        return new PeSecaoConsolidada(modelo, modelo.Visiveis.Select(v => v.Campo).Where(c => c.NaPlanilha).ToList(), linhas, ciclos);
     }
 
     /// <summary>As colunas do órgão antes dos campos (nome, sigla, nível, versão e situação do PDTIC).</summary>
@@ -276,6 +286,7 @@ public class PePlanilhaService : IPePlanilhaService
         var comCodigo = TemCodigo(secao.Modelo);
 
         var cabecalho = ColunasDoOrgao.Select(c => (c.Titulo, false)).ToList();
+        if (secao.Ciclos != null) cabecalho.Add(("Ciclo", false));
         if (comCodigo) cabecalho.Add(("Código", false));
         cabecalho.AddRange(secao.Colunas.Select(c => (c.Rotulo, true)));
         csv.Linha(cabecalho);
@@ -285,6 +296,7 @@ public class PePlanilhaService : IPePlanilhaService
             var orgao = CelulasDoOrgao(pdtic, trilha);
             // Nome, sigla e nível foram digitados por alguém: protegidos como texto livre
             var linha = new List<(string, bool)> { (orgao[0], true), (orgao[1], true), (orgao[2], true), (orgao[3], false), (orgao[4], false) };
+            if (secao.Ciclos != null) linha.Add((secao.Ciclos.GetValueOrDefault(registro.Id) ?? string.Empty, true));
             if (comCodigo) linha.Add((registro.Codigo ?? string.Empty, false));
             foreach (var campo in secao.Colunas)
                 linha.Add(visiveis.Contains(campo.Id) ? TextoCsv(campo, registro) : (string.Empty, false));
@@ -299,12 +311,14 @@ public class PePlanilhaService : IPePlanilhaService
             .Select(c => new PeXlsxColuna { Titulo = c.Titulo, Tipo = PeXlsxTipo.Texto, Largura = c.Largura, Ajuda = c.Ajuda })
             .ToList();
         var comCodigo = TemCodigo(secao.Modelo);
+        if (secao.Ciclos != null) colunas.Add(ColunaDoCiclo());
         if (comCodigo) colunas.Add(ColunaDoCodigo());
         colunas.AddRange(secao.Colunas.Select(c => Coluna(secao.Modelo, c)));
 
         var linhas = secao.Linhas.Select(l =>
         {
             var celulas = new List<object?>(CelulasDoOrgao(l.Pdtic, l.Trilha));
+            if (secao.Ciclos != null) celulas.Add(secao.Ciclos.GetValueOrDefault(l.Registro.Id));
             if (comCodigo) celulas.Add(l.Registro.Codigo);
             foreach (var campo in secao.Colunas)
                 celulas.Add(l.Visiveis.Contains(campo.Id) ? Celula(campo, l.Registro) : null);
@@ -359,15 +373,19 @@ public class PePlanilhaService : IPePlanilhaService
     {
         var csv = new CsvEscritor();
         var comCodigo = TemCodigo(secao.Modelo);
+        var comCiclo = secao.Modelo.PorCiclo != null;
 
         var cabecalho = new List<(string, bool)>();
+        if (comCiclo) cabecalho.Add(("Ciclo", false));
         if (comCodigo) cabecalho.Add(("Código", false));
         cabecalho.AddRange(secao.Colunas.Select(c => (c.Campo.Rotulo, true)));
         csv.Linha(cabecalho);
 
-        foreach (var registro in secao.Registros)
+        foreach (var registro in RegistrosNaOrdem(secao))
         {
             var linha = new List<(string, bool)>();
+            // O nome da avaliação intermediária foi digitado pela equipe: protegido como texto livre
+            if (comCiclo) linha.Add((secao.CicloDe(registro.Id)?.Rotulo ?? string.Empty, true));
             if (comCodigo) linha.Add((registro.Codigo ?? string.Empty, false));
             foreach (var coluna in secao.Colunas)
             {
@@ -409,12 +427,15 @@ public class PePlanilhaService : IPePlanilhaService
     {
         var colunas = new List<PeXlsxColuna>();
         var comCodigo = TemCodigo(secao.Modelo);
+        var comCiclo = secao.Modelo.PorCiclo != null;
+        if (comCiclo) colunas.Add(ColunaDoCiclo());
         if (comCodigo) colunas.Add(ColunaDoCodigo());
         colunas.AddRange(secao.Colunas.Select(c => Coluna(secao.Modelo, c.Campo)));
 
-        var linhas = secao.Registros.Select(registro =>
+        var linhas = RegistrosNaOrdem(secao).Select(registro =>
         {
             var celulas = new List<object?>();
+            if (comCiclo) celulas.Add(secao.CicloDe(registro.Id)?.Rotulo);
             if (comCodigo) celulas.Add(registro.Codigo);
             foreach (var coluna in secao.Colunas) celulas.Add(Celula(coluna.Campo, registro));
             return celulas.ToArray();
@@ -422,6 +443,29 @@ public class PePlanilhaService : IPePlanilhaService
 
         return new PeXlsxAba { Nome = secao.Modelo.Secao.Titulo, Colunas = colunas, Linhas = linhas };
     }
+
+    /// <summary>
+    /// Os registros na ordem da planilha: na seção por ciclo (E7, rodada B), pelo ciclo (os de
+    /// monitoramento pelo início, depois as avaliações) e, dentro dele, pela ordem da seção.
+    /// </summary>
+    private static IEnumerable<PeRegistroResponse> RegistrosNaOrdem(PeSecaoExportada secao) =>
+        secao.Modelo.PorCiclo == null
+            ? secao.Registros
+            : secao.Registros
+                .Select((registro, posicao) => (Registro: registro, Posicao: posicao, Ciclo: secao.CicloDe(registro.Id)))
+                .OrderBy(x => x.Ciclo?.Tipo == PeDominios.TipoCiclo.Avaliacao ? 1 : 0)
+                .ThenBy(x => x.Ciclo?.Inicio ?? DateOnly.MinValue)
+                .ThenBy(x => x.Ciclo?.Numero ?? 0)
+                .ThenBy(x => x.Posicao)
+                .Select(x => x.Registro);
+
+    private static PeXlsxColuna ColunaDoCiclo() => new()
+    {
+        Titulo = "Ciclo",
+        Tipo = PeXlsxTipo.Texto,
+        Largura = 24,
+        Ajuda = "O ciclo do acompanhamento do registro: o ciclo de monitoramento ou a avaliação intermediária."
+    };
 
     private static PeXlsxColuna ColunaDoCodigo() => new()
     {

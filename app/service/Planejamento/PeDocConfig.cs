@@ -16,6 +16,10 @@ namespace service.Planejamento;
 /// <item>lista_tema: { "Tema": valor de uma opção do campo acoes.tema };</item>
 /// <item>fluxo: { "Fluxo": chave do fluxo } (desenhado a partir da E6);</item>
 /// <item>matriz_swot e quebra_pagina: sem configuração;</item>
+/// <item>desde a E7 (rodada B), os blocos do acompanhamento, sem configuração: acoes_por_situacao
+/// (as ações do ciclo em grupos pela situação), metas_por_resultado (as metas pelo resultado),
+/// riscos_ocorridos (os riscos que ocorreram no ciclo ou na vigência) e medicoes (as medições do
+/// ciclo com o valor de referência);</item>
 /// <item>em todos, menos a quebra de página: "PaginaDeitada": true (página deitada no PDF).</item>
 /// </list>
 /// O Filtro guarda só as linhas cujo campo tem o Valor (lista múltipla: contém); com
@@ -63,7 +67,12 @@ public static partial class PeDocConfig
         [PeDominios.TipoBloco.MatrizSwot] = new[] { "PaginaDeitada" },
         [PeDominios.TipoBloco.Fluxo] = new[] { "Fluxo", "PaginaDeitada" },
         // PaginaDeitada é aceito (o editor manda em todo bloco), mas a quebra de página não guarda
-        [PeDominios.TipoBloco.QuebraPagina] = new[] { "PaginaDeitada" }
+        [PeDominios.TipoBloco.QuebraPagina] = new[] { "PaginaDeitada" },
+        // Os blocos do acompanhamento (E7, rodada B): os dados vêm dos ciclos do documento
+        [PeDominios.TipoBloco.AcoesPorSituacao] = new[] { "PaginaDeitada" },
+        [PeDominios.TipoBloco.MetasPorResultado] = new[] { "PaginaDeitada" },
+        [PeDominios.TipoBloco.RiscosOcorridos] = new[] { "PaginaDeitada" },
+        [PeDominios.TipoBloco.Medicoes] = new[] { "PaginaDeitada" }
     };
 
     public static Resultado Normalizar(string tipo, JsonElement? entrada, Contexto ctx)

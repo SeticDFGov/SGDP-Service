@@ -469,6 +469,7 @@ public class AcessoModuloTest : PgiaTestBase
             [typeof(PePdticController)] = ModulosSgdp.PoliticaPlanejamento,
             [typeof(PeDocumentoController)] = ModulosSgdp.PoliticaPlanejamento,
             [typeof(PeFluxosController)] = ModulosSgdp.PoliticaPlanejamento,
+            [typeof(PeAcompanhamentoController)] = ModulosSgdp.PoliticaPlanejamento,
             [typeof(PgiaAdminController)] = "role:admin",
             [typeof(CtrAdminController)] = "role:admin",
             [typeof(AcessoController)] = "role:admin",

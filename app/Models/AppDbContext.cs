@@ -102,6 +102,14 @@ namespace Models
         // Fluxos (E6): os fluxos do guia como modelo e a cópia que o órgão adaptou
         public DbSet<PeFluxoModelo> PeFluxosModelo { get; set; }
         public DbSet<PeFluxo> PeFluxos { get; set; }
+        // Acompanhamento (E7, rodada B): os ciclos e as colunas novas das tabelas que já existiam,
+        // em entidades à parte (table splitting), para a leitura de sempre não depender delas
+        public DbSet<PeCiclo> PeCiclos { get; set; }
+        public DbSet<PeRegistroCiclo> PeRegistrosCiclo { get; set; }
+        public DbSet<PeSecaoCiclo> PeSecoesCiclo { get; set; }
+        public DbSet<PeDocOrgaoDocumento> PeDocOrgaosDocumento { get; set; }
+        public DbSet<PeDocOrgaoBlocoDocumento> PeDocOrgaoBlocosDocumento { get; set; }
+        public DbSet<PeDocVersaoDocumento> PeDocVersoesDocumento { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

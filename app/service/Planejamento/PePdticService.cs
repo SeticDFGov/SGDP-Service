@@ -63,6 +63,7 @@ public class PePdticService : IPePdticService
     public const string MotivoAntesDaPublicacao = "Disponível depois da publicação do PDTIC";
     public const string MotivoAntesDaAprovacao = "Disponível depois da aprovação do CGTIC";
     public const string AvisoDevolvido = "Devolvido: ajuste e registre a nova decisão.";
+    public const string MotivoSemAvaliacao = "Abra uma avaliação intermediária quando o comitê pedir";
 
     private readonly AppDbContext _context;
     private readonly IPeRegistroService _registros;
@@ -228,8 +229,25 @@ public class PePdticService : IPePdticService
             .ToDictionary(g => g.Key, g => g.Count());
         var analise = await _registros.AnalisarAsync(PeDono.DoPdtic(pdtic.Id), trilha.SecoesMontadas());
         var porSecao = analise.Secoes.ToDictionary(s => s.Secao.Secao.Id);
+
+        // Acompanhamento (E7, rodada B; com a versão 6 do modelo inicial carregada): os ciclos (os
+        // de monitoramento pelo plano da periodicidade, sem gravar), a avaliação intermediária mais
+        // recente (as seções da avaliação são analisadas nela) e a espera da etapa 7
+        var acompanhamento = trilha.Dados.Acompanhamento;
+        var ciclos = acompanhamento.Ativo
+            ? await PeCiclosDoPdtic.EfetivosAsync(_context, _registros, pdtic, trilha)
+            : new List<PeCiclo>();
+        var avaliacao = ciclos.Where(c => c.Tipo == PeDominios.TipoCiclo.Avaliacao).OrderByDescending(c => c.Numero).FirstOrDefault();
+        if (avaliacao != null)
+        {
+            var daAvaliacao = trilha.SecoesMontadas().Where(s => s.PorCiclo == PeDominios.TipoCiclo.Avaliacao).ToList();
+            foreach (var secao in (await _registros.AnalisarAsync(PeDono.DoPdtic(pdtic.Id), daAvaliacao, avaliacao.Id)).Secoes)
+                porSecao[secao.Secao.Secao.Id] = secao;
+        }
+        var esperaDoFechamento = acompanhamento.Ativo ? EsperaDoFechamento(pdtic, trilha, porSecao, acompanhamento.DiasAvaliacaoFinal) : null;
+        // Só as versões do PDF do PDTIC contam (as do RA e do RR, não)
         var temDocumento = trilha.Passos.Any(p => p.Tipo == PeDominios.TipoPasso.Documento)
-                           && await _context.PeDocVersoes.AsNoTracking().AnyAsync(v => v.PdticId == pdtic.Id);
+                           && await PeDocumentoService.TemVersaoDoPdticAsync(_context, pdtic.Id, acompanhamento.Ativo);
         var deliberacao = pdtic.Situacao == PeDominios.SituacaoPdtic.Devolvido
             ? await _context.PeDeliberacoes.AsNoTracking()
                 .Where(d => d.ObjetoTipo == PeDominios.ObjetoDeliberacao.Pdtic && d.ObjetoId == pdtic.Id)
@@ -277,6 +295,21 @@ public class PePdticService : IPePdticService
             {
                 situacao = PeDominios.SituacaoPasso.Aguardando;
                 motivo = MotivoAntesDaPublicacao;
+            }
+            else if (acompanhamento.Ativo && grupo == PeEdicaoPdtic.Grupo.Acompanhamento && passo.Tipo == PeDominios.TipoPasso.Monitoramento)
+            {
+                (situacao, motivo, falta) = PeloCiclo(passo, ciclos, PeCiclos.Hoje());
+            }
+            else if (acompanhamento.Ativo && grupo == PeEdicaoPdtic.Grupo.Acompanhamento
+                     && passo.Secoes.Any(s => s.PorCiclo == PeDominios.TipoCiclo.Avaliacao) && avaliacao == null)
+            {
+                situacao = PeDominios.SituacaoPasso.Aguardando;
+                motivo = MotivoSemAvaliacao;
+            }
+            else if (esperaDoFechamento != null && etapas.GetValueOrDefault(passo.Id) == PeDominios.EtapaPdtic.Fechamento)
+            {
+                situacao = PeDominios.SituacaoPasso.Aguardando;
+                motivo = esperaDoFechamento;
             }
             else
             {
@@ -391,8 +424,57 @@ public class PePdticService : IPePdticService
         }
     }
 
+    /// <summary>
+    /// Os passos do monitoramento (5.1 e 5.2) pelos ciclos (E7, rodada B): atrasado quando algum
+    /// ciclo começado passou do prazo sem fechar; pendente quando há ciclo aberto no prazo; feito
+    /// quando todos os ciclos começados estão fechados; aguardando enquanto nenhum começou.
+    /// </summary>
+    private static (string Situacao, string? Motivo, string? Falta) PeloCiclo(PeTrilhaPasso passo, IReadOnlyList<PeCiclo> ciclos, DateOnly hoje)
+    {
+        var monitoramento = ciclos.Where(c => c.Tipo == PeDominios.TipoCiclo.Monitoramento).OrderBy(c => c.Inicio).ToList();
+        if (monitoramento.Count == 0)
+            return (PeDominios.SituacaoPasso.Aguardando, "Os ciclos de monitoramento saem da vigência do PDTIC (passo da abrangência)", null);
+        var comecados = monitoramento.Where(c => c.Inicio <= hoje).ToList();
+        if (comecados.Count == 0)
+            return (PeDominios.SituacaoPasso.Aguardando, $"O primeiro ciclo de monitoramento começa em {PeCiclos.Data(monitoramento[0].Inicio)}", null);
+
+        var fechar = passo.Chave == PeDominios.ChaveAcompanhamento.PassoRelatorioAcompanhamento;
+        var atrasados = comecados
+            .Where(c => PeCiclos.Exibida(c, hoje) == PeDominios.SituacaoCicloExibida.Atrasado)
+            .ToList();
+        if (atrasados.Count > 0)
+        {
+            var motivo = atrasados.Count == 1
+                ? $"O ciclo {atrasados[0].Rotulo} passou do prazo de fechamento ({PeCiclos.Data(atrasados[0].Prazo!.Value)}) e ainda está aberto"
+                : $"Os ciclos {Lista(atrasados.Select(c => c.Rotulo).ToList())} passaram do prazo de fechamento e ainda estão abertos";
+            return (PeDominios.SituacaoPasso.Atrasado, motivo, $"{motivo}. Registre os dados e feche o ciclo.");
+        }
+        var aberto = comecados.FirstOrDefault(c => c.Situacao == PeDominios.SituacaoCiclo.Aberto);
+        if (aberto != null)
+            return (PeDominios.SituacaoPasso.Pendente, null, fechar
+                ? $"Feche o ciclo {aberto.Rotulo} até {PeCiclos.Data(aberto.Prazo ?? aberto.Inicio)}."
+                : $"Registre a situação das ações do ciclo {aberto.Rotulo} até {PeCiclos.Data(aberto.Prazo ?? aberto.Inicio)}.");
+        return (PeDominios.SituacaoPasso.Feito, null, null);
+    }
+
+    /// <summary>
+    /// A etapa 7 (feche o ciclo) espera até faltarem os dias da configuração dias_avaliacao_final
+    /// para o fim da vigência, ou até a equipe gravar algum dado nela. Devolve o motivo da espera
+    /// (com a data), ou nulo quando a etapa já está disponível (ou o PDTIC não está vigente).
+    /// </summary>
+    private static string? EsperaDoFechamento(PePdtic pdtic, PeTrilhaOrgao trilha, IReadOnlyDictionary<long, PeSecaoAnalisada> porSecao, int dias)
+    {
+        if (!PeDominios.SituacaoPdtic.Vigentes.Contains(pdtic.Situacao) || pdtic.VigenciaFim is not DateOnly fim) return null;
+        var etapa = trilha.Etapas.FirstOrDefault(e => e.Chave == PeDominios.EtapaPdtic.Fechamento);
+        if (etapa == null) return null;
+        var comDado = etapa.Passos.SelectMany(p => p.Secoes).Any(s => porSecao.TryGetValue(s.Id, out var analisada) && analisada.Registros.Count > 0);
+        var abre = fim.AddDays(-dias);
+        if (comDado || abre <= PeCiclos.Hoje()) return null;
+        return $"Disponível a partir de {PeCiclos.Data(abre)}, {dias.ToString(CultureInfo.InvariantCulture)} dias antes do fim da vigência ({PeCiclos.Data(fim)})";
+    }
+
     /// <summary>O que falta nas seções visíveis do passo (a seção obrigatória sem registro e os obrigatórios vazios), ou nulo.</summary>
-    private static string? FaltaNasSecoes(PeTrilhaPasso passo, IReadOnlyDictionary<long, PeSecaoAnalisada> porSecao)
+    internal static string? FaltaNasSecoes(PeTrilhaPasso passo, IReadOnlyDictionary<long, PeSecaoAnalisada> porSecao)
     {
         var faltas = new List<string>();
         foreach (var secao in passo.Secoes)
@@ -418,7 +500,7 @@ public class PePdticService : IPePdticService
     /// O que falta num passo de aprovação: as seções completas e a decisão tomada (aprovado; na
     /// avaliação do comitê, seguir ou revisar). A decisão "devolvido" pende, com o aviso.
     /// </summary>
-    private static string? FaltaNaAprovacao(PeTrilhaPasso passo, IReadOnlyDictionary<long, PeSecaoAnalisada> porSecao, List<string> avisos)
+    internal static string? FaltaNaAprovacao(PeTrilhaPasso passo, IReadOnlyDictionary<long, PeSecaoAnalisada> porSecao, List<string> avisos)
     {
         var devolvido = DecisaoDevolvida(passo, porSecao);
         if (devolvido) avisos.Add(AvisoDevolvido);
@@ -529,7 +611,7 @@ public class PePdticService : IPePdticService
     }
 
     /// <summary>"D01", "D01 e D02", "D01, D02 e D03", até cinco e depois "e mais N".</summary>
-    private static string Lista(IReadOnlyList<string> itens)
+    internal static string Lista(IReadOnlyList<string> itens)
     {
         if (itens.Count > 5) return string.Join(", ", itens.Take(5)) + $" e mais {itens.Count - 5}";
         return itens.Count == 1 ? itens[0] : string.Join(", ", itens.Take(itens.Count - 1)) + " e " + itens[^1];
