@@ -20,6 +20,9 @@ public interface IPeModeloService
 
     Task<PagedResponse<PeHistoricoResponse>> HistoricoAsync(PeHistoricoConsulta consulta);
 
+    /// <summary>F3: troca o modo dos níveis (livre ou definido), com o histórico do modelo (entidade configuracao).</summary>
+    Task<PeModoNiveisResponse> DefinirModoNiveisAsync(PeModoNiveisDTO dto, string autor);
+
     Task<PeNivelResponse> CriarNivelAsync(PeNivelCriarDTO dto, string autor);
 
     Task<PeNivelResponse> AtualizarNivelAsync(long id, PeNivelAtualizarDTO dto, string autor);
@@ -92,4 +95,7 @@ public interface IPeOrgaoService
 
     /// <summary>Grava a lista inteira: o que não vem na lista (ou vem com Situacao nula) sai.</summary>
     Task<List<PeOrgaoAjusteResponse>> DefinirAjustesAsync(long orgaoId, List<PeOrgaoAjusteDTO> ajustes, string autor);
+
+    /// <summary>F3: escolhe a forma de um passo para o órgão no modo livre (nulo volta à padrão); devolve o passo a passo do órgão.</summary>
+    Task<PeTrilhaResponse> DefinirDetalheAsync(long orgaoId, long passoId, PePassoDetalheDTO dto, string autor);
 }

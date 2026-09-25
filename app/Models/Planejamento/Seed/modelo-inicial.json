@@ -1,5 +1,5 @@
 {
-  "versao": 7,
+  "versao": 8,
   "niveis": [
     {
       "codigo": "basico",
@@ -17,7 +17,7 @@
       "descricao": "Para o órgão maduro: segue o Guia de PDTIC do SISP por inteiro, com plano de trabalho, aprovações intermediárias e avaliação."
     }
   ],
-  "configuracoes": {"periodicidade_monitoramento_padrao": "trimestral", "prazo_fechamento_ciclo_dias": 15, "dias_avaliacao_final": 90},
+  "configuracoes": {"periodicidade_monitoramento_padrao": "trimestral", "prazo_fechamento_ciclo_dias": 15, "dias_avaliacao_final": 90, "modo_niveis": "livre"},
   "etapas": [
     {
       "chave": "preparacao",

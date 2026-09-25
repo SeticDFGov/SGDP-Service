@@ -310,7 +310,7 @@ public class PeRegistroService : IPeRegistroService
         var trilha = aberto.Trilha!;
         var chave = passoChave?.Trim() ?? string.Empty;
         var passo = trilha.Passos.FirstOrDefault(p => p.Chave == chave)
-            ?? throw new ApiException(ErrorCode.PePassoIndisponivel, "Este passo não está na trilha do órgão. Atualize a tela.");
+            ?? throw PePdticService.PassoIndisponivel();
         var secoes = passo.Secoes.Select(trilha.Montar).Where(s => s.Secao.NaPlanilha).ToList();
         if (secoes.Count == 0)
             throw new ApiException(ErrorCode.PePassoSemPlanilha,
@@ -490,6 +490,7 @@ public class PeRegistroService : IPeRegistroService
             await _context.SaveChangesAsync();
         }
         if (transacao != null) await transacao.CommitAsync();
+        await MudouDepoisDaValidacaoAsync(aberto, secao, agora);
 
         return await UmaRespostaAsync(secao, registro.Id);
     }
@@ -505,7 +506,11 @@ public class PeRegistroService : IPeRegistroService
         var gravacao = await ValidarAsync(aberto, secao, registro, dto, ctx);
 
         var agora = DateTime.UtcNow;
+        var antes = registro.Dados;
         Aplicar(registro, gravacao);
+        // F3: a gravação que muda os dados (os valores ou as ligações) conta como mudança depois da validação
+        var mudou = PeDocMarcadores.Canonico(PeRegistroDados.Ler(antes)) != PeDocMarcadores.Canonico(PeRegistroDados.Ler(registro.Dados))
+                    || gravacao.VinculosNovos.Count > 0 || gravacao.VinculosRemovidos.Count > 0;
         DarDono(gravacao, registro.Id, ctx, agora);
         registro.AlteradoEm = agora;
         registro.AlteradoPor = ctx.Email;
@@ -513,9 +518,20 @@ public class PeRegistroService : IPeRegistroService
         CopiarVigencia(aberto, secao, gravacao.Dados);
         IniciarAcompanhamento(aberto, secao, gravacao.Dados);
         await _context.SaveChangesAsync();
+        if (mudou) await MudouDepoisDaValidacaoAsync(aberto, secao, agora);
 
         return await UmaRespostaAsync(secao, registro.Id);
     }
+
+    /// <summary>
+    /// F3: a gravação mudou o conteúdo do passo da seção no PDTIC (a seção pertence a um passo só):
+    /// com a validação da equipe de pé e ainda sem mudança registrada, grava a data da primeira
+    /// mudança (UPDATE condicional). Fora do PDTIC, nada.
+    /// </summary>
+    private Task MudouDepoisDaValidacaoAsync(PeDonoAberto aberto, PeSecaoDoDono secao, DateTime agora) =>
+        aberto.Pdtic != null && aberto.Trilha != null && secao.Secao.PassoId is long passoId
+            ? PeValidacaoDaEquipe.MarcarMudancaAsync(_context, aberto.Pdtic, aberto.Trilha, new[] { passoId }, agora)
+            : Task.CompletedTask;
 
     public async Task ExcluirAsync(PeDono dono, string secaoChave, long id, PeUserContext ctx, long? cicloId = null)
     {
@@ -534,9 +550,11 @@ public class PeRegistroService : IPeRegistroService
 
         _context.PeVinculos.RemoveRange(await _context.PeVinculos.Where(v => v.RegistroOrigemId == id).ToListAsync());
         await RemoverAsync(registro, ciclo);
-        Tocar(aberto, ctx, DateTime.UtcNow, ciclo);
+        var agora = DateTime.UtcNow;
+        Tocar(aberto, ctx, agora, ciclo);
         CopiarVigencia(aberto, secao, null);
         await _context.SaveChangesAsync();
+        await MudouDepoisDaValidacaoAsync(aberto, secao, agora);
     }
 
     /// <summary>Tira o registro (e, na seção por ciclo, a parte com o ciclo, que divide a mesma linha).</summary>
@@ -643,6 +661,7 @@ public class PeRegistroService : IPeRegistroService
             await _context.SaveChangesAsync();
         }
         if (transacao != null) await transacao.CommitAsync();
+        await MudouDepoisDaValidacaoAsync(aberto, secao, agora);
     }
 
     /// <summary>
@@ -709,6 +728,7 @@ public class PeRegistroService : IPeRegistroService
         }
         Tocar(aberto, ctx, agora);
         await _context.SaveChangesAsync();
+        await MudouDepoisDaValidacaoAsync(aberto, secao, agora);
 
         var ids = criados.Select(r => r.Id).ToList();
         var gravados = await _context.PeRegistros.AsNoTracking().Where(r => ids.Contains(r.Id)).OrderBy(r => r.Ordem).ToListAsync();
@@ -833,10 +853,14 @@ public class PeRegistroService : IPeRegistroService
         if (ids.Count != registros.Count || ids.Distinct().Count() != ids.Count || !registros.Select(r => r.Id).ToHashSet().SetEquals(ids))
             throw new ApiException(ErrorCode.PeOrdemInvalida, "Mande todos os registros da seção, cada um uma vez, na nova ordem.");
 
+        // F3: reordenar muda o conteúdo do passo (para a validação da equipe) quando a ordem muda de fato
+        var mudou = registros.OrderBy(r => r.Ordem).ThenBy(r => r.Id).Select(r => r.Id).SequenceEqual(ids) == false;
         for (var i = 0; i < ids.Count; i++)
             registros.Single(r => r.Id == ids[i]).Ordem = i + 1;
-        Tocar(aberto, ctx, DateTime.UtcNow, ciclo);
+        var agora = DateTime.UtcNow;
+        Tocar(aberto, ctx, agora, ciclo);
         await _context.SaveChangesAsync();
+        if (mudou) await MudouDepoisDaValidacaoAsync(aberto, secao, agora);
 
         return await RespostaDaSecaoAsync(aberto, secao, ciclo);
     }
@@ -1228,7 +1252,7 @@ public class PeRegistroService : IPeRegistroService
 
         // O papel é conferido aqui; a situação, na seção (depende da etapa do passo dela)
         var papelEdita = _permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId);
-        if (escrita && !papelEdita) throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do órgão edita o PDTIC.");
+        if (escrita && !papelEdita) throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do PDTIC do órgão edita o PDTIC.");
         var trilha = await PeTrilhaOrgao.DoPdticAsync(_context, pdtic);
         return new PeDonoAberto(dono, null, pdtic, trilha, papelEdita);
     }
@@ -1259,7 +1283,7 @@ public class PeRegistroService : IPeRegistroService
     {
         if (aberto.Pdtic == null || aberto.Trilha == null) return null;
         var passo = aberto.Trilha.Secao(secao.Secao.Id)?.Passo;
-        if (passo == null) return "Esta seção não aparece no nível do órgão.";
+        if (passo == null) return "Esta seção não aparece para o órgão.";
         return PeEdicaoPdtic.Recusa(aberto.Pdtic, PeEdicaoPdtic.GrupoDoPasso(aberto.Trilha, passo), passo.Chave);
     }
 
@@ -1335,7 +1359,7 @@ public class PeRegistroService : IPeRegistroService
             if (entidade == null || entidade.Escopo != PeDominios.Escopo.Pdtic || entidade.ExcluidoEm != null)
                 throw new ApiException(ErrorCode.PeSecaoIndisponivel, "Esta seção não existe aqui. Atualize a tela.");
             var visivel = aberto.Trilha.Secao(entidade.Id)
-                ?? throw new ApiException(ErrorCode.PeSecaoIndisponivel, "Esta seção não aparece no nível do órgão.");
+                ?? throw new ApiException(ErrorCode.PeSecaoIndisponivel, "Esta seção não aparece para o órgão.");
             return aberto.Trilha.Montar(visivel.Secao);
         }
 

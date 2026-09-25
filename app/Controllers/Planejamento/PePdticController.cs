@@ -140,7 +140,9 @@ public class PePdticController : ControllerBase
 
     /// <summary>
     /// A situação de cada passo (feito, pendente, atencao, nao_se_aplica, continuo, aguardando,
-    /// atrasado, externo), com o Motivo, o PodeEditar de cada passo, os avisos e o próximo passo.
+    /// atrasado, externo e, desde a F3, opcional), com o Motivo, o PodeEditar de cada passo, os
+    /// avisos e o próximo passo; desde a F3, também o Obrigatorio, a validação da equipe
+    /// (AceitaValidacao e Validacao) de cada passo e o nível que o PDTIC alcançou (Nivel).
     /// </summary>
     [HttpGet("pdtic/{id:long}/situacao")]
     public Task<IActionResult> Situacao(long id) =>
@@ -155,6 +157,20 @@ public class PePdticController : ControllerBase
     [HttpDelete("pdtic/{id:long}/passos/{passoId:long}/nao-se-aplica")]
     public Task<IActionResult> DesmarcarNaoSeAplica(long id, long passoId) =>
         Executar(async ctx => Ok(await _pdtics.DesmarcarNaoSeAplicaAsync(id, passoId, ctx)));
+
+    /// <summary>
+    /// F3: marca o passo como validado pela equipe (a equipe do PDTIC do órgão e o admin geral, com
+    /// o passo feito e editável agora); devolve a situação do passo. 409 PeValidacaoRecusada (1145)
+    /// com o passo não feito ou de um tipo que não recebe a validação.
+    /// </summary>
+    [HttpPut("pdtic/{id:long}/passos/{passoId:long}/validacao")]
+    public Task<IActionResult> Validar(long id, long passoId) =>
+        Executar(async ctx => Ok(await _pdtics.ValidarPassoAsync(id, passoId, ctx)));
+
+    /// <summary>F3: desfaz a validação da equipe (sem marca, não faz nada); devolve a situação do passo.</summary>
+    [HttpDelete("pdtic/{id:long}/passos/{passoId:long}/validacao")]
+    public Task<IActionResult> DesfazerValidacao(long id, long passoId) =>
+        Executar(async ctx => Ok(await _pdtics.DesfazerValidacaoAsync(id, passoId, ctx)));
 
     /// <summary>Os três temas do decreto (incisos V, VI e IX) com as ações e a justificativa de tema sem ação.</summary>
     [HttpGet("pdtic/{id:long}/temas")]

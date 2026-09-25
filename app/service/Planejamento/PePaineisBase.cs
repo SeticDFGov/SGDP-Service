@@ -104,6 +104,9 @@ public sealed class PeBaseDosPaineis
         var ajustes = ids.Count == 0
             ? Array.Empty<PeOrgaoAjuste>().ToLookup(a => 0L)
             : (await context.PeOrgaosAjuste.AsNoTracking().Where(a => ids.Contains(a.OrgaoId)).ToListAsync()).ToLookup(a => a.OrgaoId);
+        // F3: a forma de cada passo (só no modo livre; uma consulta para todos os órgãos)
+        var detalhes = await PeTrilhaOrgao.DetalhesDosOrgaosAsync(context, dados, ids);
+        var livre = dados.ModoNiveis.Livre;
 
         var retratos = new List<PeRetratoDoOrgao>();
         foreach (var orgao in orgaos)
@@ -114,13 +117,16 @@ public sealed class PeBaseDosPaineis
             var referencia = emVigor ?? versoes.FirstOrDefault();
             var avaliado = daReferencia ? referencia : emVigor;
             long? escolhido = escolhidos.TryGetValue(orgao.Id, out var nivelId) ? nivelId : null;
-            var nivel = (escolhido != null ? dados.Niveis.FirstOrDefault(n => n.Id == escolhido) : null) ?? dados.NivelPadrao();
+            // No modo livre (F3), o nível do órgão é o base (o escolhido fica guardado e não vale)
+            var nivel = livre
+                ? dados.NivelPadrao()
+                : (escolhido != null ? dados.Niveis.FirstOrDefault(n => n.Id == escolhido) : null) ?? dados.NivelPadrao();
 
             var retrato = new PeRetratoDoOrgao
             {
                 Orgao = orgao,
                 Nivel = nivel,
-                NivelPadrao = nivel == null || escolhido != nivel.Id,
+                NivelPadrao = livre || nivel == null || escolhido != nivel.Id,
                 Pdtics = versoes,
                 EmVigor = emVigor,
                 Referencia = referencia,
@@ -130,7 +136,8 @@ public sealed class PeBaseDosPaineis
             if (avaliado != null && nivel != null)
             {
                 retrato.Trilha = PeTrilhaOrgao.Resolver(dados, orgao, escolhido,
-                    ajustes[orgao.Id].ToDictionary(a => (a.AlvoTipo, a.AlvoId), a => a.Situacao), semVigente);
+                    ajustes[orgao.Id].ToDictionary(a => (a.AlvoTipo, a.AlvoId), a => a.Situacao), semVigente,
+                    detalhes.GetValueOrDefault(orgao.Id));
                 retrato.Trilha.AjustarAoPdtic(avaliado);
             }
             retratos.Add(retrato);
@@ -140,7 +147,7 @@ public sealed class PeBaseDosPaineis
         if (comSituacao)
         {
             var avaliados = retratos.Where(r => r.Trilha != null).Select(r => r.Avaliado!.Id).ToList();
-            leitura = await PeLeituraDaSituacao.CarregarAsync(context, avaliados, dados.Acompanhamento.Ativo);
+            leitura = await PeLeituraDaSituacao.CarregarAsync(context, avaliados, dados.Acompanhamento.Ativo, dados.ModoNiveis.Ativo);
             foreach (var retrato in retratos)
             {
                 if (retrato.Trilha != null)
@@ -184,12 +191,16 @@ public static class PeConformidadeRegras
     {
         var pdtic = retrato.EmVigor;
         var referencia = retrato.Referencia;
+        // F3: o nível que o PDTIC em vigor alcançou (a mesma situação calculada no lote)
+        var nivelDoPdtic = pdtic != null && retrato.Avaliado?.Id == pdtic.Id ? retrato.Situacao?.Resposta.Nivel : null;
         var linha = new PeConformidadeOrgaoResponse
         {
             OrgaoId = retrato.Orgao.Id,
             Sigla = retrato.Orgao.Sigla,
             Nome = retrato.Orgao.Nome,
             NivelNome = retrato.Nivel?.Nome,
+            NivelAlcancadoId = nivelDoPdtic?.AlcancadoId,
+            NivelAlcancadoNome = nivelDoPdtic?.AlcancadoNome,
             // A versão e a situação de referência, as mesmas do painel (F2): o órgão com o PDTIC
             // encerrado aparece como encerrado, e "sem PDTIC" é só quem nunca abriu um. Os itens
             // continuam avaliando só a versão vigente ou a da elaboração

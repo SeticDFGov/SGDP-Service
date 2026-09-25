@@ -12,7 +12,9 @@ namespace service.Planejamento;
 /// sem versão vigente (a ligação com os catálogos dele fica opcional em todos os níveis,
 /// também no Obrigatorio da trilha). Usada pelo GET modelo/trilha, pelo motor de registros
 /// no PDTIC (seções e campos visíveis e obrigatórios do nível e dos ajustes), pela situação
-/// dos passos e pelas planilhas do PDTIC e consolidadas.
+/// dos passos e pelas planilhas do PDTIC e consolidadas. Desde a F3, no modo livre, a trilha
+/// parte do nível base (o passo fora dele aparece opcional) e cada passo tem a forma dele (a
+/// escolhida pelo órgão em pe_orgao_passo_detalhe, senão a padrão); a tela diz "passo a passo".
 /// </summary>
 public sealed class PeTrilhaOrgao
 {
@@ -20,10 +22,14 @@ public sealed class PeTrilhaOrgao
 
     public required PeModeloDados Dados { get; init; }
 
+    // No modo livre (F3), o nível base (o padrão)
     public required PeNivel Nivel { get; init; }
 
-    // O órgão não escolheu nível: vale o padrão (o primeiro ativo pela ordem)
+    // O órgão não escolheu nível: vale o padrão (o primeiro ativo pela ordem); no modo livre, sempre
     public bool NivelPadrao { get; init; }
+
+    // F3: a trilha é do modo livre (cada passo com a forma dele; o passo fora do nível base, opcional)
+    public bool Livre { get; init; }
 
     // Não há PETIC-DF vigente: a ligação com os catálogos dele já vem opcional
     public bool SemPeticVigente { get; init; }
@@ -134,7 +140,10 @@ public sealed class PeTrilhaOrgao
         return trilha;
     }
 
-    /// <summary>A trilha de um órgão com o modelo já carregado (o consolidado passa por vários órgãos).</summary>
+    /// <summary>
+    /// A trilha de um órgão com o modelo já carregado (o consolidado passa por vários órgãos). No
+    /// modo livre (F3), com a forma que o órgão escolheu para cada passo.
+    /// </summary>
     public static async Task<PeTrilhaOrgao> DoOrgaoAsync(AppDbContext context, PeModeloDados dados, PgiaOrgao orgao, bool semVigente)
     {
         var escolhido = await context.PeOrgaosConfig.AsNoTracking()
@@ -145,10 +154,45 @@ public sealed class PeTrilhaOrgao
             .Where(a => a.OrgaoId == orgao.Id)
             .Select(a => new { a.AlvoTipo, a.AlvoId, a.Situacao })
             .ToListAsync();
-        return Resolver(dados, orgao, escolhido, ajustes.ToDictionary(a => (a.AlvoTipo, a.AlvoId), a => a.Situacao), semVigente);
+        // A forma de cada passo só é lida no modo livre (a versão 8 carregada: a tabela existe)
+        var detalhes = dados.ModoNiveis.Livre
+            ? await context.PeOrgaosPassoDetalhe.AsNoTracking()
+                .Where(d => d.OrgaoId == orgao.Id)
+                .ToDictionaryAsync(d => d.PassoId, d => d.NivelId)
+            : null;
+        return Resolver(dados, orgao, escolhido, ajustes.ToDictionary(a => (a.AlvoTipo, a.AlvoId), a => a.Situacao), semVigente, detalhes);
     }
 
+    /// <summary>
+    /// A trilha do órgão no modo de hoje: no definido, pelo nível escolhido (ou o padrão) e os
+    /// ajustes; no livre (F3), a partir do nível base, com os ajustes e a forma escolhida de cada
+    /// passo (detalhes: passo → nível; o nível escolhido do órgão não vale, fica guardado).
+    /// </summary>
     public static PeTrilhaOrgao Resolver(PeModeloDados dados, PgiaOrgao orgao, long? escolhido,
+        IReadOnlyDictionary<(string Tipo, long Id), string> ajustes, bool semVigente, IReadOnlyDictionary<long, long>? detalhes = null)
+    {
+        if (!dados.ModoNiveis.Livre) return ResolverDefinido(dados, orgao, escolhido, ajustes, semVigente);
+
+        var nivelBase = dados.NivelPadrao() ?? throw PeModeloService.ModeloIndisponivel();
+        var etapas = PeTrilhaResolver.ResolverLivre(dados, ajustes, detalhes ?? new Dictionary<long, long>());
+        if (semVigente) DispensarPetic(dados, etapas);
+        return new PeTrilhaOrgao
+        {
+            Orgao = orgao,
+            Dados = dados,
+            Nivel = nivelBase,
+            NivelPadrao = true,
+            Livre = true,
+            SemPeticVigente = semVigente,
+            Etapas = etapas
+        };
+    }
+
+    /// <summary>
+    /// A trilha no modo definido (a de sempre): o nível escolhido (ou o padrão) com os ajustes.
+    /// Também a régua do nível alcançado (F3), que usa cada nível sem os ajustes de órgão.
+    /// </summary>
+    public static PeTrilhaOrgao ResolverDefinido(PeModeloDados dados, PgiaOrgao orgao, long? escolhido,
         IReadOnlyDictionary<(string Tipo, long Id), string> ajustes, bool semVigente)
     {
         var nivel = (escolhido != null ? dados.Niveis.FirstOrDefault(n => n.Id == escolhido) : null)
@@ -177,13 +221,31 @@ public sealed class PeTrilhaOrgao
     public static async Task<bool> SemPeticVigenteAsync(AppDbContext context) =>
         !await context.PePetics.AnyAsync(p => p.Situacao == PeDominios.SituacaoPetic.Aprovado);
 
-    /// <summary>O nível de hoje de cada órgão (o escolhido ou o padrão; nulo sem modelo), em lote.</summary>
+    /// <summary>
+    /// A forma escolhida de cada passo dos órgãos dados (órgão → passo → nível), em lote. Só lê no
+    /// modo livre (a versão 8 carregada); no definido, vazio.
+    /// </summary>
+    public static async Task<Dictionary<long, Dictionary<long, long>>> DetalhesDosOrgaosAsync(AppDbContext context, PeModeloDados dados,
+        IReadOnlyCollection<long> orgaoIds)
+    {
+        if (!dados.ModoNiveis.Livre || orgaoIds.Count == 0) return new Dictionary<long, Dictionary<long, long>>();
+        var ids = orgaoIds.Distinct().ToList();
+        return (await context.PeOrgaosPassoDetalhe.AsNoTracking().Where(d => ids.Contains(d.OrgaoId)).ToListAsync())
+            .GroupBy(d => d.OrgaoId)
+            .ToDictionary(g => g.Key, g => g.ToDictionary(d => d.PassoId, d => d.NivelId));
+    }
+
+    /// <summary>
+    /// O nível de hoje de cada órgão (o escolhido ou o padrão; nulo sem modelo), em lote. No modo
+    /// livre (F3), o nível base para todos (o escolhido não vale nele).
+    /// </summary>
     public static async Task<Dictionary<long, PeNivel?>> NiveisDosOrgaosAsync(AppDbContext context, IEnumerable<long> orgaoIds)
     {
         var ids = orgaoIds.Distinct().ToList();
         if (ids.Count == 0) return new Dictionary<long, PeNivel?>();
         var niveis = await context.PeNiveis.AsNoTracking().OrderBy(n => n.Ordem).ThenBy(n => n.Id).ToListAsync();
         var padrao = niveis.FirstOrDefault(n => n.Ativo);
+        if ((await PeModoNiveis.LerAsync(context)).Livre) return ids.ToDictionary(id => id, _ => padrao);
         var escolhidos = await context.PeOrgaosConfig.AsNoTracking()
             .Where(c => ids.Contains(c.OrgaoId))
             .ToDictionaryAsync(c => c.OrgaoId, c => c.NivelId);

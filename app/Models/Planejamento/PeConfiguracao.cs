@@ -5,8 +5,9 @@ namespace Models.Planejamento;
 /// modelo inicial já carregada (seed_modelo_versao), a periodicidade padrão do
 /// monitoramento (periodicidade_monitoramento_padrao) e, desde a E7 (rodada B), os dias de
 /// prazo para fechar um ciclo depois do fim dele (prazo_fechamento_ciclo_dias, 15) e quantos
-/// dias antes do fim da vigência a etapa 7 fica disponível (dias_avaliacao_final, 90). Tabela
-/// pe_configuracao.
+/// dias antes do fim da vigência a etapa 7 fica disponível (dias_avaliacao_final, 90) e, desde a
+/// F3, como os órgãos usam os níveis (modo_niveis: "livre" ou "definido"; o carregador versão 8
+/// grava "livre" quando a chave não existe). Tabela pe_configuracao.
 /// </summary>
 public class PeConfiguracao : IPeAuditavel
 {
@@ -14,6 +15,7 @@ public class PeConfiguracao : IPeAuditavel
     public const string ChavePeriodicidadeMonitoramento = "periodicidade_monitoramento_padrao";
     public const string ChavePrazoFechamentoCiclo = "prazo_fechamento_ciclo_dias";
     public const string ChaveDiasAvaliacaoFinal = "dias_avaliacao_final";
+    public const string ChaveModoNiveis = "modo_niveis";
 
     // Os valores quando a configuração não existe (antes de o carregador trazer a versão 6)
     public const int PrazoFechamentoCicloPadrao = 15;

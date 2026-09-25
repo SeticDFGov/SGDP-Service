@@ -212,7 +212,14 @@ public class PeConformidadeOrgaoResponse
 
     public string Nome { get; set; } = string.Empty;
 
+    // O nível de hoje do órgão (o escolhido ou o padrão; no modo livre, o nível base)
     public string? NivelNome { get; set; }
+
+    // F3: o nível que o PDTIC vigente (ou o da elaboração) alcançou, calculado no mesmo lote da
+    // situação; nulo sem esse PDTIC, sem nível alcançado ou no PDTIC registrado fora do sistema
+    public long? NivelAlcancadoId { get; set; }
+
+    public string? NivelAlcancadoNome { get; set; }
 
     // O PDTIC de referência do órgão (F2, a regra do painel): a versão vigente; sem ela, a da
     // elaboração; sem as duas, a mais recente (encerrada). Nulo só quando o órgão nunca abriu um PDTIC
@@ -561,7 +568,7 @@ public class PeOrgaoResumoOrgaoResponse
 
 public class PeOrgaoResumoNivelResponse
 {
-    // O nível de hoje (o escolhido ou o padrão); nulo sem modelo
+    // O nível de hoje (o escolhido ou o padrão; no modo livre, o nível base); nulo sem modelo
     public long? Id { get; set; }
 
     public string? Nome { get; set; }
@@ -571,6 +578,20 @@ public class PeOrgaoResumoNivelResponse
 
     // As trocas de nível, da mais nova para a mais antiga
     public List<PeOrgaoNivelTrocaResponse> Historico { get; set; } = new();
+
+    // F3: o modo dos níveis ("livre" ou "definido") e o nível que o PDTIC de referência alcançou,
+    // o próximo e o que falta para chegar a ele (a régua da situação dos passos)
+    public string Modo { get; set; } = "definido";
+
+    public long? AlcancadoId { get; set; }
+
+    public string? AlcancadoNome { get; set; }
+
+    public long? ProximoId { get; set; }
+
+    public string? ProximoNome { get; set; }
+
+    public List<PeNivelFaltaResponse> Faltam { get; set; } = new();
 }
 
 public class PeOrgaoNivelTrocaResponse
@@ -608,6 +629,9 @@ public class PeOrgaoAndamentoResponse
     public int Atrasados { get; set; }
 
     public int Aguardando { get; set; }
+
+    // F3: quantos passos da etapa estão validados pela equipe
+    public int Validados { get; set; }
 }
 
 public class PeOrgaoNaoSeAplicaResponse

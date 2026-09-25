@@ -160,7 +160,12 @@ public class PeFluxoService : IPeFluxoService
         var json = PeFluxoDefinicaoLeitor.ParaJson(definicao);
         var agora = DateTime.UtcNow;
 
-        if (nome == modelo.Nome && Canonico(json) == Canonico(modelo.Definicao))
+        var igualAoModelo = nome == modelo.Nome && Canonico(json) == Canonico(modelo.Definicao);
+        // F3: a cópia do fluxo mudou de fato (para a validação da equipe nos passos com fluxos)
+        var mudou = igualAoModelo
+            ? copia != null
+            : copia == null || copia.Nome != nome || Canonico(copia.Definicao) != Canonico(json);
+        if (igualAoModelo)
         {
             // Igual ao modelo: não é adaptação; o fluxo volta a seguir o modelo
             if (copia != null) _context.PeFluxos.Remove(copia);
@@ -183,6 +188,7 @@ public class PeFluxoService : IPeFluxoService
         }
         Tocar(pdtic, ctx, agora);
         await _context.SaveChangesAsync();
+        if (mudou) await PeValidacaoDaEquipe.MarcarMudancaNosFluxosAsync(_context, pdtic, agora);
         return await ObterDepoisDeGravarAsync(pdtic.Id, modelo, ctx);
     }
 
@@ -194,8 +200,10 @@ public class PeFluxoService : IPeFluxoService
         if (copia != null)
         {
             _context.PeFluxos.Remove(copia);
-            Tocar(pdtic, ctx, DateTime.UtcNow);
+            var agora = DateTime.UtcNow;
+            Tocar(pdtic, ctx, agora);
             await _context.SaveChangesAsync();
+            await PeValidacaoDaEquipe.MarcarMudancaNosFluxosAsync(_context, pdtic, agora);
         }
         return await ObterDepoisDeGravarAsync(pdtic.Id, modelo, ctx);
     }
@@ -288,7 +296,7 @@ public class PeFluxoService : IPeFluxoService
     {
         var pdtic = await PePdticService.LerAsync(_context, _permissoes, pdticId, ctx);
         if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
-            throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do órgão monta o cronograma do plano de trabalho.");
+            throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do PDTIC monta o cronograma do plano de trabalho.");
         if (!PeEdicaoPdtic.ElaboracaoAberta(pdtic)) throw PePdticService.Fechado(pdtic);
 
         var (mapa, _) = await NomesDoOrgaoAsync(pdtic);
@@ -470,7 +478,7 @@ public class PeFluxoService : IPeFluxoService
     {
         var pdtic = await PePdticService.LerAsync(_context, _permissoes, pdticId, ctx, rastrear: true);
         if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
-            throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do órgão adapta os fluxos do PDTIC.");
+            throw new ApiException(ErrorCode.PeSemPermissao, "Só a equipe do PDTIC adapta os fluxos do PDTIC.");
         if (!PeEdicaoPdtic.ElaboracaoAberta(pdtic)) throw PePdticService.Fechado(pdtic);
         return pdtic;
     }

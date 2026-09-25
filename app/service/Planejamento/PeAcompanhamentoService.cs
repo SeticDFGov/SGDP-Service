@@ -122,9 +122,9 @@ public class PeAcompanhamentoService : IPeAcompanhamentoService
         var pdtic = await PePdticService.LerAsync(_context, _permissoes, pdticId, ctx, rastrear: true);
         var trilha = await PeTrilhaOrgao.DoPdticAsync(_context, pdtic);
         trilha.Dados.Acompanhamento.Exigir();
-        ConferirGravacao(pdtic, ctx, "Quem abre a avaliação intermediária é a equipe do órgão.");
+        ConferirGravacao(pdtic, ctx, "Quem abre a avaliação intermediária é a equipe do PDTIC.");
         if (!TemSecoesDoTipo(trilha, PeDominios.TipoCiclo.Avaliacao))
-            throw new ApiException(ErrorCode.PePassoIndisponivel, "A avaliação intermediária não está na trilha do nível do órgão.");
+            throw new ApiException(ErrorCode.PePassoIndisponivel, "A avaliação intermediária não aparece no passo a passo do órgão.");
 
         var avaliacoes = await _context.PeCiclos.AsNoTracking()
             .Where(c => c.PdticId == pdtic.Id && c.Tipo == PeDominios.TipoCiclo.Avaliacao)
@@ -160,7 +160,7 @@ public class PeAcompanhamentoService : IPeAcompanhamentoService
 
     public async Task<PeCicloResponse> FecharCicloAsync(long cicloId, PeUserContext ctx)
     {
-        var (ciclo, pdtic, trilha) = await CicloParaGravarAsync(cicloId, ctx, "Quem fecha o ciclo é a equipe do órgão.");
+        var (ciclo, pdtic, trilha) = await CicloParaGravarAsync(cicloId, ctx, "Quem fecha o ciclo é a equipe do PDTIC.");
         var hoje = PeCiclos.Hoje();
         if (ciclo.Situacao == PeDominios.SituacaoCiclo.Fechado)
             throw new ApiException(ErrorCode.PeCicloFechado,
@@ -190,7 +190,7 @@ public class PeAcompanhamentoService : IPeAcompanhamentoService
 
     public async Task<PeCicloResponse> ReabrirCicloAsync(long cicloId, PeUserContext ctx)
     {
-        var (ciclo, pdtic, trilha) = await CicloParaGravarAsync(cicloId, ctx, "Quem reabre o ciclo é a equipe do órgão.");
+        var (ciclo, pdtic, trilha) = await CicloParaGravarAsync(cicloId, ctx, "Quem reabre o ciclo é a equipe do PDTIC.");
         if (ciclo.Situacao != PeDominios.SituacaoCiclo.Fechado)
             throw new ApiException(ErrorCode.PeCicloFechado, $"O ciclo {ciclo.Rotulo} já está aberto.");
         if (ciclo.Tipo == PeDominios.TipoCiclo.Avaliacao
@@ -214,9 +214,10 @@ public class PeAcompanhamentoService : IPeAcompanhamentoService
 
     /// <summary>
     /// O que falta para fechar. Monitoramento: a situação de cada ação do PDTIC no ciclo (e os
-    /// obrigatórios do registro, pelo nível) e, com o passo 5.2 na trilha, o resumo do ciclo.
-    /// Avaliação: as seções obrigatórias dos passos da avaliação (6.1 a 6.3), com a decisão do
-    /// comitê. Passo marcado "não se aplica" não pede nada.
+    /// obrigatórios do registro, pelo nível) e, com o passo 5.2 na trilha e obrigatório para o
+    /// órgão (F3: nada obrigatório depende de passo opcional), o resumo do ciclo. Avaliação: as
+    /// seções obrigatórias dos passos da avaliação (6.1 a 6.3), com a decisão do comitê. Passo
+    /// marcado "não se aplica" não pede nada.
     /// </summary>
     private async Task<List<PePendenciaResponse>> PendenciasDoFechamentoAsync(PePdtic pdtic, PeTrilhaOrgao trilha, PeCiclo ciclo)
     {
@@ -260,7 +261,7 @@ public class PeAcompanhamentoService : IPeAcompanhamentoService
             }
 
             if (trilha.Passos.FirstOrDefault(p => p.Chave == PeDominios.ChaveAcompanhamento.PassoRelatorioAcompanhamento) is { } resumo
-                && !naoSeAplica.Contains(resumo.Id))
+                && resumo.Situacao == PeDominios.Situacao.Obrigatorio && !naoSeAplica.Contains(resumo.Id))
             {
                 var secoes = resumo.Secoes.Select(trilha.Montar).ToList();
                 var analise = await _registros.AnalisarAsync(dono, secoes, ciclo.Id);
@@ -326,7 +327,7 @@ public class PeAcompanhamentoService : IPeAcompanhamentoService
             "A situação das ações é registrada nos ciclos de monitoramento.");
         SecaoDaGrade(trilha, PeDominios.ChaveAcompanhamento.SecaoMonitoramentoAcoes);
         if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
-            throw new ApiException(ErrorCode.PeSemPermissao, "Quem registra a situação das ações é a equipe do órgão.");
+            throw new ApiException(ErrorCode.PeSemPermissao, "Quem registra a situação das ações é a equipe do PDTIC.");
         var itens = dto.Itens ?? new List<PeCicloAcaoItemDTO>();
         var grade = await GradeDasAcoesAsync(pdtic, trilha, ciclo);
         var porAcao = grade.ToDictionary(g => g.AcaoId);
@@ -437,7 +438,7 @@ public class PeAcompanhamentoService : IPeAcompanhamentoService
             "As medições dos indicadores são registradas nos ciclos de monitoramento.");
         SecaoDaGrade(trilha, PeDominios.ChaveAcompanhamento.SecaoMedicoes);
         if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
-            throw new ApiException(ErrorCode.PeSemPermissao, "Quem registra as medições é a equipe do órgão.");
+            throw new ApiException(ErrorCode.PeSemPermissao, "Quem registra as medições é a equipe do PDTIC.");
         var grade = await GradeDasMedicoesAsync(pdtic, trilha, ciclo);
         var porIndicador = grade.ToDictionary(g => g.IndicadorId);
 
@@ -536,7 +537,7 @@ public class PeAcompanhamentoService : IPeAcompanhamentoService
     private static void SecaoDaGrade(PeTrilhaOrgao trilha, string chave)
     {
         if (trilha.Secao(chave) == null)
-            throw new ApiException(ErrorCode.PeSecaoIndisponivel, "Esta seção não aparece no nível do órgão.");
+            throw new ApiException(ErrorCode.PeSecaoIndisponivel, "Esta seção não aparece para o órgão.");
     }
 
     private static JsonElement Json(object? valor) => JsonSerializer.SerializeToElement(valor);

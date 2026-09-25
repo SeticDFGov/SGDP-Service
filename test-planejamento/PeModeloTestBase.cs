@@ -31,7 +31,26 @@ public abstract class PeModeloTestBase : PeTestBase
         Modelo = new PeModeloService(Context);
         Orgaos = new PeOrgaoService(Context);
         EmailAdmin = UserPeAdmin.Email;
-        if (carregar) new PeCarregadorModelo(Context).CarregarAsync().GetAwaiter().GetResult();
+        if (carregar)
+        {
+            new PeCarregadorModelo(Context).CarregarAsync().GetAwaiter().GetResult();
+            // F3: o carregador versão 8 grava o modo livre; as bases da E1 à F2 continuam no definido
+            // (os testes do modo livre ligam o modo de novo)
+            DefinirModoNiveis(PeDominios.ModoNiveis.Definido);
+        }
+    }
+
+    /// <summary>Grava o modo dos níveis (livre ou definido) em pe_configuracao, como o PUT modelo/modo-niveis grava.</summary>
+    protected void DefinirModoNiveis(string modo)
+    {
+        var linha = Context.PeConfiguracoes.SingleOrDefault(c => c.Chave == PeConfiguracao.ChaveModoNiveis);
+        if (linha == null)
+        {
+            linha = new PeConfiguracao { Chave = PeConfiguracao.ChaveModoNiveis, CriadoEm = DateTime.UtcNow, CriadoPor = AutorSemente };
+            Context.PeConfiguracoes.Add(linha);
+        }
+        linha.Valor = JsonSerializer.Serialize(modo);
+        Context.SaveChanges();
     }
 
     // ── Atalhos ───────────────────────────────────────────────────────────────

@@ -133,7 +133,8 @@ public class PePdticSituacaoTest : PePdticTestBase
         Assert.Equal(PeDominios.SituacaoPasso.NaoSeAplica, (await PassoAsync(pdtic.Id, "preparacao.equipe")).Situacao);
 
         var desfeito = await Pdtics.DesmarcarNaoSeAplicaAsync(pdtic.Id, equipe, await Orgao());
-        Assert.Equal(PeDominios.SituacaoPasso.Pendente, desfeito.Situacao);
+        // F3: opcional para o órgão e sem conteúdo, o passo não é cobrado (antes, pendente)
+        Assert.Equal(PeDominios.SituacaoPasso.Opcional, desfeito.Situacao);
         Assert.Null(desfeito.NaoSeAplica);
         var linha = Context.PePdticPassos.Single(p => p.PdticId == pdtic.Id && p.PassoId == equipe);
         Assert.False(linha.NaoSeAplica);

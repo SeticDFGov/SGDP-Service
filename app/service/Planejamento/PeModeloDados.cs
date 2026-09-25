@@ -35,6 +35,13 @@ public sealed class PeModeloDados
     // As configurações do acompanhamento e se ele já está ligado (versão 6 carregada)
     public PeAcompanhamentoAtivo Acompanhamento { get; private init; } = new(false, 0, 0, PeDominios.Periodicidade.Padrao);
 
+    // F3: o modo dos níveis (livre ou definido) e a marca da versão 8 (a forma de cada passo e a validação da equipe)
+    public PeModoNiveis ModoNiveis { get; private init; } = PeModoNiveis.Anterior;
+
+    // A régua do nível alcançado (F3), montada uma vez por leitura do modelo: a trilha de cada nível
+    // ativo sem os ajustes de órgão (com e sem PETIC-DF vigente)
+    private readonly Dictionary<bool, List<PeReguaNivel>> _reguas = new();
+
     public static async Task<PeModeloDados> CarregarAsync(AppDbContext context)
     {
         var passoNivel = await context.PePassosNivel.AsNoTracking().ToListAsync();
@@ -44,8 +51,10 @@ public sealed class PeModeloDados
             .GroupBy(c => c.NivelId)
             .Select(g => new { NivelId = g.Key, Total = g.Count() })
             .ToListAsync();
-        // A coluna por_ciclo só é lida com a versão 6 carregada (que só carrega com a migration aplicada)
-        var acompanhamento = await PeAcompanhamentoAtivo.LerAsync(context);
+        // As configurações numa consulta só: a coluna por_ciclo só é lida com a versão 6 carregada
+        // (que só carrega com a migration aplicada); a forma dos passos e a validação, com a versão 8
+        var configuracoes = await context.PeConfiguracoes.AsNoTracking().ToListAsync();
+        var acompanhamento = PeAcompanhamentoAtivo.De(configuracoes);
         var porCiclo = acompanhamento.Ativo
             ? await context.PeSecoesCiclo.AsNoTracking().ToDictionaryAsync(s => s.Id, s => s.PorCiclo)
             : new Dictionary<long, string>();
@@ -54,6 +63,7 @@ public sealed class PeModeloDados
         {
             PorCiclo = porCiclo,
             Acompanhamento = acompanhamento,
+            ModoNiveis = PeModoNiveis.De(configuracoes),
             Niveis = await context.PeNiveis.AsNoTracking().OrderBy(n => n.Ordem).ThenBy(n => n.Id).ToListAsync(),
             Etapas = await context.PeEtapas.AsNoTracking().OrderBy(e => e.Ordem).ThenBy(e => e.Id).ToListAsync(),
             Passos = await context.PePassos.AsNoTracking().OrderBy(p => p.Ordem).ThenBy(p => p.Id).ToListAsync(),
@@ -92,13 +102,27 @@ public sealed class PeModeloDados
     public bool CampoTravado(PeCampo campo) =>
         campo.Travado || (campo.Principal && Secoes.FirstOrDefault(s => s.Id == campo.SecaoId)?.Travada == true);
 
-    /// <summary>O primeiro nível ativo pela ordem (o padrão de quem não tem nível escolhido).</summary>
+    /// <summary>O primeiro nível ativo pela ordem (o padrão de quem não tem nível escolhido; no modo livre, o nível base).</summary>
     public PeNivel? NivelPadrao() => Niveis.FirstOrDefault(n => n.Ativo);
+
+    /// <summary>
+    /// A régua do nível alcançado (F3): para cada nível ativo, pela ordem, a trilha dele sem os
+    /// ajustes de órgão (a mesma para todos os órgãos), com a regra do PETIC-DF sem vigente, e as
+    /// seções dos passos que contam, já montadas. Montada uma vez por leitura do modelo.
+    /// </summary>
+    public IReadOnlyList<PeReguaNivel> Regua(bool semPeticVigente)
+    {
+        if (_reguas.TryGetValue(semPeticVigente, out var pronta)) return pronta;
+        var regua = Niveis.Where(n => n.Ativo).Select(n => PeReguaNivel.Montar(this, n, semPeticVigente)).ToList();
+        _reguas[semPeticVigente] = regua;
+        return regua;
+    }
 
     // ── Respostas do GET modelo ─────────────────────────────────────────────
 
     public PeModeloResponse Modelo(bool incluirExcluidos) => new()
     {
+        ModoNiveis = ModoNiveis.Vigente,
         Niveis = Niveis.Select(Nivel).ToList(),
         Etapas = Etapas.Select(e => Etapa(e, incluirExcluidos)).ToList(),
         SecoesForaDoPdtic = Secoes
@@ -226,50 +250,119 @@ public sealed class PeModeloDados
 }
 
 /// <summary>
-/// Resolução da trilha efetiva de um órgão. Para cada passo, seção e campo: o ajuste do
-/// órgão, senão a situação no nível do órgão, senão desligado; item travado (e o campo
-/// principal de seção travada) nunca desliga: vira obrigatório. A etapa aparece se tiver
-/// passo visível; a seção, se o passo aparece; o campo, se a seção aparece (e o campo de
-/// ligação, se a seção que ele liga também aparece). Itens apagados não entram. A
+/// Resolução da trilha efetiva de um órgão (a tela diz "passo a passo"). Para cada seção e
+/// campo: o ajuste do órgão, senão a situação no nível da forma do passo, senão desligado; item
+/// travado (e o campo principal de seção travada) nunca desliga: vira obrigatório. A etapa
+/// aparece se tiver passo visível; a seção, se o passo aparece; o campo, se a seção aparece (e o
+/// campo de ligação, se a seção que ele liga também aparece). Itens apagados não entram. A
 /// numeração é pela posição entre os visíveis: etapa N, passo N.M.
+/// <list type="bullet">
+/// <item>Modo definido (<see cref="Resolver"/>): o passo pela situação no nível do órgão (o
+/// escolhido ou o padrão), com o ajuste por cima; a forma de todos os passos é esse nível.</item>
+/// <item>Modo livre (<see cref="ResolverLivre"/>, F3): o passo aparece e cobra pelo ajuste do
+/// órgão, senão pela situação no nível base (o padrão), senão fica opcional quando está ligado em
+/// algum nível ativo; a forma do passo (o nível cujas seções e campos valem) é a escolhida pelo
+/// órgão, quando é um nível ativo em que o passo está ligado, senão o nível base (quando ligado
+/// nele), senão o primeiro nível ativo em que está ligado. As formas oferecidas são os níveis
+/// ativos em que o passo está ligado, sem repetir forma (dois níveis que dão ao passo as mesmas
+/// seções e os mesmos campos, com a mesma obrigatoriedade, viram uma opção só, a do mais baixo).</item>
+/// </list>
 /// </summary>
 public static class PeTrilhaResolver
 {
+    // A situação do passo e o nível da forma dele (no livre, também o que a escolha usa)
+    private sealed record PassoResolvido(string Situacao, long Forma, PeFormaLivre? Livre);
+
+    // Modo livre: a forma padrão, a escolhida (quando vale) e os níveis ativos em que o passo está ligado
+    private sealed record PeFormaLivre(long Padrao, long? Escolhida, List<PeNivel> LigadoEm);
+
+    /// <summary>Modo definido: a trilha do nível dado, com os ajustes do órgão.</summary>
     public static List<PeTrilhaEtapa> Resolver(PeModeloDados dados, long nivelId,
         IReadOnlyDictionary<(string Tipo, long Id), string> ajustes)
     {
-        string Efetiva(string tipo, long id, Dictionary<long, string>? porNivel, bool travado)
-        {
-            var situacao = ajustes.TryGetValue((tipo, id), out var ajustada)
-                ? ajustada
-                : porNivel != null && porNivel.TryGetValue(nivelId, out var doNivel) ? doNivel : PeDominios.Situacao.Desligado;
-            return travado && situacao == PeDominios.Situacao.Desligado ? PeDominios.Situacao.Obrigatorio : situacao;
-        }
-
-        // Primeiro, o que fica visível: passos e seções (as ligações dependem delas)
-        var passosVisiveis = new Dictionary<long, string>();
-        var secoesVisiveis = new Dictionary<long, string>();
+        var passos = new Dictionary<long, PassoResolvido>();
         foreach (var passo in dados.Passos.Where(p => p.ExcluidoEm == null))
         {
-            var situacao = Efetiva(PeDominios.AlvoAjuste.Passo, passo.Id, dados.SituacaoPasso.GetValueOrDefault(passo.Id), passo.Travado);
-            if (situacao == PeDominios.Situacao.Desligado) continue;
-            passosVisiveis[passo.Id] = situacao;
-
-            foreach (var secao in dados.SecoesDoPasso(passo.Id, false).Where(s => s.Escopo == PeDominios.Escopo.Pdtic))
-            {
-                var sit = Efetiva(PeDominios.AlvoAjuste.Secao, secao.Id, dados.SituacaoSecao.GetValueOrDefault(secao.Id), secao.Travada);
-                if (sit != PeDominios.Situacao.Desligado) secoesVisiveis[secao.Id] = sit;
-            }
+            var situacao = Efetiva(ajustes, PeDominios.AlvoAjuste.Passo, passo.Id, dados.SituacaoPasso.GetValueOrDefault(passo.Id),
+                passo.Travado, nivelId);
+            if (situacao != PeDominios.Situacao.Desligado) passos[passo.Id] = new PassoResolvido(situacao, nivelId, null);
         }
+        return Montar(dados, ajustes, passos);
+    }
+
+    /// <summary>
+    /// Modo livre (F3): a trilha do órgão a partir do nível base (o primeiro ativo), com os ajustes
+    /// e a forma escolhida para cada passo (passo → nível).
+    /// </summary>
+    public static List<PeTrilhaEtapa> ResolverLivre(PeModeloDados dados, IReadOnlyDictionary<(string Tipo, long Id), string> ajustes,
+        IReadOnlyDictionary<long, long> escolhas)
+    {
+        var ativos = dados.Niveis.Where(n => n.Ativo).ToList();
+        var nivelBase = ativos.FirstOrDefault() ?? throw PeModeloService.ModeloIndisponivel();
+
+        var passos = new Dictionary<long, PassoResolvido>();
+        foreach (var passo in dados.Passos.Where(p => p.ExcluidoEm == null))
+        {
+            var porNivel = dados.SituacaoPasso.GetValueOrDefault(passo.Id);
+            string NoNivel(long nivelId) => Efetiva(Vazio, PeDominios.AlvoAjuste.Passo, passo.Id, porNivel, passo.Travado, nivelId);
+            var ligadoEm = ativos.Where(n => NoNivel(n.Id) != PeDominios.Situacao.Desligado).ToList();
+            var noBase = ligadoEm.Any(n => n.Id == nivelBase.Id);
+
+            string situacao;
+            if (ajustes.TryGetValue((PeDominios.AlvoAjuste.Passo, passo.Id), out var ajustada))
+                situacao = passo.Travado && ajustada == PeDominios.Situacao.Desligado ? PeDominios.Situacao.Obrigatorio : ajustada;
+            else if (noBase)
+                situacao = NoNivel(nivelBase.Id);
+            else
+                situacao = ligadoEm.Count > 0 ? PeDominios.Situacao.Opcional : PeDominios.Situacao.Desligado;
+            if (situacao == PeDominios.Situacao.Desligado) continue;
+
+            var padrao = noBase ? nivelBase.Id : ligadoEm.FirstOrDefault()?.Id ?? nivelBase.Id;
+            long? escolhida = escolhas.TryGetValue(passo.Id, out var nivelEscolhido) && ligadoEm.Any(n => n.Id == nivelEscolhido)
+                ? nivelEscolhido
+                : null;
+            passos[passo.Id] = new PassoResolvido(situacao, escolhida ?? padrao, new PeFormaLivre(padrao, escolhida, ligadoEm));
+        }
+        return Montar(dados, ajustes, passos);
+    }
+
+    private static readonly IReadOnlyDictionary<(string Tipo, long Id), string> Vazio = new Dictionary<(string, long), string>();
+
+    /// <summary>A situação de um item num nível: o ajuste, senão a do nível, senão desligado; o travado nunca desliga.</summary>
+    private static string Efetiva(IReadOnlyDictionary<(string Tipo, long Id), string> ajustes, string tipo, long id,
+        Dictionary<long, string>? porNivel, bool travado, long nivelId)
+    {
+        var situacao = ajustes.TryGetValue((tipo, id), out var ajustada)
+            ? ajustada
+            : porNivel != null && porNivel.TryGetValue(nivelId, out var doNivel) ? doNivel : PeDominios.Situacao.Desligado;
+        return travado && situacao == PeDominios.Situacao.Desligado ? PeDominios.Situacao.Obrigatorio : situacao;
+    }
+
+    /// <summary>
+    /// As etapas visíveis, com os passos na forma resolvida: primeiro o que fica visível (as
+    /// seções de cada passo, no nível da forma dele; as ligações dependem delas), depois os
+    /// campos e, no modo livre, as formas oferecidas.
+    /// </summary>
+    private static List<PeTrilhaEtapa> Montar(PeModeloDados dados, IReadOnlyDictionary<(string Tipo, long Id), string> ajustes,
+        IReadOnlyDictionary<long, PassoResolvido> passos)
+    {
+        var secoesVisiveis = new Dictionary<long, string>();
+        foreach (var (passoId, resolvido) in passos)
+            foreach (var secao in SecoesDoPdtic(dados, passoId))
+            {
+                var situacao = SituacaoDaSecao(dados, ajustes, secao, resolvido.Forma);
+                if (situacao != PeDominios.Situacao.Desligado) secoesVisiveis[secao.Id] = situacao;
+            }
         var chavesVisiveis = dados.Secoes.Where(s => secoesVisiveis.ContainsKey(s.Id)).Select(s => s.Chave).ToHashSet();
 
         var etapas = new List<PeTrilhaEtapa>();
         foreach (var etapa in dados.Etapas)
         {
-            var passos = new List<PeTrilhaPasso>();
-            foreach (var passo in dados.PassosDaEtapa(etapa.Id, false).Where(p => passosVisiveis.ContainsKey(p.Id)))
+            var lista = new List<PeTrilhaPasso>();
+            foreach (var passo in dados.PassosDaEtapa(etapa.Id, false).Where(p => passos.ContainsKey(p.Id)))
             {
-                passos.Add(new PeTrilhaPasso
+                var resolvido = passos[passo.Id];
+                var item = new PeTrilhaPasso
                 {
                     Id = passo.Id,
                     Chave = passo.Chave,
@@ -281,18 +374,20 @@ public static class PeTrilhaResolver
                     IncisoDecreto = passo.IncisoDecreto,
                     Travado = passo.Travado,
                     AceitaNaoSeAplica = passo.AceitaNaoSeAplica,
-                    Situacao = passosVisiveis[passo.Id],
+                    Situacao = resolvido.Situacao,
                     AjustadoParaOrgao = ajustes.ContainsKey((PeDominios.AlvoAjuste.Passo, passo.Id)),
-                    Secoes = dados.SecoesDoPasso(passo.Id, false)
+                    Secoes = SecoesDoPdtic(dados, passo.Id)
                         .Where(s => secoesVisiveis.ContainsKey(s.Id))
-                        .Select(s => Secao(dados, s, secoesVisiveis[s.Id], chavesVisiveis, Efetiva))
+                        .Select(s => Secao(dados, ajustes, s, secoesVisiveis[s.Id], chavesVisiveis, resolvido.Forma))
                         .ToList()
-                });
+                };
+                if (resolvido.Livre != null) Formas(dados, ajustes, passo, resolvido, chavesVisiveis, item);
+                lista.Add(item);
             }
-            if (passos.Count == 0) continue;
+            if (lista.Count == 0) continue;
 
             var numero = etapas.Count + 1;
-            for (var i = 0; i < passos.Count; i++) passos[i].Numero = $"{numero}.{i + 1}";
+            for (var i = 0; i < lista.Count; i++) lista[i].Numero = $"{numero}.{i + 1}";
             etapas.Add(new PeTrilhaEtapa
             {
                 Numero = numero,
@@ -301,28 +396,40 @@ public static class PeTrilhaResolver
                 Titulo = etapa.Titulo,
                 Descricao = etapa.Descricao,
                 ReferenciaGuia = etapa.ReferenciaGuia,
-                Passos = passos
+                Passos = lista
             });
         }
         return etapas;
     }
 
-    private static PeTrilhaSecao Secao(PeModeloDados dados, PeSecao secao, string situacao, ISet<string> chavesVisiveis,
-        Func<string, long, Dictionary<long, string>?, bool, string> efetiva)
+    private static IEnumerable<PeSecao> SecoesDoPdtic(PeModeloDados dados, long passoId) =>
+        dados.SecoesDoPasso(passoId, false).Where(s => s.Escopo == PeDominios.Escopo.Pdtic);
+
+    private static string SituacaoDaSecao(PeModeloDados dados, IReadOnlyDictionary<(string Tipo, long Id), string> ajustes, PeSecao secao,
+        long nivelId) =>
+        Efetiva(ajustes, PeDominios.AlvoAjuste.Secao, secao.Id, dados.SituacaoSecao.GetValueOrDefault(secao.Id), secao.Travada, nivelId);
+
+    private static string SituacaoDoCampo(PeModeloDados dados, IReadOnlyDictionary<(string Tipo, long Id), string> ajustes, PeSecao secao,
+        PeCampo campo, long nivelId) =>
+        Efetiva(ajustes, PeDominios.AlvoAjuste.Campo, campo.Id, dados.SituacaoCampo.GetValueOrDefault(campo.Id),
+            campo.Travado || (campo.Principal && secao.Travada), nivelId);
+
+    /// <summary>O campo de ligação com uma seção que o órgão não vê some (e o campo sem alvo também).</summary>
+    private static bool LigacaoSemAlvo(PeCampo campo, ISet<string> chavesVisiveis)
+    {
+        if (campo.Tipo != PeDominios.TipoCampo.LigacaoSecao) return false;
+        var alvo = PeConfigCampo.SecaoDaLigacao(campo.Config);
+        return alvo == null || !chavesVisiveis.Contains(alvo);
+    }
+
+    private static PeTrilhaSecao Secao(PeModeloDados dados, IReadOnlyDictionary<(string Tipo, long Id), string> ajustes, PeSecao secao,
+        string situacao, ISet<string> chavesVisiveis, long nivelId)
     {
         var campos = new List<PeTrilhaCampo>();
         foreach (var campo in dados.CamposDaSecao(secao.Id, false))
         {
-            var sit = efetiva(PeDominios.AlvoAjuste.Campo, campo.Id, dados.SituacaoCampo.GetValueOrDefault(campo.Id),
-                campo.Travado || (campo.Principal && secao.Travada));
-            if (sit == PeDominios.Situacao.Desligado) continue;
-
-            // Ligação com uma seção que o órgão não vê: o campo também some
-            if (campo.Tipo == PeDominios.TipoCampo.LigacaoSecao)
-            {
-                var alvo = PeConfigCampo.SecaoDaLigacao(campo.Config);
-                if (alvo == null || !chavesVisiveis.Contains(alvo)) continue;
-            }
+            var sit = SituacaoDoCampo(dados, ajustes, secao, campo, nivelId);
+            if (sit == PeDominios.Situacao.Desligado || LigacaoSemAlvo(campo, chavesVisiveis)) continue;
 
             campos.Add(new PeTrilhaCampo
             {
@@ -355,5 +462,72 @@ public static class PeTrilhaResolver
             NaPlanilha = secao.NaPlanilha,
             Campos = campos
         };
+    }
+
+    /// <summary>
+    /// Modo livre: a forma em uso (Detalhe), se o órgão escolheu uma forma que não é a padrão
+    /// (DetalheEscolhido) e as formas oferecidas (OpcoesDetalhe, só com duas ou mais), com a
+    /// quantidade de seções e de campos visíveis em cada uma. Cada forma é comparada pelo que dá
+    /// ao passo (as seções e os campos visíveis, com a obrigatoriedade, e os ajustes do órgão por
+    /// cima): níveis com a mesma forma viram a opção do mais baixo.
+    /// </summary>
+    private static void Formas(PeModeloDados dados, IReadOnlyDictionary<(string Tipo, long Id), string> ajustes, PePasso passo,
+        PassoResolvido resolvido, ISet<string> chavesVisiveis, PeTrilhaPasso item)
+    {
+        var livre = resolvido.Livre!;
+        var proprias = SecoesDoPdtic(dados, passo.Id).ToList();
+        var deOutrosPassos = new HashSet<string>(chavesVisiveis);
+        foreach (var secao in proprias) deOutrosPassos.Remove(secao.Chave);
+
+        // A forma que o nível dá ao passo: a assinatura (para comparar) e as quantidades
+        (string Assinatura, int Secoes, int Campos) FormaNoNivel(long nivelId)
+        {
+            var visiveis = proprias.Select(s => (Secao: s, Situacao: SituacaoDaSecao(dados, ajustes, s, nivelId)))
+                .Where(x => x.Situacao != PeDominios.Situacao.Desligado)
+                .ToList();
+            var alvos = new HashSet<string>(deOutrosPassos);
+            foreach (var (secao, _) in visiveis) alvos.Add(secao.Chave);
+            var assinatura = new System.Text.StringBuilder();
+            var campos = 0;
+            foreach (var (secao, situacao) in visiveis)
+            {
+                assinatura.Append('s').Append(secao.Id).Append(':').Append(situacao).Append(';');
+                foreach (var campo in dados.CamposDaSecao(secao.Id, false))
+                {
+                    var sit = SituacaoDoCampo(dados, ajustes, secao, campo, nivelId);
+                    if (sit == PeDominios.Situacao.Desligado || LigacaoSemAlvo(campo, alvos)) continue;
+                    assinatura.Append('c').Append(campo.Id).Append(':').Append(sit == PeDominios.Situacao.Obrigatorio ? '1' : '0').Append(';');
+                    campos++;
+                }
+            }
+            return (assinatura.ToString(), visiveis.Count, campos);
+        }
+
+        // Cada nível em que o passo está ligado, com o representante da forma dele (o mais baixo com a mesma forma)
+        var representante = new Dictionary<long, long>();
+        var opcoes = new List<(PeNivel Nivel, int Secoes, int Campos)>();
+        var porAssinatura = new Dictionary<string, long>(StringComparer.Ordinal);
+        foreach (var nivel in livre.LigadoEm)
+        {
+            var forma = FormaNoNivel(nivel.Id);
+            if (porAssinatura.TryGetValue(forma.Assinatura, out var mesmo))
+            {
+                representante[nivel.Id] = mesmo;
+                continue;
+            }
+            porAssinatura[forma.Assinatura] = nivel.Id;
+            representante[nivel.Id] = nivel.Id;
+            opcoes.Add((nivel, forma.Secoes, forma.Campos));
+        }
+
+        long Representante(long nivelId) => representante.GetValueOrDefault(nivelId, nivelId);
+        var emUso = Representante(resolvido.Forma);
+        var nivelEmUso = dados.Niveis.FirstOrDefault(n => n.Id == emUso);
+        item.Detalhe = nivelEmUso == null ? null : new PeTrilhaDetalhe { NivelId = nivelEmUso.Id, NivelNome = nivelEmUso.Nome };
+        item.DetalheEscolhido = opcoes.Count >= 2 && livre.Escolhida is long escolhida && Representante(escolhida) != Representante(livre.Padrao);
+        item.OpcoesDetalhe = opcoes.Count >= 2
+            ? opcoes.Select(o => new PeTrilhaOpcaoDetalhe { NivelId = o.Nivel.Id, NivelNome = o.Nivel.Nome, Secoes = o.Secoes, Campos = o.Campos }).ToList()
+            : new List<PeTrilhaOpcaoDetalhe>();
+        item.FormaPorNivel = representante;
     }
 }

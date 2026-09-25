@@ -52,23 +52,59 @@ public class PeModeloService : IPeModeloService
         (await PeModeloDados.CarregarAsync(_context)).Modelo(incluirExcluidos);
 
     /// <summary>
-    /// A trilha resolvida do órgão (nível e ajustes). Desde a E4, sem PETIC-DF vigente a
-    /// ligação com os catálogos dele vem com Obrigatorio falso (o motor já dispensava).
+    /// A trilha resolvida do órgão (nível e ajustes; a tela diz "passo a passo"). Desde a E4, sem
+    /// PETIC-DF vigente a ligação com os catálogos dele vem com Obrigatorio falso (o motor já
+    /// dispensava). Desde a F3, com o modo dos níveis; no livre, o nível base e a forma de cada passo.
     /// </summary>
-    public async Task<PeTrilhaResponse> TrilhaAsync(long orgaoId)
+    public async Task<PeTrilhaResponse> TrilhaAsync(long orgaoId) => Trilha(await PeTrilhaOrgao.CarregarAsync(_context, orgaoId));
+
+    internal static PeTrilhaResponse Trilha(PeTrilhaOrgao trilha) => new()
     {
-        var trilha = await PeTrilhaOrgao.CarregarAsync(_context, orgaoId);
-        return new PeTrilhaResponse
+        OrgaoId = trilha.Orgao.Id,
+        OrgaoSigla = trilha.Orgao.Sigla,
+        OrgaoNome = trilha.Orgao.Nome,
+        ModoNiveis = trilha.Dados.ModoNiveis.Vigente,
+        NivelId = trilha.Nivel.Id,
+        NivelNome = trilha.Nivel.Nome,
+        NivelPadrao = trilha.NivelPadrao,
+        NivelAtivo = trilha.Livre || trilha.Nivel.Ativo,
+        Etapas = trilha.Etapas
+    };
+
+    // ── Modo dos níveis (F3) ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Troca o modo dos níveis ("livre" ou "definido"; fora do domínio, 400) e grava no histórico do
+    /// modelo (entidade configuracao, com o antes e o depois). O mesmo modo de novo não grava nada.
+    /// Antes de o carregador trazer a versão 8 do modelo inicial, 409 (o intervalo da atualização).
+    /// </summary>
+    public async Task<PeModoNiveisResponse> DefinirModoNiveisAsync(PeModoNiveisDTO dto, string autor)
+    {
+        var configuracoes = await _context.PeConfiguracoes.ToListAsync();
+        var atual = PeModoNiveis.De(configuracoes).Exigir();
+        var modo = dto.Modo?.Trim().ToLowerInvariant();
+        if (modo == null || !PeDominios.ModoNiveis.Todos.Contains(modo))
+            throw Dados("Escolha o modo dos níveis: livre ou definido.");
+        if (modo == atual.Modo) return new PeModoNiveisResponse { ModoNiveis = modo };
+
+        var agora = DateTime.UtcNow;
+        var linha = configuracoes.FirstOrDefault(c => c.Chave == PeConfiguracao.ChaveModoNiveis);
+        var valor = JsonSerializer.Serialize(modo);
+        if (linha == null)
         {
-            OrgaoId = trilha.Orgao.Id,
-            OrgaoSigla = trilha.Orgao.Sigla,
-            OrgaoNome = trilha.Orgao.Nome,
-            NivelId = trilha.Nivel.Id,
-            NivelNome = trilha.Nivel.Nome,
-            NivelPadrao = trilha.NivelPadrao,
-            NivelAtivo = trilha.Nivel.Ativo,
-            Etapas = trilha.Etapas
-        };
+            _context.PeConfiguracoes.Add(new PeConfiguracao { Chave = PeConfiguracao.ChaveModoNiveis, Valor = valor, CriadoEm = agora, CriadoPor = autor });
+        }
+        else
+        {
+            linha.Valor = valor;
+            linha.AlteradoEm = agora;
+            linha.AlteradoPor = autor;
+        }
+        Registrar(PeDominios.EntidadeHistorico.Configuracao, 0, PeDominios.AcaoHistorico.Alteracao,
+            new { Chave = PeConfiguracao.ChaveModoNiveis, Valor = atual.Modo },
+            new { Chave = PeConfiguracao.ChaveModoNiveis, Valor = modo }, autor, agora);
+        await _context.SaveChangesAsync();
+        return new PeModoNiveisResponse { ModoNiveis = modo };
     }
 
     public async Task<PagedResponse<PeHistoricoResponse>> HistoricoAsync(PeHistoricoConsulta consulta)

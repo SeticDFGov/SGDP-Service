@@ -32,6 +32,10 @@ public class PePainelService : IPePainelService
 {
     private const string SemProximoPasso = "Sem próximo passo";
 
+    // F3, modo livre: o item do painel e do filtro dos órgãos sem nível alcançado (sem PDTIC, sem
+    // nível ou com o PDTIC registrado fora do sistema)
+    public const string SemNivelAlcancado = "Sem nível alcançado";
+
     private readonly AppDbContext _context;
     private readonly IPePermissionService _permissoes;
     private readonly IPePdticService _pdtics;
@@ -56,10 +60,12 @@ public class PePainelService : IPePainelService
         var base_ = await PeBaseDosPaineis.CarregarAsync(_context, await PeBaseDosPaineis.OrgaosAtivosAsync(_context), comSituacao: true);
         var dados = base_.Dados;
 
-        // Os filtros valem para tudo; fora do domínio (nível que não existe, situação desconhecida), nenhum órgão
+        // Os filtros valem para tudo; fora do domínio (nível que não existe, situação desconhecida), nenhum órgão.
+        // No modo livre (F3), o filtro do nível é pelo nível alcançado (0 = sem nível alcançado)
+        var livre = dados.ModoNiveis.Livre;
         var situacaoFiltro = string.IsNullOrWhiteSpace(consulta.Situacao) ? null : consulta.Situacao.Trim();
         var filtrados = base_.Orgaos
-            .Where(r => consulta.NivelId == null || r.Nivel?.Id == consulta.NivelId)
+            .Where(r => NoNivel(r, consulta.NivelId, livre))
             .Where(r => situacaoFiltro == null || (PeDominios.SituacaoPainel.Todas.Contains(situacaoFiltro) && r.SituacaoNoPainel == situacaoFiltro))
             .ToList();
         var comDados = filtrados.Where(r => r.EmVigor != null && r.Trilha != null && r.Avaliado?.Id == r.EmVigor.Id).ToList();
@@ -77,10 +83,7 @@ public class PePainelService : IPePainelService
                 })
                 .ToList(),
             EmElaboracaoPorEtapa = PorEtapa(dados, filtrados),
-            PorNivel = dados.Niveis
-                .Select(n => new PePainelNivelResponse { NivelId = n.Id, Nome = n.Nome, Quantidade = filtrados.Count(r => r.Nivel?.Id == n.Id) })
-                .Where(n => n.Quantidade > 0 || dados.Niveis.First(x => x.Id == n.NivelId).Ativo)
-                .ToList(),
+            PorNivel = PorNivel(dados, filtrados, livre),
             PorObjetivoPetic = await PorObjetivoAsync(dados, comDados, base_.Leitura!),
             AcoesPorTema = AcoesPorTema(dados, comDados, base_.Leitura!),
             RiscosPorNivel = RiscosPorNivel(dados, comDados, base_.Leitura!),
@@ -88,13 +91,46 @@ public class PePainelService : IPePainelService
             Alertas = await AlertasAsync(filtrados, semFiltro: consulta.NivelId == null && situacaoFiltro == null),
             Filtros = new PePainelFiltrosResponse
             {
-                Niveis = dados.Niveis.Select(n => new PePainelFiltroNivelResponse { Id = n.Id, Nome = n.Nome }).ToList(),
+                Niveis = (livre ? new[] { new PePainelFiltroNivelResponse { Id = 0, Nome = SemNivelAlcancado } } : Array.Empty<PePainelFiltroNivelResponse>())
+                    .Concat(dados.Niveis.Select(n => new PePainelFiltroNivelResponse { Id = n.Id, Nome = n.Nome }))
+                    .ToList(),
                 Situacoes = PeDominios.SituacaoPainel.Todas
                     .Select(s => new PePainelFiltroSituacaoResponse { Chave = s, Rotulo = PeDominios.SituacaoPainel.Rotulo(s) })
                     .ToList()
             }
         };
         return resposta;
+    }
+
+    /// <summary>O nível alcançado pelo PDTIC em vigor do órgão (F3), ou nulo.</summary>
+    private static long? Alcancado(PeRetratoDoOrgao retrato) => retrato.Conformidade?.Linha.NivelAlcancadoId;
+
+    /// <summary>
+    /// O órgão entra no filtro do nível: no modo definido, pelo nível de hoje; no livre (F3), pelo
+    /// nível alcançado, com o 0 para os sem nível alcançado.
+    /// </summary>
+    private static bool NoNivel(PeRetratoDoOrgao retrato, long? nivelId, bool livre) =>
+        nivelId == null || (livre ? (nivelId == 0 ? Alcancado(retrato) == null : Alcancado(retrato) == nivelId) : retrato.Nivel?.Id == nivelId);
+
+    /// <summary>
+    /// Os órgãos por nível: no modo definido, pelo nível de hoje (os níveis ativos e os inativos com
+    /// órgão); no livre (F3), pelo nível alcançado, com o item 0 ("Sem nível alcançado") primeiro.
+    /// </summary>
+    private static List<PePainelNivelResponse> PorNivel(PeModeloDados dados, IReadOnlyList<PeRetratoDoOrgao> filtrados, bool livre)
+    {
+        if (!livre)
+            return dados.Niveis
+                .Select(n => new PePainelNivelResponse { NivelId = n.Id, Nome = n.Nome, Quantidade = filtrados.Count(r => r.Nivel?.Id == n.Id) })
+                .Where(n => n.Quantidade > 0 || dados.Niveis.First(x => x.Id == n.NivelId).Ativo)
+                .ToList();
+        var lista = new List<PePainelNivelResponse>
+        {
+            new() { NivelId = 0, Nome = SemNivelAlcancado, Quantidade = filtrados.Count(r => Alcancado(r) == null) }
+        };
+        lista.AddRange(dados.Niveis
+            .Select(n => new PePainelNivelResponse { NivelId = n.Id, Nome = n.Nome, Quantidade = filtrados.Count(r => Alcancado(r) == n.Id) })
+            .Where(n => n.Quantidade > 0 || dados.Niveis.First(x => x.Id == n.NivelId).Ativo));
+        return lista;
     }
 
     /// <summary>
@@ -414,8 +450,10 @@ public class PePainelService : IPePainelService
         var busca = string.IsNullOrWhiteSpace(consulta.Filtro) ? null : ParaBusca(consulta.Filtro);
         var situacoes = ListaDoFiltro(consulta.Situacao);
         var alerta = string.IsNullOrWhiteSpace(consulta.Alerta) ? null : consulta.Alerta.Trim();
+        // No modo livre (F3), o filtro do nível é pelo nível alcançado (0 = sem nível alcançado)
+        var livre = base_.Dados.ModoNiveis.Livre;
         var linhas = base_.Orgaos
-            .Where(r => consulta.NivelId == null || r.Nivel?.Id == consulta.NivelId)
+            .Where(r => NoNivel(r, consulta.NivelId, livre))
             .Where(r => busca == null || ParaBusca(r.Orgao.Sigla).Contains(busca) || ParaBusca(r.Orgao.Nome).Contains(busca))
             .Where(r => situacoes == null || situacoes.Contains(r.SituacaoNoPainel))
             .Where(r => alerta == null || TemAlerta(r.Conformidade!, alerta))
@@ -463,14 +501,17 @@ public class PePainelService : IPePainelService
     }
 
     /// <summary>Os filtros da planilha em texto, para a aba Leia-me (F2): "Grupo: Alta · Nível: Básico · Busca: saúde".</summary>
-    private async Task<string> DescricaoDosFiltrosAsync(PeConformidadeConsulta consulta)
+    private async Task<string> DescricaoDosFiltrosAsync(PeConformidadeConsulta consulta, bool livre)
     {
         var partes = new List<string>();
         if (!string.IsNullOrWhiteSpace(consulta.Grupo)) partes.Add($"Grupo: {PeDominios.GrupoConformidade.Rotulo(consulta.Grupo.Trim())}");
         if (consulta.NivelId is long nivelId)
         {
-            var nome = await _context.PeNiveis.AsNoTracking().Where(n => n.Id == nivelId).Select(n => n.Nome).FirstOrDefaultAsync();
-            partes.Add($"Nível: {nome ?? "não encontrado"}");
+            // No modo livre (F3), o filtro é pelo nível alcançado (0 = sem nível alcançado)
+            var nome = livre && nivelId == 0
+                ? SemNivelAlcancado
+                : await _context.PeNiveis.AsNoTracking().Where(n => n.Id == nivelId).Select(n => n.Nome).FirstOrDefaultAsync();
+            partes.Add($"{(livre ? "Nível alcançado" : "Nível")}: {nome ?? "não encontrado"}");
         }
         if (!string.IsNullOrWhiteSpace(consulta.Filtro)) partes.Add($"Busca: {consulta.Filtro.Trim()}");
         if (ListaDoFiltro(consulta.Situacao) is { } situacoes)
@@ -496,11 +537,16 @@ public class PePainelService : IPePainelService
         var conformidade = await ConformidadeAsync(consulta, ctx);
         var nome = $"PDTIC_conformidade_{PePlanilhaService.Hoje()}.{tipo}";
         var itens = PeDominios.ItemConformidade.Todos;
+        // No modo livre (F3), a coluna do nível é a do nível alcançado
+        var livre = (await PeModoNiveis.LerAsync(_context)).Livre;
+        var tituloDoNivel = livre ? "Nível alcançado" : "Nível";
+        string? NivelDaLinha(PeConformidadeOrgaoResponse linha) =>
+            livre ? linha.NivelAlcancadoNome ?? SemNivelAlcancado : linha.NivelNome;
 
         if (tipo == "csv")
         {
             var csv = new CsvEscritor();
-            var cabecalho = new List<string> { "Órgão", "Sigla", "Nível", "Versão do PDTIC", "Situação do PDTIC" };
+            var cabecalho = new List<string> { "Órgão", "Sigla", tituloDoNivel, "Versão do PDTIC", "Situação do PDTIC" };
             cabecalho.AddRange(itens.Select(i => i.Rotulo));
             cabecalho.AddRange(new[] { "Atendidos", "Aplicáveis", "Percentual", "Grupo", "Inadimplência", "Prazo da notificação" });
             csv.Linha(cabecalho);
@@ -509,7 +555,7 @@ public class PePainelService : IPePainelService
                 // Nome, sigla e nível foram digitados por alguém: protegidos como texto livre
                 var celulas = new List<(string, bool)>
                 {
-                    (linha.Nome, true), (linha.Sigla, true), (linha.NivelNome ?? string.Empty, true), (linha.PdticVersao ?? string.Empty, false),
+                    (linha.Nome, true), (linha.Sigla, true), (NivelDaLinha(linha) ?? string.Empty, true), (linha.PdticVersao ?? string.Empty, false),
                     (linha.PdticSituacao == null ? "Sem PDTIC" : PeDominios.SituacaoPdtic.Rotulo(linha.PdticSituacao), false)
                 };
                 celulas.AddRange(itens.Select(i => (PeConformidadeRegras.Texto(linha.Itens.GetValueOrDefault(i.Chave)?.Atende), false)));
@@ -528,7 +574,14 @@ public class PePainelService : IPePainelService
         {
             new() { Titulo = "Órgão", Largura = 40, Ajuda = "Nome do órgão ou entidade." },
             new() { Titulo = "Sigla", Largura = 10, Ajuda = "Sigla do órgão." },
-            new() { Titulo = "Nível", Largura = 16, Ajuda = "Nível de maturidade do órgão hoje." },
+            new()
+            {
+                Titulo = tituloDoNivel,
+                Largura = 16,
+                Ajuda = livre
+                    ? "O nível que o PDTIC vigente (ou o da elaboração) alcançou, pelo que o PDTIC tem; \"Sem nível alcançado\" quando não completa o primeiro nível, não tem PDTIC ou foi aprovado fora do sistema."
+                    : "Nível de maturidade do órgão hoje."
+            },
             new() { Titulo = "Versão do PDTIC", Largura = 12, Ajuda = "A versão de referência do órgão: a vigente; sem ela, a da elaboração; sem as duas, a mais recente (encerrada)." },
             new() { Titulo = "Situação do PDTIC", Largura = 20, Ajuda = "Situação da versão de referência, a mesma do painel (a substituída conta como encerrada); \"Sem PDTIC\" quando o órgão nunca abriu um." }
         };
@@ -551,7 +604,7 @@ public class PePainelService : IPePainelService
         {
             var celulas = new List<object?>
             {
-                linha.Nome, linha.Sigla, linha.NivelNome, linha.PdticVersao,
+                linha.Nome, linha.Sigla, NivelDaLinha(linha), linha.PdticVersao,
                 linha.PdticSituacao == null ? "Sem PDTIC" : PeDominios.SituacaoPdtic.Rotulo(linha.PdticSituacao)
             };
             celulas.AddRange(itens.Select(i => (object?)PeConformidadeRegras.Texto(linha.Itens.GetValueOrDefault(i.Chave)?.Atende)));
@@ -566,7 +619,7 @@ public class PePainelService : IPePainelService
         var leiaMe = new List<(string, string)>
         {
             ("Conteúdo", "Conformidade dos PDTICs dos órgãos com os itens de TIC acompanhados pela SGDI"),
-            ("Filtros", await DescricaoDosFiltrosAsync(consulta)),
+            ("Filtros", await DescricaoDosFiltrosAsync(consulta, livre)),
             ("Órgãos", conformidade.Orgaos.Count == 1 ? "1 órgão" : $"{conformidade.Orgaos.Count} órgãos"),
             ("Resumo", $"Alta: {conformidade.Resumo.Alta} · Média: {conformidade.Resumo.Media} · Baixa: {conformidade.Resumo.Baixa}"),
             ("Extraído em", PePlanilhaService.Agora()),
@@ -775,6 +828,8 @@ public class PePainelService : IPePainelService
         var historico = await _orgaos.HistoricoNivelAsync(orgaoId);
         var nomesInadimplencias = await PeInadimplenciaService.NomesAsync(_context, inadimplencias);
 
+        // F3: o nível que o PDTIC de referência alcançou, pela régua (a mesma situação dos passos)
+        var nivelDoPdtic = situacao?.Resposta.Nivel;
         var resposta = new PeOrgaoResumoResponse
         {
             Orgao = new PeOrgaoResumoOrgaoResponse { Id = orgao.Id, Sigla = orgao.Sigla, Nome = orgao.Nome },
@@ -783,6 +838,12 @@ public class PePainelService : IPePainelService
                 Id = retrato.Nivel?.Id,
                 Nome = retrato.Nivel?.Nome,
                 Padrao = retrato.NivelPadrao,
+                Modo = base_.Dados.ModoNiveis.Vigente,
+                AlcancadoId = nivelDoPdtic?.AlcancadoId,
+                AlcancadoNome = nivelDoPdtic?.AlcancadoNome,
+                ProximoId = nivelDoPdtic?.ProximoId,
+                ProximoNome = nivelDoPdtic?.ProximoNome,
+                Faltam = nivelDoPdtic?.Faltam ?? new List<PeNivelFaltaResponse>(),
                 Historico = historico.Select(h => new PeOrgaoNivelTrocaResponse
                 {
                     NivelNome = h.NivelNovo,
@@ -816,7 +877,8 @@ public class PePainelService : IPePainelService
                         or PeDominios.SituacaoPasso.NaoSeAplica),
                     Total = passos.Count,
                     Atrasados = passos.Count(p => p.Situacao == PeDominios.SituacaoPasso.Atrasado),
-                    Aguardando = passos.Count(p => p.Situacao == PeDominios.SituacaoPasso.Aguardando)
+                    Aguardando = passos.Count(p => p.Situacao == PeDominios.SituacaoPasso.Aguardando),
+                    Validados = passos.Count(p => p.Validacao != null)
                 };
             }).ToList();
             resposta.NaoSeAplica = situacao.Resposta.Passos

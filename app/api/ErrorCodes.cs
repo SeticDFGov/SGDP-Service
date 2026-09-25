@@ -182,4 +182,7 @@ public enum ErrorCode
     PeInadimplenciaSituacaoInvalida = 1142, // 409: a operação não vale na situação (justificar ou registrar fora de notificado, sanear o justificado ou o saneado)
     PeInadimplenciaPrazoAberto = 1143,      // 409: registrar a inadimplência antes de vencer o prazo de 5 dias úteis (art. 11, II)
     PePassoSemPlanilha = 1144,              // 404: a planilha do passo sem seção visível e marcada "na planilha" (documento, envio sem seção, deliberação)
+    // Retorno do dono do produto (F3)
+    PeValidacaoRecusada = 1145,             // 409: validar um passo que não está feito ou de um tipo que não recebe a validação da equipe
+    PeDetalheRecusado = 1146,               // 409: trocar a forma de um passo no modo definido ou com o passo fechado no PDTIC atual
 }

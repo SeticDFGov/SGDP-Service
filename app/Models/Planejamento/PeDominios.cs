@@ -297,7 +297,9 @@ public static class PeDominios
     /// decide), "atrasado" (o ciclo de monitoramento passou do prazo sem fechar, rodada B) e
     /// "externo" (feito fora do sistema, no PDTIC registrado externamente), com o Motivo em
     /// texto. "continuo" fica para o tipo fluxo e, antes de o carregador trazer a versão 6 do
-    /// modelo inicial, para o monitoramento.
+    /// modelo inicial, para o monitoramento. Desde a F3, "opcional": o passo opcional para o
+    /// órgão e ainda sem conteúdo no PDTIC, que não é cobrado (onde antes ficaria pendente ou
+    /// atrasado), nos dois modos dos níveis.
     /// </summary>
     public static class SituacaoPasso
     {
@@ -310,8 +312,25 @@ public static class PeDominios
         public const string Aguardando = "aguardando";
         public const string Atrasado = "atrasado";
         public const string Externo = "externo";
+        // F3: passo opcional sem conteúdo (sem registro em nenhuma seção dele; no documento, sem PDF gerado)
+        public const string Opcional = "opcional";
 
-        public static readonly string[] Todas = { Feito, Pendente, Atencao, NaoSeAplica, Continuo, Aguardando, Atrasado, Externo };
+        public static readonly string[] Todas = { Feito, Pendente, Atencao, NaoSeAplica, Continuo, Aguardando, Atrasado, Externo, Opcional };
+    }
+
+    /// <summary>
+    /// Como os órgãos usam os níveis de maturidade (pe_configuracao.modo_niveis, desde a F3):
+    /// "livre" (cada órgão começa pelo mínimo do decreto, o nível base, vê os outros passos do
+    /// guia como opcionais, escolhe a forma de cada passo e o nível sai no fim, pelo que o PDTIC
+    /// tem) ou "definido" (o administrador escolhe o nível de cada órgão, como até a F2). Sem a
+    /// configuração, ou antes de o carregador trazer a versão 8 do modelo inicial, vale o definido.
+    /// </summary>
+    public static class ModoNiveis
+    {
+        public const string Livre = "livre";
+        public const string Definido = "definido";
+
+        public static readonly string[] Todos = { Livre, Definido };
     }
 
     /// <summary>
@@ -421,6 +440,9 @@ public static class PeDominios
         public const string PassoRiscos = "planejamento.riscos";
         // A avaliação do comitê (6.3): a decisão "revisar" libera a revisão
         public const string PassoAvaliacaoComite = "avaliacao-intermediaria.avaliacao-comite";
+        // A metodologia de elaboração (1.5): mostra os fluxos do órgão; gravar ou restaurar um fluxo
+        // é mudança no conteúdo dela (F3, a validação pela equipe)
+        public const string PassoMetodologia = "preparacao.metodologia";
     }
 
     /// <summary>
@@ -535,9 +557,11 @@ public static class PeDominios
         public const string DocBloco = "doc_bloco";
         // Fluxo do guia (modelo, E6)
         public const string FluxoModelo = "fluxo_modelo";
+        // Uma configuração geral do módulo (F3: o modo dos níveis; entidade_id = 0, a chave vai no antes e no depois)
+        public const string Configuracao = "configuracao";
 
         public static readonly string[] Todas =
-            { Nivel, Etapa, Passo, Secao, Campo, Opcao, OrgaoNivel, OrgaoAjuste, DocCapitulo, DocBloco, FluxoModelo };
+            { Nivel, Etapa, Passo, Secao, Campo, Opcao, OrgaoNivel, OrgaoAjuste, DocCapitulo, DocBloco, FluxoModelo, Configuracao };
     }
 
     /// <summary>O que aconteceu com o item (pe_modelo_historico.acao).</summary>

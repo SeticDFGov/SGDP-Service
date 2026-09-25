@@ -48,9 +48,83 @@ public class PeOrgaoService : IPeOrgaoService
             .ToDictionary(g => g.Key, g => g.Count());
         var niveis = await NiveisAsync();
 
+        // F3: o nível que o PDTIC de cada órgão alcançou (o vigente ou o da elaboração), no mesmo
+        // lote da situação dos passos do painel (poucas consultas para todos os órgãos)
+        var base_ = await PeBaseDosPaineis.CarregarAsync(_context, orgaos, comSituacao: true, comInadimplencias: false);
+        var alcancados = base_.Orgaos.ToDictionary(r => r.Orgao.Id, r => r.Conformidade?.Linha);
+
         return orgaos
-            .Select(o => Item(o, escolhidos.TryGetValue(o.Id, out var n) ? (long?)n : null, niveis, ajustes.GetValueOrDefault(o.Id)))
+            .Select(o =>
+            {
+                var item = Item(o, escolhidos.TryGetValue(o.Id, out var n) ? (long?)n : null, niveis, ajustes.GetValueOrDefault(o.Id));
+                var linha = alcancados.GetValueOrDefault(o.Id);
+                item.NivelAlcancadoId = linha?.NivelAlcancadoId;
+                item.NivelAlcancadoNome = linha?.NivelAlcancadoNome;
+                return item;
+            })
             .ToList();
+    }
+
+    // ── Forma de cada passo no modo livre (F3) ──────────────────────────────
+
+    /// <summary>
+    /// Escolhe a forma de um passo para o órgão (o nível cujas seções e campos valem nele) e devolve
+    /// o passo a passo do órgão. NivelId nulo, ou o da forma padrão, volta à forma padrão (apaga a
+    /// escolha). Só no modo livre (409 PeDetalheRecusado no definido); o passo aparece para o órgão
+    /// (404); o nível é uma das formas oferecidas (400); e o passo pode mudar no PDTIC atual do órgão
+    /// (a versão em elaboração, senão a vigente), pela regra de quem edita o passo (409
+    /// PeDetalheRecusado com a mensagem da situação; sem PDTIC atual, pode). Mudar a forma não apaga
+    /// dado: o campo que sai guarda o valor e volta quando a forma volta (decisão 13).
+    /// </summary>
+    public async Task<PeTrilhaResponse> DefinirDetalheAsync(long orgaoId, long passoId, PePassoDetalheDTO dto, string autor)
+    {
+        var orgao = await OrgaoAtivoAsync(orgaoId);
+        var dados = await PeModeloDados.CarregarAsync(_context);
+        dados.ModoNiveis.Exigir();
+        if (!dados.ModoNiveis.Livre)
+            throw new ApiException(ErrorCode.PeDetalheRecusado, "No modo definido, a forma dos passos segue o nível que o administrador escolheu para o órgão.");
+
+        var semVigente = await PeTrilhaOrgao.SemPeticVigenteAsync(_context);
+        var trilha = await PeTrilhaOrgao.DoOrgaoAsync(_context, dados, orgao, semVigente);
+        var passo = trilha.Passo(passoId) ?? throw PePdticService.PassoIndisponivel();
+        if (dto.NivelId != null && passo.OpcoesDetalhe.All(o => o.NivelId != dto.NivelId))
+            throw new ApiException(ErrorCode.PeDadosInvalidos, "Escolha uma das formas deste passo.");
+
+        var atuais = await _context.PePdtics.AsNoTracking()
+            .Where(p => p.OrgaoId == orgaoId && !PeDominios.SituacaoPdtic.Encerradas.Contains(p.Situacao))
+            .OrderByDescending(p => p.Id)
+            .ToListAsync();
+        var atual = atuais.FirstOrDefault(p => PeDominios.SituacaoPdtic.DaElaboracao.Contains(p.Situacao)) ?? atuais.FirstOrDefault();
+        if (atual != null && PeEdicaoPdtic.Recusa(atual, PeEdicaoPdtic.GrupoDoPasso(trilha, passo), passo.Chave) is string recusa)
+            throw new ApiException(ErrorCode.PeDetalheRecusado, recusa);
+
+        // A forma padrão é a primeira oferecida: escolhê-la é voltar ao padrão
+        long? nivelId = dto.NivelId != null && dto.NivelId != passo.OpcoesDetalhe.FirstOrDefault()?.NivelId ? dto.NivelId : null;
+        var linha = await _context.PeOrgaosPassoDetalhe.FirstOrDefaultAsync(d => d.OrgaoId == orgaoId && d.PassoId == passoId);
+        if (nivelId == null)
+        {
+            if (linha != null) _context.PeOrgaosPassoDetalhe.Remove(linha);
+        }
+        else if (linha == null)
+        {
+            _context.PeOrgaosPassoDetalhe.Add(new PeOrgaoPassoDetalhe
+            {
+                OrgaoId = orgaoId,
+                PassoId = passoId,
+                NivelId = nivelId.Value,
+                AlteradoEm = DateTime.UtcNow,
+                AlteradoPor = autor
+            });
+        }
+        else if (linha.NivelId != nivelId)
+        {
+            linha.NivelId = nivelId.Value;
+            linha.AlteradoEm = DateTime.UtcNow;
+            linha.AlteradoPor = autor;
+        }
+        await _context.SaveChangesAsync();
+
+        return PeModeloService.Trilha(await PeTrilhaOrgao.DoOrgaoAsync(_context, dados, orgao, semVigente));
     }
 
     public async Task<PeOrgaoNivelResponse> DefinirNivelAsync(long orgaoId, PeOrgaoNivelDTO dto, string autor)

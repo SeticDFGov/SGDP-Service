@@ -54,6 +54,12 @@ public interface IPePdticService
 
     Task<PePassoSituacaoResponse> DesmarcarNaoSeAplicaAsync(long id, long passoId, PeUserContext ctx);
 
+    /// <summary>F3: marca o passo como validado pela equipe (PUT pdtic/{id}/passos/{passoId}/validacao).</summary>
+    Task<PePassoSituacaoResponse> ValidarPassoAsync(long id, long passoId, PeUserContext ctx);
+
+    /// <summary>F3: desfaz a validação da equipe (DELETE pdtic/{id}/passos/{passoId}/validacao).</summary>
+    Task<PePassoSituacaoResponse> DesfazerValidacaoAsync(long id, long passoId, PeUserContext ctx);
+
     Task<PeTemasResponse> TemasAsync(long id, PeUserContext ctx);
 
     Task<List<PeSistemaIaPgiaResponse>> SistemasIaAsync(long id, PeUserContext ctx);

@@ -24,9 +24,10 @@ public static class PapeisPlanejamento
     // Secretaria Executiva do CGTIC (art. 9º do Decreto nº 48.900/2026): recebe os PDTICs
     // e o PETIC enviados e registra a deliberação do comitê
     public const string Cgtic = "pe_cgtic";
-    // Equipe do órgão: preenche e acompanha o PDTIC do próprio órgão
+    // Equipe do PDTIC (EqPDTIC; na tela, desde a F3, "Equipe do PDTIC"): elabora e acompanha
+    // o PDTIC do próprio órgão
     public const string Orgao = "pe_orgao";
-    // Consulta do órgão (autoridade máxima, membros do SGTIC): só lê o próprio órgão
+    // Consulta do PDTIC (autoridade máxima, membros do SGTIC): só lê o PDTIC do próprio órgão
     public const string OrgaoConsulta = "pe_orgao_consulta";
 
     public static readonly string[] Todos = { Admin, Sgdi, Cgtic, Orgao, OrgaoConsulta };

@@ -33,12 +33,15 @@ public sealed class PeLeituraDaSituacao
     private readonly HashSet<long> _comDocumento;
     private readonly ILookup<long, PeDeliberacao> _deliberacoes;
     private readonly HashSet<long> _ciclosComRegistro;
+    private readonly Dictionary<long, Dictionary<long, PePdticPassoValidacao>> _validacoes;
 
     private PeLeituraDaSituacao(ILookup<long, PeRegistro> registros, Dictionary<long, long> cicloDoRegistro, ILookup<long, PeVinculo> vinculos,
         Dictionary<long, Dictionary<long, PePdticPasso>> marcas, Dictionary<long, Dictionary<long, int>> abertos, ILookup<long, PeCiclo> ciclos,
-        HashSet<long> comDocumento, ILookup<long, PeDeliberacao> deliberacoes, bool semPeticVigente, PeNomes nomes)
+        HashSet<long> comDocumento, ILookup<long, PeDeliberacao> deliberacoes, bool semPeticVigente, PeNomes nomes,
+        Dictionary<long, Dictionary<long, PePdticPassoValidacao>> validacoes)
     {
         Nomes = nomes;
+        _validacoes = validacoes;
         _registros = registros;
         _cicloDoRegistro = cicloDoRegistro;
         _vinculos = vinculos;
@@ -54,15 +57,19 @@ public sealed class PeLeituraDaSituacao
     // Não há versão do PETIC-DF aprovada: a ligação com os catálogos dele fica opcional
     public bool SemPeticVigente { get; }
 
-    // F1 (C19): os nomes de quem marcou os "não se aplica" (lidos de uma vez com as marcas)
+    // F1 (C19): os nomes de quem marcou os "não se aplica" (lidos de uma vez com as marcas) e, desde a
+    // F3, os de quem validou os passos
     public PeNomes Nomes { get; }
 
     /// <summary>
     /// Lê tudo de uma vez para os PDTICs dados. Com acompanhamentoAtivo (a versão 6 do modelo
     /// inicial carregada), também o ciclo de cada registro, os ciclos gravados e o documento de
     /// cada versão (sem ele, nenhum ciclo e toda versão conta como do PDTIC, como na rodada A).
+    /// Com validacaoAtiva (a versão 8, F3), também a validação da equipe em cada passo (as colunas
+    /// novas de pe_pdtic_passo; sem ela, nenhuma validação).
     /// </summary>
-    public static async Task<PeLeituraDaSituacao> CarregarAsync(AppDbContext context, IReadOnlyCollection<long> pdticIds, bool acompanhamentoAtivo)
+    public static async Task<PeLeituraDaSituacao> CarregarAsync(AppDbContext context, IReadOnlyCollection<long> pdticIds, bool acompanhamentoAtivo,
+        bool validacaoAtiva = false)
     {
         var ids = pdticIds.Distinct().ToList();
         if (ids.Count == 0)
@@ -70,7 +77,7 @@ public sealed class PeLeituraDaSituacao
                 Array.Empty<PeVinculo>().ToLookup(v => 0L), new Dictionary<long, Dictionary<long, PePdticPasso>>(),
                 new Dictionary<long, Dictionary<long, int>>(), Array.Empty<PeCiclo>().ToLookup(c => 0L), new HashSet<long>(),
                 Array.Empty<PeDeliberacao>().ToLookup(d => 0L), !await context.PePetics.AnyAsync(p => p.Situacao == PeDominios.SituacaoPetic.Aprovado),
-                PeNomes.Vazio);
+                PeNomes.Vazio, new Dictionary<long, Dictionary<long, PePdticPassoValidacao>>());
 
         // Os registros de todas as seções (na ordem da seção) e as ligações que saem deles
         var registros = await context.PeRegistros.AsNoTracking()
@@ -101,7 +108,14 @@ public sealed class PeLeituraDaSituacao
                 .ToListAsync())
             .GroupBy(p => p.PdticId)
             .ToDictionary(g => g.Key, g => g.ToDictionary(p => p.PassoId));
-        var nomes = await PeNomes.CarregarAsync(context, marcas.Values.SelectMany(m => m.Values).Select(p => p.MarcadoPor));
+        // A validação da equipe (F3): só com a versão 8 carregada (as colunas são da migration dela)
+        var validacoes = validacaoAtiva
+            ? (await context.PePdticPassosValidacao.AsNoTracking().Where(v => ids.Contains(v.PdticId)).ToListAsync())
+                .GroupBy(v => v.PdticId)
+                .ToDictionary(g => g.Key, g => g.ToDictionary(v => v.PassoId))
+            : new Dictionary<long, Dictionary<long, PePdticPassoValidacao>>();
+        var nomes = await PeNomes.CarregarAsync(context, marcas.Values.SelectMany(m => m.Values).Select(p => p.MarcadoPor)
+            .Concat(validacoes.Values.SelectMany(v => v.Values).Select(v => v.ValidadoPor)));
         var abertos = (await context.PeComentarios.AsNoTracking()
                 .Where(c => ids.Contains(c.PdticId) && c.PaiId == null && c.ResolvidoEm == null)
                 .Select(c => new { c.PdticId, c.PassoId })
@@ -122,8 +136,12 @@ public sealed class PeLeituraDaSituacao
 
         return new PeLeituraDaSituacao(registros.ToLookup(r => r.PdticId!.Value), cicloDoRegistro, vinculos.ToLookup(v => v.RegistroOrigemId),
             marcas, abertos, ciclos.ToLookup(c => c.PdticId), comDocumento,
-            deliberacoes.OrderByDescending(d => d.Id).ToLookup(d => d.ObjetoId), semPeticVigente, nomes);
+            deliberacoes.OrderByDescending(d => d.Id).ToLookup(d => d.ObjetoId), semPeticVigente, nomes, validacoes);
     }
+
+    /// <summary>A validação da equipe em cada passo do PDTIC (F3), pelo passo.</summary>
+    public IReadOnlyDictionary<long, PePdticPassoValidacao> Validacoes(long pdticId) =>
+        _validacoes.TryGetValue(pdticId, out var validacoes) ? validacoes : new Dictionary<long, PePdticPassoValidacao>();
 
     /// <summary>A análise das seções dadas no PDTIC (na seção por ciclo, só os registros do cicloId; sem ele, nenhum).</summary>
     public PeAnaliseDono Analisar(long pdticId, IReadOnlyList<PeSecaoDoDono> secoes, long? cicloId = null) =>

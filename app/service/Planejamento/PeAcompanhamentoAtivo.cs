@@ -21,9 +21,12 @@ namespace service.Planejamento;
 /// </summary>
 public sealed record PeAcompanhamentoAtivo(bool Ativo, int PrazoFechamentoDias, int DiasAvaliacaoFinal, string PeriodicidadePadrao)
 {
-    public static async Task<PeAcompanhamentoAtivo> LerAsync(AppDbContext context)
+    public static async Task<PeAcompanhamentoAtivo> LerAsync(AppDbContext context) =>
+        De(await context.PeConfiguracoes.AsNoTracking().ToListAsync());
+
+    /// <summary>As configurações do acompanhamento a partir das linhas de pe_configuracao já lidas.</summary>
+    public static PeAcompanhamentoAtivo De(IReadOnlyList<PeConfiguracao> configuracoes)
     {
-        var configuracoes = await context.PeConfiguracoes.AsNoTracking().ToListAsync();
         string? Valor(string chave) => configuracoes.FirstOrDefault(c => c.Chave == chave)?.Valor;
 
         var versao = Inteiro(Valor(PeConfiguracao.ChaveVersaoModelo)) ?? 0;
@@ -46,7 +49,7 @@ public sealed record PeAcompanhamentoAtivo(bool Ativo, int PrazoFechamentoDias, 
         : throw new ApiException(ErrorCode.PeModeloIndisponivel,
             "O acompanhamento do PDTIC está sendo preparado nesta atualização. Tente de novo em alguns minutos.");
 
-    private static int? Inteiro(string? json)
+    internal static int? Inteiro(string? json)
     {
         if (string.IsNullOrWhiteSpace(json)) return null;
         try
@@ -64,7 +67,7 @@ public sealed record PeAcompanhamentoAtivo(bool Ativo, int PrazoFechamentoDias, 
         }
     }
 
-    private static string? Texto(string? json)
+    internal static string? Texto(string? json)
     {
         if (string.IsNullOrWhiteSpace(json)) return null;
         try

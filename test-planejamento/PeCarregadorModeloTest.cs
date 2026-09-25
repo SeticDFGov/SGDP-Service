@@ -275,9 +275,9 @@ public class PeCarregadorModeloTest : PeModeloTestBase
     [Fact]
     public void Configuracoes_VersaoDoModeloEPeriodicidadeTrimestral()
     {
-        // Versão 7 (F1): as correções da revisão final (a 6, da E7 rodada B, trouxe as seções por
-        // ciclo, os modelos do RA e do RR e as configurações do acompanhamento)
-        Assert.Equal("7", Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChaveVersaoModelo).Valor);
+        // Versão 8 (F3): o modo dos níveis (a 7, da F1, trouxe as correções da revisão final; a 6, da
+        // E7 rodada B, as seções por ciclo, os modelos do RA e do RR e as configurações do acompanhamento)
+        Assert.Equal("8", Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChaveVersaoModelo).Valor);
         Assert.Equal("\"trimestral\"",
             Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChavePeriodicidadeMonitoramento).Valor);
         Assert.Equal("15", Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChavePrazoFechamentoCiclo).Valor);
@@ -293,7 +293,7 @@ public class PeCarregadorModeloTest : PeModeloTestBase
 
         Assert.DoesNotContain('\u2014', texto);
         Assert.DoesNotContain('\u2013', texto);
-        Assert.Equal(PeCarregadorModelo.VersaoDaRevisaoFinal, PeCarregadorModelo.LerSeed(texto).Versao);
+        Assert.Equal(PeCarregadorModelo.VersaoDoModoLivre, PeCarregadorModelo.LerSeed(texto).Versao);
     }
 
     // ── Idempotência e "nunca sobrescreve" ────────────────────────────────────
@@ -304,7 +304,7 @@ public class PeCarregadorModeloTest : PeModeloTestBase
         var resultado = await new PeCarregadorModelo(Context).CarregarAsync();
 
         Assert.False(resultado.Executou);
-        Assert.Equal(PeCarregadorModelo.VersaoDaRevisaoFinal, resultado.VersaoAnterior);
+        Assert.Equal(PeCarregadorModelo.VersaoDoModoLivre, resultado.VersaoAnterior);
         Assert.Equal(50, Context.PePassos.Count());
         // 346 do PDTIC (com o logotipo da versão 3) e 33 do DF e do PETIC-DF (versão 2)
         Assert.Equal(379, Context.PeCampos.Count());

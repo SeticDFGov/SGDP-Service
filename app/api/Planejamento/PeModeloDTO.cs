@@ -13,6 +13,9 @@ namespace api.Planejamento;
 /// </summary>
 public class PeModeloResponse
 {
+    // F3: como os órgãos usam os níveis, "livre" ou "definido" (antes de a versão 8 do modelo inicial carregar, "definido")
+    public string ModoNiveis { get; set; } = "definido";
+
     public List<PeNivelResponse> Niveis { get; set; } = new();
 
     public List<PeEtapaResponse> Etapas { get; set; } = new();
@@ -205,8 +208,10 @@ public class PeOpcaoResponse
 // ── GET api/planejamento/modelo/trilha ───────────────────────────────────────
 
 /// <summary>
-/// A trilha resolvida de um órgão: só os itens visíveis (situação diferente de
-/// desligado), já na ordem e numerados pela posição (etapa N, passo N.M).
+/// A trilha resolvida de um órgão (a tela diz "passo a passo"): só os itens visíveis (situação
+/// diferente de desligado), já na ordem e numerados pela posição (etapa N, passo N.M). Desde a
+/// F3, com o modo dos níveis; no modo livre, o nível é o base (o padrão) e cada passo traz a forma
+/// em uso e as formas oferecidas.
 /// </summary>
 public class PeTrilhaResponse
 {
@@ -216,17 +221,41 @@ public class PeTrilhaResponse
 
     public string OrgaoNome { get; set; } = string.Empty;
 
+    // F3: "livre" ou "definido"
+    public string ModoNiveis { get; set; } = "definido";
+
+    // No modo livre, o nível base (o primeiro ativo pela ordem)
     public long NivelId { get; set; }
 
     public string NivelNome { get; set; } = string.Empty;
 
-    // O órgão não tem nível escolhido: vale o primeiro nível ativo pela ordem
+    // O órgão não tem nível escolhido: vale o primeiro nível ativo pela ordem (no modo livre, sempre verdadeiro)
     public bool NivelPadrao { get; set; }
 
-    // Falso quando o nível do órgão foi desativado (o órgão continua nele até a troca)
+    // Falso quando o nível do órgão foi desativado (o órgão continua nele até a troca; no modo livre, sempre verdadeiro)
     public bool NivelAtivo { get; set; } = true;
 
     public List<PeTrilhaEtapa> Etapas { get; set; } = new();
+}
+
+/// <summary>A forma de um passo no modo livre (F3): o nível cujas seções e campos valem para ele.</summary>
+public class PeTrilhaDetalhe
+{
+    public long NivelId { get; set; }
+
+    public string NivelNome { get; set; } = string.Empty;
+}
+
+/// <summary>Uma forma oferecida para o passo no modo livre (F3), com as seções e os campos visíveis nela.</summary>
+public class PeTrilhaOpcaoDetalhe
+{
+    public long NivelId { get; set; }
+
+    public string NivelNome { get; set; } = string.Empty;
+
+    public int Secoes { get; set; }
+
+    public int Campos { get; set; }
 }
 
 public class PeTrilhaEtapa
@@ -275,6 +304,19 @@ public class PeTrilhaPasso
     public string Situacao { get; set; } = string.Empty;
 
     public bool AjustadoParaOrgao { get; set; }
+
+    // F3, modo livre: a forma em uso (o nível cujas seções e campos valem); nulo no modo definido
+    public PeTrilhaDetalhe? Detalhe { get; set; }
+
+    // F3: o órgão escolheu a forma (não é a forma padrão)
+    public bool DetalheEscolhido { get; set; }
+
+    // F3: as formas oferecidas, do nível mais baixo para o mais alto (vazia sem escolha ou no modo definido)
+    public List<PeTrilhaOpcaoDetalhe> OpcoesDetalhe { get; set; } = new();
+
+    // F3, só no servidor: o nível de cada forma (nível em que o passo está ligado → o mais baixo com a mesma forma)
+    [JsonIgnore]
+    public Dictionary<long, long> FormaPorNivel { get; set; } = new();
 
     public List<PeTrilhaSecao> Secoes { get; set; } = new();
 }
@@ -638,6 +680,30 @@ public class PeOrgaoNivelResponse
 
     // Quantos ajustes o órgão tem por cima do nível
     public int Ajustes { get; set; }
+
+    // F3: o nível que o PDTIC do órgão alcançou (o vigente ou o da elaboração); nulo sem PDTIC,
+    // sem nível alcançado ou no PDTIC registrado fora do sistema
+    public long? NivelAlcancadoId { get; set; }
+
+    public string? NivelAlcancadoNome { get; set; }
+}
+
+/// <summary>PUT modelo/modo-niveis (F3): { Modo } com "livre" ou "definido".</summary>
+public class PeModoNiveisDTO
+{
+    public string? Modo { get; set; }
+}
+
+/// <summary>Resposta do PUT modelo/modo-niveis (F3).</summary>
+public class PeModoNiveisResponse
+{
+    public string ModoNiveis { get; set; } = string.Empty;
+}
+
+/// <summary>PUT orgaos/{orgaoId}/passos/{passoId}/detalhe (F3): { NivelId } (nulo volta à forma padrão).</summary>
+public class PePassoDetalheDTO
+{
+    public long? NivelId { get; set; }
 }
 
 public class PeOrgaoNivelDTO

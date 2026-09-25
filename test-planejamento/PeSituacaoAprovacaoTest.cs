@@ -126,12 +126,15 @@ public class PeSituacaoAprovacaoTest : PeAprovacaoTestBase
     [Fact]
     public async Task ProximoPasso_NaoRecomendaOPendenteDeUmaEtapaFechada_NemOAguardando()
     {
-        // Os documentos de referência, opcionais para a SES (fora do Básico): pendentes, mas não exigidos no envio
+        // Os documentos de referência, opcionais para a SES (fora do Básico): não exigidos no envio. Desde
+        // a F3, o passo opcional sem conteúdo fica "opcional" (não é cobrado) e o opcional nunca é o
+        // próximo passo por pendente (antes, pendente e recomendado)
         await AjustarPassosAsync(OrgaoSes, ("preparacao.documentos-referencia", "opcional"));
         var pdtic = await ProntoParaEnviarAsync();
         var referencias = await PassoDaSituacaoAsync(pdtic.Id, "preparacao.documentos-referencia");
-        Assert.Equal(PeDominios.SituacaoPasso.Pendente, referencias.Situacao);
-        Assert.Equal(referencias.Numero, (await SituacaoAsync(pdtic.Id)).ProximoPasso);
+        Assert.Equal(PeDominios.SituacaoPasso.Opcional, referencias.Situacao);
+        Assert.False(referencias.Obrigatorio);
+        Assert.NotEqual(referencias.Numero, (await SituacaoAsync(pdtic.Id)).ProximoPasso);
         Assert.True((await Aprovacao.EnvioAsync(pdtic.Id, await Orgao())).PodeEnviar);
 
         await EnviarAsync(pdtic.Id);

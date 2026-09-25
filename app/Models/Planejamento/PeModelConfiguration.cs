@@ -77,6 +77,7 @@ public static class PeModelConfiguration
         modelBuilder.ApplyPeFluxoConfiguration();
         modelBuilder.ApplyPeAcompanhamentoConfiguration();
         modelBuilder.ApplyPePaineisConfiguration();
+        modelBuilder.ApplyPeModoLivreConfiguration();
     }
 
     // ── Modelo configurável e níveis de maturidade (E2) ──────────────────────
@@ -1306,6 +1307,65 @@ public static class PeModelConfiguration
                 .HasForeignKey(i => i.OrgaoId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_pe_inadimplencia_orgao");
+        });
+    }
+
+    // ── Retorno do dono do produto (F3): a forma dos passos e a validação da equipe ────
+
+    private static void ApplyPeModoLivreConfiguration(this ModelBuilder modelBuilder)
+    {
+        // A forma de cada passo escolhida pelo órgão (modo livre dos níveis)
+        modelBuilder.Entity<PeOrgaoPassoDetalhe>(entity =>
+        {
+            entity.ToTable("pe_orgao_passo_detalhe");
+
+            entity.HasKey(d => new { d.OrgaoId, d.PassoId }).HasName("pk_pe_orgao_passo_detalhe");
+            entity.Property(d => d.OrgaoId).HasColumnName("orgao_id");
+            entity.Property(d => d.PassoId).HasColumnName("passo_id");
+            entity.Property(d => d.NivelId).HasColumnName("nivel_id");
+            entity.Property(d => d.AlteradoEm).HasColumnName("alterado_em");
+            entity.Property(d => d.AlteradoPor).HasColumnName("alterado_por").HasMaxLength(200).IsRequired();
+
+            entity.HasIndex(d => d.PassoId).HasDatabaseName("ix_pe_orgao_passo_detalhe_passo");
+            entity.HasIndex(d => d.NivelId).HasDatabaseName("ix_pe_orgao_passo_detalhe_nivel");
+
+            // Órgão do PGIA não é apagado (só desativado), o passo tem exclusão lógica e o nível
+            // é desativado: as FKs só impedem apagar por engano
+            entity.HasOne(d => d.Orgao)
+                .WithMany()
+                .HasForeignKey(d => d.OrgaoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_orgao_passo_detalhe_orgao");
+            entity.HasOne(d => d.Passo)
+                .WithMany()
+                .HasForeignKey(d => d.PassoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_orgao_passo_detalhe_passo");
+            entity.HasOne(d => d.Nivel)
+                .WithMany()
+                .HasForeignKey(d => d.NivelId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pe_orgao_passo_detalhe_nivel");
+        });
+
+        // pe_pdtic_passo.validado_em, validado_por e validacao_alterada_em (table splitting com o
+        // "não se aplica": as consultas de sempre não selecionam as colunas novas)
+        modelBuilder.Entity<PePdticPassoValidacao>(entity =>
+        {
+            entity.ToTable("pe_pdtic_passo", t =>
+            {
+                // Quem validou e quando andam juntos
+                t.HasCheckConstraint("ck_pe_pdtic_passo_validacao", "(validado_em IS NULL) = (validado_por IS NULL)");
+                // A mudança depois da validação só existe com a validação
+                t.HasCheckConstraint("ck_pe_pdtic_passo_validacao_alterada", "validacao_alterada_em IS NULL OR validado_em IS NOT NULL");
+            });
+            entity.HasKey(v => new { v.PdticId, v.PassoId }).HasName("pk_pe_pdtic_passo");
+            entity.Property(v => v.PdticId).HasColumnName("pdtic_id");
+            entity.Property(v => v.PassoId).HasColumnName("passo_id");
+            entity.Property(v => v.ValidadoEm).HasColumnName("validado_em").IsRequired();
+            entity.Property(v => v.ValidadoPor).HasColumnName("validado_por").HasMaxLength(200).IsRequired();
+            entity.Property(v => v.AlteradaEm).HasColumnName("validacao_alterada_em");
+            entity.HasOne(v => v.Linha).WithOne().HasForeignKey<PePdticPassoValidacao>(v => new { v.PdticId, v.PassoId });
         });
     }
 }

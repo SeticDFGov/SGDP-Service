@@ -185,6 +185,48 @@ public class PePdticSituacaoResponse
     public string? ProximoPassoMotivo { get; set; }
 
     public List<PePassoSituacaoResponse> Passos { get; set; } = new();
+
+    // F3: o nível que o PDTIC alcançou pela régua dos níveis e o que falta para o próximo
+    public PeNivelDoPdticResponse Nivel { get; set; } = new();
+}
+
+/// <summary>
+/// O nível que o PDTIC alcançou (F3; nos dois modos, a tela usa no modo livre): o nível mais alto
+/// cujos passos obrigatórios que contam (etapas 1 a 3, dos tipos dados, conferência dos temas e
+/// aprovação) estão resolvidos, com todos os níveis antes dele também; o próximo nível e o que
+/// falta para chegar a ele. No PDTIC registrado fora do sistema, o nível não é calculado (o Motivo diz).
+/// </summary>
+public class PeNivelDoPdticResponse
+{
+    // O modo dos níveis de hoje: "livre" ou "definido"
+    public string Modo { get; set; } = "definido";
+
+    public long? AlcancadoId { get; set; }
+
+    public string? AlcancadoNome { get; set; }
+
+    // O seguinte ao alcançado (sem nível alcançado, o primeiro); nulo quando alcançou o último
+    public long? ProximoId { get; set; }
+
+    public string? ProximoNome { get; set; }
+
+    // O que falta para chegar ao próximo nível (vazia sem próximo nível)
+    public List<PeNivelFaltaResponse> Faltam { get; set; } = new();
+
+    // Por que o nível não é calculado (PDTIC registrado fora do sistema), ou nulo
+    public string? Motivo { get; set; }
+}
+
+/// <summary>Um passo que falta para o próximo nível: o número no passo a passo do órgão (nulo quando o órgão não vê o passo), o título e o que falta.</summary>
+public class PeNivelFaltaResponse
+{
+    public long PassoId { get; set; }
+
+    public string? PassoNumero { get; set; }
+
+    public string PassoTitulo { get; set; } = string.Empty;
+
+    public string Motivo { get; set; } = string.Empty;
 }
 
 public class PePassoSituacaoResponse
@@ -195,8 +237,18 @@ public class PePassoSituacaoResponse
 
     public string Numero { get; set; } = string.Empty;
 
-    // feito, pendente, atencao, nao_se_aplica, continuo, aguardando, atrasado ou externo
+    // feito, pendente, atencao, nao_se_aplica, continuo, aguardando, atrasado, externo ou (F3) opcional
     public string Situacao { get; set; } = string.Empty;
+
+    // F3: a situação do passo no passo a passo do órgão é "obrigatorio"
+    public bool Obrigatorio { get; set; }
+
+    // F3: o passo recebe a validação da equipe (os da elaboração dos tipos dados, conferência dos
+    // temas, documento e fluxo; sem olhar quem chama; falso antes da versão 8 do modelo inicial)
+    public bool AceitaValidacao { get; set; }
+
+    // F3: a validação da equipe, ou nulo
+    public PeValidacaoResponse? Validacao { get; set; }
 
     // Por que o passo está aguardando, atrasado ou externo (texto pronto); nulo nos outros
     public string? Motivo { get; set; }
@@ -227,6 +279,23 @@ public class PeNaoSeAplicaResponse
 public class PeNaoSeAplicaDTO
 {
     public string? Justificativa { get; set; }
+}
+
+/// <summary>
+/// A validação da equipe num passo (F3): quem marcou e quando e, quando os dados do passo mudaram
+/// depois, a data da primeira mudança.
+/// </summary>
+public class PeValidacaoResponse
+{
+    public DateTime ValidadoEm { get; set; }
+
+    public string ValidadoPor { get; set; } = string.Empty;
+
+    // O nome da pessoa (o do cadastro do usuário; sem nome, o e-mail)
+    public string ValidadoPorNome { get; set; } = string.Empty;
+
+    // A primeira mudança nos dados do passo depois da validação, ou nulo
+    public DateTime? AlteradoDepoisEm { get; set; }
 }
 
 // ── Temas das ações (incisos V, VI e IX) ─────────────────────────────────────

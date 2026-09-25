@@ -18,7 +18,8 @@ namespace Controllers.Planejamento;
 /// ser montado e, desde a E7, transição que não vale na situação do PDTIC, encerramento ou
 /// revisão recusados, versão em elaboração e versão repetida e, na rodada B, ciclo que não
 /// aceita a operação e avaliação já aberta; na E8, a inadimplência na situação errada ou
-/// registrada antes do prazo; 400 para o resto). A validação de registro (e das grades do
+/// registrada antes do prazo; na F3, a validação da equipe recusada e a forma do passo
+/// recusada; 400 para o resto). A validação de registro (e das grades do
 /// ciclo), da publicação, do registro externo e da inadimplência (PeValidacaoException) leva
 /// também Campos, com a mensagem de cada campo; o envio e o fechamento do ciclo com pendências
 /// (PePendenciasException), a lista Pendencias; desde a F1, o envio do PETIC-DF com pendências
@@ -79,7 +80,8 @@ internal static class PeRespostas
                 or ErrorCode.PePdticSituacaoInvalida or ErrorCode.PeEncerramentoRecusado or ErrorCode.PeRevisaoEmAndamento
                 or ErrorCode.PeRevisaoRecusada or ErrorCode.PeVersaoPdticDuplicada
                 or ErrorCode.PeCicloFechado or ErrorCode.PeAvaliacaoAberta
-                or ErrorCode.PeInadimplenciaSituacaoInvalida or ErrorCode.PeInadimplenciaPrazoAberto => StatusCodes.Status409Conflict,
+                or ErrorCode.PeInadimplenciaSituacaoInvalida or ErrorCode.PeInadimplenciaPrazoAberto
+                or ErrorCode.PeValidacaoRecusada or ErrorCode.PeDetalheRecusado => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
         // Validação de registro: a mensagem de cada campo, pela chave

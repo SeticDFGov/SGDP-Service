@@ -71,6 +71,12 @@ public interface IPePermissionService
     bool PodeEditarPdtic(PeUserContext ctx, long orgaoId);
 
     /// <summary>
+    /// F3: escolhe a forma de um passo para o órgão no modo livre: a equipe do PDTIC (pe_orgao) no
+    /// próprio órgão, o administrador do módulo e o admin geral.
+    /// </summary>
+    bool PodeEscolherFormaDoPasso(PeUserContext ctx, long orgaoId);
+
+    /// <summary>
     /// Comenta um passo do PDTIC (comentário principal): pe_admin, pe_sgdi e admin geral. A
     /// Secretaria do CGTIC não comenta (plano, seção 4.1); quem responde é a equipe do órgão.
     /// </summary>

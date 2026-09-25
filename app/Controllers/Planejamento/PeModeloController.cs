@@ -61,7 +61,7 @@ public class PeModeloController : ControllerBase
             if (orgaoId != null)
             {
                 if (!_permissoes.PodeVerOrgao(ctx, orgaoId.Value))
-                    return PeRespostas.SemPermissao("Você só vê a trilha do seu próprio órgão.");
+                    return PeRespostas.SemPermissao("Você só vê o passo a passo do seu próprio órgão.");
                 alvo = orgaoId.Value;
             }
             else if (ctx.OrgaoId != null && PapeisPlanejamento.EhDeOrgao(ctx.Papel))
@@ -71,7 +71,7 @@ public class PeModeloController : ControllerBase
             else if (_permissoes.VeTodosOsOrgaos(ctx))
             {
                 if (ctx.OrgaoId == null)
-                    return PeRespostas.Erro(new service.ApiException(ErrorCode.PeOrgaoObrigatorio, "Escolha o órgão para ver a trilha dele."));
+                    return PeRespostas.Erro(new service.ApiException(ErrorCode.PeOrgaoObrigatorio, "Escolha o órgão para ver o passo a passo dele."));
                 alvo = ctx.OrgaoId.Value;
             }
             else
@@ -91,6 +91,18 @@ public class PeModeloController : ControllerBase
     public Task<IActionResult> Historico([FromQuery] PeHistoricoConsulta consulta) =>
         Executar(_permissoes.VeTodosOsOrgaos, async _ => Ok(await _service.HistoricoAsync(consulta)),
             "O histórico do modelo é da SGDI, da Secretaria do CGTIC e do administrador do módulo.");
+
+    // ── Modo dos níveis (F3) ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Troca o modo dos níveis ({ Modo }: "livre" ou "definido"; o administrador do módulo e o admin
+    /// geral) e devolve { ModoNiveis }. Valor fora do domínio: 400; antes da versão 8 do modelo
+    /// inicial (o intervalo da atualização): 409 com corpo. A troca fica no histórico do modelo
+    /// (entidade configuracao).
+    /// </summary>
+    [HttpPut("modo-niveis")]
+    public Task<IActionResult> DefinirModoNiveis([FromBody] JsonElement corpo) =>
+        Escrever(async ctx => Ok(await _service.DefinirModoNiveisAsync(PeCorpo.Ler<PeModoNiveisDTO>(corpo), ctx.Email)));
 
     // ── Níveis ──────────────────────────────────────────────────────────────
 

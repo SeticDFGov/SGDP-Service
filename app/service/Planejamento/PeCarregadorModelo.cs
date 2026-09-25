@@ -162,7 +162,9 @@ public sealed record PeCarregamentoResultado(
 /// final), as regras novas do config nos campos que já existiam (a data de decisão que não pode
 /// ser futura, o formato do processo SEI e o do endereço de internet) e a troca dos textos que o
 /// próprio carregador gravou e que ninguém mudou (a ajuda de "Quem decidiu" em cada aprovação, os
-/// textos do passo 5.1 e a capa do RA). O conteúdo fica em JSON embutido na aplicação.
+/// textos do passo 5.1 e a capa do RA); na versão 8 (F3, o retorno do dono do produto), a
+/// configuração modo_niveis = "livre" quando ela ainda não existe (só carrega com a migration
+/// PeModoLivreValidacao aplicada). O conteúdo fica em JSON embutido na aplicação.
 /// <list type="bullet">
 /// <item>Idempotente: se a versão gravada em pe_configuracao (seed_modelo_versao) já é a do
 /// JSON, não faz nada; senão insere só o que falta, achando cada item pela chave (nível
@@ -218,6 +220,15 @@ public sealed class PeCarregadorModelo
     /// anterior à 7: o que o administrador mudou depois (inclusive tirar a chave) fica.
     /// </summary>
     public static readonly string[] ChavesNovasDoConfig = { "naoFutura", "formato" };
+
+    /// <summary>
+    /// Versão do modelo inicial da F3 (o retorno do dono do produto): grava a configuração
+    /// modo_niveis = "livre" quando ela não existe (vale para os bancos que já têm o módulo). Só
+    /// carrega com a migration PeModoLivreValidacao aplicada (lê a tabela pe_orgao_passo_detalhe e
+    /// as colunas novas de pe_pdtic_passo); é a marca que liga o modo livre, a forma de cada passo e
+    /// a validação da equipe na API (<see cref="PeModoNiveis"/>).
+    /// </summary>
+    public const int VersaoDoModoLivre = 8;
 
     // Trava do carregador no PostgreSQL: segura até o fim da transação
     private const string SqlTrava = "SELECT pg_advisory_xact_lock(4890020260924)";
@@ -438,6 +449,16 @@ public sealed class PeCarregadorModelo
         var versaoAnterior = LerVersao(registroVersao?.Valor);
         if (versaoAnterior >= seed.Versao)
             return new PeCarregamentoResultado(versaoAnterior, versaoAnterior, false, 0, 0, 0, 0, 0, 0, 0);
+
+        // Versão 8 (F3): lê a tabela nova e as colunas novas de pe_pdtic_passo. No intervalo do
+        // deploy (o código novo sem a migration), a leitura falha antes de qualquer gravação e o
+        // carregador tenta de novo: a marca da versão 8 (o modo livre, a forma de cada passo e a
+        // validação da equipe) só entra com a migration aplicada
+        if (seed.Versao >= VersaoDoModoLivre)
+        {
+            await _context.PeOrgaosPassoDetalhe.AsNoTracking().AnyAsync(ct);
+            await _context.PePdticPassosValidacao.AsNoTracking().AnyAsync(ct);
+        }
 
         var agora = DateTime.UtcNow;
         int nNiveis = 0, nEtapas = 0, nPassos = 0, nSecoes = 0, nCampos = 0, nOpcoes = 0, nConfig = 0, nCorrecoes = 0;

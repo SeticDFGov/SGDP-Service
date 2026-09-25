@@ -139,6 +139,10 @@ public class PePermissionService : IPePermissionService
     public bool PodeEditarPdtic(PeUserContext ctx, long orgaoId) =>
         ctx.EhAdminGeral || (ctx.Papel == PapeisPlanejamento.Orgao && ctx.OrgaoId == orgaoId);
 
+    // F3: a forma de cada passo no modo livre (a equipe do PDTIC no próprio órgão, o administrador do módulo e o admin geral)
+    public bool PodeEscolherFormaDoPasso(PeUserContext ctx, long orgaoId) =>
+        PodeEditarPdtic(ctx, orgaoId) || ctx.Papel == PapeisPlanejamento.Admin;
+
     // Plano, seção 4.1: o administrador do módulo e a SGDI comentam; a Secretaria do CGTIC não
     public bool PodeComentarPdtic(PeUserContext ctx) =>
         ctx.EhAdminGeral || ctx.Papel is PapeisPlanejamento.Admin or PapeisPlanejamento.Sgdi;

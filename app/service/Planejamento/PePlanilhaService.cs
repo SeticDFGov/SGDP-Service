@@ -75,18 +75,29 @@ public class PePlanilhaService : IPePlanilhaService
         var tipo = Formato(formato, completa: false);
         // O motor confere quem chama e a seção no nível do órgão
         var secao = await _registros.ExportarSecaoAsync(PeDono.DoPdtic(pdticId), secaoChave, ctx);
-        var (pdtic, orgao, nivel) = await CabecalhoDoPdticAsync(pdticId);
+        var pdtic = await PdticDaPlanilhaAsync(pdticId);
+        var orgao = await OrgaoDaPlanilhaAsync(pdtic);
         var nome = $"PDTIC_{NomeSeguro(orgao.Sigla)}_{secao.Modelo.Secao.Chave}_{Hoje()}.{tipo}";
-        return tipo == Csv
-            ? new PePlanilhaArquivo(GerarCsv(secao), MimeCsv, nome)
-            : new PePlanilhaArquivo(PeXlsx.Gerar(new[] { Aba(secao) }, LeiaMeDoPdtic(pdtic, orgao, nivel)), MimeXlsx, nome);
+        if (tipo == Csv) return new PePlanilhaArquivo(GerarCsv(secao), MimeCsv, nome);
+        var nivel = await NivelDaLeiaMeAsync(pdtic);
+        return new PePlanilhaArquivo(PeXlsx.Gerar(new[] { Aba(secao) }, LeiaMeDoPdtic(pdtic, orgao, nivel)), MimeXlsx, nome);
     }
 
     public async Task<PePlanilhaArquivo> PdticCompletaAsync(long pdticId, string? formato, PeUserContext ctx)
     {
         Formato(formato, completa: true);
         var secoes = await _registros.ExportarSecoesAsync(PeDono.DoPdtic(pdticId), ctx);
-        var (pdtic, orgao, nivel) = await CabecalhoDoPdticAsync(pdticId);
+        var pdtic = await PdticDaPlanilhaAsync(pdticId);
+
+        // F3 (C4): a seção de passo opcional para o órgão e ainda sem conteúdo fica de fora da completa
+        var trilha = await PeTrilhaOrgao.DoPdticAsync(_context, pdtic);
+        var comConteudo = await PeConteudoDosPassos.ComConteudoAsync(_context, trilha.Dados, pdtic.Id);
+        secoes = secoes
+            .Where(s => trilha.Secao(s.Modelo.Secao.Id) is not { } visivel || !PeConteudoDosPassos.OpcionalSemConteudo(visivel.Passo, comConteudo))
+            .ToList();
+
+        var orgao = await OrgaoDaPlanilhaAsync(pdtic);
+        var nivel = await NivelDaLeiaMeAsync(pdtic, trilha);
         var nome = $"PDTIC_{NomeSeguro(orgao.Sigla)}_{Completa}_{Hoje()}.{Xlsx}";
         return new PePlanilhaArquivo(PeXlsx.Gerar(secoes.Select(Aba).ToList(), LeiaMeDoPdtic(pdtic, orgao, nivel)), MimeXlsx, nome);
     }
@@ -98,7 +109,8 @@ public class PePlanilhaService : IPePlanilhaService
         var tipo = Formato(formato, completa: false);
         // O motor confere quem chama, o passo na trilha do órgão, as seções e o ciclo
         var passo = await _registros.ExportarPassoAsync(pdticId, passoChave, cicloId, ctx);
-        var (pdtic, orgao, nivel) = await CabecalhoDoPdticAsync(pdticId);
+        var pdtic = await PdticDaPlanilhaAsync(pdticId);
+        var orgao = await OrgaoDaPlanilhaAsync(pdtic);
         var numero = passo.Passo.Numero;
         var nome = $"PDTIC_{NomeSeguro(orgao.Sigla)}_passo-{numero}"
                    + (passo.Ciclo == null ? string.Empty : "_" + PeCiclos.RotuloCurto(passo.Ciclo))
@@ -120,11 +132,12 @@ public class PePlanilhaService : IPePlanilhaService
             return new PePlanilhaArquivo(memoria.ToArray(), MimeZip, $"{nome}.zip");
         }
 
+        var nivel = await NivelDaLeiaMeAsync(pdtic);
         var leiaMe = new List<(string, string)>
         {
             ("Órgão", $"{orgao.Sigla} · {orgao.Nome}"),
             ("PDTIC", $"Plano Diretor de Tecnologia da Informação e Comunicação, versão {pdtic.Versao} ({PeDominios.SituacaoPdtic.RotuloMinusculo(pdtic.Situacao)})"),
-            ("Nível de maturidade", nivel?.Nome ?? "-"),
+            (nivel.Titulo, nivel.Valor),
             ("Passo", $"{numero} · {passo.Passo.Titulo}")
         };
         if (passo.Ciclo != null)
@@ -132,33 +145,53 @@ public class PePlanilhaService : IPePlanilhaService
                 ? $"{passo.Ciclo.Rotulo} ({PeFormato.Data(passo.Ciclo.Inicio)} a {(passo.Ciclo.Fim is DateOnly fim ? PeFormato.Data(fim) : "-")})"
                 : passo.Ciclo.Rotulo));
         leiaMe.Add(("Extraído em", Agora()));
-        leiaMe.Add(("Como ler", "Cada aba é uma seção do passo, com as colunas do nível do órgão. A coluna Código identifica cada registro "
+        leiaMe.Add(("Como ler", "Cada aba é uma seção do passo, com as colunas que aparecem para o órgão. A coluna Código identifica cada registro "
                                 + "(por exemplo, N01), e as colunas de ligação mostram os códigos dos registros ligados, para cruzar as abas. "
                                 + (passo.Ciclo == null ? string.Empty : "As seções registradas a cada ciclo trazem só o ciclo acima. ")
                                 + "Datas e valores estão como números."));
         return new PePlanilhaArquivo(PeXlsx.Gerar(passo.Secoes.Select(Aba).ToList(), leiaMe), MimeXlsx, $"{nome}.{Xlsx}");
     }
 
-    private async Task<(PePdtic Pdtic, PgiaOrgao Orgao, PeNivel? Nivel)> CabecalhoDoPdticAsync(long pdticId)
+    private async Task<PePdtic> PdticDaPlanilhaAsync(long pdticId) =>
+        await _context.PePdtics.AsNoTracking().FirstAsync(p => p.Id == pdticId);
+
+    private async Task<PgiaOrgao> OrgaoDaPlanilhaAsync(PePdtic pdtic) =>
+        await _context.PgiaOrgaos.AsNoTracking().FirstAsync(o => o.Id == pdtic.OrgaoId);
+
+    /// <summary>
+    /// A linha do nível da Leia-me das planilhas do PDTIC (só o XLSX tem a Leia-me: o CSV não lê
+    /// nada disto). No modo definido, "Nível de maturidade" com o nível de hoje do órgão, como
+    /// sempre. No modo livre (F3), o nível base diria o mesmo para todos: a linha passa a "Nível
+    /// alcançado", com o nível que este PDTIC alcançou (a régua da conformidade, lendo a situação só
+    /// dele), "-" sem nível alcançado e o motivo no PDTIC registrado fora do sistema. A trilha,
+    /// quando quem chama já a tem, é reaproveitada.
+    /// </summary>
+    private async Task<(string Titulo, string Valor)> NivelDaLeiaMeAsync(PePdtic pdtic, PeTrilhaOrgao? trilha = null)
     {
-        var pdtic = await _context.PePdtics.AsNoTracking().FirstAsync(p => p.Id == pdticId);
-        var orgao = await _context.PgiaOrgaos.AsNoTracking().FirstAsync(o => o.Id == pdtic.OrgaoId);
-        var niveis = await PeTrilhaOrgao.NiveisDosOrgaosAsync(_context, new[] { orgao.Id });
-        return (pdtic, orgao, niveis.GetValueOrDefault(orgao.Id));
+        var livre = trilha?.Dados.ModoNiveis.Livre ?? (await PeModoNiveis.LerAsync(_context)).Livre;
+        if (livre)
+        {
+            trilha ??= await PeTrilhaOrgao.DoPdticAsync(_context, pdtic);
+            var leitura = await PeLeituraDaSituacao.CarregarAsync(_context, new[] { pdtic.Id }, trilha.Dados.Acompanhamento.Ativo);
+            var alcancado = PeNivelAlcancado.Calcular(pdtic, trilha, leitura);
+            return ("Nível alcançado", alcancado.AlcancadoNome ?? alcancado.Motivo ?? "-");
+        }
+        var niveis = await PeTrilhaOrgao.NiveisDosOrgaosAsync(_context, new[] { pdtic.OrgaoId });
+        return ("Nível de maturidade", niveis.GetValueOrDefault(pdtic.OrgaoId)?.Nome ?? "-");
     }
 
-    private static IReadOnlyList<(string, string)> LeiaMeDoPdtic(PePdtic pdtic, PgiaOrgao orgao, PeNivel? nivel)
+    private static IReadOnlyList<(string, string)> LeiaMeDoPdtic(PePdtic pdtic, PgiaOrgao orgao, (string Titulo, string Valor) nivel)
     {
         var itens = new List<(string, string)>
         {
             ("Órgão", $"{orgao.Sigla} · {orgao.Nome}"),
             ("PDTIC", $"Plano Diretor de Tecnologia da Informação e Comunicação, versão {pdtic.Versao} ({PeDominios.SituacaoPdtic.RotuloMinusculo(pdtic.Situacao)})"),
-            ("Nível de maturidade", nivel?.Nome ?? "-"),
+            (nivel.Titulo, nivel.Valor),
             ("Vigência", pdtic.VigenciaInicio != null && pdtic.VigenciaFim != null
                 ? $"{PeFormato.Data(pdtic.VigenciaInicio.Value)} a {PeFormato.Data(pdtic.VigenciaFim.Value)}"
                 : "-"),
             ("Extraído em", Agora()),
-            ("Como ler", "Cada aba é uma seção do PDTIC, com as colunas do nível do órgão. A coluna Código identifica cada registro "
+            ("Como ler", "Cada aba é uma seção do PDTIC, com as colunas que aparecem para o órgão. A coluna Código identifica cada registro "
                          + "(por exemplo, N01), e as colunas de ligação mostram os códigos dos registros ligados, para cruzar as abas. "
                          + "Datas e valores estão como números.")
         };
@@ -167,11 +200,16 @@ public class PePlanilhaService : IPePlanilhaService
 
     // ── Consolidado de todos os órgãos (E4) ─────────────────────────────────
 
-    /// <summary>Os PDTICs atuais com o órgão, o nível e a trilha de cada um, e a trilha de cada nível.</summary>
+    /// <summary>
+    /// Os PDTICs atuais com o órgão, o nível e a trilha de cada um, e a trilha de cada nível. No modo
+    /// livre (F3), também o nível que cada PDTIC alcançou (nulo quando não alcançou nenhum ou foi
+    /// registrado fora do sistema); no modo definido, <c>NiveisAlcancados</c> é nulo.
+    /// </summary>
     private sealed record PeBaseConsolidada(
         PeModeloDados Dados,
         List<(PePdtic Pdtic, PeTrilhaOrgao Trilha)> Pdtics,
-        List<List<PeTrilhaEtapa>> TrilhasDosNiveis);
+        List<List<PeTrilhaEtapa>> TrilhasDosNiveis,
+        IReadOnlyDictionary<long, string?>? NiveisAlcancados = null);
 
     /// <summary>Uma seção consolidada: as colunas de campo (a união) e as linhas de cada órgão.</summary>
     private sealed record PeSecaoConsolidada(
@@ -179,7 +217,9 @@ public class PePlanilhaService : IPePlanilhaService
         List<PeCampo> Colunas,
         List<(PePdtic Pdtic, PeTrilhaOrgao Trilha, HashSet<long> Visiveis, PeRegistroResponse Registro)> Linhas,
         // Seção por ciclo (E7, rodada B): o rótulo do ciclo de cada registro; nulo nas outras
-        Dictionary<long, string>? Ciclos = null);
+        Dictionary<long, string>? Ciclos = null,
+        // F3, modo livre: o nível que o PDTIC de cada linha alcançou (a coluna "Nível alcançado"); nulo no definido
+        IReadOnlyDictionary<long, string?>? NiveisAlcancados = null);
 
     public async Task<PePlanilhaArquivo> ConsolidadoSecaoAsync(string secaoChave, string? formato, PeUserContext ctx)
     {
@@ -244,14 +284,25 @@ public class PePlanilhaService : IPePlanilhaService
             .ToDictionaryAsync(c => c.OrgaoId, c => c.NivelId);
         var ajustes = (await _context.PeOrgaosAjuste.AsNoTracking().Where(a => ids.Contains(a.OrgaoId)).ToListAsync())
             .ToLookup(a => a.OrgaoId);
+        // F3: no modo livre, a forma de cada passo de cada órgão (uma consulta)
+        var detalhes = await PeTrilhaOrgao.DetalhesDosOrgaosAsync(_context, dados, ids);
 
-        var pdtics = atuais.Select(a => (a.Pdtic, PeTrilhaOrgao.Resolver(dados, a.Orgao,
+        var pdtics = atuais.Select(a => (Pdtic: a.Pdtic, Trilha: PeTrilhaOrgao.Resolver(dados, a.Orgao,
                 escolhidos.TryGetValue(a.Orgao.Id, out var nivel) ? nivel : null,
                 ajustes[a.Orgao.Id].ToDictionary(x => (x.AlvoTipo, x.AlvoId), x => x.Situacao),
-                semVigente)))
+                semVigente, detalhes.GetValueOrDefault(a.Orgao.Id))))
             .ToList();
         var niveis = dados.Niveis.Select(n => PeTrilhaOrgao.DoNivel(dados, n.Id)).ToList();
-        return new PeBaseConsolidada(dados, pdtics, niveis);
+
+        // F3: no modo livre, a coluna do nível traz o nível que cada PDTIC alcançou, pela régua e pelo
+        // lote da conformidade (uma leitura da situação para todos os PDTICs, sem consulta por órgão)
+        Dictionary<long, string?>? alcancados = null;
+        if (dados.ModoNiveis.Livre)
+        {
+            var leitura = await PeLeituraDaSituacao.CarregarAsync(_context, pdtics.Select(p => p.Pdtic.Id).ToList(), dados.Acompanhamento.Ativo);
+            alcancados = pdtics.ToDictionary(p => p.Pdtic.Id, p => PeNivelAlcancado.Calcular(p.Pdtic, p.Trilha, leitura).AlcancadoNome);
+        }
+        return new PeBaseConsolidada(dados, pdtics, niveis, alcancados);
     }
 
     /// <summary>
@@ -307,7 +358,8 @@ public class PePlanilhaService : IPePlanilhaService
                 .Select(r => (pdtic, trilha, visiveis, r)));
         }
 
-        return new PeSecaoConsolidada(modelo, modelo.Visiveis.Select(v => v.Campo).Where(c => c.NaPlanilha).ToList(), linhas, ciclos);
+        return new PeSecaoConsolidada(modelo, modelo.Visiveis.Select(v => v.Campo).Where(c => c.NaPlanilha).ToList(), linhas, ciclos,
+            baseConsolidada.NiveisAlcancados);
     }
 
     /// <summary>As colunas do órgão antes dos campos (nome, sigla, nível, versão e situação do PDTIC).</summary>
@@ -320,11 +372,27 @@ public class PePlanilhaService : IPePlanilhaService
         ("Situação do PDTIC", 20, "Situação do PDTIC atual do órgão.")
     };
 
-    private static string[] CelulasDoOrgao(PePdtic pdtic, PeTrilhaOrgao trilha) => new[]
+    /// <summary>
+    /// F3, modo livre: a coluna do nível passa a ser a do nível alcançado pelo PDTIC da linha (o
+    /// nível base, que valeria para todos os órgãos, não diria nada).
+    /// </summary>
+    private static readonly (string Titulo, double Largura, string Ajuda)[] ColunasDoOrgaoNoModoLivre = ColunasDoOrgao
+        .Select((c, i) => i == 2
+            ? ("Nível alcançado", 16d,
+                "O nível que o PDTIC da linha alcançou, pela régua dos níveis (a mesma da conformidade). Fica vazio quando o PDTIC "
+                + "ainda não completa o primeiro nível ou foi aprovado fora do sistema.")
+            : c)
+        .ToArray();
+
+    private static (string Titulo, double Largura, string Ajuda)[] ColunasDoOrgaoDe(PeSecaoConsolidada secao) =>
+        secao.NiveisAlcancados == null ? ColunasDoOrgao : ColunasDoOrgaoNoModoLivre;
+
+    /// <summary>As células do órgão; no modo livre, a do nível é o nível alcançado pelo PDTIC da linha (nula sem ele).</summary>
+    private static string?[] CelulasDoOrgao(PePdtic pdtic, PeTrilhaOrgao trilha, IReadOnlyDictionary<long, string?>? niveisAlcancados) => new[]
     {
         trilha.Orgao.Nome,
         trilha.Orgao.Sigla,
-        trilha.Nivel.Nome,
+        niveisAlcancados == null ? trilha.Nivel.Nome : niveisAlcancados.GetValueOrDefault(pdtic.Id),
         pdtic.Versao,
         PeDominios.SituacaoPdtic.Rotulo(pdtic.Situacao)
     };
@@ -334,7 +402,7 @@ public class PePlanilhaService : IPePlanilhaService
         var csv = new CsvEscritor();
         var comCodigo = TemCodigo(secao.Modelo);
 
-        var cabecalho = ColunasDoOrgao.Select(c => (c.Titulo, false)).ToList();
+        var cabecalho = ColunasDoOrgaoDe(secao).Select(c => (c.Titulo, false)).ToList();
         if (secao.Ciclos != null) cabecalho.Add(("Ciclo", false));
         if (comCodigo) cabecalho.Add(("Código", false));
         cabecalho.AddRange(secao.Colunas.Select(c => (c.Rotulo, true)));
@@ -342,9 +410,13 @@ public class PePlanilhaService : IPePlanilhaService
 
         foreach (var (pdtic, trilha, visiveis, registro) in secao.Linhas)
         {
-            var orgao = CelulasDoOrgao(pdtic, trilha);
+            var orgao = CelulasDoOrgao(pdtic, trilha, secao.NiveisAlcancados);
             // Nome, sigla e nível foram digitados por alguém: protegidos como texto livre
-            var linha = new List<(string, bool)> { (orgao[0], true), (orgao[1], true), (orgao[2], true), (orgao[3], false), (orgao[4], false) };
+            var linha = new List<(string, bool)>
+            {
+                (orgao[0] ?? string.Empty, true), (orgao[1] ?? string.Empty, true), (orgao[2] ?? string.Empty, true),
+                (orgao[3] ?? string.Empty, false), (orgao[4] ?? string.Empty, false)
+            };
             if (secao.Ciclos != null) linha.Add((secao.Ciclos.GetValueOrDefault(registro.Id) ?? string.Empty, true));
             if (comCodigo) linha.Add((registro.Codigo ?? string.Empty, false));
             foreach (var campo in secao.Colunas)
@@ -356,7 +428,7 @@ public class PePlanilhaService : IPePlanilhaService
 
     private static PeXlsxAba AbaConsolidada(PeSecaoConsolidada secao)
     {
-        var colunas = ColunasDoOrgao
+        var colunas = ColunasDoOrgaoDe(secao)
             .Select(c => new PeXlsxColuna { Titulo = c.Titulo, Tipo = PeXlsxTipo.Texto, Largura = c.Largura, Ajuda = c.Ajuda })
             .ToList();
         var comCodigo = TemCodigo(secao.Modelo);
@@ -366,7 +438,7 @@ public class PePlanilhaService : IPePlanilhaService
 
         var linhas = secao.Linhas.Select(l =>
         {
-            var celulas = new List<object?>(CelulasDoOrgao(l.Pdtic, l.Trilha));
+            var celulas = new List<object?>(CelulasDoOrgao(l.Pdtic, l.Trilha, secao.NiveisAlcancados));
             if (secao.Ciclos != null) celulas.Add(secao.Ciclos.GetValueOrDefault(l.Registro.Id));
             if (comCodigo) celulas.Add(l.Registro.Codigo);
             foreach (var campo in secao.Colunas)
@@ -380,12 +452,16 @@ public class PePlanilhaService : IPePlanilhaService
     private static IReadOnlyList<(string, string)> LeiaMeDoConsolidado(PeBaseConsolidada baseConsolidada)
     {
         var orgaos = baseConsolidada.Pdtics.Select(p => p.Pdtic.OrgaoId).Distinct().Count();
+        // F3: no modo livre, a coluna do nível é a do nível que o PDTIC alcançou
+        var nivel = baseConsolidada.NiveisAlcancados == null
+            ? "o nível de maturidade dele"
+            : "o nível que o PDTIC alcançou (vazio quando ele ainda não completa o primeiro nível ou foi aprovado fora do sistema)";
         return new List<(string, string)>
         {
             ("Conteúdo", "Consolidado dos PDTICs atuais de todos os órgãos (em elaboração, em aprovação, devolvidos, aprovados, publicados ou em acompanhamento)"),
             ("Órgãos", orgaos == 1 ? "1 órgão com PDTIC atual" : $"{orgaos} órgãos com PDTIC atual"),
             ("Extraído em", Agora()),
-            ("Como ler", "Cada linha é um registro do PDTIC de um órgão. As primeiras colunas dizem o órgão, o nível de maturidade dele, "
+            ("Como ler", $"Cada linha é um registro do PDTIC de um órgão. As primeiras colunas dizem o órgão, {nivel}, "
                          + "a versão e a situação do PDTIC. As colunas dos campos juntam o que aparece em qualquer nível: a célula fica vazia "
                          + "quando o campo não aparece para o órgão. Os códigos (por exemplo, N01) valem dentro do PDTIC de cada órgão.")
         };

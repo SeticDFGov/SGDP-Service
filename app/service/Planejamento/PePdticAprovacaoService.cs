@@ -31,8 +31,9 @@ namespace service.Planejamento;
 /// elaboração, com a cópia dos registros (códigos, sequências e ligações refeitas), dos
 /// fluxos, dos textos e capítulos do documento e dos "não se aplica"; sem os registros dos
 /// passos de aprovação, de envio e de publicação, sem comentários, deliberações nem versões do
-/// documento. Exige a avaliação do comitê (6.3) com a decisão "revisar" quando o passo está na
-/// trilha do órgão; senão, a justificativa;</item>
+/// documento. Exige a avaliação do comitê (6.3) com a decisão "revisar" quando o passo é
+/// obrigatório para o órgão; com ele opcional ou fora do passo a passo (F3), a justificativa ou
+/// a decisão "revisar" da avaliação mais recente que tem decisão;</item>
 /// <item>registrar um PDTIC aprovado fora do sistema (decisão 20): já publicado, com a
 /// vigência, a publicação, o PDF como a versão 1 publicada e, quando o CGTIC aprovou, a
 /// deliberação aprovada com o ato; quando outra instância aprovou, a aprovação vai para a
@@ -93,7 +94,7 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
     {
         var pdtic = await PePdticService.LerAsync(_context, _permissoes, id, ctx, rastrear: true);
         if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
-            throw new ApiException(ErrorCode.PeSemPermissao, "Quem envia o PDTIC ao CGTIC é a equipe do órgão.");
+            throw new ApiException(ErrorCode.PeSemPermissao, "Quem envia o PDTIC ao CGTIC é a equipe do PDTIC.");
         if (!PodeReceberEnvio(pdtic)) throw SituacaoInvalida(PorQueNaoEnvia(pdtic, ctx) ?? "Este PDTIC não pode ser enviado agora.");
 
         var pendencias = await PendenciasAsync(pdtic, await PeTrilhaOrgao.DoPdticAsync(_context, pdtic), ctx);
@@ -140,7 +141,7 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
             _ => null
         };
         if (situacao != null) return situacao;
-        return _permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId) ? null : "Quem envia o PDTIC ao CGTIC é a equipe do órgão.";
+        return _permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId) ? null : "Quem envia o PDTIC ao CGTIC é a equipe do PDTIC.";
     }
 
     /// <summary>
@@ -220,7 +221,7 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
     {
         var pdtic = await PePdticService.LerAsync(_context, _permissoes, id, ctx, rastrear: true);
         if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
-            throw new ApiException(ErrorCode.PeSemPermissao, "Quem registra a publicação é a equipe do órgão.");
+            throw new ApiException(ErrorCode.PeSemPermissao, "Quem registra a publicação é a equipe do PDTIC.");
         if (pdtic.Situacao != PeDominios.SituacaoPdtic.Aprovado)
             throw SituacaoInvalida(pdtic.PublicadoEm != null
                 ? $"O PDTIC já foi publicado (registrado em {PePdticService.DataBrasilia(pdtic.PublicadoEm)})."
@@ -281,7 +282,7 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
         var administra = ctx.EhAdminGeral || ctx.Papel == PapeisPlanejamento.Admin;
         if (!equipe && !administra)
             throw new ApiException(ErrorCode.PeSemPermissao,
-                "Quem encerra o PDTIC é a equipe do órgão, com a aprovação da autoridade máxima, ou o administrador do módulo, depois do fim da vigência.");
+                "Quem encerra o PDTIC é a equipe do PDTIC, com a aprovação da autoridade máxima, ou o administrador do módulo, depois do fim da vigência.");
         if (PeDominios.SituacaoPdtic.Encerradas.Contains(pdtic.Situacao))
             throw SituacaoInvalida(pdtic.Situacao == PeDominios.SituacaoPdtic.Encerrado
                 ? "Este PDTIC já foi encerrado."
@@ -344,7 +345,7 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
     {
         var atual = await PePdticService.LerAsync(_context, _permissoes, id, ctx);
         if (!_permissoes.PodeEditarPdtic(ctx, atual.OrgaoId))
-            throw new ApiException(ErrorCode.PeSemPermissao, "Quem abre a revisão do PDTIC é a equipe do órgão.");
+            throw new ApiException(ErrorCode.PeSemPermissao, "Quem abre a revisão do PDTIC é a equipe do PDTIC.");
         if (!PeDominios.SituacaoPdtic.Vigentes.Contains(atual.Situacao))
             throw SituacaoInvalida("Só o PDTIC vigente (publicado ou em acompanhamento) abre uma revisão.");
         var justificativa = Texto(dto.Justificativa, MaximoTexto, "A justificativa");
@@ -355,24 +356,24 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
                 $"O órgão já tem a versão {emAndamento.Versao} em andamento ({PeDominios.SituacaoPdtic.RotuloMinusculo(emAndamento.Situacao)}). "
                 + "Termine aquela antes de abrir outra revisão.");
 
-        // A decisão do comitê (6.3) libera a revisão; sem o passo na trilha, a justificativa. Com a
-        // seção por ciclo (a versão 6 carregada), vale a decisão da avaliação intermediária mais
-        // recente que já tem decisão; antes, a seção como seção comum (rodada A)
+        // A decisão do comitê (6.3) libera a revisão quando o passo é obrigatório para o órgão; com
+        // ele opcional (ou fora do passo a passo), a justificativa, e desde a F3 a decisão "revisar"
+        // também basta (nada obrigatório depende de passo opcional). Com a seção por ciclo (a versão 6
+        // carregada), vale a decisão da avaliação intermediária mais recente que já tem decisão;
+        // antes, a seção como seção comum (rodada A)
         var trilha = await PeTrilhaOrgao.DoPdticAsync(_context, atual);
         var comite = trilha.Passos.FirstOrDefault(p => p.Chave == PeDominios.ChavePdtic.PassoAvaliacaoComite);
-        if (comite != null && PePdticService.RecusaDoNaoSeAplica(comite) == null
-            && await _context.PePdticPassos.AsNoTracking().AnyAsync(p => p.PdticId == atual.Id && p.PassoId == comite.Id && p.NaoSeAplica))
-            comite = null;
-        if (comite != null)
+        var secaoDoComite = comite?.Secoes.FirstOrDefault(s => s.Chave == PeDominios.ChavePdtic.SecaoAvaliacaoComite);
+        if (comite != null && comite.Situacao == PeDominios.Situacao.Obrigatorio)
         {
-            var secao = comite.Secoes.FirstOrDefault(s => s.Chave == PeDominios.ChavePdtic.SecaoAvaliacaoComite);
-            var decisao = secao == null ? null : await DecisaoDoComiteAsync(atual, trilha, secao);
+            var decisao = secaoDoComite == null ? null : await DecisaoDoComiteAsync(atual, trilha, secaoDoComite);
             if (decisao != PeDominios.Decisao.Revisar)
-                throw new ApiException(ErrorCode.PeRevisaoRecusada, secao?.PorCiclo == PeDominios.TipoCiclo.Avaliacao
+                throw new ApiException(ErrorCode.PeRevisaoRecusada, secaoDoComite?.PorCiclo == PeDominios.TipoCiclo.Avaliacao
                     ? $"Para abrir a revisão, registre na avaliação intermediária (passo {comite.Numero}) a avaliação do comitê com a decisão \"Revisar o PDTIC\"."
                     : $"Para abrir a revisão, registre no passo {comite.Numero} a avaliação do comitê com a decisão \"Revisar o PDTIC\".");
         }
-        else if (justificativa == null)
+        else if (justificativa == null
+                 && (secaoDoComite == null || await DecisaoDoComiteAsync(atual, trilha, secaoDoComite) != PeDominios.Decisao.Revisar))
         {
             throw new ApiException(ErrorCode.PeJustificativaObrigatoria, "Explique por que o PDTIC será revisto.");
         }
@@ -544,7 +545,7 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
     public async Task<PePdticResponse> RegistrarExternoAsync(PeRegistroExternoDTO dto, PeUserContext ctx)
     {
         var orgaoId = PePdticService.OrgaoParaCriar(dto.OrgaoId, ctx,
-            "Só a equipe do órgão registra o PDTIC aprovado fora do sistema.", "Você só registra o PDTIC do seu próprio órgão.");
+            "Só a equipe do PDTIC registra o PDTIC aprovado fora do sistema.", "Você só registra o PDTIC do seu próprio órgão.");
         var orgao = await _context.PgiaOrgaos.AsNoTracking().FirstOrDefaultAsync(o => o.Id == orgaoId && o.Ativo)
             ?? throw new ApiException(ErrorCode.PeOrgaoNaoEncontrado, "Órgão não encontrado ou desativado.");
 

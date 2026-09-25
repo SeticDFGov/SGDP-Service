@@ -311,9 +311,9 @@ public partial class PeDocumentoService : IPeDocumentoService
     public async Task<PeDocBlocoResponse> SalvarTextoAsync(PeDocAlvo alvo, long blocoId, JsonElement texto, PeUserContext ctx)
     {
         var (pdtic, documento) = await PdticParaEditarAsync(alvo, ctx);
-        var (bloco, _) = await BlocoDoOrgaoAsync(pdtic, documento, blocoId);
+        var (bloco, base_) = await BlocoDoOrgaoAsync(pdtic, documento, blocoId);
         if (bloco.Tipo != PeDominios.TipoBloco.Texto)
-            throw new ApiException(ErrorCode.PeDocBlocoNaoEditavel, "Só o texto do documento é editado aqui. Os dados das tabelas são editados nos passos da trilha.");
+            throw new ApiException(ErrorCode.PeDocBlocoNaoEditavel, "Só o texto do documento é editado aqui. Os dados das tabelas são editados em cada passo.");
 
         if (texto.ValueKind != JsonValueKind.Object || texto.GetRawText().Length > PeDocConfig.MaximoTexto)
             throw new ApiException(ErrorCode.PeDocTextoInvalido, "O texto passou do tamanho máximo ou veio num formato que não serve.");
@@ -333,6 +333,10 @@ public partial class PeDocumentoService : IPeDocumentoService
 
         var igualAoModelo = PeDocMarcadores.Canonico(novo) == PeDocMarcadores.Canonico(textoDoModelo)
                             || (!PeTextoRico.TemConteudo(novo) && !PeTextoRico.TemConteudo(textoDoModelo));
+        // F3: o texto do bloco mudou de fato (para a validação da equipe no passo do documento)
+        var mudou = igualAoModelo
+            ? copia != null
+            : copia == null || PeDocMarcadores.Canonico(JsonNode.Parse(copia.Texto)) != PeDocMarcadores.Canonico(novo);
         if (igualAoModelo)
         {
             // Igual ao texto do modelo: não é edição; o bloco volta a seguir o modelo
@@ -363,8 +367,19 @@ public partial class PeDocumentoService : IPeDocumentoService
         }
         Tocar(pdtic, ctx, agora);
         await _context.SaveChangesAsync();
+        if (mudou) await MudouDepoisDaValidacaoAsync(pdtic, documento, base_, agora);
         return await BlocoResolvidoAsync(pdtic.Id, documento, bloco.Id, ctx);
     }
+
+    /// <summary>
+    /// F3: gravar ou voltar ao modelo o texto de um bloco, ou mudar um capítulo, do documento do
+    /// PDTIC (não do RA nem do RR) muda o conteúdo do passo do documento: com a validação da equipe
+    /// de pé, grava a data da primeira mudança.
+    /// </summary>
+    private Task MudouDepoisDaValidacaoAsync(PePdtic pdtic, PeDocContexto documento, Base base_, DateTime agora) =>
+        documento.Alvo.EhPdtic
+            ? PeValidacaoDaEquipe.MarcarMudancaAsync(_context, pdtic, base_.Trilha, PeValidacaoDaEquipe.PassosDoDocumento(base_.Trilha), agora)
+            : Task.CompletedTask;
 
     public Task<PeDocBlocoResponse> RestaurarTextoAsync(long pdticId, long blocoId, PeUserContext ctx) =>
         RestaurarTextoAsync(PeDocAlvo.DoPdtic(pdticId), blocoId, ctx);
@@ -372,7 +387,7 @@ public partial class PeDocumentoService : IPeDocumentoService
     public async Task<PeDocBlocoResponse> RestaurarTextoAsync(PeDocAlvo alvo, long blocoId, PeUserContext ctx)
     {
         var (pdtic, documento) = await PdticParaEditarAsync(alvo, ctx);
-        var (bloco, _) = await BlocoDoOrgaoAsync(pdtic, documento, blocoId);
+        var (bloco, base_) = await BlocoDoOrgaoAsync(pdtic, documento, blocoId);
         if (bloco.Tipo != PeDominios.TipoBloco.Texto)
             throw new ApiException(ErrorCode.PeDocBlocoNaoEditavel, "Só o texto do documento volta ao texto do modelo.");
 
@@ -380,8 +395,10 @@ public partial class PeDocumentoService : IPeDocumentoService
         if (copia != null)
         {
             await RemoverTextoAsync(copia, alvo);
-            Tocar(pdtic, ctx, DateTime.UtcNow);
+            var agora = DateTime.UtcNow;
+            Tocar(pdtic, ctx, agora);
             await _context.SaveChangesAsync();
+            await MudouDepoisDaValidacaoAsync(pdtic, documento, base_, agora);
         }
         return await BlocoResolvidoAsync(pdtic.Id, documento, bloco.Id, ctx);
     }
@@ -444,6 +461,7 @@ public partial class PeDocumentoService : IPeDocumentoService
                     _context.PeDocOrgaosDocumento.Add(new PeDocOrgaoDocumento { Linha = linha, DocTipo = alvo.Tipo, CicloId = alvo.CicloId });
                 Tocar(pdtic, ctx, agora);
                 await _context.SaveChangesAsync();
+                await MudouDepoisDaValidacaoAsync(pdtic, documento, base_, agora);
             }
         }
         else if (copia.Oculto != oculto || copia.TituloProprio != tituloProprio)
@@ -454,6 +472,7 @@ public partial class PeDocumentoService : IPeDocumentoService
             copia.AlteradoPor = ctx.Email;
             Tocar(pdtic, ctx, agora);
             await _context.SaveChangesAsync();
+            await MudouDepoisDaValidacaoAsync(pdtic, documento, base_, agora);
         }
 
         var pdticLido = await _context.PePdtics.AsNoTracking().FirstAsync(p => p.Id == pdtic.Id);
@@ -470,8 +489,8 @@ public partial class PeDocumentoService : IPeDocumentoService
         var pdtic = await PePdticService.LerAsync(_context, _permissoes, alvo.PdticId, ctx);
         if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
             throw new ApiException(ErrorCode.PeSemPermissao, alvo.EhPdtic
-                ? "Só a equipe do órgão gera o PDF do documento."
-                : $"Só a equipe do órgão gera o PDF do {PeDominios.TipoDocumento.NomeCurto(alvo.Tipo).ToLowerInvariant()}.");
+                ? "Só a equipe do PDTIC gera o PDF do documento."
+                : $"Só a equipe do PDTIC gera o PDF do {PeDominios.TipoDocumento.NomeCurto(alvo.Tipo).ToLowerInvariant()}.");
         var documento = await DocumentoAsync(pdtic, alvo);
         if (RecusaDaEdicao(pdtic, documento) is string recusa) throw PeEdicaoPdtic.Fechado(recusa);
 
@@ -724,8 +743,8 @@ public partial class PeDocumentoService : IPeDocumentoService
         var pdtic = await PePdticService.LerAsync(_context, _permissoes, alvo.PdticId, ctx, rastrear: true);
         if (!_permissoes.PodeEditarPdtic(ctx, pdtic.OrgaoId))
             throw new ApiException(ErrorCode.PeSemPermissao, alvo.EhPdtic
-                ? "Só a equipe do órgão edita o documento do PDTIC."
-                : $"Só a equipe do órgão edita o {PeDominios.TipoDocumento.NomeCurto(alvo.Tipo).ToLowerInvariant()}.");
+                ? "Só a equipe do PDTIC edita o documento do PDTIC."
+                : $"Só a equipe do PDTIC edita o {PeDominios.TipoDocumento.NomeCurto(alvo.Tipo).ToLowerInvariant()}.");
         var documento = await DocumentoAsync(pdtic, alvo);
         if (RecusaDaEdicao(pdtic, documento) is string recusa) throw PeEdicaoPdtic.Fechado(recusa);
         return (pdtic, documento);
@@ -780,10 +799,19 @@ public partial class PeDocumentoService : IPeDocumentoService
         public required Dictionary<long, PeDocOrgao> CopiaCapitulos { get; init; }
         public required Dictionary<long, PeDocOrgaoBloco> CopiaBlocos { get; init; }
 
-        /// <summary>O capítulo aparece para o órgão: o passo dele está na trilha e o pai aparece sem estar oculto.</summary>
+        // F3 (C4): os passos opcionais para o órgão e ainda sem conteúdo no PDTIC (pela chave): o
+        // capítulo deles (e os subcapítulos) e os blocos de dados das seções deles não aparecem
+        public HashSet<string> PassosOpcionaisVazios { get; init; } = new();
+
+        /// <summary>
+        /// O capítulo aparece para o órgão: o passo dele está na trilha (e, desde a F3, não é um passo
+        /// opcional ainda sem conteúdo) e o pai aparece sem estar oculto.
+        /// </summary>
         public bool Presente(PeDocCapitulo capitulo)
         {
-            if (capitulo.PassoChave != null && Trilha.Passos.All(p => p.Chave != capitulo.PassoChave)) return false;
+            if (capitulo.PassoChave != null
+                && (Trilha.Passos.All(p => p.Chave != capitulo.PassoChave) || PassosOpcionaisVazios.Contains(capitulo.PassoChave)))
+                return false;
             if (capitulo.PaiId == null) return true;
             var pai = Capitulos.FirstOrDefault(c => c.Id == capitulo.PaiId);
             return pai != null && Presente(pai) && !Oculto(pai);
@@ -792,6 +820,16 @@ public partial class PeDocumentoService : IPeDocumentoService
         /// <summary>Oculto pelo órgão (só vale no capítulo opcional; o obrigatório sempre aparece).</summary>
         public bool Oculto(PeDocCapitulo capitulo) =>
             !capitulo.Obrigatorio && !capitulo.Travado && CopiaCapitulos.TryGetValue(capitulo.Id, out var copia) && copia.Oculto;
+
+        /// <summary>
+        /// F3 (C4): todas as seções que o bloco usa (das que o órgão vê) são de passos opcionais ainda
+        /// sem conteúdo: o bloco de tabela ou de lista não aparece.
+        /// </summary>
+        public bool SoDePassosVazios(IEnumerable<string> secoes)
+        {
+            var passos = secoes.Select(s => Trilha.Secao(s)?.Passo.Chave).Where(c => c != null).ToList();
+            return passos.Count > 0 && passos.All(c => PassosOpcionaisVazios.Contains(c!));
+        }
 
         /// <summary>O capítulo (ou o pai dele) é de um passo da avaliação intermediária (etapa 6).</summary>
         public bool DaAvaliacao(PeDocCapitulo capitulo)
@@ -820,8 +858,11 @@ public partial class PeDocumentoService : IPeDocumentoService
             .Where(b => ids.Contains(b.CapituloId) && b.ExcluidoEm == null)
             .OrderBy(b => b.Ordem).ThenBy(b => b.Id)
             .ToListAsync();
+        // F3 (C4): o passo opcional sem conteúdo não aparece no documento (nem no RA e no RR)
+        var comConteudo = await PeConteudoDosPassos.ComConteudoAsync(_context, trilha.Dados, pdtic.Id);
         return new Base
         {
+            PassosOpcionaisVazios = trilha.Passos.Where(p => PeConteudoDosPassos.OpcionalSemConteudo(p, comConteudo)).Select(p => p.Chave).ToHashSet(),
             Pdtic = pdtic,
             Orgao = orgao,
             Trilha = trilha,
@@ -1185,6 +1226,8 @@ public partial class PeDocumentoService : IPeDocumentoService
     private static PeDocBlocoResponse? Bloco(PeDocBloco bloco, ContextoDosBlocos ctx)
     {
         var config = PeDocConfig.Ler(bloco.Config);
+        // F3 (C4): o bloco de tabela ou de lista cujas seções são de passos opcionais sem conteúdo não aparece
+        if (ctx.Base.PassosOpcionaisVazios.Count > 0 && ctx.Base.SoDePassosVazios(SecoesDoBloco(bloco.Tipo, config))) return null;
         var resposta = new PeDocBlocoResponse
         {
             Id = bloco.Id,
@@ -1242,6 +1285,16 @@ public partial class PeDocumentoService : IPeDocumentoService
         }
         return resposta;
     }
+
+    /// <summary>As seções do PDTIC que um bloco de dados usa (o inventário do PGIA e os blocos sem seção, nenhuma).</summary>
+    private static IEnumerable<string> SecoesDoBloco(string tipo, JsonObject config) => tipo switch
+    {
+        PeDominios.TipoBloco.TabelaSecao when PeDocConfig.Secao(config) is string secao && secao != PeDocConfig.SecaoPgia => new[] { secao },
+        PeDominios.TipoBloco.ListaTema => new[] { PeDominios.TemaDecreto.SecaoAcoes },
+        PeDominios.TipoBloco.MatrizSwot => PeDominios.SecoesSwot.Todas,
+        _ when PeDominios.TipoBloco.DoAcompanhamento.Contains(tipo) => SecoesDoBlocoDoAcompanhamento(tipo),
+        _ => Array.Empty<string>()
+    };
 
     private static void Texto(PeDocBlocoResponse resposta, PeDocBloco bloco, JsonObject config, Base base_,
         IReadOnlyDictionary<string, string?> marcadores, PeNomes nomes)

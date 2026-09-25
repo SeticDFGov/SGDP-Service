@@ -170,7 +170,7 @@ public class PeEnvioTest : PeAprovacaoTestBase
         // A consulta vê a prévia, mas não envia
         var previa = await Aprovacao.EnvioAsync(pdtic.Id, await ContextoDe(UserConsultaSes));
         Assert.False(previa.PodeEnviar);
-        Assert.Equal("Quem envia o PDTIC ao CGTIC é a equipe do órgão.", previa.Motivo);
+        Assert.Equal("Quem envia o PDTIC ao CGTIC é a equipe do PDTIC.", previa.Motivo);
         Assert.Empty(previa.Pendencias);
 
         var enviado = await EnviarAsync(pdtic.Id, UserAdminGeral);

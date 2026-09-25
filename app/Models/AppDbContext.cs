@@ -112,6 +112,10 @@ namespace Models
         public DbSet<PeDocVersaoDocumento> PeDocVersoesDocumento { get; set; }
         // Painéis da SGDI (E8): a inadimplência do art. 11 do Decreto nº 48.899/2026
         public DbSet<PeInadimplencia> PeInadimplencias { get; set; }
+        // Retorno do dono do produto (F3): a forma de cada passo no modo livre e a validação da equipe
+        // (colunas novas de pe_pdtic_passo, table splitting)
+        public DbSet<PeOrgaoPassoDetalhe> PeOrgaosPassoDetalhe { get; set; }
+        public DbSet<PePdticPassoValidacao> PePdticPassosValidacao { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

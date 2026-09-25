@@ -1,3 +1,4 @@
+using System.Text.Json;
 using api.Planejamento;
 using app.Auth;
 using Microsoft.AspNetCore.Authorization;
@@ -62,7 +63,19 @@ public class PeOrgaosController : ControllerBase
     [HttpPut("{id:long}/ajustes")]
     public Task<IActionResult> DefinirAjustes(long id, [FromBody] List<PeOrgaoAjusteDTO> ajustes) =>
         Executar(ctx => _permissoes.PodeConfigurarModelo(ctx), async ctx => Ok(await _service.DefinirAjustesAsync(id, ajustes, ctx.Email)),
-            "Só o administrador do módulo ajusta a trilha de um órgão.");
+            "Só o administrador do módulo ajusta o passo a passo de um órgão.");
+
+    /// <summary>
+    /// F3: escolhe a forma de um passo para o órgão no modo livre ({ NivelId }: um nível das
+    /// OpcoesDetalhe do passo; nulo volta à forma padrão) e devolve o passo a passo do órgão. A
+    /// equipe do PDTIC do próprio órgão, o administrador do módulo e o admin geral. No modo
+    /// definido, ou com o passo fechado no PDTIC atual do órgão, 409 PeDetalheRecusado (1146).
+    /// </summary>
+    [HttpPut("{orgaoId:long}/passos/{passoId:long}/detalhe")]
+    public Task<IActionResult> DefinirDetalhe(long orgaoId, long passoId, [FromBody] JsonElement corpo) =>
+        Executar(ctx => _permissoes.PodeEscolherFormaDoPasso(ctx, orgaoId),
+            async ctx => Ok(await _service.DefinirDetalheAsync(orgaoId, passoId, PeCorpo.Ler<PePassoDetalheDTO>(corpo), ctx.Email)),
+            "Quem escolhe a forma dos passos é a equipe do PDTIC do órgão ou o administrador do módulo.");
 
     private Task<IActionResult> Executar(Func<PeUserContext, bool> pode, Func<PeUserContext, Task<IActionResult>> acao,
         string semPermissao) =>

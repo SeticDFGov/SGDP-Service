@@ -25,7 +25,8 @@ public class PeF1CarregadorTest
         var seed = PeCarregadorModelo.LerSeed();
         var campos = CamposDoSeed(seed).ToList();
 
-        Assert.Equal(PeCarregadorModelo.VersaoDaRevisaoFinal, seed.Versao);
+        // Desde a F3, o JSON está na versão 8 (o modo dos níveis); os "antes" e as regras novas são os da 7
+        Assert.Equal(PeCarregadorModelo.VersaoDoModoLivre, seed.Versao);
         Assert.Single(seed.Etapas.SelectMany(e => e.Passos), p => p.Antes != null);
         // A sigla do órgão e a ajuda de "Quem decidiu" nas cinco aprovações
         Assert.Equal(6, campos.Count(c => c.Antes != null));
@@ -60,7 +61,8 @@ public class PeF1CarregadorTest
 
         var seed = PeCarregadorModelo.LerSeed();
         Assert.True(resultado.Executou);
-        Assert.Equal((PeCarregadorModelo.VersaoDoAcompanhamento, PeCarregadorModelo.VersaoDaRevisaoFinal),
+        // Desde a F3, a carga vai direto à versão 8 (com as correções da 7)
+        Assert.Equal((PeCarregadorModelo.VersaoDoAcompanhamento, PeCarregadorModelo.VersaoDoModoLivre),
             (resultado.VersaoAnterior, resultado.Versao));
         Assert.Equal(0, resultado.Niveis + resultado.Etapas + resultado.Passos + resultado.Secoes + resultado.Campos + resultado.Opcoes
                         + resultado.Documentos + resultado.Capitulos + resultado.Blocos + resultado.Fluxos + resultado.Registros);
