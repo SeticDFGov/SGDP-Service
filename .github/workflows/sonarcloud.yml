@@ -52,6 +52,7 @@ jobs:
         dotnet restore app/demanda_service.sln
         dotnet restore test-pgia/test-pgia.csproj
         dotnet restore test-contratacoes/test-contratacoes.csproj
+        dotnet restore test-planejamento/test-planejamento.csproj
 
     # Build dos projetos de teste (além do app) é o que faz o MSBuild integration
     # do scanner reconhecer demanda_service como projeto MAIN corretamente — sem
@@ -62,8 +63,9 @@ jobs:
         dotnet build app/demanda_service.sln --no-restore --configuration Release
         dotnet build test-pgia/test-pgia.csproj --no-restore --configuration Release
         dotnet build test-contratacoes/test-contratacoes.csproj --no-restore --configuration Release
+        dotnet build test-planejamento/test-planejamento.csproj --no-restore --configuration Release
 
-    # Cobertura dos dois projetos de teste (test/ é o legado que não compila, fora
+    # Cobertura dos três projetos de teste (test/ é o legado que não compila, fora
     # do escopo). O relatório é o que dotnet-sonarscanner end lê para publicar a
     # cobertura no dashboard do SonarCloud.
     - name: Testes com cobertura (test-pgia)
@@ -80,6 +82,14 @@ jobs:
         --no-build --no-restore --configuration Release
         --collect:"XPlat Code Coverage"
         --results-directory test-contratacoes/TestResults
+        -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+
+    - name: Testes com cobertura (test-planejamento)
+      run: >
+        dotnet test test-planejamento/test-planejamento.csproj
+        --no-build --no-restore --configuration Release
+        --collect:"XPlat Code Coverage"
+        --results-directory test-planejamento/TestResults
         -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
 
     - name: Finalizar análise do SonarCloud

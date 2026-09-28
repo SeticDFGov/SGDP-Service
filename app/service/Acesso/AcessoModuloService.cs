@@ -6,6 +6,7 @@ using app.Models;
 using Microsoft.EntityFrameworkCore;
 using Models;
 using Models.Acesso;
+using Models.Planejamento;
 using service.Interface;
 
 namespace service.Acesso;
@@ -16,6 +17,12 @@ namespace service.Acesso;
 /// requisição, pelo GET /api/Auth/me e pela tela de gestão de acessos.
 /// Escreve direto no AppDbContext (mesmo padrão do PgiaAdminService/CtrAdminService):
 /// o AuthRepositorio e o GetOrCreateUserAsync não são tocados.
+///
+/// Governança Estratégica: o acesso ao módulo (linha de acesso_modulo) e o papel do
+/// módulo (pe_papel_usuario, com o histórico) são gravados e retirados juntos, sempre
+/// por aqui. Regra do deploy: o caminho de cada requisição (CalcularModulos,
+/// ModulosDoPrincipalAsync, ModulosDoUsuarioAsync) nunca lê tabela pe_; as telas só
+/// leem o papel de quem tem a concessão do módulo, que não existe antes da migration.
 /// </summary>
 public class AcessoModuloService : IAcessoModuloService
 {
@@ -39,6 +46,7 @@ public class AcessoModuloService : IAcessoModuloService
     /// gestor e "pgia" do grupo) ao que o sistema concede (linhas de acesso_modulo
     /// com origem "sistema") e aos papéis de módulo (PapelPgia, PapelContratacoes).
     /// Sem nenhuma dessas fontes, a lista é vazia: o usuário não enxerga módulo algum.
+    /// A Governança Estratégica vem só da concessão: o papel do módulo não entra aqui.
     /// </summary>
     public static List<string> CalcularModulos(
         bool admin, bool gestor, bool rolePgia,
@@ -60,6 +68,11 @@ public class AcessoModuloService : IAcessoModuloService
 
         if (papelContratacoes == PapeisContratacoes.Analise)
             modulos.Add(ModulosSgdp.Contratacoes);
+
+        // A concessão é gravada junto com o papel do módulo; ler o papel aqui quebraria
+        // o login no intervalo entre publicar o código e rodar a migration
+        if (concessoes.Contains(ModulosSgdp.Planejamento))
+            modulos.Add(ModulosSgdp.Planejamento);
 
         return modulos;
     }
@@ -219,8 +232,11 @@ public class AcessoModuloService : IAcessoModuloService
             .Where(a => ids.Contains(a.UserId))
             .ToListAsync();
         var porUsuario = acessos.ToLookup(a => a.UserId);
+        var papeisPlanejamento = await PapeisPlanejamentoAsync(acessos);
 
-        var itens = usuarios.Select(u => Mapear(u, porUsuario[u.Id])).ToList();
+        var itens = usuarios
+            .Select(u => Mapear(u, porUsuario[u.Id], papeisPlanejamento.GetValueOrDefault(u.Id)))
+            .ToList();
         return new PagedResponse<UsuarioAcessoResponse>(itens, total, page, pageSize);
     }
 
@@ -237,6 +253,7 @@ public class AcessoModuloService : IAcessoModuloService
         var acessos = _context.AcessosModulo;
         const string admin = ModulosSgdp.Administracao;
         const string keycloak = OrigemAcesso.Keycloak;
+        const string sistema = OrigemAcesso.Sistema;
         const string analise = PapeisContratacoes.Analise;
 
         return modulo switch
@@ -257,6 +274,13 @@ public class AcessoModuloService : IAcessoModuloService
                 u.PapelContratacoes == analise
                 || acessos.Any(a => a.UserId == u.Id && a.Modulo == admin && a.Origem == keycloak)),
 
+            // Só a concessão (que anda com o papel) ou o admin do Keycloak: nenhuma role
+            // do Keycloak abre este módulo, e o filtro não lê a tabela do papel
+            ModulosSgdp.Planejamento => query.Where(u =>
+                acessos.Any(a => a.UserId == u.Id
+                    && ((a.Modulo == ModulosSgdp.Planejamento && a.Origem == sistema)
+                        || (a.Modulo == admin && a.Origem == keycloak)))),
+
             FiltroSemAcesso => query.Where(u =>
                 u.PapelPgia == null
                 && (u.PapelContratacoes == null || u.PapelContratacoes != analise)
@@ -272,7 +296,8 @@ public class AcessoModuloService : IAcessoModuloService
             ?? throw new ApiException(ErrorCode.AcessoUsuarioNaoEncontrado, "Usuário não encontrado.");
 
         var acessos = await _context.AcessosModulo.Where(a => a.UserId == userId).ToListAsync();
-        return Mapear(user, acessos);
+        var papeisPlanejamento = await PapeisPlanejamentoAsync(acessos);
+        return Mapear(user, acessos, papeisPlanejamento.GetValueOrDefault(userId));
     }
 
     public async Task<UsuarioAcessoResponse> DefinirAcessosAsync(Guid userId, AcessoUsuarioUpdateDTO dto, string autorEmail)
@@ -284,8 +309,28 @@ public class AcessoModuloService : IAcessoModuloService
             throw new ApiException(ErrorCode.AcessoInvalido,
                 "Para definir o papel no PGIA, libere também o acesso ao módulo PGIA.");
 
+        // Governança Estratégica: os dois campos são opcionais. Planejamento nulo (front
+        // antigo, que não conhece o módulo) não muda nada, nem o acesso nem o papel
+        var papelPlanejamento = string.IsNullOrWhiteSpace(dto.PapelPlanejamento) ? null : dto.PapelPlanejamento.Trim();
+        if (papelPlanejamento != null && !PapeisPlanejamento.EhValido(papelPlanejamento))
+            throw new ApiException(ErrorCode.AcessoInvalido, $"Papel na Governança Estratégica inválido: {papelPlanejamento}");
+
+        if (papelPlanejamento != null && dto.Planejamento != true)
+            throw new ApiException(ErrorCode.AcessoInvalido,
+                "Para definir o papel na Governança Estratégica, libere também o acesso ao módulo.");
+
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId)
             ?? throw new ApiException(ErrorCode.AcessoUsuarioNaoEncontrado, "Usuário não encontrado.");
+
+        // O papel em vigor só é lido quando a tela mexe no módulo; ligar o módulo sem
+        // papel novo mantém o que a pessoa já tem, e sem papel algum não liga
+        var papelAtual = dto.Planejamento == null
+            ? null
+            : await _context.PePapeisUsuario.FirstOrDefaultAsync(p => p.UserId == userId);
+        var papelFinal = papelPlanejamento ?? papelAtual?.Papel;
+        if (dto.Planejamento == true && !PapeisPlanejamento.EhValido(papelFinal))
+            throw new ApiException(ErrorCode.AcessoInvalido,
+                "Escolha o papel da pessoa na Governança Estratégica: o acesso ao módulo vem junto com o papel.");
 
         var concedidos = await _context.AcessosModulo
             .Where(a => a.UserId == userId && a.Origem == OrigemAcesso.Sistema)
@@ -298,11 +343,17 @@ public class AcessoModuloService : IAcessoModuloService
         user.PapelPgia = dto.Pgia ? dto.PapelPgia : null;
         user.PapelContratacoes = dto.Contratacoes ? PapeisContratacoes.Analise : null;
 
+        // Governança Estratégica: acesso e papel juntos (false tira os dois)
+        if (dto.Planejamento != null)
+            PrepararPapelPlanejamento(userId, papelAtual, dto.Planejamento.Value ? papelFinal : null,
+                autorEmail, PeDominios.OrigemPapel.GestaoAcessos, null, concedidos);
+
         // Quem pediu um dos módulos liberados agora sai da fila de pedidos
         var liberados = new List<string>();
         if (dto.Demandas) liberados.Add(ModulosSgdp.Demandas);
         if (dto.Pgia) liberados.Add(ModulosSgdp.Pgia);
         if (dto.Contratacoes) liberados.Add(ModulosSgdp.Contratacoes);
+        if (dto.Planejamento == true) liberados.Add(ModulosSgdp.Planejamento);
         await MarcarPedidosAtendidosAsync(userId, liberados, autorEmail, user.PapelPgia);
 
         await SalvarAceitandoPedidoJaDecididoAsync();
@@ -313,6 +364,12 @@ public class AcessoModuloService : IAcessoModuloService
     {
         if (!ModulosSgdp.Concedidos.Contains(modulo))
             throw new ApiException(ErrorCode.AcessoInvalido, $"Módulo não concedível pela tela: {modulo}");
+
+        // Na Governança Estratégica não existe concessão sem papel: o acesso é gravado
+        // junto com o papel do módulo (DefinirPapelPlanejamentoAsync)
+        if (modulo == ModulosSgdp.Planejamento)
+            throw new ApiException(ErrorCode.AcessoInvalido,
+                "O acesso à Governança Estratégica é dado junto com o papel do módulo.");
 
         var existe = await _context.Users.AnyAsync(u => u.Id == userId);
         if (!existe)
@@ -328,7 +385,8 @@ public class AcessoModuloService : IAcessoModuloService
         await SalvarAceitandoPedidoJaDecididoAsync();
     }
 
-    public async Task PrepararLiberacaoAsync(Guid userId, string modulo, string? papelPgia, string autorEmail)
+    public async Task PrepararLiberacaoAsync(Guid userId, string modulo, string? papelPgia, string autorEmail,
+        string? papelPlanejamento, long? pedidoAcessoId)
     {
         if (!ModulosSgdp.Liberaveis.Contains(modulo))
             throw new ApiException(ErrorCode.AcessoInvalido, $"Módulo não liberado pelo sistema: {modulo}");
@@ -338,6 +396,15 @@ public class AcessoModuloService : IAcessoModuloService
 
         if (papelPgia != null && modulo != ModulosSgdp.Pgia)
             throw new ApiException(ErrorCode.AcessoInvalido, "O papel no PGIA só vale para o módulo PGIA.");
+
+        // Governança Estratégica: o acesso vem junto com o papel do módulo, obrigatório
+        if (modulo == ModulosSgdp.Planejamento && !PapeisPlanejamento.EhValido(papelPlanejamento))
+            throw new ApiException(ErrorCode.AcessoInvalido,
+                "Escolha o papel da pessoa na Governança Estratégica: o acesso ao módulo vem junto com o papel.");
+
+        if (papelPlanejamento != null && modulo != ModulosSgdp.Planejamento)
+            throw new ApiException(ErrorCode.AcessoInvalido,
+                "O papel na Governança Estratégica só vale para esse módulo.");
 
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId)
             ?? throw new ApiException(ErrorCode.AcessoUsuarioNaoEncontrado, "Usuário não encontrado.");
@@ -352,10 +419,45 @@ public class AcessoModuloService : IAcessoModuloService
         var concedidos = await _context.AcessosModulo
             .Where(a => a.UserId == userId && a.Origem == OrigemAcesso.Sistema && a.Modulo == modulo)
             .ToListAsync();
+
+        if (modulo == ModulosSgdp.Planejamento)
+        {
+            var atual = await _context.PePapeisUsuario.FirstOrDefaultAsync(p => p.UserId == userId);
+            PrepararPapelPlanejamento(userId, atual, papelPlanejamento, autorEmail,
+                PeDominios.OrigemPapel.Pedido, pedidoAcessoId, concedidos);
+            return;
+        }
+
         AplicarConcessao(userId, modulo, true, autorEmail, concedidos);
 
         // Liberar como agente (sem papel) não tira um papel que a pessoa já tenha
         if (papelPgia != null) user.PapelPgia = papelPgia;
+    }
+
+    public async Task DefinirPapelPlanejamentoAsync(Guid userId, string? papel, string autorEmail, string origem)
+    {
+        if (papel != null && !PapeisPlanejamento.EhValido(papel))
+            throw new ApiException(ErrorCode.AcessoInvalido, $"Papel na Governança Estratégica inválido: {papel}");
+
+        if (!PeDominios.OrigemPapel.Todas.Contains(origem))
+            throw new ArgumentException($"Origem de papel desconhecida: {origem}", nameof(origem));
+
+        var existe = await _context.Users.AnyAsync(u => u.Id == userId);
+        if (!existe)
+            throw new ApiException(ErrorCode.AcessoUsuarioNaoEncontrado, "Usuário não encontrado.");
+
+        var concedidos = await _context.AcessosModulo
+            .Where(a => a.UserId == userId && a.Origem == OrigemAcesso.Sistema && a.Modulo == ModulosSgdp.Planejamento)
+            .ToListAsync();
+        var atual = await _context.PePapeisUsuario.FirstOrDefaultAsync(p => p.UserId == userId);
+
+        PrepararPapelPlanejamento(userId, atual, papel, autorEmail, origem, null, concedidos);
+
+        // Deu o papel (e com ele o acesso): o pedido pendente do módulo sai da fila
+        if (papel != null)
+            await MarcarPedidosAtendidosAsync(userId, new List<string> { ModulosSgdp.Planejamento }, autorEmail, null);
+
+        await SalvarAceitandoPedidoJaDecididoAsync();
     }
 
     public async Task EncerrarPedidosAtendidosAsync(Guid userId, IEnumerable<string> modulos, string? autorEmail, string? papelPgia)
@@ -367,11 +469,83 @@ public class AcessoModuloService : IAcessoModuloService
         await SalvarAceitandoPedidoJaDecididoAsync();
     }
 
+    // ── Governança Estratégica: papel e acesso juntos ─────────────────────────
+
+    /// <summary>
+    /// Deixa pronto, SEM gravar, o papel na Governança Estratégica junto com a
+    /// concessão do módulo: papel dá o acesso, papel nulo tira os dois. Toda mudança de
+    /// papel entra no histórico; papel igual ao atual não grava nada (nem histórico).
+    /// </summary>
+    private void PrepararPapelPlanejamento(Guid userId, PePapelUsuario? atual, string? papel,
+        string autorEmail, string origem, long? pedidoAcessoId, List<AcessoModulo> concedidos)
+    {
+        var agora = DateTime.UtcNow;
+        var anterior = atual?.Papel;
+
+        if (papel == null)
+        {
+            if (atual != null) _context.PePapeisUsuario.Remove(atual);
+        }
+        else if (atual == null)
+        {
+            _context.PePapeisUsuario.Add(new PePapelUsuario
+            {
+                UserId = userId,
+                Papel = papel,
+                ConcedidoEm = agora,
+                ConcedidoPor = autorEmail
+            });
+        }
+        else if (atual.Papel != papel)
+        {
+            atual.Papel = papel;
+            atual.AlteradoEm = agora;
+            atual.AlteradoPor = autorEmail;
+        }
+
+        if (anterior != papel)
+        {
+            _context.PePapeisUsuarioHistorico.Add(new PePapelUsuarioHistorico
+            {
+                UserId = userId,
+                PapelAnterior = anterior,
+                PapelNovo = papel,
+                Origem = origem,
+                PedidoAcessoId = pedidoAcessoId,
+                AlteradoEm = agora,
+                AlteradoPor = autorEmail
+            });
+        }
+
+        AplicarConcessao(userId, ModulosSgdp.Planejamento, papel != null, autorEmail, concedidos);
+    }
+
+    /// <summary>
+    /// Papel na Governança Estratégica de quem tem a concessão do módulo, em lote (uma
+    /// consulta por página). Só consulta pe_papel_usuario quando alguém da página tem a
+    /// concessão: antes da migration do módulo o CHECK antigo de acesso_modulo não deixa
+    /// existir essa linha, e a gestão de acessos segue de pé no intervalo do deploy.
+    /// </summary>
+    private async Task<Dictionary<Guid, string>> PapeisPlanejamentoAsync(IEnumerable<AcessoModulo> acessos)
+    {
+        var ids = acessos
+            .Where(a => a.Modulo == ModulosSgdp.Planejamento && a.Origem == OrigemAcesso.Sistema)
+            .Select(a => a.UserId)
+            .Distinct()
+            .ToList();
+        if (ids.Count == 0) return new Dictionary<Guid, string>();
+
+        return await _context.PePapeisUsuario.AsNoTracking()
+            .Where(p => ids.Contains(p.UserId))
+            .ToDictionaryAsync(p => p.UserId, p => p.Papel);
+    }
+
     // ── Pedidos de acesso atendidos por outro caminho ─────────────────────────
 
     /// <summary>
     /// Marca como aprovados os pedidos pendentes destes módulos, sem gravar. O papel
-    /// só é anotado no pedido do PGIA.
+    /// só é anotado no pedido do PGIA (o da Governança Estratégica fica no histórico
+    /// de papéis do módulo).
     /// </summary>
     private async Task MarcarPedidosAtendidosAsync(Guid userId, List<string> modulos, string? autorEmail, string? papelPgia)
     {
@@ -451,7 +625,7 @@ public class AcessoModuloService : IAcessoModuloService
         }
     }
 
-    private static UsuarioAcessoResponse Mapear(User user, IEnumerable<AcessoModulo> acessos)
+    private static UsuarioAcessoResponse Mapear(User user, IEnumerable<AcessoModulo> acessos, string? papelPlanejamento)
     {
         var lista = acessos.ToList();
         var concedidos = lista.Where(a => a.Origem == OrigemAcesso.Sistema).ToList();
@@ -466,6 +640,7 @@ public class AcessoModuloService : IAcessoModuloService
             UnidadeNome = user.Unidade?.Nome,
             PapelPgia = user.PapelPgia,
             PapelContratacoes = user.PapelContratacoes,
+            PapelPlanejamento = papelPlanejamento,
             Concedidos = concedidos.OrderBy(a => a.Modulo).Select(Mapear).ToList(),
             Keycloak = retrato.OrderBy(a => a.Modulo).Select(Mapear).ToList(),
             // Para os outros usuários a tela não tem o token: o retrato do último

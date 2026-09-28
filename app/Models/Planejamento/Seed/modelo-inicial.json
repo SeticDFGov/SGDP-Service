@@ -1,0 +1,4103 @@
+{
+  "versao": 8,
+  "niveis": [
+    {
+      "codigo": "basico",
+      "nome": "Básico",
+      "descricao": "Para o órgão que está começando: pede o mínimo do decreto, com os campos essenciais de cada conteúdo."
+    },
+    {
+      "codigo": "intermediario",
+      "nome": "Intermediário",
+      "descricao": "Para o órgão que já planeja a TIC: acrescenta o diagnóstico completo, a priorização pela matriz GUT e o monitoramento."
+    },
+    {
+      "codigo": "avancado",
+      "nome": "Avançado",
+      "descricao": "Para o órgão maduro: segue o Guia de PDTIC do SISP por inteiro, com plano de trabalho, aprovações intermediárias e avaliação."
+    }
+  ],
+  "configuracoes": {"periodicidade_monitoramento_padrao": "trimestral", "prazo_fechamento_ciclo_dias": 15, "dias_avaliacao_final": 90, "modo_niveis": "livre"},
+  "etapas": [
+    {
+      "chave": "preparacao",
+      "titulo": "Prepare o PDTIC",
+      "referenciaGuia": "atividades 1.1 a 1.8",
+      "descricao": "Abrangência, nomes, comitê, equipe, referências, estratégias, princípios e plano de trabalho.",
+      "passos": [
+        {
+          "chave": "preparacao.abrangencia",
+          "titulo": "Diga o que o PDTIC abrange e por quanto tempo vale",
+          "tipo": "dados",
+          "referenciaGuia": "1.1",
+          "aceitaNaoSeAplica": false,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Informe as unidades que o PDTIC alcança, o início e o fim da vigência (o guia sugere de 2 a 4 anos, conforme a maturidade) e de quanto em quanto tempo ele é revisado.",
+          "secoes": [
+            {
+              "chave": "abrangencia",
+              "titulo": "Abrangência e vigência",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "O que o PDTIC cobre e por quanto tempo vale. Estes dados vão para a apresentação do documento.",
+              "campos": [
+                {
+                  "chave": "tipo_abrangencia",
+                  "rotulo": "O que o PDTIC abrange",
+                  "tipo": "lista",
+                  "principal": true,
+                  "ajuda": "Escolha se o PDTIC vale para todo o órgão, com ou sem as entidades vinculadas, só para unidades regionais ou para outro escopo.",
+                  "opcoes": [
+                    {"valor": "todo_com_vinculadas", "rotulo": "Todo o órgão, com as entidades vinculadas"},
+                    {"valor": "todo_sem_vinculadas", "rotulo": "Todo o órgão, sem as entidades vinculadas"},
+                    {"valor": "unidades_regionais", "rotulo": "Unidades regionais do órgão"},
+                    {"valor": "outro", "rotulo": "Outro escopo"}
+                  ]
+                },
+                {
+                  "chave": "descricao_escopo",
+                  "rotulo": "Descrição do escopo",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional",
+                  "ajuda": "Explique o escopo quando escolher \"Outro escopo\" ou quando precisar dizer o que fica de fora."
+                },
+                {
+                  "chave": "unidades",
+                  "rotulo": "Unidades alcançadas",
+                  "tipo": "texto_longo",
+                  "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "ajuda": "Liste as unidades do órgão que o PDTIC alcança."
+                },
+                {"chave": "vigencia_inicio", "rotulo": "Início da vigência", "tipo": "data"},
+                {
+                  "chave": "vigencia_fim",
+                  "rotulo": "Fim da vigência",
+                  "tipo": "data",
+                  "ajuda": "O guia sugere de 2 a 4 anos: perto de 2 para o órgão que está começando e perto de 4 para o mais maduro."
+                },
+                {
+                  "chave": "periodicidade_revisao",
+                  "rotulo": "Revisão do PDTIC",
+                  "tipo": "lista",
+                  "ajuda": "De quanto em quanto tempo o PDTIC é revisado. O padrão é a revisão anual.",
+                  "opcoes": [
+                    {"valor": "anual", "rotulo": "Anual"},
+                    {"valor": "semestral", "rotulo": "Semestral"},
+                    {"valor": "outra", "rotulo": "Outra"}
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "preparacao.nomes",
+          "titulo": "Defina os nomes do órgão: comitê, equipes, autoridade máxima, unidade de TIC",
+          "tipo": "dados",
+          "aceitaNaoSeAplica": false,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Diga como o seu órgão chama o comitê, as equipes de elaboração e de acompanhamento, a autoridade máxima e a unidade de TIC. Esses nomes aparecem no documento e nos fluxos.",
+          "secoes": [
+            {
+              "chave": "nomes",
+              "titulo": "Dicionário de nomes",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "Os nomes que o documento e os fluxos usam. Troque aqui e muda em todo lugar.",
+              "campos": [
+                {
+                  "chave": "comite",
+                  "rotulo": "Nome do comitê interno de TIC (SGTIC)",
+                  "tipo": "texto_curto",
+                  "principal": true,
+                  "ajuda": "Como o órgão chama o Subcomitê Gestor de TIC. Por exemplo: Comitê de Governança de TIC."
+                },
+                {
+                  "chave": "equipe_elaboracao",
+                  "rotulo": "Nome da equipe de elaboração",
+                  "tipo": "texto_curto",
+                  "ajuda": "Por exemplo: Equipe de Elaboração do PDTIC."
+                },
+                {
+                  "chave": "equipe_acompanhamento",
+                  "rotulo": "Nome da equipe de acompanhamento",
+                  "tipo": "texto_curto",
+                  "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"}
+                },
+                {
+                  "chave": "autoridade_cargo",
+                  "rotulo": "Cargo da autoridade máxima",
+                  "tipo": "texto_curto",
+                  "ajuda": "Por exemplo: Secretário de Estado de Saúde."
+                },
+                {"chave": "autoridade_nome", "rotulo": "Nome da autoridade máxima", "tipo": "texto_curto"},
+                {
+                  "chave": "unidade_tic",
+                  "rotulo": "Nome da unidade de TIC",
+                  "tipo": "texto_curto",
+                  "ajuda": "A unidade que cuida da TIC no órgão."
+                },
+                {
+                  "chave": "sigla_orgao",
+                  "rotulo": "Sigla do órgão",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "estreita",
+                  "config": {"max": 20},
+                  "ajuda": "Deixe em branco para usar a sigla do cadastro.",
+                  "antes": {"config": [{}], "largura": [null]}
+                },
+                {
+                  "chave": "logotipo",
+                  "rotulo": "Logotipo do órgão",
+                  "tipo": "arquivo",
+                  "config": {"tipos": ["png", "jpg"], "maxMb": 5},
+                  "niveis": "opcional",
+                  "noDocumento": false,
+                  "naPlanilha": false,
+                  "ajuda": "Imagem PNG ou JPEG de até 5 MB. Ela vai na capa do documento do PDTIC."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "preparacao.sgtic",
+          "titulo": "Registre o SGTIC: ato de criação ou a estrutura que faz esse papel, e os membros",
+          "tipo": "dados",
+          "baseLegal": "art. 8º, §§ 1º e 2º",
+          "aceitaNaoSeAplica": false,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Registre o Subcomitê Gestor de TIC (SGTIC) do órgão, ou a estrutura colegiada que já faz esse papel, com o ato (tipo, número, data e processo SEI) e os membros.",
+          "secoes": [
+            {
+              "chave": "sgtic",
+              "titulo": "Subcomitê Gestor de TIC (SGTIC)",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "Cada órgão tem um SGTIC, ligado tecnicamente ao CGTIC. Uma estrutura colegiada que já existe pode fazer esse papel, se o ato dela disser isso (art. 8º, §§ 1º e 2º).",
+              "campos": [
+                {
+                  "chave": "forma",
+                  "rotulo": "Como o órgão tem o SGTIC",
+                  "tipo": "lista",
+                  "principal": true,
+                  "opcoes": [
+                    {"valor": "subcomite", "rotulo": "Subcomitê criado para esse fim"},
+                    {"valor": "estrutura_existente", "rotulo": "Estrutura colegiada que já existe no órgão"}
+                  ]
+                },
+                {
+                  "chave": "nome_estrutura",
+                  "rotulo": "Nome da estrutura colegiada",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "ajuda": "Preencha quando uma estrutura que já existe faz o papel do SGTIC."
+                },
+                {
+                  "chave": "ato_tipo",
+                  "rotulo": "Tipo do ato",
+                  "tipo": "lista",
+                  "opcoes": [
+                    {"valor": "portaria", "rotulo": "Portaria"},
+                    {"valor": "resolucao", "rotulo": "Resolução"},
+                    {"valor": "ordem_servico", "rotulo": "Ordem de serviço"},
+                    {"valor": "decreto", "rotulo": "Decreto"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {"chave": "ato_numero", "rotulo": "Número do ato", "tipo": "texto_curto"},
+                {"chave": "ato_data", "rotulo": "Data do ato", "tipo": "data", "config": {"naoFutura": true}},
+                {"chave": "sei", "rotulo": "Processo SEI", "tipo": "texto_curto", "niveis": "opcional", "config": {"max": 30, "formato": "sei"}},
+                {
+                  "chave": "ato_arquivo",
+                  "rotulo": "Cópia do ato",
+                  "tipo": "arquivo",
+                  "niveis": "opcional",
+                  "noDocumento": false,
+                  "naPlanilha": false,
+                  "config": {"tipos": ["pdf"], "maxMb": 25}
+                }
+              ]
+            },
+            {
+              "chave": "sgtic_membros",
+              "titulo": "Membros do SGTIC",
+              "tipo": "tabela",
+              "niveis": "obrigatorio",
+              "ajuda": "Quem faz parte do SGTIC e o papel de cada um.",
+              "campos": [
+                {"chave": "nome", "rotulo": "Nome", "tipo": "texto_curto", "principal": true, "largura": "larga"},
+                {
+                  "chave": "papel",
+                  "rotulo": "Papel",
+                  "tipo": "lista",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "presidente", "rotulo": "Presidente"},
+                    {"valor": "membro", "rotulo": "Membro"},
+                    {"valor": "suplente", "rotulo": "Suplente"},
+                    {"valor": "secretaria", "rotulo": "Secretaria"}
+                  ]
+                },
+                {
+                  "chave": "cargo",
+                  "rotulo": "Cargo",
+                  "tipo": "texto_curto",
+                  "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "media"
+                },
+                {
+                  "chave": "unidade",
+                  "rotulo": "Unidade",
+                  "tipo": "texto_curto",
+                  "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "media"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "preparacao.equipe",
+          "titulo": "Monte a equipe de elaboração",
+          "tipo": "dados",
+          "referenciaGuia": "1.2",
+          "aceitaNaoSeAplica": true,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Liste quem elabora o PDTIC: nome, papel (coordenação ou membro), cargo e área. Inclua pessoas das áreas finalísticas, não só da TIC, e informe o ato de designação.",
+          "secoes": [
+            {
+              "chave": "equipe_elaboracao",
+              "titulo": "Equipe de elaboração",
+              "tipo": "tabela",
+              "niveis": "obrigatorio",
+              "ajuda": "O guia pede uma equipe que não seja só de TIC: pessoas das áreas finalísticas ajudam a entender o negócio. Na forma do nível Básico, o mínimo do decreto, basta a lista de nomes.",
+              "campos": [
+                {"chave": "nome", "rotulo": "Nome", "tipo": "texto_curto", "principal": true, "largura": "larga"},
+                {
+                  "chave": "papel",
+                  "rotulo": "Papel na equipe",
+                  "tipo": "lista",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "coordenacao", "rotulo": "Coordenação"},
+                    {"valor": "coordenacao_substituta", "rotulo": "Coordenação substituta"},
+                    {"valor": "membro", "rotulo": "Membro"}
+                  ]
+                },
+                {
+                  "chave": "cargo",
+                  "rotulo": "Cargo ou função",
+                  "tipo": "texto_curto",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "media"
+                },
+                {
+                  "chave": "area",
+                  "rotulo": "Área que representa",
+                  "tipo": "texto_curto",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "media"
+                },
+                {
+                  "chave": "tipo_area",
+                  "rotulo": "A área é finalística ou de TIC?",
+                  "tipo": "lista",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "media",
+                  "ajuda": "O sistema avisa quando todas as pessoas forem da TIC.",
+                  "opcoes": [
+                    {"valor": "finalistica", "rotulo": "Área finalística ou meio"},
+                    {"valor": "tic", "rotulo": "Área de TIC"}
+                  ]
+                }
+              ]
+            },
+            {
+              "chave": "equipe_designacao",
+              "titulo": "Ato de designação da equipe",
+              "tipo": "formulario",
+              "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "obrigatorio"},
+              "ajuda": "O ato que designa a equipe e a coordenação. O modelo de portaria está no Anexo I do guia.",
+              "campos": [
+                {
+                  "chave": "ato_numero",
+                  "rotulo": "Número do ato",
+                  "tipo": "texto_curto",
+                  "principal": true,
+                  "niveis": "obrigatorio"
+                },
+                {
+                  "chave": "ato_tipo",
+                  "rotulo": "Tipo do ato",
+                  "tipo": "lista",
+                  "niveis": "obrigatorio",
+                  "opcoes": [
+                    {"valor": "portaria", "rotulo": "Portaria"},
+                    {"valor": "resolucao", "rotulo": "Resolução"},
+                    {"valor": "ordem_servico", "rotulo": "Ordem de serviço"},
+                    {"valor": "decreto", "rotulo": "Decreto"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {"chave": "ato_data", "rotulo": "Data do ato", "tipo": "data", "niveis": "obrigatorio", "config": {"naoFutura": true}},
+                {"chave": "sei", "rotulo": "Processo SEI", "tipo": "texto_curto", "niveis": "opcional", "config": {"max": 30, "formato": "sei"}},
+                {
+                  "chave": "ato_arquivo",
+                  "rotulo": "Cópia do ato",
+                  "tipo": "arquivo",
+                  "niveis": "opcional",
+                  "noDocumento": false,
+                  "naPlanilha": false,
+                  "config": {"tipos": ["pdf"], "maxMb": 25}
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "preparacao.metodologia",
+          "titulo": "Descreva a metodologia e ajuste o fluxo",
+          "tipo": "dados",
+          "referenciaGuia": "1.3",
+          "aceitaNaoSeAplica": true,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Explique como o PDTIC será elaborado e ajuste o fluxo de elaboração do guia ao jeito do seu órgão.",
+          "secoes": [
+            {
+              "chave": "metodologia",
+              "titulo": "Metodologia de elaboração",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "Diga qual metodologia o órgão segue. Na forma do nível Básico, o mínimo do decreto, use o guia como está.",
+              "campos": [
+                {
+                  "chave": "metodologia_adotada",
+                  "rotulo": "Metodologia adotada",
+                  "tipo": "lista",
+                  "principal": true,
+                  "opcoes": [
+                    {"valor": "guia_sisp", "rotulo": "Guia de PDTIC do SISP e as orientações da SGDI"},
+                    {"valor": "guia_adaptado", "rotulo": "Guia de PDTIC do SISP adaptado ao órgão"},
+                    {"valor": "outro_modelo", "rotulo": "Outro modelo de PDTIC"},
+                    {"valor": "modelo_proprio", "rotulo": "Modelo próprio do órgão"}
+                  ]
+                },
+                {
+                  "chave": "descricao",
+                  "rotulo": "Como o PDTIC será elaborado",
+                  "tipo": "texto_longo",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "ajuda": "As fases, os pontos de aprovação e as boas práticas usadas."
+                },
+                {
+                  "chave": "tecnicas",
+                  "rotulo": "Técnicas de levantamento das necessidades",
+                  "tipo": "lista_multipla",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "opcoes": [
+                    {"valor": "comite", "rotulo": "Levantamento no comitê"},
+                    {"valor": "formularios", "rotulo": "Formulários enviados às áreas"},
+                    {"valor": "grupo_trabalho", "rotulo": "Grupo de trabalho"},
+                    {"valor": "entrevistas", "rotulo": "Entrevistas"},
+                    {"valor": "questionarios", "rotulo": "Questionários"},
+                    {"valor": "historico_demandas", "rotulo": "Histórico de demandas da TIC"},
+                    {"valor": "outras", "rotulo": "Outras"}
+                  ]
+                },
+                {
+                  "chave": "metodos_complementares",
+                  "rotulo": "Métodos complementares",
+                  "tipo": "texto_longo",
+                  "niveis": {"basico": "desligado", "intermediario": "desligado", "avancado": "opcional"},
+                  "ajuda": "Por exemplo: BSC, COBIT ou ITIL, para órgãos mais maduros."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "preparacao.documentos-referencia",
+          "titulo": "Liste os documentos de referência",
+          "tipo": "dados",
+          "referenciaGuia": "1.4",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+          "oQueFazer": "Liste os documentos que servem de base: leis do orçamento (PPA, LDO e LOA), Estratégia de Governança Digital (EGD/DF), PETIC-DF, planejamento estratégico do órgão, regimento, normas e o PDTIC anterior.",
+          "secoes": [
+            {
+              "chave": "documentos_referencia",
+              "titulo": "Documentos de referência",
+              "tipo": "tabela",
+              "prefixo": "DR",
+              "niveis": "obrigatorio",
+              "ajuda": "É o primeiro passo do alinhamento: dos documentos saem os princípios, as diretrizes e as estratégias. Revise a lista durante toda a elaboração.",
+              "campos": [
+                {
+                  "chave": "identificacao",
+                  "rotulo": "Documento",
+                  "tipo": "texto_curto",
+                  "principal": true,
+                  "largura": "larga",
+                  "ajuda": "Nome, número e ano. Por exemplo: Lei nº 7.000/2023 (PPA 2024 a 2027)."
+                },
+                {
+                  "chave": "tipo",
+                  "rotulo": "Tipo",
+                  "tipo": "lista",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "ppa", "rotulo": "Plano Plurianual (PPA)"},
+                    {"valor": "ldo", "rotulo": "Lei de Diretrizes Orçamentárias (LDO)"},
+                    {"valor": "loa", "rotulo": "Lei Orçamentária Anual (LOA)"},
+                    {"valor": "egd", "rotulo": "Estratégia de Governança Digital (EGD/DF)"},
+                    {"valor": "petic", "rotulo": "PETIC-DF"},
+                    {"valor": "pei", "rotulo": "Planejamento estratégico institucional (PEI)"},
+                    {"valor": "regimento", "rotulo": "Regimento interno"},
+                    {"valor": "norma", "rotulo": "Lei, decreto ou outra norma"},
+                    {"valor": "pdtic_anterior", "rotulo": "PDTIC anterior"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {
+                  "chave": "link",
+                  "rotulo": "Endereço na internet",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "config": {"max": 500, "formato": "url"}
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "preparacao.estrategias",
+          "titulo": "Mostre as estratégias do órgão: PETIC-DF, EGD/DF, PEI, PPA, competências",
+          "tipo": "dados",
+          "referenciaGuia": "1.5",
+          "baseLegal": "art. 9º, § 1º, do Decreto nº 48.899/2026",
+          "aceitaNaoSeAplica": true,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Escolha os objetivos do PETIC-DF a que o PDTIC se liga e mostre as outras estratégias: EGD/DF, planejamento estratégico institucional (PEI), Plano Plurianual (PPA) e competências do órgão. Se um instrumento não existe, diga qual documento foi usado no lugar.",
+          "secoes": [
+            {
+              "chave": "alinhamento_petic",
+              "titulo": "Objetivos do PETIC-DF",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "O PDTIC precisa estar alinhado ao PETIC-DF e à EGD/DF vigentes (art. 9º, § 1º, do Decreto nº 48.899/2026).",
+              "campos": [
+                {
+                  "chave": "objetivos_petic",
+                  "rotulo": "Objetivos do PETIC-DF a que o PDTIC se liga",
+                  "tipo": "ligacao_catalogo",
+                  "principal": true,
+                  "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "config": {"catalogo": "petic_objetivo", "multipla": true},
+                  "ajuda": "Obrigatório nas formas dos níveis Intermediário e Avançado, quando há PETIC-DF vigente."
+                }
+              ]
+            },
+            {
+              "chave": "estrategias",
+              "titulo": "Estratégias do órgão",
+              "tipo": "tabela",
+              "prefixo": "E",
+              "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+              "ajuda": "Objetivos e linhas de ação dos planos do governo e do órgão que geram necessidades de TIC.",
+              "campos": [
+                {
+                  "chave": "descricao",
+                  "rotulo": "Estratégia ou objetivo",
+                  "tipo": "texto_longo",
+                  "principal": true,
+                  "largura": "larga"
+                },
+                {
+                  "chave": "fonte",
+                  "rotulo": "De onde vem",
+                  "tipo": "lista",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "egd", "rotulo": "EGD/DF"},
+                    {"valor": "pei", "rotulo": "Planejamento estratégico institucional (PEI)"},
+                    {"valor": "ppa", "rotulo": "Plano Plurianual (PPA)"},
+                    {"valor": "loa", "rotulo": "Lei Orçamentária Anual (LOA)"},
+                    {"valor": "competencias", "rotulo": "Competências legais e regimento"},
+                    {"valor": "outra", "rotulo": "Outra"}
+                  ]
+                }
+              ]
+            },
+            {
+              "chave": "instrumentos_ausentes",
+              "titulo": "Instrumentos que o órgão não tem",
+              "tipo": "tabela",
+              "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+              "ajuda": "Se o órgão não tem PEI, por exemplo, diga qual documento foi usado no lugar.",
+              "campos": [
+                {
+                  "chave": "instrumento",
+                  "rotulo": "Instrumento que não existe",
+                  "tipo": "texto_curto",
+                  "principal": true,
+                  "niveis": "obrigatorio",
+                  "largura": "media"
+                },
+                {
+                  "chave": "substituto",
+                  "rotulo": "Documento usado no lugar",
+                  "tipo": "texto_curto",
+                  "niveis": "obrigatorio",
+                  "largura": "larga"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "preparacao.principios",
+          "titulo": "Escolha princípios e diretrizes",
+          "tipo": "dados",
+          "referenciaGuia": "1.6",
+          "baseLegal": "art. 4º",
+          "aceitaNaoSeAplica": true,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Os princípios do art. 4º já vêm marcados. Inclua os princípios e as diretrizes do órgão e diga quais servem de critério para priorizar as necessidades.",
+          "secoes": [
+            {
+              "chave": "principios_diretrizes",
+              "titulo": "Princípios e diretrizes",
+              "tipo": "tabela",
+              "prefixo": "PD",
+              "niveis": "obrigatorio",
+              "ajuda": "Os princípios e as diretrizes que orientam o PDTIC, a priorização das necessidades e a aceitação de riscos. O modelo está no Anexo II do guia.",
+              "campos": [
+                {
+                  "chave": "principio",
+                  "rotulo": "Princípio ou diretriz",
+                  "tipo": "texto_longo",
+                  "principal": true,
+                  "largura": "larga"
+                },
+                {
+                  "chave": "origem",
+                  "rotulo": "Origem",
+                  "tipo": "lista",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "art4", "rotulo": "Art. 4º do Decreto nº 48.900/2026"},
+                    {"valor": "orgao", "rotulo": "Documento do órgão ou do governo"}
+                  ]
+                },
+                {
+                  "chave": "fonte",
+                  "rotulo": "Documento de origem",
+                  "tipo": "texto_curto",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "media",
+                  "ajuda": "De onde vem: EGD/DF, PEI, norma do órgão ou resolução do CGTIC."
+                },
+                {
+                  "chave": "criterio_priorizacao",
+                  "rotulo": "Serve de critério de priorização?",
+                  "tipo": "sim_nao",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "estreita"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "preparacao.plano-trabalho",
+          "titulo": "Faça o plano de trabalho e o cronograma",
+          "tipo": "dados",
+          "referenciaGuia": "1.7",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "desligado", "avancado": "obrigatorio"},
+          "oQueFazer": "Registre o objetivo, a justificativa, as premissas, as restrições e as partes interessadas, e monte o cronograma com as atividades do fluxo de elaboração.",
+          "secoes": [
+            {
+              "chave": "plano_trabalho",
+              "titulo": "Plano de trabalho",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "O plano do projeto de elaboração do PDTIC. O modelo está no Anexo III do guia.",
+              "campos": [
+                {"chave": "objetivo", "rotulo": "Objetivo", "tipo": "texto_longo", "principal": true},
+                {"chave": "justificativa", "rotulo": "Justificativa", "tipo": "texto_longo"},
+                {"chave": "contexto", "rotulo": "Contexto da unidade de TIC", "tipo": "texto_longo", "niveis": "opcional"},
+                {"chave": "premissas_restricoes", "rotulo": "Premissas e restrições", "tipo": "texto_longo"}
+              ]
+            },
+            {
+              "chave": "partes_interessadas",
+              "titulo": "Partes interessadas",
+              "tipo": "tabela",
+              "niveis": "opcional",
+              "campos": [
+                {
+                  "chave": "nome",
+                  "rotulo": "Nome",
+                  "tipo": "texto_curto",
+                  "principal": true,
+                  "niveis": "obrigatorio",
+                  "largura": "larga"
+                },
+                {
+                  "chave": "orgao",
+                  "rotulo": "Órgão ou unidade",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "media"
+                },
+                {"chave": "cargo", "rotulo": "Cargo", "tipo": "texto_curto", "niveis": "opcional", "largura": "media"}
+              ]
+            },
+            {
+              "chave": "cronograma_elaboracao",
+              "titulo": "Cronograma da elaboração",
+              "tipo": "tabela",
+              "niveis": "obrigatorio",
+              "ajuda": "As atividades da elaboração, com responsável e datas. O modelo está no Anexo IV do guia.",
+              "campos": [
+                {"chave": "atividade", "rotulo": "Atividade", "tipo": "texto_curto", "principal": true, "largura": "larga"},
+                {"chave": "responsavel", "rotulo": "Responsável", "tipo": "texto_curto", "largura": "media"},
+                {"chave": "inicio", "rotulo": "Início", "tipo": "data", "largura": "estreita"},
+                {"chave": "termino", "rotulo": "Término", "tipo": "data", "largura": "estreita"},
+                {
+                  "chave": "predecessoras",
+                  "rotulo": "Vem depois de",
+                  "tipo": "ligacao_secao",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "config": {"secao": "cronograma_elaboracao", "multipla": true}
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "preparacao.aprovacao-plano-trabalho",
+          "titulo": "Registre a aprovação do plano de trabalho",
+          "tipo": "aprovacao",
+          "referenciaGuia": "1.8",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "desligado", "avancado": "obrigatorio"},
+          "oQueFazer": "Registre quem aprovou o plano de trabalho, a decisão, a data, o ato e o processo SEI, e anexe o documento.",
+          "secoes": [
+            {
+              "chave": "aprovacao_plano_trabalho",
+              "titulo": "Aprovação do plano de trabalho",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "O comitê aprova o plano de trabalho ou devolve para ajustes.",
+              "campos": [
+                {
+                  "chave": "decisao",
+                  "rotulo": "Decisão",
+                  "tipo": "lista",
+                  "principal": true,
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "aprovado", "rotulo": "Aprovado", "cor": "verde"},
+                    {"valor": "devolvido", "rotulo": "Devolvido para ajustes", "cor": "amarelo"}
+                  ]
+                },
+                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita", "config": {"naoFutura": true}},
+                {
+                  "chave": "instancia",
+                  "rotulo": "Quem decidiu",
+                  "tipo": "lista",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "ajuda": "Em geral, quem aprova o plano de trabalho é o comitê interno de TIC (SGTIC). Mude quando outra instância decidiu.",
+                  "antes": {"ajuda": ["Em geral, o SGTIC. Mude quando outra instância decidiu."]},
+                  "opcoes": [
+                    {"valor": "sgtic", "rotulo": "SGTIC (comitê interno de TIC)"},
+                    {"valor": "autoridade_maxima", "rotulo": "Autoridade máxima do órgão"},
+                    {"valor": "outra", "rotulo": "Outra instância"}
+                  ]
+                },
+                {
+                  "chave": "ato_tipo",
+                  "rotulo": "Tipo do ato",
+                  "tipo": "lista",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "ata", "rotulo": "Ata de reunião"},
+                    {"valor": "resolucao", "rotulo": "Resolução"},
+                    {"valor": "portaria", "rotulo": "Portaria"},
+                    {"valor": "despacho", "rotulo": "Despacho"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {
+                  "chave": "ato_numero",
+                  "rotulo": "Número do ato",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "estreita"
+                },
+                {
+                  "chave": "sei",
+                  "rotulo": "Processo SEI",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "config": {"max": 30, "formato": "sei"}
+                },
+                {
+                  "chave": "documento",
+                  "rotulo": "Documento",
+                  "tipo": "arquivo",
+                  "niveis": "opcional",
+                  "noDocumento": false,
+                  "naPlanilha": false,
+                  "config": {"tipos": ["pdf"], "maxMb": 25}
+                },
+                {
+                  "chave": "observacao",
+                  "rotulo": "Observação",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional",
+                  "largura": "larga",
+                  "ajuda": "Se voltou, diga o que precisa ser ajustado."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "chave": "diagnostico",
+      "titulo": "Faça o diagnóstico",
+      "referenciaGuia": "atividades 2.1 a 2.14",
+      "descricao": "Onde o órgão está: ambiente de TIC, ativos, análise SWOT e as necessidades de informação e de TIC.",
+      "passos": [
+        {
+          "chave": "diagnostico.pdtic-anterior",
+          "titulo": "Veja o que o PDTIC anterior entregou",
+          "tipo": "dados",
+          "referenciaGuia": "2.1",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+          "oQueFazer": "Veja o que o PDTIC anterior entregou: metas alcançadas, ações concluídas e o que ficou pendente. Se não houve PDTIC anterior, diga isso e cite o documento usado no lugar.",
+          "secoes": [
+            {
+              "chave": "resultados_pdtic_anterior",
+              "titulo": "Resultados do PDTIC anterior",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "O ponto de partida é o relatório de resultados do ciclo anterior. As necessidades não atendidas voltam para o inventário.",
+              "campos": [
+                {
+                  "chave": "resultados",
+                  "rotulo": "O que o PDTIC anterior entregou",
+                  "tipo": "texto_longo",
+                  "principal": true,
+                  "ajuda": "Metas cumpridas e não cumpridas, os motivos e o que ficou pendente. Sem PDTIC anterior, cite o instrumento usado no lugar (PPA, PEI ou EGD/DF)."
+                },
+                {"chave": "teve_anterior", "rotulo": "O órgão teve PDTIC anterior?", "tipo": "sim_nao"},
+                {
+                  "chave": "execucao_orcamentaria",
+                  "rotulo": "Avaliação da execução orçamentária",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional"
+                },
+                {"chave": "licoes", "rotulo": "Lições aprendidas", "tipo": "texto_longo", "niveis": "opcional"}
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "diagnostico.referencial-estrategico",
+          "titulo": "Descreva o referencial estratégico da TIC: missão, visão, valores e objetivos",
+          "tipo": "dados",
+          "referenciaGuia": "2.2",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+          "oQueFazer": "Descreva a missão, a visão, os valores e os objetivos estratégicos da TIC, ligando cada objetivo a um objetivo do PETIC-DF.",
+          "secoes": [
+            {
+              "chave": "referencial_estrategico",
+              "titulo": "Missão, visão e valores da TIC",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "O referencial da TIC estende o do órgão. Se faltar algum elemento, a falta vira uma necessidade no inventário.",
+              "campos": [
+                {
+                  "chave": "missao",
+                  "rotulo": "Missão",
+                  "tipo": "texto_longo",
+                  "principal": true,
+                  "ajuda": "Por que a unidade de TIC existe, o que faz e para quem."
+                },
+                {"chave": "visao", "rotulo": "Visão", "tipo": "texto_longo", "ajuda": "Onde a TIC quer chegar."},
+                {"chave": "valores", "rotulo": "Valores", "tipo": "texto_longo"}
+              ]
+            },
+            {
+              "chave": "objetivos_tic",
+              "titulo": "Objetivos estratégicos da TIC",
+              "tipo": "tabela",
+              "prefixo": "OT",
+              "niveis": "obrigatorio",
+              "campos": [
+                {"chave": "objetivo", "rotulo": "Objetivo", "tipo": "texto_longo", "principal": true, "largura": "larga"},
+                {
+                  "chave": "objetivo_petic",
+                  "rotulo": "Objetivo do PETIC-DF ligado",
+                  "tipo": "ligacao_catalogo",
+                  "largura": "media",
+                  "config": {"catalogo": "petic_objetivo", "multipla": false}
+                }
+              ]
+            },
+            {
+              "chave": "checklist_referencial",
+              "titulo": "Checklist do referencial",
+              "tipo": "formulario",
+              "niveis": {"basico": "desligado", "intermediario": "desligado", "avancado": "obrigatorio"},
+              "ajuda": "As perguntas do guia sobre o referencial estratégico da TIC.",
+              "campos": [
+                {"chave": "existe", "rotulo": "O referencial existe?", "tipo": "sim_nao", "principal": true},
+                {"chave": "formalizado", "rotulo": "É formalizado?", "tipo": "sim_nao"},
+                {"chave": "praticado", "rotulo": "É praticado?", "tipo": "sim_nao"},
+                {"chave": "monitorado", "rotulo": "É monitorado?", "tipo": "sim_nao"},
+                {"chave": "reavaliado", "rotulo": "É reavaliado de tempos em tempos?", "tipo": "sim_nao"},
+                {"chave": "coerente", "rotulo": "É coerente e alinhado à estratégia do órgão?", "tipo": "sim_nao"},
+                {"chave": "precisa_ajuste", "rotulo": "Precisa de ajustes?", "tipo": "sim_nao"}
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "diagnostico.ambiente-tecnologico",
+          "titulo": "Descreva o ambiente tecnológico e a organização da TIC",
+          "tipo": "dados",
+          "referenciaGuia": "2.3",
+          "baseLegal": "art. 12, § 2º, I",
+          "inciso": "I",
+          "travado": true,
+          "aceitaNaoSeAplica": false,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Descreva como a TIC do órgão está organizada e o quadro de pessoal de TIC: efetivos, comissionados, terceirizados e temporários.",
+          "secoes": [
+            {
+              "chave": "diagnostico_ambiente",
+              "titulo": "Ambiente tecnológico e organização da TIC",
+              "tipo": "formulario",
+              "travada": true,
+              "inciso": "I",
+              "niveis": "obrigatorio",
+              "ajuda": "O diagnóstico do ambiente tecnológico é um dos nove conteúdos mínimos do PDTIC (art. 12, § 2º, I).",
+              "campos": [
+                {
+                  "chave": "diagnostico",
+                  "rotulo": "Diagnóstico do ambiente tecnológico",
+                  "tipo": "texto_rico",
+                  "principal": true,
+                  "ajuda": "Como a unidade de TIC se insere no órgão e se organiza: estrutura, arquitetura, processos e recursos. Pode incluir o organograma."
+                }
+              ]
+            },
+            {
+              "chave": "quadro_pessoal_tic",
+              "titulo": "Quadro de pessoal de TIC",
+              "tipo": "formulario",
+              "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+              "campos": [
+                {
+                  "chave": "efetivos",
+                  "rotulo": "Servidores efetivos",
+                  "tipo": "numero",
+                  "principal": true,
+                  "config": {"min": 0, "casas": 0}
+                },
+                {"chave": "comissionados", "rotulo": "Comissionados", "tipo": "numero", "config": {"min": 0, "casas": 0}},
+                {"chave": "terceirizados", "rotulo": "Terceirizados", "tipo": "numero", "config": {"min": 0, "casas": 0}},
+                {"chave": "temporarios", "rotulo": "Temporários", "tipo": "numero", "config": {"min": 0, "casas": 0}}
+              ]
+            },
+            {
+              "chave": "checklist_organizacao",
+              "titulo": "Checklist da organização da TIC",
+              "tipo": "formulario",
+              "niveis": {"basico": "desligado", "intermediario": "desligado", "avancado": "obrigatorio"},
+              "ajuda": "As perguntas do guia sobre a organização da TIC.",
+              "campos": [
+                {
+                  "chave": "organograma_adequado",
+                  "rotulo": "O organograma da TIC é adequado?",
+                  "tipo": "sim_nao",
+                  "principal": true
+                },
+                {
+                  "chave": "arquitetura_gerenciada",
+                  "rotulo": "A arquitetura de TIC é adequada e gerenciada?",
+                  "tipo": "sim_nao"
+                },
+                {
+                  "chave": "processos_formalizados",
+                  "rotulo": "Os processos de TIC existem e são formalizados, medidos e melhorados?",
+                  "tipo": "sim_nao"
+                },
+                {
+                  "chave": "inventario_atualizado",
+                  "rotulo": "O inventário de recursos de TIC está atualizado?",
+                  "tipo": "sim_nao"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "diagnostico.ativos",
+          "titulo": "Liste as soluções e os ativos de TIC",
+          "tipo": "dados",
+          "referenciaGuia": "Anexo X, item 19",
+          "baseLegal": "art. 12, § 2º, II",
+          "inciso": "II",
+          "travado": true,
+          "aceitaNaoSeAplica": false,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Liste os sistemas, a infraestrutura, os serviços, os contratos e as licenças de TIC, com a situação, a hospedagem (CeTIC-DF, datacenter próprio ou nuvem) e o uso da rede GDFNet.",
+          "secoes": [
+            {
+              "chave": "ativos",
+              "titulo": "Soluções e ativos de TIC",
+              "tipo": "tabela",
+              "prefixo": "AT",
+              "travada": true,
+              "inciso": "II",
+              "niveis": "obrigatorio",
+              "ajuda": "O inventário das soluções e dos ativos de TIC é um dos nove conteúdos mínimos do PDTIC (art. 12, § 2º, II). Na forma do nível Básico, o mínimo do decreto, bastam o nome, o tipo e a situação.",
+              "campos": [
+                {"chave": "nome", "rotulo": "Nome", "tipo": "texto_curto", "principal": true, "largura": "larga"},
+                {
+                  "chave": "tipo",
+                  "rotulo": "Tipo",
+                  "tipo": "lista",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "sistema", "rotulo": "Sistema"},
+                    {"valor": "infraestrutura", "rotulo": "Infraestrutura"},
+                    {"valor": "servico", "rotulo": "Serviço"},
+                    {"valor": "contrato", "rotulo": "Contrato"},
+                    {"valor": "rede", "rotulo": "Rede"},
+                    {"valor": "licenca", "rotulo": "Licença"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {
+                  "chave": "situacao",
+                  "rotulo": "Situação",
+                  "tipo": "lista",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "em_operacao", "rotulo": "Em operação", "cor": "verde"},
+                    {"valor": "em_implantacao", "rotulo": "Em implantação", "cor": "azul"},
+                    {"valor": "em_desativacao", "rotulo": "Em desativação", "cor": "cinza"}
+                  ]
+                },
+                {
+                  "chave": "descricao",
+                  "rotulo": "Descrição",
+                  "tipo": "texto_longo",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "larga"
+                },
+                {
+                  "chave": "hospedagem",
+                  "rotulo": "Hospedagem",
+                  "tipo": "lista",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "media",
+                  "ajuda": "O CeTIC-DF é o datacenter corporativo oficial do DF (art. 13).",
+                  "opcoes": [
+                    {"valor": "cetic", "rotulo": "CeTIC-DF"},
+                    {"valor": "datacenter_proprio", "rotulo": "Datacenter próprio"},
+                    {"valor": "nuvem", "rotulo": "Nuvem"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {
+                  "chave": "usa_gdfnet",
+                  "rotulo": "Usa a rede GDFNet?",
+                  "tipo": "sim_nao",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "estreita",
+                  "ajuda": "A GDFNet é a rede corporativa oficial do DF (art. 15)."
+                },
+                {
+                  "chave": "contrato",
+                  "rotulo": "Contrato",
+                  "tipo": "texto_curto",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "media"
+                },
+                {
+                  "chave": "contrato_vigencia",
+                  "rotulo": "Fim da vigência do contrato",
+                  "tipo": "data",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "estreita"
+                },
+                {
+                  "chave": "criticidade",
+                  "rotulo": "Criticidade",
+                  "tipo": "lista",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "obrigatorio"},
+                  "largura": "estreita",
+                  "opcoes": [
+                    {"valor": "alta", "rotulo": "Alta", "cor": "vermelho"},
+                    {"valor": "media", "rotulo": "Média", "cor": "amarelo"},
+                    {"valor": "baixa", "rotulo": "Baixa", "cor": "verde"}
+                  ]
+                },
+                {
+                  "chave": "responsavel",
+                  "rotulo": "Responsável",
+                  "tipo": "texto_curto",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "media"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "diagnostico.swot",
+          "titulo": "Faça a análise SWOT da TIC",
+          "tipo": "dados",
+          "referenciaGuia": "2.4",
+          "baseLegal": "art. 12, § 2º, I",
+          "inciso": "I",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+          "oQueFazer": "Liste as forças, as fraquezas, as oportunidades e as ameaças da TIC (análise SWOT). Toda fraqueza deve gerar uma necessidade, e toda ameaça, um risco.",
+          "secoes": [
+            {
+              "chave": "swot_forcas",
+              "titulo": "Forças",
+              "tipo": "tabela",
+              "prefixo": "F",
+              "niveis": "obrigatorio",
+              "ajuda": "Pontos fortes internos: capacidades da TIC que ajudam a atingir as metas.",
+              "campos": [
+                {"chave": "descricao", "rotulo": "Força", "tipo": "texto_longo", "principal": true, "largura": "larga"}
+              ]
+            },
+            {
+              "chave": "swot_fraquezas",
+              "titulo": "Fraquezas",
+              "tipo": "tabela",
+              "prefixo": "D",
+              "niveis": "obrigatorio",
+              "ajuda": "Pontos fracos internos: capacidades que faltam. Toda fraqueza precisa de uma necessidade ligada no inventário.",
+              "campos": [
+                {"chave": "descricao", "rotulo": "Fraqueza", "tipo": "texto_longo", "principal": true, "largura": "larga"}
+              ]
+            },
+            {
+              "chave": "swot_oportunidades",
+              "titulo": "Oportunidades",
+              "tipo": "tabela",
+              "prefixo": "O",
+              "niveis": "obrigatorio",
+              "ajuda": "Fatores externos, que a TIC não controla, que podem ajudar a atingir as metas.",
+              "campos": [
+                {"chave": "descricao", "rotulo": "Oportunidade", "tipo": "texto_longo", "principal": true, "largura": "larga"}
+              ]
+            },
+            {
+              "chave": "swot_ameacas",
+              "titulo": "Ameaças",
+              "tipo": "tabela",
+              "prefixo": "AM",
+              "niveis": "obrigatorio",
+              "ajuda": "Fatores externos que podem impedir as metas. Toda ameaça precisa ser tratada no plano de riscos.",
+              "campos": [
+                {"chave": "descricao", "rotulo": "Ameaça", "tipo": "texto_longo", "principal": true, "largura": "larga"}
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "diagnostico.capacidade",
+          "titulo": "Estime a capacidade de execução",
+          "tipo": "dados",
+          "referenciaGuia": "2.5",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "desligado", "avancado": "obrigatorio"},
+          "oQueFazer": "Estime quanto a equipe de TIC consegue executar no período: a capacidade total, o esforço já alocado e o que fica disponível.",
+          "secoes": [
+            {
+              "chave": "capacidade_execucao",
+              "titulo": "Capacidade de execução",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "A capacidade disponível é a capacidade total estimada menos o esforço já alocado. O guia não fixa unidade: use horas, pontos de função ou pessoas.",
+              "campos": [
+                {
+                  "chave": "capacidade_total",
+                  "rotulo": "Capacidade total estimada",
+                  "tipo": "numero",
+                  "principal": true,
+                  "config": {"min": 0}
+                },
+                {
+                  "chave": "esforco_alocado",
+                  "rotulo": "Esforço já alocado",
+                  "tipo": "numero",
+                  "config": {"min": 0},
+                  "ajuda": "O que continua ocupado durante toda a vigência, sem contar as necessidades deste PDTIC."
+                },
+                {
+                  "chave": "capacidade_disponivel",
+                  "rotulo": "Capacidade disponível",
+                  "tipo": "calculado",
+                  "niveis": "opcional",
+                  "config": {"calculo": "subtracao", "campos": ["capacidade_total", "esforco_alocado"]}
+                },
+                {
+                  "chave": "unidade",
+                  "rotulo": "Unidade de medida",
+                  "tipo": "lista",
+                  "opcoes": [
+                    {"valor": "horas", "rotulo": "Horas"},
+                    {"valor": "pontos_funcao", "rotulo": "Pontos de função"},
+                    {"valor": "pessoas", "rotulo": "Pessoas"},
+                    {"valor": "outra", "rotulo": "Outra"}
+                  ]
+                },
+                {
+                  "chave": "como_estimou",
+                  "rotulo": "Como a estimativa foi feita",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "diagnostico.plano-levantamento",
+          "titulo": "Planeje o levantamento das necessidades",
+          "tipo": "dados",
+          "referenciaGuia": "2.6",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "desligado", "avancado": "obrigatorio"},
+          "oQueFazer": "Planeje como as necessidades serão levantadas: quem será ouvido, de que forma e em que prazo.",
+          "secoes": [
+            {
+              "chave": "plano_levantamento",
+              "titulo": "Plano de levantamento das necessidades",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "O foco são as necessidades ligadas aos objetivos do órgão e ao valor para o cidadão, e não só à melhoria da TIC.",
+              "campos": [
+                {"chave": "areas", "rotulo": "Áreas que serão ouvidas", "tipo": "texto_longo", "principal": true},
+                {
+                  "chave": "abordagem",
+                  "rotulo": "Como as áreas serão envolvidas",
+                  "tipo": "texto_longo",
+                  "ajuda": "Reuniões, palestras, visitas e, se quiser, a participação do cidadão."
+                },
+                {
+                  "chave": "instrumentos",
+                  "rotulo": "Instrumentos de levantamento",
+                  "tipo": "lista_multipla",
+                  "opcoes": [
+                    {"valor": "questionario", "rotulo": "Questionário"},
+                    {"valor": "entrevista", "rotulo": "Entrevista"},
+                    {"valor": "formulario", "rotulo": "Formulário eletrônico"},
+                    {"valor": "reuniao", "rotulo": "Reunião ou oficina"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {"chave": "prazo", "rotulo": "Prazo para as respostas", "tipo": "data", "niveis": "opcional"}
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "diagnostico.necessidades-informacao",
+          "titulo": "Levante as necessidades de informação",
+          "tipo": "dados",
+          "referenciaGuia": "2.7",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+          "oQueFazer": "Registre as necessidades de informação das áreas do órgão e a estratégia a que cada uma se liga.",
+          "secoes": [
+            {
+              "chave": "necessidades_informacao",
+              "titulo": "Necessidades de informação",
+              "tipo": "tabela",
+              "prefixo": "NI",
+              "niveis": "obrigatorio",
+              "ajuda": "A informação de que o órgão precisa para trabalhar. Ela liga as estratégias às necessidades de TIC. O modelo está no Anexo VI do guia.",
+              "campos": [
+                {
+                  "chave": "descricao",
+                  "rotulo": "Necessidade de informação",
+                  "tipo": "texto_longo",
+                  "principal": true,
+                  "largura": "larga"
+                },
+                {"chave": "areas", "rotulo": "Áreas que precisam", "tipo": "texto_curto", "largura": "media"},
+                {
+                  "chave": "estrategia",
+                  "rotulo": "Estratégia relacionada",
+                  "tipo": "ligacao_secao",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "obrigatorio"},
+                  "largura": "media",
+                  "config": {"secao": "estrategias", "multipla": true}
+                },
+                {
+                  "chave": "origem",
+                  "rotulo": "Origem",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "ajuda": "O processo de trabalho ou o serviço de onde vem a necessidade."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "diagnostico.necessidades-tic",
+          "titulo": "Levante as necessidades de TIC: serviços, infraestrutura, contratação e pessoal",
+          "tipo": "dados",
+          "referenciaGuia": "2.8 a 2.11",
+          "baseLegal": "art. 12, § 2º, III",
+          "inciso": "III",
+          "travado": true,
+          "aceitaNaoSeAplica": false,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Registre cada necessidade de TIC com o tipo, a origem, as áreas que pedem, o objetivo do PETIC-DF e o valor estimado.",
+          "secoes": [
+            {
+              "chave": "necessidades",
+              "titulo": "Necessidades de TIC",
+              "tipo": "tabela",
+              "prefixo": "N",
+              "travada": true,
+              "inciso": "III",
+              "niveis": "obrigatorio",
+              "ajuda": "As necessidades de infraestrutura, sistemas e serviços são um dos nove conteúdos mínimos do PDTIC (art. 12, § 2º, III). O modelo está no Anexo VI do guia. Na forma do nível Básico, o mínimo do decreto, bastam a descrição, o tipo, o objetivo do PETIC-DF e a prioridade alta, média ou baixa.",
+              "campos": [
+                {"chave": "descricao", "rotulo": "Necessidade", "tipo": "texto_longo", "principal": true, "largura": "larga"},
+                {
+                  "chave": "tipo",
+                  "rotulo": "Tipo",
+                  "tipo": "lista",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "servico", "rotulo": "Serviço de TIC"},
+                    {"valor": "infraestrutura", "rotulo": "Infraestrutura de TIC"},
+                    {"valor": "contratacao", "rotulo": "Contratação de TIC"},
+                    {"valor": "pessoal", "rotulo": "Pessoal de TIC"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {
+                  "chave": "origem",
+                  "rotulo": "Origem",
+                  "tipo": "lista",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "principios", "rotulo": "Princípios e diretrizes"},
+                    {"valor": "pdtic_anterior", "rotulo": "PDTIC anterior"},
+                    {"valor": "referencial", "rotulo": "Referencial estratégico da TIC"},
+                    {"valor": "organizacao", "rotulo": "Organização da TIC"},
+                    {"valor": "swot", "rotulo": "Análise SWOT"},
+                    {"valor": "informacao", "rotulo": "Necessidade de informação"},
+                    {"valor": "servicos", "rotulo": "Serviços de TIC"},
+                    {"valor": "infraestrutura", "rotulo": "Infraestrutura de TIC"},
+                    {"valor": "contratacao", "rotulo": "Contratação de TIC"},
+                    {"valor": "pessoal", "rotulo": "Pessoal de TIC"}
+                  ]
+                },
+                {
+                  "chave": "areas",
+                  "rotulo": "Áreas que pedem",
+                  "tipo": "texto_curto",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "media"
+                },
+                {
+                  "chave": "necessidade_informacao",
+                  "rotulo": "Necessidade de informação ligada",
+                  "tipo": "ligacao_secao",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "media",
+                  "config": {"secao": "necessidades_informacao", "multipla": true}
+                },
+                {
+                  "chave": "estrategia",
+                  "rotulo": "Estratégia ligada",
+                  "tipo": "ligacao_secao",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "media",
+                  "config": {"secao": "estrategias", "multipla": true}
+                },
+                {
+                  "chave": "fraqueza",
+                  "rotulo": "Fraqueza da SWOT que ela resolve",
+                  "tipo": "ligacao_secao",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "media",
+                  "config": {"secao": "swot_fraquezas", "multipla": true}
+                },
+                {
+                  "chave": "objetivo_petic",
+                  "rotulo": "Objetivo do PETIC-DF",
+                  "tipo": "ligacao_catalogo",
+                  "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "media",
+                  "config": {"catalogo": "petic_objetivo", "multipla": false},
+                  "ajuda": "Obrigatório nas formas dos níveis Intermediário e Avançado, quando há PETIC-DF vigente."
+                },
+                {
+                  "chave": "eixo",
+                  "rotulo": "Eixo de governo",
+                  "tipo": "ligacao_catalogo",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "media",
+                  "config": {"catalogo": "petic_eixo", "multipla": false}
+                },
+                {
+                  "chave": "valor_estimado",
+                  "rotulo": "Valor estimado",
+                  "tipo": "moeda",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "media"
+                },
+                {
+                  "chave": "prioridade_simples",
+                  "rotulo": "Prioridade",
+                  "tipo": "lista",
+                  "niveis": {"basico": "obrigatorio", "intermediario": "desligado", "avancado": "desligado"},
+                  "largura": "estreita",
+                  "ajuda": "Na forma do nível Básico, diga só se a prioridade é alta, média ou baixa.",
+                  "opcoes": [
+                    {"valor": "alta", "rotulo": "Alta", "cor": "vermelho"},
+                    {"valor": "media", "rotulo": "Média", "cor": "amarelo"},
+                    {"valor": "baixa", "rotulo": "Baixa", "cor": "verde"}
+                  ]
+                },
+                {
+                  "chave": "gravidade",
+                  "rotulo": "Gravidade",
+                  "tipo": "numero",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "estreita",
+                  "config": {"min": 1, "max": 5, "casas": 0},
+                  "ajuda": "O tamanho do problema se a necessidade não for atendida: de 1 (sem gravidade) a 5 (extremamente grave)."
+                },
+                {
+                  "chave": "urgencia",
+                  "rotulo": "Urgência",
+                  "tipo": "numero",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "estreita",
+                  "config": {"min": 1, "max": 5, "casas": 0},
+                  "ajuda": "Quanto tempo dá para esperar: de 1 (pode esperar) a 5 (precisa de ação imediata)."
+                },
+                {
+                  "chave": "tendencia",
+                  "rotulo": "Tendência",
+                  "tipo": "numero",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "estreita",
+                  "config": {"min": 1, "max": 5, "casas": 0},
+                  "ajuda": "Se o problema piora, ou a oportunidade se perde, enquanto nada é feito: de 1 (não vai piorar) a 5 (vai piorar rapidamente)."
+                },
+                {
+                  "chave": "prioridade",
+                  "rotulo": "Prioridade calculada",
+                  "tipo": "calculado",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "estreita",
+                  "config": {"calculo": "produto", "campos": ["gravidade", "urgencia", "tendencia"]},
+                  "ajuda": "Gravidade x urgência x tendência (matriz GUT), de 1 a 125. O administrador pode trocar os critérios, os pesos e o cálculo."
+                },
+                {
+                  "chave": "priorizada",
+                  "rotulo": "Priorizada?",
+                  "tipo": "sim_nao",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "estreita",
+                  "ajuda": "As não priorizadas não entram no inventário: vão para o anexo do documento."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "diagnostico.sistemas-ia",
+          "titulo": "Confira os sistemas de IA (vêm do PGIA) e planeje as aquisições",
+          "tipo": "dados",
+          "baseLegal": "art. 12, § 2º, VIII",
+          "inciso": "VIII",
+          "travado": true,
+          "aceitaNaoSeAplica": false,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Confira os sistemas de inteligência artificial (IA) do órgão, que vêm do inventário do PGIA com a classificação de risco, e registre as aquisições de IA planejadas.",
+          "secoes": [
+            {
+              "chave": "aquisicoes_ia",
+              "titulo": "Aquisições de IA planejadas",
+              "tipo": "tabela",
+              "prefixo": "IA",
+              "travada": true,
+              "inciso": "VIII",
+              "niveis": "opcional",
+              "ajuda": "Os sistemas de IA em uso vêm do inventário do PGIA, com a classificação de risco. Aqui entram só as aquisições planejadas. Sem aquisição planejada, a tabela fica vazia.",
+              "campos": [
+                {
+                  "chave": "objeto",
+                  "rotulo": "O que será adquirido",
+                  "tipo": "texto_longo",
+                  "principal": true,
+                  "niveis": "obrigatorio",
+                  "largura": "larga"
+                },
+                {
+                  "chave": "finalidade",
+                  "rotulo": "Para que serve",
+                  "tipo": "texto_longo",
+                  "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "larga"
+                },
+                {
+                  "chave": "classificacao_prevista",
+                  "rotulo": "Classificação de risco prevista",
+                  "tipo": "lista",
+                  "niveis": "obrigatorio",
+                  "largura": "media",
+                  "ajuda": "A classificação de risco segue o Decreto nº 48.901/2026 (PGIA/DF).",
+                  "opcoes": [
+                    {"valor": "baixo", "rotulo": "Risco Baixo", "cor": "verde"},
+                    {"valor": "moderado", "rotulo": "Risco Moderado", "cor": "amarelo"},
+                    {"valor": "alto", "rotulo": "Risco Alto", "cor": "vermelho"},
+                    {"valor": "a_definir", "rotulo": "Ainda não classificado", "cor": "cinza"}
+                  ]
+                },
+                {
+                  "chave": "previsao",
+                  "rotulo": "Previsão de aquisição",
+                  "tipo": "data",
+                  "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "estreita"
+                },
+                {
+                  "chave": "necessidade",
+                  "rotulo": "Necessidade ligada",
+                  "tipo": "ligacao_secao",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "media",
+                  "config": {"secao": "necessidades", "multipla": false}
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "diagnostico.inventario",
+          "titulo": "Consolide o inventário e ligue as necessidades às estratégias",
+          "tipo": "dados",
+          "referenciaGuia": "2.12 e 2.13",
+          "baseLegal": "art. 9º, § 1º, do Decreto nº 48.899/2026",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+          "oQueFazer": "Consolide o inventário de necessidades e ligue cada uma às estratégias do órgão e ao PETIC-DF.",
+          "secoes": [
+            {
+              "chave": "consolidacao_inventario",
+              "titulo": "Consolidação do inventário",
+              "tipo": "formulario",
+              "niveis": "opcional",
+              "ajuda": "Revise as necessidades: junte as parecidas, tire as repetidas e corrija as incoerências. As ligações com as estratégias e com o PETIC-DF ficam na tabela de necessidades de TIC.",
+              "campos": [
+                {
+                  "chave": "resumo",
+                  "rotulo": "O que foi revisto",
+                  "tipo": "texto_longo",
+                  "principal": true,
+                  "niveis": "opcional"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "diagnostico.aprovacao-inventario",
+          "titulo": "Registre a aprovação do inventário",
+          "tipo": "aprovacao",
+          "referenciaGuia": "2.14",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "desligado", "avancado": "obrigatorio"},
+          "oQueFazer": "Registre a aprovação do inventário de necessidades: quem aprovou, a decisão, a data e o ato.",
+          "secoes": [
+            {
+              "chave": "aprovacao_inventario",
+              "titulo": "Aprovação do inventário",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "O comitê confere se cada necessidade é razoável, justificável e ajuda os objetivos do órgão.",
+              "campos": [
+                {
+                  "chave": "decisao",
+                  "rotulo": "Decisão",
+                  "tipo": "lista",
+                  "principal": true,
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "aprovado", "rotulo": "Aprovado", "cor": "verde"},
+                    {"valor": "devolvido", "rotulo": "Devolvido para ajustes", "cor": "amarelo"}
+                  ]
+                },
+                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita", "config": {"naoFutura": true}},
+                {
+                  "chave": "instancia",
+                  "rotulo": "Quem decidiu",
+                  "tipo": "lista",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "ajuda": "Em geral, quem aprova o inventário de necessidades é o comitê interno de TIC (SGTIC). Mude quando outra instância decidiu.",
+                  "antes": {"ajuda": ["Em geral, o SGTIC. Mude quando outra instância decidiu."]},
+                  "opcoes": [
+                    {"valor": "sgtic", "rotulo": "SGTIC (comitê interno de TIC)"},
+                    {"valor": "autoridade_maxima", "rotulo": "Autoridade máxima do órgão"},
+                    {"valor": "outra", "rotulo": "Outra instância"}
+                  ]
+                },
+                {
+                  "chave": "ato_tipo",
+                  "rotulo": "Tipo do ato",
+                  "tipo": "lista",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "ata", "rotulo": "Ata de reunião"},
+                    {"valor": "resolucao", "rotulo": "Resolução"},
+                    {"valor": "portaria", "rotulo": "Portaria"},
+                    {"valor": "despacho", "rotulo": "Despacho"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {
+                  "chave": "ato_numero",
+                  "rotulo": "Número do ato",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "estreita"
+                },
+                {
+                  "chave": "sei",
+                  "rotulo": "Processo SEI",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "config": {"max": 30, "formato": "sei"}
+                },
+                {
+                  "chave": "documento",
+                  "rotulo": "Documento",
+                  "tipo": "arquivo",
+                  "niveis": "opcional",
+                  "noDocumento": false,
+                  "naPlanilha": false,
+                  "config": {"tipos": ["pdf"], "maxMb": 25}
+                },
+                {
+                  "chave": "observacao",
+                  "rotulo": "Observação",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional",
+                  "largura": "larga",
+                  "ajuda": "Se voltou, diga o que precisa ser ajustado."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "chave": "planejamento",
+      "titulo": "Planeje",
+      "referenciaGuia": "atividades 3.1 a 3.10",
+      "descricao": "Prioridades, metas, ações, contratações, pessoas, orçamento e riscos. Depois, a aprovação, a deliberação do CGTIC e a publicação.",
+      "passos": [
+        {
+          "chave": "planejamento.criterios-priorizacao",
+          "titulo": "Confirme os critérios de priorização",
+          "tipo": "dados",
+          "referenciaGuia": "3.1",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+          "oQueFazer": "Confirme os critérios que ordenam as necessidades. O padrão é a matriz GUT (gravidade, urgência e tendência), com notas de 1 a 5.",
+          "secoes": [
+            {
+              "chave": "criterios_priorizacao",
+              "titulo": "Critérios de priorização",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "Os critérios e os pesos vêm do modelo da SGDI. O comitê confirma ou acrescenta critérios do órgão.",
+              "campos": [
+                {"chave": "confirmados", "rotulo": "O comitê confirmou os critérios?", "tipo": "sim_nao", "principal": true},
+                {
+                  "chave": "outros_criterios",
+                  "rotulo": "Outros critérios do órgão",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional",
+                  "ajuda": "Por exemplo: prazos legais, restrições de orçamento ou alinhamento à EGD/DF."
+                },
+                {"chave": "data_confirmacao", "rotulo": "Data da confirmação", "tipo": "data", "niveis": "opcional"}
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "planejamento.priorizacao",
+          "titulo": "Priorize as necessidades",
+          "tipo": "dados",
+          "referenciaGuia": "3.2",
+          "aceitaNaoSeAplica": true,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Dê as notas de cada critério às necessidades e confira a prioridade calculada. As que não forem priorizadas vão para o anexo do documento.",
+          "secoes": [
+            {
+              "chave": "priorizacao",
+              "titulo": "Resumo da priorização",
+              "tipo": "formulario",
+              "niveis": "opcional",
+              "ajuda": "As notas e a prioridade de cada necessidade ficam na tabela de necessidades de TIC. Aqui, registre como a priorização foi feita e o limite da capacidade de execução.",
+              "campos": [
+                {
+                  "chave": "resumo",
+                  "rotulo": "Como as necessidades foram priorizadas",
+                  "tipo": "texto_longo",
+                  "principal": true,
+                  "niveis": "opcional"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "planejamento.metas-acoes",
+          "titulo": "Defina metas, indicadores e ações",
+          "tipo": "dados",
+          "referenciaGuia": "3.3",
+          "baseLegal": "art. 12, § 2º, VII",
+          "inciso": "VII",
+          "travado": true,
+          "aceitaNaoSeAplica": false,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Para as necessidades priorizadas, defina as metas, com indicador, valor e prazo, e as ações que levam a cada meta, com responsável, prazo e custo.",
+          "secoes": [
+            {
+              "chave": "metas",
+              "titulo": "Metas",
+              "tipo": "tabela",
+              "prefixo": "M",
+              "travada": true,
+              "inciso": "VII",
+              "niveis": "obrigatorio",
+              "ajuda": "Cada meta tem indicador, valor e prazo. Indicadores e metas de desempenho são um dos nove conteúdos mínimos do PDTIC (art. 12, § 2º, VII). O modelo está no Anexo VII do guia.",
+              "campos": [
+                {"chave": "descricao", "rotulo": "Meta", "tipo": "texto_longo", "principal": true, "largura": "larga"},
+                {
+                  "chave": "necessidades",
+                  "rotulo": "Necessidades atendidas",
+                  "tipo": "ligacao_secao",
+                  "largura": "media",
+                  "config": {"secao": "necessidades", "multipla": true}
+                },
+                {"chave": "indicador", "rotulo": "Indicador", "tipo": "texto_curto", "largura": "media"},
+                {
+                  "chave": "formula",
+                  "rotulo": "Fórmula de cálculo",
+                  "tipo": "texto_longo",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "obrigatorio"},
+                  "largura": "larga"
+                },
+                {
+                  "chave": "unidade",
+                  "rotulo": "Unidade de medida",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "estreita"
+                },
+                {
+                  "chave": "linha_base",
+                  "rotulo": "Linha de base",
+                  "tipo": "numero",
+                  "niveis": "opcional",
+                  "largura": "estreita",
+                  "ajuda": "O valor do indicador hoje. O guia não pede, mas ajuda a medir o avanço."
+                },
+                {
+                  "chave": "sentido",
+                  "rotulo": "Sentido desejado",
+                  "tipo": "lista",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "aumentar", "rotulo": "Quanto maior, melhor"},
+                    {"valor": "diminuir", "rotulo": "Quanto menor, melhor"},
+                    {"valor": "manter", "rotulo": "Manter"}
+                  ]
+                },
+                {
+                  "chave": "valor",
+                  "rotulo": "Valor da meta",
+                  "tipo": "texto_curto",
+                  "largura": "estreita",
+                  "ajuda": "Por exemplo: 100%, 20 sistemas ou Sim."
+                },
+                {"chave": "prazo", "rotulo": "Prazo", "tipo": "data", "largura": "estreita"},
+                {
+                  "chave": "objetivo_petic",
+                  "rotulo": "Objetivo do PETIC-DF",
+                  "tipo": "ligacao_catalogo",
+                  "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "media",
+                  "config": {"catalogo": "petic_objetivo", "multipla": false}
+                },
+                {
+                  "chave": "situacao",
+                  "rotulo": "Situação",
+                  "tipo": "lista",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "em_andamento", "rotulo": "Em andamento", "cor": "azul"},
+                    {"valor": "alcancada", "rotulo": "Alcançada", "cor": "verde"},
+                    {"valor": "nao_alcancada", "rotulo": "Não alcançada", "cor": "vermelho"},
+                    {"valor": "cancelada", "rotulo": "Cancelada", "cor": "cinza"}
+                  ]
+                }
+              ]
+            },
+            {
+              "chave": "acoes",
+              "titulo": "Ações",
+              "tipo": "tabela",
+              "prefixo": "A",
+              "travada": true,
+              "inciso": "V,VI,IX",
+              "niveis": "obrigatorio",
+              "ajuda": "As ações que levam às metas, cada uma com o tema. Os temas de segurança da informação, de transformação digital e de governança de dados cobrem os incisos V, VI e IX do art. 12, § 2º. Na forma do nível Básico, o mínimo do decreto, bastam a descrição, o tema, o responsável, o prazo e a situação.",
+              "campos": [
+                {"chave": "descricao", "rotulo": "Ação", "tipo": "texto_longo", "principal": true, "largura": "larga"},
+                {
+                  "chave": "metas",
+                  "rotulo": "Metas ligadas",
+                  "tipo": "ligacao_secao",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "media",
+                  "config": {"secao": "metas", "multipla": true}
+                },
+                {
+                  "chave": "tema",
+                  "rotulo": "Tema",
+                  "tipo": "lista_multipla",
+                  "travado": true,
+                  "largura": "media",
+                  "ajuda": "Os três temas do decreto (incisos V, VI e IX) não podem ser tirados da lista.",
+                  "opcoes": [
+                    {
+                      "valor": "seguranca",
+                      "rotulo": "Segurança da informação e continuidade de serviços (inciso V)",
+                      "travada": true
+                    },
+                    {
+                      "valor": "transformacao_digital",
+                      "rotulo": "Transformação digital e interoperabilidade (inciso VI)",
+                      "travada": true
+                    },
+                    {"valor": "governanca_dados", "rotulo": "Governança de dados (inciso IX)", "travada": true},
+                    {"valor": "infraestrutura", "rotulo": "Infraestrutura"},
+                    {"valor": "sistemas", "rotulo": "Sistemas"},
+                    {"valor": "pessoas", "rotulo": "Pessoas"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {"chave": "responsavel", "rotulo": "Responsável", "tipo": "texto_curto", "largura": "media"},
+                {
+                  "chave": "unidade_demandante",
+                  "rotulo": "Unidade demandante",
+                  "tipo": "texto_curto",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "media"
+                },
+                {
+                  "chave": "unidade_executora",
+                  "rotulo": "Unidade executora",
+                  "tipo": "texto_curto",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "media"
+                },
+                {
+                  "chave": "inicio",
+                  "rotulo": "Início",
+                  "tipo": "data",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "estreita"
+                },
+                {"chave": "conclusao", "rotulo": "Prazo de conclusão", "tipo": "data", "largura": "estreita"},
+                {
+                  "chave": "prazo_legal",
+                  "rotulo": "O prazo é exigência legal?",
+                  "tipo": "sim_nao",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "estreita",
+                  "ajuda": "Marque quando a data é uma restrição, em geral legal, com pouca margem para mudar."
+                },
+                {
+                  "chave": "pessoas_quantidade",
+                  "rotulo": "Pessoas necessárias",
+                  "tipo": "numero",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "obrigatorio"},
+                  "largura": "estreita",
+                  "config": {"min": 0, "casas": 0}
+                },
+                {
+                  "chave": "pessoas_competencias",
+                  "rotulo": "Competências necessárias",
+                  "tipo": "texto_longo",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "obrigatorio"},
+                  "largura": "larga"
+                },
+                {
+                  "chave": "investimento",
+                  "rotulo": "Investimento",
+                  "tipo": "moeda",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "media"
+                },
+                {
+                  "chave": "custeio",
+                  "rotulo": "Custeio",
+                  "tipo": "moeda",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "media"
+                },
+                {
+                  "chave": "situacao",
+                  "rotulo": "Situação",
+                  "tipo": "lista",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "nao_iniciada", "rotulo": "Não iniciada", "cor": "cinza"},
+                    {"valor": "em_andamento", "rotulo": "Em andamento", "cor": "azul"},
+                    {"valor": "concluida", "rotulo": "Concluída", "cor": "verde"},
+                    {"valor": "cancelada", "rotulo": "Cancelada", "cor": "vermelho"}
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "planejamento.acoes-tematicas",
+          "titulo": "Confira as ações de segurança, transformação digital e dados",
+          "tipo": "conferencia_temas",
+          "baseLegal": "art. 12, § 2º, V, VI e IX",
+          "inciso": "V,VI,IX",
+          "travado": true,
+          "aceitaNaoSeAplica": false,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Confira as ações marcadas com os temas que o decreto exige: segurança da informação e continuidade, transformação digital e interoperabilidade, e governança de dados. Para tema sem ação, explique por quê.",
+          "secoes": [
+            {
+              "chave": "temas_sem_acao",
+              "titulo": "Temas sem ação",
+              "tipo": "formulario",
+              "niveis": "opcional",
+              "ajuda": "Preencha só para o tema que ficou sem nenhuma ação no plano.",
+              "campos": [
+                {
+                  "chave": "justificativa_seguranca",
+                  "rotulo": "Por que não há ação de segurança da informação e continuidade (inciso V)?",
+                  "tipo": "texto_longo",
+                  "principal": true,
+                  "niveis": "opcional"
+                },
+                {
+                  "chave": "justificativa_transformacao",
+                  "rotulo": "Por que não há ação de transformação digital e interoperabilidade (inciso VI)?",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional"
+                },
+                {
+                  "chave": "justificativa_dados",
+                  "rotulo": "Por que não há ação de governança de dados (inciso IX)?",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "planejamento.contratacoes",
+          "titulo": "Planeje as contratações de TIC, ligadas ao Plano de Contratações Anual",
+          "tipo": "dados",
+          "referenciaGuia": "2.10 e 3.5",
+          "baseLegal": "art. 12, § 1º, e § 2º, IV",
+          "inciso": "IV",
+          "travado": true,
+          "aceitaNaoSeAplica": false,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Liste as contratações de TIC previstas, com o objeto, o valor estimado e a previsão, e diga se cada uma está no Plano de Contratações Anual.",
+          "secoes": [
+            {
+              "chave": "contratacoes",
+              "titulo": "Contratações planejadas",
+              "tipo": "tabela",
+              "prefixo": "C",
+              "travada": true,
+              "inciso": "IV",
+              "niveis": "obrigatorio",
+              "ajuda": "O planejamento das contratações de TIC é um dos nove conteúdos mínimos do PDTIC (art. 12, § 2º, IV) e se liga ao Plano de Contratações Anual (art. 12, § 1º).",
+              "campos": [
+                {"chave": "objeto", "rotulo": "Objeto", "tipo": "texto_longo", "principal": true, "largura": "larga"},
+                {
+                  "chave": "tipo",
+                  "rotulo": "Tipo",
+                  "tipo": "lista",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "bem", "rotulo": "Bem"},
+                    {"valor": "servico", "rotulo": "Serviço"},
+                    {"valor": "solucao", "rotulo": "Solução de TIC"},
+                    {"valor": "renovacao", "rotulo": "Renovação"},
+                    {"valor": "prorrogacao", "rotulo": "Prorrogação"}
+                  ]
+                },
+                {
+                  "chave": "necessidades",
+                  "rotulo": "Necessidades atendidas",
+                  "tipo": "ligacao_secao",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "config": {"secao": "necessidades", "multipla": true}
+                },
+                {
+                  "chave": "acoes",
+                  "rotulo": "Ações ligadas",
+                  "tipo": "ligacao_secao",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "config": {"secao": "acoes", "multipla": true}
+                },
+                {"chave": "valor_estimado", "rotulo": "Valor estimado", "tipo": "moeda", "largura": "media"},
+                {
+                  "chave": "ano_previsto",
+                  "rotulo": "Ano previsto",
+                  "tipo": "numero",
+                  "largura": "estreita",
+                  "config": {"min": 2020, "max": 2100, "casas": 0}
+                },
+                {
+                  "chave": "trimestre_previsto",
+                  "rotulo": "Trimestre previsto",
+                  "tipo": "lista",
+                  "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "estreita",
+                  "opcoes": [
+                    {"valor": "t1", "rotulo": "1º trimestre"},
+                    {"valor": "t2", "rotulo": "2º trimestre"},
+                    {"valor": "t3", "rotulo": "3º trimestre"},
+                    {"valor": "t4", "rotulo": "4º trimestre"}
+                  ]
+                },
+                {
+                  "chave": "no_pca",
+                  "rotulo": "Está no Plano de Contratações Anual?",
+                  "tipo": "sim_nao",
+                  "largura": "estreita"
+                },
+                {
+                  "chave": "item_pca",
+                  "rotulo": "Item do Plano de Contratações Anual",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "media"
+                },
+                {
+                  "chave": "situacao",
+                  "rotulo": "Situação",
+                  "tipo": "lista",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "prevista", "rotulo": "Prevista"},
+                    {"valor": "em_planejamento", "rotulo": "Em planejamento"},
+                    {"valor": "em_licitacao", "rotulo": "Em licitação"},
+                    {"valor": "contratada", "rotulo": "Contratada", "cor": "verde"},
+                    {"valor": "cancelada", "rotulo": "Cancelada", "cor": "cinza"}
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "planejamento.pessoas",
+          "titulo": "Planeje as pessoas",
+          "tipo": "dados",
+          "referenciaGuia": "3.4",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+          "oQueFazer": "Planeje o quadro mínimo e o ideal de pessoas de TIC, as capacitações e os serviços a contratar.",
+          "secoes": [
+            {
+              "chave": "plano_pessoas",
+              "titulo": "Plano de gestão de pessoas",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "Quantas pessoas, com que perfis, a TIC precisa para cumprir as metas, e o risco de não tê-las.",
+              "campos": [
+                {"chave": "quadro_minimo", "rotulo": "Quadro mínimo necessário", "tipo": "texto_longo", "principal": true},
+                {"chave": "quadro_ideal", "rotulo": "Quadro ideal", "tipo": "texto_longo"},
+                {"chave": "servicos_contratar", "rotulo": "Serviços a contratar", "tipo": "texto_longo", "niveis": "opcional"}
+              ]
+            },
+            {
+              "chave": "capacitacoes",
+              "titulo": "Capacitações planejadas",
+              "tipo": "tabela",
+              "niveis": "opcional",
+              "campos": [
+                {
+                  "chave": "tema",
+                  "rotulo": "Tema",
+                  "tipo": "texto_curto",
+                  "principal": true,
+                  "niveis": "obrigatorio",
+                  "largura": "larga"
+                },
+                {"chave": "publico", "rotulo": "Público", "tipo": "texto_curto", "niveis": "obrigatorio", "largura": "media"},
+                {
+                  "chave": "quantidade",
+                  "rotulo": "Pessoas",
+                  "tipo": "numero",
+                  "niveis": "opcional",
+                  "largura": "estreita",
+                  "config": {"min": 0, "casas": 0}
+                },
+                {"chave": "previsao", "rotulo": "Previsão", "tipo": "data", "niveis": "opcional", "largura": "estreita"}
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "planejamento.orcamento",
+          "titulo": "Planeje o orçamento",
+          "tipo": "dados",
+          "referenciaGuia": "3.5",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+          "oQueFazer": "Planeje o investimento e o custeio de cada ação, ano a ano, e compare com o valor de TIC na lei orçamentária do órgão.",
+          "secoes": [
+            {
+              "chave": "orcamento_acoes",
+              "titulo": "Orçamento por ação e por ano",
+              "tipo": "tabela",
+              "niveis": "obrigatorio",
+              "ajuda": "Um registro por ação e por ano da vigência. O modelo está no Anexo VIII do guia.",
+              "campos": [
+                {
+                  "chave": "acao",
+                  "rotulo": "Ação",
+                  "tipo": "ligacao_secao",
+                  "principal": true,
+                  "largura": "larga",
+                  "config": {"secao": "acoes", "multipla": false}
+                },
+                {
+                  "chave": "ano",
+                  "rotulo": "Ano",
+                  "tipo": "numero",
+                  "largura": "estreita",
+                  "config": {"min": 2020, "max": 2100, "casas": 0}
+                },
+                {"chave": "investimento", "rotulo": "Investimento", "tipo": "moeda", "largura": "media"},
+                {"chave": "custeio", "rotulo": "Custeio", "tipo": "moeda", "largura": "media"}
+              ]
+            },
+            {
+              "chave": "orcamento_loa",
+              "titulo": "Comparação com a lei orçamentária",
+              "tipo": "formulario",
+              "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "obrigatorio"},
+              "ajuda": "O PDTIC não é a proposta orçamentária, mas deve embasá-la. Compare o total com o valor de TIC na lei orçamentária anual (LOA) do órgão.",
+              "campos": [
+                {
+                  "chave": "valor_loa",
+                  "rotulo": "Valor de TIC na LOA do órgão",
+                  "tipo": "moeda",
+                  "principal": true,
+                  "niveis": "obrigatorio"
+                },
+                {"chave": "observacao", "rotulo": "Observação", "tipo": "texto_longo", "niveis": "opcional"}
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "planejamento.fatores-criticos",
+          "titulo": "Liste os fatores críticos de sucesso",
+          "tipo": "dados",
+          "referenciaGuia": "3.6",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "desligado", "avancado": "obrigatorio"},
+          "oQueFazer": "Liste o que precisa dar certo para o PDTIC ser cumprido.",
+          "secoes": [
+            {
+              "chave": "fatores_criticos",
+              "titulo": "Fatores críticos de sucesso",
+              "tipo": "tabela",
+              "prefixo": "FCS",
+              "niveis": "obrigatorio",
+              "ajuda": "Por exemplo: apoio da alta administração, orçamento disponível e equipe adequada.",
+              "campos": [
+                {
+                  "chave": "descricao",
+                  "rotulo": "Fator crítico de sucesso",
+                  "tipo": "texto_longo",
+                  "principal": true,
+                  "largura": "larga"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "planejamento.riscos",
+          "titulo": "Planeje os riscos",
+          "tipo": "dados",
+          "referenciaGuia": "3.7",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+          "oQueFazer": "Liste os riscos com a probabilidade, o impacto, o nível e a resposta a cada um: mitigar, aceitar, transferir ou evitar.",
+          "secoes": [
+            {
+              "chave": "riscos",
+              "titulo": "Riscos",
+              "tipo": "tabela",
+              "prefixo": "R",
+              "niveis": "obrigatorio",
+              "ajuda": "Os riscos das metas e das ações, com a análise e a resposta planejada. As ameaças da SWOT entram aqui. O modelo está no Anexo IX do guia. Na forma do nível Básico, o mínimo do decreto, bastam a descrição, o nível, a ação e o responsável.",
+              "campos": [
+                {"chave": "descricao", "rotulo": "Risco", "tipo": "texto_longo", "principal": true, "largura": "larga"},
+                {
+                  "chave": "metas",
+                  "rotulo": "Metas afetadas",
+                  "tipo": "ligacao_secao",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "media",
+                  "config": {"secao": "metas", "multipla": true}
+                },
+                {
+                  "chave": "acoes",
+                  "rotulo": "Ações afetadas",
+                  "tipo": "ligacao_secao",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "media",
+                  "config": {"secao": "acoes", "multipla": true}
+                },
+                {
+                  "chave": "ameaca",
+                  "rotulo": "Ameaça da SWOT",
+                  "tipo": "ligacao_secao",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "media",
+                  "config": {"secao": "swot_ameacas", "multipla": true}
+                },
+                {
+                  "chave": "categoria",
+                  "rotulo": "Categoria",
+                  "tipo": "lista",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "estrategico", "rotulo": "Estratégico"},
+                    {"valor": "orcamentario", "rotulo": "Orçamentário"},
+                    {"valor": "pessoas", "rotulo": "Pessoas"},
+                    {"valor": "tecnologico", "rotulo": "Tecnológico"},
+                    {"valor": "contratual", "rotulo": "Contratual"},
+                    {"valor": "legal", "rotulo": "Legal"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {
+                  "chave": "probabilidade",
+                  "rotulo": "Probabilidade",
+                  "tipo": "lista",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "estreita",
+                  "opcoes": [
+                    {"valor": "baixa", "rotulo": "Baixa"},
+                    {"valor": "media", "rotulo": "Média"},
+                    {"valor": "alta", "rotulo": "Alta"}
+                  ]
+                },
+                {
+                  "chave": "impacto",
+                  "rotulo": "Impacto",
+                  "tipo": "lista",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "estreita",
+                  "opcoes": [
+                    {"valor": "baixo", "rotulo": "Baixo"},
+                    {"valor": "medio", "rotulo": "Médio"},
+                    {"valor": "alto", "rotulo": "Alto"}
+                  ]
+                },
+                {
+                  "chave": "nivel",
+                  "rotulo": "Nível do risco",
+                  "tipo": "calculado",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "estreita",
+                  "config": {
+                    "calculo": "nivel_risco",
+                    "campos": ["probabilidade", "impacto"],
+                    "matriz": {
+                      "baixa": {"baixo": "baixo", "medio": "baixo", "alto": "medio"},
+                      "media": {"baixo": "baixo", "medio": "medio", "alto": "alto"},
+                      "alta": {"baixo": "medio", "medio": "alto", "alto": "alto"}
+                    }
+                  },
+                  "ajuda": "Sai da matriz probabilidade x impacto.",
+                  "opcoes": [
+                    {"valor": "baixo", "rotulo": "Baixo", "cor": "verde"},
+                    {"valor": "medio", "rotulo": "Médio", "cor": "amarelo"},
+                    {"valor": "alto", "rotulo": "Alto", "cor": "vermelho"}
+                  ]
+                },
+                {
+                  "chave": "nivel_simples",
+                  "rotulo": "Nível do risco",
+                  "tipo": "lista",
+                  "niveis": {"basico": "obrigatorio", "intermediario": "desligado", "avancado": "desligado"},
+                  "largura": "estreita",
+                  "ajuda": "Na forma do nível Básico, diga só se o risco é baixo, médio ou alto.",
+                  "opcoes": [
+                    {"valor": "baixo", "rotulo": "Baixo", "cor": "verde"},
+                    {"valor": "medio", "rotulo": "Médio", "cor": "amarelo"},
+                    {"valor": "alto", "rotulo": "Alto", "cor": "vermelho"}
+                  ]
+                },
+                {
+                  "chave": "estrategia",
+                  "rotulo": "Estratégia",
+                  "tipo": "lista",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "mitigar", "rotulo": "Mitigar"},
+                    {"valor": "aceitar", "rotulo": "Aceitar"},
+                    {"valor": "transferir", "rotulo": "Transferir"},
+                    {"valor": "evitar", "rotulo": "Evitar"}
+                  ]
+                },
+                {
+                  "chave": "acao_preventiva",
+                  "rotulo": "Ação para evitar ou reduzir o risco",
+                  "tipo": "texto_longo",
+                  "largura": "larga"
+                },
+                {
+                  "chave": "gatilho",
+                  "rotulo": "Gatilho",
+                  "tipo": "texto_longo",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "obrigatorio"},
+                  "largura": "larga",
+                  "ajuda": "O sinal de que o risco está virando problema."
+                },
+                {
+                  "chave": "resposta",
+                  "rotulo": "Resposta se o risco acontecer",
+                  "tipo": "texto_longo",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "larga"
+                },
+                {
+                  "chave": "contingencia",
+                  "rotulo": "Contingência",
+                  "tipo": "texto_longo",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "larga"
+                },
+                {"chave": "responsavel", "rotulo": "Responsável", "tipo": "texto_curto", "largura": "media"},
+                {
+                  "chave": "proxima_revisao",
+                  "rotulo": "Próxima revisão",
+                  "tipo": "data",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "obrigatorio"},
+                  "largura": "estreita"
+                },
+                {
+                  "chave": "situacao",
+                  "rotulo": "Situação",
+                  "tipo": "lista",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "estreita",
+                  "opcoes": [
+                    {"valor": "aberto", "rotulo": "Aberto", "cor": "amarelo"},
+                    {"valor": "fechado", "rotulo": "Fechado", "cor": "verde"},
+                    {"valor": "excluido", "rotulo": "Excluído", "cor": "cinza"}
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "planejamento.documento",
+          "titulo": "Monte o documento e confira a prévia",
+          "tipo": "documento",
+          "referenciaGuia": "3.8",
+          "aceitaNaoSeAplica": false,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Monte o documento do PDTIC a partir do que foi preenchido. Ajuste os textos na prévia e confira tudo antes de enviar.",
+          "secoes": []
+        },
+        {
+          "chave": "planejamento.aprovacao-sgtic",
+          "titulo": "Registre a aprovação do SGTIC e envie à SGDI",
+          "tipo": "envio",
+          "referenciaGuia": "3.9",
+          "baseLegal": "art. 7º, V, do Decreto nº 48.899/2026",
+          "aceitaNaoSeAplica": false,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Registre a aprovação do PDTIC pelo SGTIC e comunique o plano aprovado à SGDI. O órgão que não comunica fica inadimplente no painel da SGDI.",
+          "secoes": [
+            {
+              "chave": "aprovacao_sgtic",
+              "titulo": "Aprovação do SGTIC",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "O comitê interno aprova o PDTIC. Depois, o órgão comunica o plano aprovado à SGDI (art. 7º, V, do Decreto nº 48.899/2026).",
+              "campos": [
+                {
+                  "chave": "decisao",
+                  "rotulo": "Decisão",
+                  "tipo": "lista",
+                  "principal": true,
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "aprovado", "rotulo": "Aprovado", "cor": "verde"},
+                    {"valor": "devolvido", "rotulo": "Devolvido para ajustes", "cor": "amarelo"}
+                  ]
+                },
+                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita", "config": {"naoFutura": true}},
+                {
+                  "chave": "instancia",
+                  "rotulo": "Quem decidiu",
+                  "tipo": "lista",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "ajuda": "Em geral, o SGTIC. Mude quando outra instância decidiu.",
+                  "opcoes": [
+                    {"valor": "sgtic", "rotulo": "SGTIC (comitê interno de TIC)"},
+                    {"valor": "autoridade_maxima", "rotulo": "Autoridade máxima do órgão"},
+                    {"valor": "outra", "rotulo": "Outra instância"}
+                  ]
+                },
+                {
+                  "chave": "ato_tipo",
+                  "rotulo": "Tipo do ato",
+                  "tipo": "lista",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "ata", "rotulo": "Ata de reunião"},
+                    {"valor": "resolucao", "rotulo": "Resolução"},
+                    {"valor": "portaria", "rotulo": "Portaria"},
+                    {"valor": "despacho", "rotulo": "Despacho"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {
+                  "chave": "ato_numero",
+                  "rotulo": "Número do ato",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "estreita"
+                },
+                {
+                  "chave": "sei",
+                  "rotulo": "Processo SEI",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "config": {"max": 30, "formato": "sei"}
+                },
+                {
+                  "chave": "documento",
+                  "rotulo": "Documento",
+                  "tipo": "arquivo",
+                  "niveis": "opcional",
+                  "noDocumento": false,
+                  "naPlanilha": false,
+                  "config": {"tipos": ["pdf"], "maxMb": 25}
+                },
+                {
+                  "chave": "observacao",
+                  "rotulo": "Observação",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional",
+                  "largura": "larga",
+                  "ajuda": "Se voltou, diga o que precisa ser ajustado."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "planejamento.deliberacao-cgtic",
+          "titulo": "Acompanhe a deliberação do CGTIC",
+          "tipo": "deliberacao",
+          "baseLegal": "art. 5º",
+          "aceitaNaoSeAplica": false,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Acompanhe a decisão do CGTIC, que aprova o PDTIC ou o devolve com ajustes. Se ele voltar, ajuste e envie de novo.",
+          "secoes": []
+        },
+        {
+          "chave": "planejamento.publicacao",
+          "titulo": "Registre a publicação",
+          "tipo": "publicacao",
+          "referenciaGuia": "3.10",
+          "aceitaNaoSeAplica": false,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Registre a publicação do PDTIC aprovado, com a data e o endereço onde ele está publicado.",
+          "secoes": [
+            {
+              "chave": "publicacao",
+              "titulo": "Publicação",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "A íntegra do PDTIC vai para o sítio do órgão, e o resumo, para o Diário Oficial do Distrito Federal (DODF).",
+              "campos": [
+                {"chave": "data", "rotulo": "Data da publicação", "tipo": "data", "principal": true, "config": {"naoFutura": true}},
+                {
+                  "chave": "endereco",
+                  "rotulo": "Endereço da íntegra na internet",
+                  "tipo": "texto_curto",
+                  "config": {"max": 500, "formato": "url"}
+                },
+                {
+                  "chave": "dodf",
+                  "rotulo": "Publicação no DODF",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "ajuda": "Edição, data e página do resumo."
+                },
+                {"chave": "observacao", "rotulo": "Observação", "tipo": "texto_longo", "niveis": "opcional"}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "chave": "plano-acompanhamento",
+      "titulo": "Planeje o acompanhamento",
+      "referenciaGuia": "atividades 4.1 a 4.6",
+      "descricao": "Quem acompanha e como a execução será monitorada e avaliada.",
+      "passos": [
+        {
+          "chave": "plano-acompanhamento.quem-acompanha",
+          "titulo": "Diga quem acompanha: a mesma equipe ou outra, com o ato",
+          "tipo": "dados",
+          "referenciaGuia": "4.1",
+          "aceitaNaoSeAplica": true,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Diga quem acompanha a execução do PDTIC, a mesma equipe da elaboração ou outra, e informe o ato de designação.",
+          "secoes": [
+            {
+              "chave": "responsavel_acompanhamento",
+              "titulo": "Quem acompanha",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "O acompanhamento pode ficar com a mesma equipe da elaboração, com uma equipe própria ou com uma estrutura que já existe. O modelo de portaria está no Anexo XI do guia.",
+              "campos": [
+                {
+                  "chave": "modalidade",
+                  "rotulo": "Quem acompanha",
+                  "tipo": "lista",
+                  "principal": true,
+                  "opcoes": [
+                    {"valor": "mesma_equipe", "rotulo": "A mesma equipe da elaboração"},
+                    {"valor": "equipe_propria", "rotulo": "Uma equipe de acompanhamento própria"},
+                    {"valor": "estrutura_existente", "rotulo": "Uma estrutura ou função que já existe"}
+                  ]
+                },
+                {"chave": "descricao", "rotulo": "Quem faz parte", "tipo": "texto_longo", "niveis": "opcional"},
+                {
+                  "chave": "ato_tipo",
+                  "rotulo": "Tipo do ato",
+                  "tipo": "lista",
+                  "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "opcoes": [
+                    {"valor": "portaria", "rotulo": "Portaria"},
+                    {"valor": "resolucao", "rotulo": "Resolução"},
+                    {"valor": "ordem_servico", "rotulo": "Ordem de serviço"},
+                    {"valor": "decreto", "rotulo": "Decreto"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {
+                  "chave": "ato_numero",
+                  "rotulo": "Número do ato",
+                  "tipo": "texto_curto",
+                  "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"}
+                },
+                {
+                  "chave": "ato_data",
+                  "rotulo": "Data do ato",
+                  "tipo": "data",
+                  "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "config": {"naoFutura": true}
+                },
+                {"chave": "sei", "rotulo": "Processo SEI", "tipo": "texto_curto", "niveis": "opcional", "config": {"max": 30, "formato": "sei"}}
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "plano-acompanhamento.plano-execucao",
+          "titulo": "Planeje a execução: projetos de cada ação e quanto cada um contribui",
+          "tipo": "dados",
+          "referenciaGuia": "4.2",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "desligado", "avancado": "obrigatorio"},
+          "oQueFazer": "Defina os projetos de cada ação e quanto cada um contribui para a ação e para a meta.",
+          "secoes": [
+            {
+              "chave": "projetos",
+              "titulo": "Projetos das ações",
+              "tipo": "tabela",
+              "prefixo": "P",
+              "niveis": "obrigatorio",
+              "ajuda": "O andamento da ação sai do andamento dos projetos, e o da meta, do andamento das ações. O modelo está no Anexo XII do guia.",
+              "campos": [
+                {"chave": "nome", "rotulo": "Projeto", "tipo": "texto_curto", "principal": true, "largura": "larga"},
+                {
+                  "chave": "acao",
+                  "rotulo": "Ação",
+                  "tipo": "ligacao_secao",
+                  "largura": "media",
+                  "config": {"secao": "acoes", "multipla": false}
+                },
+                {
+                  "chave": "peso_na_acao",
+                  "rotulo": "Quanto o projeto pesa na ação (%)",
+                  "tipo": "percentual",
+                  "largura": "estreita"
+                },
+                {
+                  "chave": "peso_da_acao_na_meta",
+                  "rotulo": "Quanto a ação pesa na meta (%)",
+                  "tipo": "percentual",
+                  "niveis": "opcional",
+                  "largura": "estreita"
+                },
+                {"chave": "inicio", "rotulo": "Início", "tipo": "data", "largura": "estreita"},
+                {"chave": "conclusao", "rotulo": "Conclusão", "tipo": "data", "largura": "estreita"},
+                {"chave": "orcamento", "rotulo": "Orçamento", "tipo": "moeda", "niveis": "opcional", "largura": "media"}
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "plano-acompanhamento.plano-monitoramento",
+          "titulo": "Planeje o monitoramento: periodicidade, indicadores e valores de referência",
+          "tipo": "dados",
+          "referenciaGuia": "4.3",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+          "oQueFazer": "Defina de quanto em quanto tempo o PDTIC é monitorado, os indicadores medidos e o valor de referência de cada período.",
+          "secoes": [
+            {
+              "chave": "periodicidade_monitoramento",
+              "titulo": "Periodicidade do monitoramento",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "O padrão é trimestral. O órgão pode ajustar.",
+              "campos": [
+                {
+                  "chave": "periodicidade",
+                  "rotulo": "Periodicidade",
+                  "tipo": "lista",
+                  "principal": true,
+                  "opcoes": [
+                    {"valor": "mensal", "rotulo": "Mensal"},
+                    {"valor": "bimestral", "rotulo": "Bimestral"},
+                    {"valor": "trimestral", "rotulo": "Trimestral"},
+                    {"valor": "semestral", "rotulo": "Semestral"}
+                  ]
+                }
+              ]
+            },
+            {
+              "chave": "indicadores_monitoramento",
+              "titulo": "Indicadores de monitoramento",
+              "tipo": "tabela",
+              "prefixo": "IM",
+              "niveis": "obrigatorio",
+              "ajuda": "Indicadores do andamento, com o valor de referência de cada período. Desvio pede ação corretiva.",
+              "campos": [
+                {"chave": "indicador", "rotulo": "Indicador", "tipo": "texto_curto", "principal": true, "largura": "larga"},
+                {"chave": "objeto", "rotulo": "O que é monitorado", "tipo": "texto_curto", "largura": "media"},
+                {"chave": "formula", "rotulo": "Fórmula de cálculo", "tipo": "texto_longo", "largura": "larga"},
+                {
+                  "chave": "fonte",
+                  "rotulo": "Fonte dos dados",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "media"
+                },
+                {"chave": "responsavel", "rotulo": "Responsável pela medição", "tipo": "texto_curto", "largura": "media"},
+                {
+                  "chave": "valores_referencia",
+                  "rotulo": "Valor de referência de cada período",
+                  "tipo": "texto_longo",
+                  "largura": "larga"
+                },
+                {
+                  "chave": "acao_corretiva",
+                  "rotulo": "Ação corretiva se houver desvio",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional",
+                  "largura": "larga"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "plano-acompanhamento.plano-avaliacao",
+          "titulo": "Planeje a avaliação: indicadores de resultado e metas intermediárias",
+          "tipo": "dados",
+          "referenciaGuia": "4.4",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "desligado", "avancado": "obrigatorio"},
+          "oQueFazer": "Defina os indicadores de resultado e as metas intermediárias da avaliação no meio da vigência.",
+          "secoes": [
+            {
+              "chave": "indicadores_avaliacao",
+              "titulo": "Indicadores de avaliação",
+              "tipo": "tabela",
+              "prefixo": "IR",
+              "niveis": "obrigatorio",
+              "ajuda": "Indicadores de resultado, com a meta de cada período. Podem ser os mesmos das metas do PDTIC, com metas intermediárias.",
+              "campos": [
+                {"chave": "indicador", "rotulo": "Indicador", "tipo": "texto_curto", "principal": true, "largura": "larga"},
+                {"chave": "objeto", "rotulo": "O que é avaliado", "tipo": "texto_curto", "largura": "media"},
+                {
+                  "chave": "formula",
+                  "rotulo": "Fórmula de cálculo",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional",
+                  "largura": "larga"
+                },
+                {"chave": "responsavel", "rotulo": "Responsável", "tipo": "texto_curto", "largura": "media"},
+                {
+                  "chave": "prazo_coleta",
+                  "rotulo": "Prazo de coleta",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "media"
+                },
+                {"chave": "periodicidade", "rotulo": "Periodicidade da avaliação", "tipo": "texto_curto", "largura": "media"},
+                {
+                  "chave": "metas_periodo",
+                  "rotulo": "Meta de cada período",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional",
+                  "largura": "larga"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "plano-acompanhamento.plano-acompanhamento",
+          "titulo": "Feche o plano de acompanhamento: riscos atualizados e comunicação",
+          "tipo": "dados",
+          "referenciaGuia": "4.5",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "desligado", "avancado": "obrigatorio"},
+          "oQueFazer": "Atualize os riscos e planeje a comunicação: o que informar, a quem, por qual canal e com que frequência.",
+          "secoes": [
+            {
+              "chave": "comunicacao",
+              "titulo": "Plano de comunicação",
+              "tipo": "tabela",
+              "niveis": "obrigatorio",
+              "ajuda": "Os relatórios e as reuniões do acompanhamento: quem informa, a quem, por qual canal e com que frequência. Os riscos são revistos na tabela de riscos do planejamento.",
+              "campos": [
+                {"chave": "evento", "rotulo": "Evento", "tipo": "texto_curto", "principal": true, "largura": "larga"},
+                {"chave": "objetivo", "rotulo": "Objetivo", "tipo": "texto_longo", "largura": "larga"},
+                {"chave": "responsavel", "rotulo": "Responsável", "tipo": "texto_curto", "largura": "media"},
+                {"chave": "publico", "rotulo": "Público", "tipo": "texto_curto", "largura": "media"},
+                {
+                  "chave": "canal",
+                  "rotulo": "Canal",
+                  "tipo": "lista_multipla",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "email", "rotulo": "E-mail"},
+                    {"valor": "oficio", "rotulo": "Ofício"},
+                    {"valor": "sistema", "rotulo": "Sistema"},
+                    {"valor": "reuniao", "rotulo": "Reunião"},
+                    {"valor": "sitio", "rotulo": "Sítio do órgão"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {"chave": "periodicidade", "rotulo": "Periodicidade", "tipo": "texto_curto", "largura": "media"}
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "plano-acompanhamento.aprovacao-acompanhamento",
+          "titulo": "Registre a aprovação do plano de acompanhamento",
+          "tipo": "aprovacao",
+          "referenciaGuia": "4.6",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "desligado", "avancado": "obrigatorio"},
+          "oQueFazer": "Registre a aprovação do plano de acompanhamento: quem aprovou, a decisão, a data e o ato.",
+          "secoes": [
+            {
+              "chave": "aprovacao_plano_acompanhamento",
+              "titulo": "Aprovação do plano de acompanhamento",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "O comitê aprova o plano de acompanhamento ou devolve para ajustes.",
+              "campos": [
+                {
+                  "chave": "decisao",
+                  "rotulo": "Decisão",
+                  "tipo": "lista",
+                  "principal": true,
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "aprovado", "rotulo": "Aprovado", "cor": "verde"},
+                    {"valor": "devolvido", "rotulo": "Devolvido para ajustes", "cor": "amarelo"}
+                  ]
+                },
+                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita", "config": {"naoFutura": true}},
+                {
+                  "chave": "instancia",
+                  "rotulo": "Quem decidiu",
+                  "tipo": "lista",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "ajuda": "Em geral, quem aprova o plano de acompanhamento é o comitê interno de TIC (SGTIC). Mude quando outra instância decidiu.",
+                  "antes": {"ajuda": ["Em geral, o SGTIC. Mude quando outra instância decidiu."]},
+                  "opcoes": [
+                    {"valor": "sgtic", "rotulo": "SGTIC (comitê interno de TIC)"},
+                    {"valor": "autoridade_maxima", "rotulo": "Autoridade máxima do órgão"},
+                    {"valor": "outra", "rotulo": "Outra instância"}
+                  ]
+                },
+                {
+                  "chave": "ato_tipo",
+                  "rotulo": "Tipo do ato",
+                  "tipo": "lista",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "ata", "rotulo": "Ata de reunião"},
+                    {"valor": "resolucao", "rotulo": "Resolução"},
+                    {"valor": "portaria", "rotulo": "Portaria"},
+                    {"valor": "despacho", "rotulo": "Despacho"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {
+                  "chave": "ato_numero",
+                  "rotulo": "Número do ato",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "estreita"
+                },
+                {
+                  "chave": "sei",
+                  "rotulo": "Processo SEI",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "config": {"max": 30, "formato": "sei"}
+                },
+                {
+                  "chave": "documento",
+                  "rotulo": "Documento",
+                  "tipo": "arquivo",
+                  "niveis": "opcional",
+                  "noDocumento": false,
+                  "naPlanilha": false,
+                  "config": {"tipos": ["pdf"], "maxMb": 25}
+                },
+                {
+                  "chave": "observacao",
+                  "rotulo": "Observação",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional",
+                  "largura": "larga",
+                  "ajuda": "Se voltou, diga o que precisa ser ajustado."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "chave": "monitoramento",
+      "titulo": "Monitore",
+      "referenciaGuia": "atividades 5.1 e 5.2",
+      "descricao": "A cada ciclo (trimestral por padrão), o andamento das ações e o relatório do período.",
+      "passos": [
+        {
+          "chave": "monitoramento.ciclo-monitoramento",
+          "titulo": "Atualize a situação das ações no ciclo",
+          "tipo": "monitoramento",
+          "referenciaGuia": "5.1",
+          "aceitaNaoSeAplica": false,
+          "niveis": "obrigatorio",
+          "oQueFazer": "A cada ciclo, atualize a situação de cada ação. Na forma do nível Básico, o mínimo do decreto, basta a situação; nas formas dos outros níveis, o passo pede também a execução, o valor dos indicadores e os riscos que ocorreram.",
+          "antes": {
+            "titulo": ["Atualize a situação das ações e registre as medições e os riscos que ocorreram"],
+            "oQueFazer": ["A cada ciclo, atualize a situação e a execução de cada ação, registre o valor dos indicadores e os riscos que ocorreram."]
+          },
+          "secoes": [
+            {
+              "chave": "monitoramento_acoes",
+              "porCiclo": "monitoramento",
+              "titulo": "Situação das ações no ciclo",
+              "tipo": "tabela",
+              "niveis": "obrigatorio",
+              "ajuda": "Registre todas as ações, inclusive as que estão em dia. Na forma do nível Básico, o mínimo do decreto, basta a situação.",
+              "campos": [
+                {
+                  "chave": "acao",
+                  "rotulo": "Ação",
+                  "tipo": "ligacao_secao",
+                  "principal": true,
+                  "largura": "larga",
+                  "config": {"secao": "acoes", "multipla": false}
+                },
+                {
+                  "chave": "situacao",
+                  "rotulo": "Situação",
+                  "tipo": "lista",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "nao_iniciada", "rotulo": "Não iniciada", "cor": "cinza"},
+                    {"valor": "em_andamento", "rotulo": "Em andamento", "cor": "azul"},
+                    {"valor": "concluida", "rotulo": "Concluída", "cor": "verde"},
+                    {"valor": "cancelada", "rotulo": "Cancelada", "cor": "vermelho"}
+                  ]
+                },
+                {
+                  "chave": "execucao_fisica",
+                  "rotulo": "Execução física (%)",
+                  "tipo": "percentual",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "estreita"
+                },
+                {
+                  "chave": "execucao_orcamentaria",
+                  "rotulo": "Execução orçamentária (%)",
+                  "tipo": "percentual",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+                  "largura": "estreita"
+                },
+                {
+                  "chave": "observacao",
+                  "rotulo": "Observação",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional",
+                  "largura": "larga"
+                }
+              ]
+            },
+            {
+              "chave": "medicoes_indicadores",
+              "porCiclo": "monitoramento",
+              "titulo": "Medições dos indicadores",
+              "tipo": "tabela",
+              "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+              "campos": [
+                {
+                  "chave": "indicador",
+                  "rotulo": "Indicador",
+                  "tipo": "ligacao_secao",
+                  "principal": true,
+                  "largura": "larga",
+                  "config": {"secao": "indicadores_monitoramento", "multipla": false}
+                },
+                {"chave": "valor_apurado", "rotulo": "Valor apurado", "tipo": "numero", "largura": "estreita"},
+                {"chave": "data", "rotulo": "Data da medição", "tipo": "data", "largura": "estreita"},
+                {
+                  "chave": "observacao",
+                  "rotulo": "Observação",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional",
+                  "largura": "larga"
+                }
+              ]
+            },
+            {
+              "chave": "riscos_ocorridos",
+              "porCiclo": "monitoramento",
+              "titulo": "Riscos que ocorreram",
+              "tipo": "tabela",
+              "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"},
+              "ajuda": "O que foi feito para evitar o risco, a contingência adotada e quem cuidou. Risco novo ou ajustado vai para a tabela de riscos.",
+              "campos": [
+                {
+                  "chave": "risco",
+                  "rotulo": "Risco",
+                  "tipo": "ligacao_secao",
+                  "principal": true,
+                  "niveis": "obrigatorio",
+                  "largura": "larga",
+                  "config": {"secao": "riscos", "multipla": false}
+                },
+                {"chave": "data", "rotulo": "Data", "tipo": "data", "niveis": "obrigatorio", "largura": "estreita"},
+                {
+                  "chave": "situacao",
+                  "rotulo": "Situação",
+                  "tipo": "lista",
+                  "niveis": "obrigatorio",
+                  "largura": "estreita",
+                  "opcoes": [
+                    {"valor": "aberto", "rotulo": "Aberto", "cor": "amarelo"},
+                    {"valor": "fechado", "rotulo": "Fechado", "cor": "verde"},
+                    {"valor": "excluido", "rotulo": "Excluído", "cor": "cinza"}
+                  ]
+                },
+                {
+                  "chave": "acoes_realizadas",
+                  "rotulo": "Ações realizadas",
+                  "tipo": "texto_longo",
+                  "niveis": "obrigatorio",
+                  "largura": "larga"
+                },
+                {
+                  "chave": "responsavel",
+                  "rotulo": "Responsável",
+                  "tipo": "texto_curto",
+                  "niveis": "obrigatorio",
+                  "largura": "media"
+                },
+                {"chave": "resultado", "rotulo": "Resultado", "tipo": "texto_longo", "niveis": "opcional", "largura": "larga"}
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "monitoramento.relatorio-acompanhamento",
+          "titulo": "Feche o ciclo no relatório de acompanhamento",
+          "tipo": "monitoramento",
+          "referenciaGuia": "5.2",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+          "oQueFazer": "Feche o ciclo no relatório de acompanhamento, com o resumo do período.",
+          "secoes": [
+            {
+              "chave": "relatorio_ciclo",
+              "porCiclo": "monitoramento",
+              "titulo": "Resumo do ciclo",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "O relatório do ciclo mostra as ações em dia, as atrasadas, com a justificativa, e as não iniciadas, com o motivo. O modelo está no Anexo XIV do guia.",
+              "campos": [
+                {"chave": "resumo", "rotulo": "Resumo do período", "tipo": "texto_longo", "principal": true},
+                {
+                  "chave": "acoes_atrasadas",
+                  "rotulo": "Por que há ações atrasadas?",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional"
+                },
+                {
+                  "chave": "acoes_nao_iniciadas",
+                  "rotulo": "Por que há ações não iniciadas?",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "chave": "avaliacao-intermediaria",
+      "titulo": "Avalie no meio do caminho",
+      "referenciaGuia": "atividades 6.1 a 6.3",
+      "descricao": "No meio da vigência, os resultados comparados com as metas e a decisão de seguir ou revisar.",
+      "passos": [
+        {
+          "chave": "avaliacao-intermediaria.resultados-intermediarios",
+          "titulo": "Consolide os resultados intermediários",
+          "tipo": "dados",
+          "referenciaGuia": "6.1",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+          "oQueFazer": "Reúna os resultados alcançados até o meio da vigência.",
+          "secoes": [
+            {
+              "chave": "resultados_intermediarios",
+              "porCiclo": "avaliacao",
+              "titulo": "Resultados intermediários das metas",
+              "tipo": "tabela",
+              "niveis": "obrigatorio",
+              "campos": [
+                {
+                  "chave": "meta",
+                  "rotulo": "Meta",
+                  "tipo": "ligacao_secao",
+                  "principal": true,
+                  "largura": "larga",
+                  "config": {"secao": "metas", "multipla": false}
+                },
+                {"chave": "valor_alcancado", "rotulo": "Valor alcançado", "tipo": "texto_curto", "largura": "estreita"},
+                {"chave": "data", "rotulo": "Data da medição", "tipo": "data", "largura": "estreita"},
+                {
+                  "chave": "situacao",
+                  "rotulo": "Situação da meta",
+                  "tipo": "lista",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "em_andamento", "rotulo": "Em andamento", "cor": "azul"},
+                    {"valor": "alcancada", "rotulo": "Alcançada", "cor": "verde"},
+                    {"valor": "nao_alcancada", "rotulo": "Não alcançada", "cor": "vermelho"},
+                    {"valor": "cancelada", "rotulo": "Cancelada", "cor": "cinza"}
+                  ]
+                },
+                {
+                  "chave": "observacao",
+                  "rotulo": "Observação",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional",
+                  "largura": "larga"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "avaliacao-intermediaria.comparacao-metas",
+          "titulo": "Compare com as metas e proponha ajustes",
+          "tipo": "dados",
+          "referenciaGuia": "6.2",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+          "oQueFazer": "Compare os resultados com as metas e proponha ajustes nas metas, nas ações ou nos prazos.",
+          "secoes": [
+            {
+              "chave": "analise_intermediaria",
+              "porCiclo": "avaliacao",
+              "titulo": "Análise dos resultados",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "Os pareceres que vão ao comitê no relatório de acompanhamento.",
+              "campos": [
+                {
+                  "chave": "parecer_execucao",
+                  "rotulo": "Execução física e orçamentária",
+                  "tipo": "texto_longo",
+                  "principal": true
+                },
+                {
+                  "chave": "metas_nao_atingidas",
+                  "rotulo": "Por que algumas metas não foram atingidas?",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional"
+                },
+                {"chave": "parecer_riscos", "rotulo": "Riscos", "tipo": "texto_longo", "niveis": "opcional"},
+                {
+                  "chave": "parecer_alinhamento",
+                  "rotulo": "Alinhamento estratégico",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional"
+                },
+                {
+                  "chave": "parecer_pessoas",
+                  "rotulo": "Plano de gestão de pessoas",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional"
+                },
+                {
+                  "chave": "ajustes_propostos",
+                  "rotulo": "Ajustes propostos",
+                  "tipo": "texto_longo",
+                  "ajuda": "Mudanças nas metas, nas ações ou nos prazos que o comitê vai decidir."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "avaliacao-intermediaria.avaliacao-comite",
+          "titulo": "Registre a avaliação do comitê: seguir ou revisar o PDTIC",
+          "tipo": "aprovacao",
+          "referenciaGuia": "6.3",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+          "oQueFazer": "Registre a decisão do comitê: seguir com o PDTIC como está ou revisar. A revisão abre uma versão nova e volta à etapa 2.",
+          "secoes": [
+            {
+              "chave": "avaliacao_comite",
+              "porCiclo": "avaliacao",
+              "titulo": "Avaliação do comitê",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "A revisão reaproveita os dados atuais numa versão nova do PDTIC e reabre o diagnóstico.",
+              "campos": [
+                {
+                  "chave": "decisao",
+                  "rotulo": "Decisão",
+                  "tipo": "lista",
+                  "principal": true,
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "seguir", "rotulo": "Seguir com o PDTIC", "cor": "verde"},
+                    {"valor": "revisar", "rotulo": "Revisar o PDTIC", "cor": "amarelo"}
+                  ]
+                },
+                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita", "config": {"naoFutura": true}},
+                {
+                  "chave": "ato_tipo",
+                  "rotulo": "Tipo do ato",
+                  "tipo": "lista",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "ata", "rotulo": "Ata de reunião"},
+                    {"valor": "resolucao", "rotulo": "Resolução"},
+                    {"valor": "portaria", "rotulo": "Portaria"},
+                    {"valor": "despacho", "rotulo": "Despacho"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {
+                  "chave": "ato_numero",
+                  "rotulo": "Número do ato",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "estreita"
+                },
+                {
+                  "chave": "sei",
+                  "rotulo": "Processo SEI",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "config": {"max": 30, "formato": "sei"}
+                },
+                {
+                  "chave": "documento",
+                  "rotulo": "Documento",
+                  "tipo": "arquivo",
+                  "niveis": "opcional",
+                  "noDocumento": false,
+                  "naPlanilha": false,
+                  "config": {"tipos": ["pdf"], "maxMb": 25}
+                },
+                {
+                  "chave": "observacao",
+                  "rotulo": "Observação",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional",
+                  "largura": "larga",
+                  "ajuda": "Se voltou, diga o que precisa ser ajustado."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "chave": "fechamento",
+      "titulo": "Feche o ciclo",
+      "referenciaGuia": "atividades 7.1 a 7.4",
+      "descricao": "No fim da vigência, os resultados, as lições aprendidas e as aprovações finais.",
+      "passos": [
+        {
+          "chave": "fechamento.indicadores-finais",
+          "titulo": "Colete os indicadores finais",
+          "tipo": "dados",
+          "referenciaGuia": "7.1",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+          "oQueFazer": "Colete o valor final de cada indicador.",
+          "secoes": [
+            {
+              "chave": "indicadores_finais",
+              "titulo": "Valores finais dos indicadores",
+              "tipo": "tabela",
+              "niveis": "obrigatorio",
+              "campos": [
+                {
+                  "chave": "meta",
+                  "rotulo": "Meta",
+                  "tipo": "ligacao_secao",
+                  "principal": true,
+                  "largura": "larga",
+                  "config": {"secao": "metas", "multipla": false}
+                },
+                {"chave": "valor_final", "rotulo": "Valor final", "tipo": "texto_curto", "largura": "estreita"},
+                {"chave": "data", "rotulo": "Data da medição", "tipo": "data", "largura": "estreita"},
+                {
+                  "chave": "observacao",
+                  "rotulo": "Observação",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional",
+                  "largura": "larga"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "fechamento.licoes-aprendidas",
+          "titulo": "Analise os resultados e registre as lições aprendidas",
+          "tipo": "dados",
+          "referenciaGuia": "7.2",
+          "aceitaNaoSeAplica": true,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Diga se cada meta foi alcançada, não alcançada ou cancelada, com o motivo, e registre as lições aprendidas para o próximo PDTIC.",
+          "secoes": [
+            {
+              "chave": "resultados_metas",
+              "titulo": "Resultado de cada meta",
+              "tipo": "tabela",
+              "niveis": "obrigatorio",
+              "ajuda": "O modelo do relatório de resultados está no Anexo XV do guia.",
+              "campos": [
+                {
+                  "chave": "meta",
+                  "rotulo": "Meta",
+                  "tipo": "ligacao_secao",
+                  "principal": true,
+                  "largura": "larga",
+                  "config": {"secao": "metas", "multipla": false}
+                },
+                {
+                  "chave": "resultado",
+                  "rotulo": "Resultado",
+                  "tipo": "lista",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "alcancada", "rotulo": "Alcançada", "cor": "verde"},
+                    {"valor": "nao_alcancada", "rotulo": "Não alcançada", "cor": "vermelho"},
+                    {"valor": "cancelada", "rotulo": "Cancelada", "cor": "cinza"}
+                  ]
+                },
+                {
+                  "chave": "motivo",
+                  "rotulo": "Motivo",
+                  "tipo": "texto_longo",
+                  "niveis": {"basico": "opcional", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+                  "largura": "larga"
+                }
+              ]
+            },
+            {
+              "chave": "avaliacao_final",
+              "titulo": "Avaliação final",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "campos": [
+                {
+                  "chave": "licoes_aprendidas",
+                  "rotulo": "Lições aprendidas",
+                  "tipo": "texto_longo",
+                  "principal": true,
+                  "ajuda": "O que deu certo e o que evitar no próximo PDTIC."
+                },
+                {
+                  "chave": "parecer_execucao",
+                  "rotulo": "Execução física e orçamentária",
+                  "tipo": "texto_longo",
+                  "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"}
+                },
+                {
+                  "chave": "parecer_riscos",
+                  "rotulo": "Gestão dos riscos",
+                  "tipo": "texto_longo",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"}
+                },
+                {
+                  "chave": "parecer_alinhamento",
+                  "rotulo": "Alinhamento estratégico",
+                  "tipo": "texto_longo",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"}
+                },
+                {
+                  "chave": "parecer_pessoas",
+                  "rotulo": "Plano de gestão de pessoas",
+                  "tipo": "texto_longo",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"}
+                },
+                {
+                  "chave": "nao_priorizadas",
+                  "rotulo": "Necessidades não priorizadas que seguem para o próximo PDTIC",
+                  "tipo": "texto_longo",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "opcional"}
+                },
+                {
+                  "chave": "conclusao",
+                  "rotulo": "Conclusão",
+                  "tipo": "texto_longo",
+                  "niveis": {"basico": "desligado", "intermediario": "opcional", "avancado": "obrigatorio"}
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "fechamento.aprovacao-comite",
+          "titulo": "Registre a aprovação do comitê",
+          "tipo": "aprovacao",
+          "referenciaGuia": "7.3",
+          "aceitaNaoSeAplica": true,
+          "niveis": {"basico": "desligado", "intermediario": "obrigatorio", "avancado": "obrigatorio"},
+          "oQueFazer": "Registre a aprovação do relatório de resultados pelo comitê.",
+          "secoes": [
+            {
+              "chave": "aprovacao_resultados_comite",
+              "titulo": "Aprovação do relatório de resultados pelo comitê",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "O comitê aprova o relatório de resultados, em caráter preliminar, e o envia à autoridade máxima.",
+              "campos": [
+                {
+                  "chave": "decisao",
+                  "rotulo": "Decisão",
+                  "tipo": "lista",
+                  "principal": true,
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "aprovado", "rotulo": "Aprovado", "cor": "verde"},
+                    {"valor": "devolvido", "rotulo": "Devolvido para ajustes", "cor": "amarelo"}
+                  ]
+                },
+                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita", "config": {"naoFutura": true}},
+                {
+                  "chave": "instancia",
+                  "rotulo": "Quem decidiu",
+                  "tipo": "lista",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "ajuda": "Em geral, quem aprova o relatório de resultados preliminar é o comitê interno de TIC (SGTIC). Mude quando outra instância decidiu.",
+                  "antes": {"ajuda": ["Em geral, o SGTIC. Mude quando outra instância decidiu."]},
+                  "opcoes": [
+                    {"valor": "sgtic", "rotulo": "SGTIC (comitê interno de TIC)"},
+                    {"valor": "autoridade_maxima", "rotulo": "Autoridade máxima do órgão"},
+                    {"valor": "outra", "rotulo": "Outra instância"}
+                  ]
+                },
+                {
+                  "chave": "ato_tipo",
+                  "rotulo": "Tipo do ato",
+                  "tipo": "lista",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "ata", "rotulo": "Ata de reunião"},
+                    {"valor": "resolucao", "rotulo": "Resolução"},
+                    {"valor": "portaria", "rotulo": "Portaria"},
+                    {"valor": "despacho", "rotulo": "Despacho"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {
+                  "chave": "ato_numero",
+                  "rotulo": "Número do ato",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "estreita"
+                },
+                {
+                  "chave": "sei",
+                  "rotulo": "Processo SEI",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "config": {"max": 30, "formato": "sei"}
+                },
+                {
+                  "chave": "documento",
+                  "rotulo": "Documento",
+                  "tipo": "arquivo",
+                  "niveis": "opcional",
+                  "noDocumento": false,
+                  "naPlanilha": false,
+                  "config": {"tipos": ["pdf"], "maxMb": 25}
+                },
+                {
+                  "chave": "observacao",
+                  "rotulo": "Observação",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional",
+                  "largura": "larga",
+                  "ajuda": "Se voltou, diga o que precisa ser ajustado."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "chave": "fechamento.aprovacao-autoridade",
+          "titulo": "Registre a aprovação da autoridade máxima",
+          "tipo": "aprovacao",
+          "referenciaGuia": "7.4",
+          "aceitaNaoSeAplica": false,
+          "niveis": "obrigatorio",
+          "oQueFazer": "Registre a aprovação da autoridade máxima do órgão, que encerra o ciclo.",
+          "secoes": [
+            {
+              "chave": "aprovacao_resultados_autoridade",
+              "titulo": "Aprovação da autoridade máxima",
+              "tipo": "formulario",
+              "niveis": "obrigatorio",
+              "ajuda": "A autoridade máxima aprova o relatório de resultados. A publicação dos resultados é opcional.",
+              "campos": [
+                {
+                  "chave": "decisao",
+                  "rotulo": "Decisão",
+                  "tipo": "lista",
+                  "principal": true,
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "aprovado", "rotulo": "Aprovado", "cor": "verde"},
+                    {"valor": "devolvido", "rotulo": "Devolvido para ajustes", "cor": "amarelo"}
+                  ]
+                },
+                {"chave": "data", "rotulo": "Data da decisão", "tipo": "data", "largura": "estreita", "config": {"naoFutura": true}},
+                {
+                  "chave": "instancia",
+                  "rotulo": "Quem decidiu",
+                  "tipo": "lista",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "ajuda": "Em geral, quem aprova o relatório de resultados final é a autoridade máxima do órgão. Mude quando outra instância decidiu.",
+                  "antes": {"ajuda": ["Em geral, o SGTIC. Mude quando outra instância decidiu."]},
+                  "opcoes": [
+                    {"valor": "sgtic", "rotulo": "SGTIC (comitê interno de TIC)"},
+                    {"valor": "autoridade_maxima", "rotulo": "Autoridade máxima do órgão"},
+                    {"valor": "outra", "rotulo": "Outra instância"}
+                  ]
+                },
+                {
+                  "chave": "ato_tipo",
+                  "rotulo": "Tipo do ato",
+                  "tipo": "lista",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "opcoes": [
+                    {"valor": "ata", "rotulo": "Ata de reunião"},
+                    {"valor": "resolucao", "rotulo": "Resolução"},
+                    {"valor": "portaria", "rotulo": "Portaria"},
+                    {"valor": "despacho", "rotulo": "Despacho"},
+                    {"valor": "outro", "rotulo": "Outro"}
+                  ]
+                },
+                {
+                  "chave": "ato_numero",
+                  "rotulo": "Número do ato",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "estreita"
+                },
+                {
+                  "chave": "sei",
+                  "rotulo": "Processo SEI",
+                  "tipo": "texto_curto",
+                  "niveis": "opcional",
+                  "largura": "media",
+                  "config": {"max": 30, "formato": "sei"}
+                },
+                {
+                  "chave": "documento",
+                  "rotulo": "Documento",
+                  "tipo": "arquivo",
+                  "niveis": "opcional",
+                  "noDocumento": false,
+                  "naPlanilha": false,
+                  "config": {"tipos": ["pdf"], "maxMb": 25}
+                },
+                {
+                  "chave": "observacao",
+                  "rotulo": "Observação",
+                  "tipo": "texto_longo",
+                  "niveis": "opcional",
+                  "largura": "larga",
+                  "ajuda": "Se voltou, diga o que precisa ser ajustado."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "secoesForaDoPdtic": [
+    {
+      "escopo": "df",
+      "chave": "principio",
+      "titulo": "Princípios e diretrizes",
+      "tipo": "tabela",
+      "prefixo": "PR",
+      "situacao": "obrigatorio",
+      "ajuda": "Os princípios da Política de Governança de TIC (art. 4º do Decreto nº 48.900/2026) vêm prontos e não mudam. Acrescente outros princípios ou diretrizes, por exemplo os de resoluções do CGTIC.",
+      "campos": [
+        {
+          "chave": "texto",
+          "rotulo": "Princípio ou diretriz",
+          "tipo": "texto_longo",
+          "principal": true,
+          "largura": "larga",
+          "config": {
+            "max": 4000
+          }
+        },
+        {
+          "chave": "fundamento",
+          "rotulo": "Fundamento",
+          "tipo": "texto_curto",
+          "largura": "media",
+          "config": {
+            "max": 300
+          },
+          "ajuda": "De onde vem: o artigo do decreto, a resolução do CGTIC ou outro ato."
+        },
+        {
+          "chave": "criterio_priorizacao",
+          "rotulo": "Pode ser critério de priorização?",
+          "tipo": "sim_nao",
+          "situacao": "opcional",
+          "largura": "estreita",
+          "ajuda": "Sim quando o princípio pode servir para priorizar as necessidades nos PDTICs dos órgãos."
+        }
+      ],
+      "registros": [
+        {
+          "codigo": "PR01",
+          "dados": {
+            "texto": "Eficiência e economicidade: uso racional dos recursos de TIC, evitando redundâncias e priorizando soluções corporativas compartilhadas;",
+            "fundamento": "art. 4º, I, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR02",
+          "dados": {
+            "texto": "Alinhamento estratégico: subordinação das iniciativas de TIC às prioridades do GDF definidas no Plano Estratégico de TIC e na Estratégia de Governança Digital;",
+            "fundamento": "art. 4º, II, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR03",
+          "dados": {
+            "texto": "Centralização orientada ao valor: preferência por soluções e infraestruturas corporativas centralizadas quando gerarem ganhos de escala, segurança ou padronização;",
+            "fundamento": "art. 4º, III, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR04",
+          "dados": {
+            "texto": "Transparência e prestação de contas: publicidade dos instrumentos de planejamento, das decisões e dos resultados de governança de TIC;",
+            "fundamento": "art. 4º, IV, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR05",
+          "dados": {
+            "texto": "Segurança e resiliência: proteção dos ativos de informação e garantia de continuidade dos serviços essenciais;",
+            "fundamento": "art. 4º, V, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR06",
+          "dados": {
+            "texto": "Interoperabilidade: integração e comunicação entre sistemas, dados e plataformas, eliminando silos tecnológicos;",
+            "fundamento": "art. 4º, VI, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR07",
+          "dados": {
+            "texto": "Transformação digital orientada ao cidadão: uso da tecnologia para ampliar a qualidade, a acessibilidade e a eficiência dos serviços públicos; e",
+            "fundamento": "art. 4º, VII, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR08",
+          "dados": {
+            "texto": "Integridade pública: alinhamento das condutas dos agentes públicos a valores éticos, priorizando o interesse coletivo sobre interesses privados. É a base da boa governança, prevenindo desvios e garantindo serviços eficientes e transparentes.",
+            "fundamento": "art. 4º, VIII, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR09",
+          "dados": {
+            "texto": "Segregação de funções nas contratações: separação das atribuições entre diferentes agentes públicos, de modo a evitar conflitos de interesse, erros, fraudes e ocultação de falhas nas contratações;",
+            "fundamento": "art. 4º, IX, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR10",
+          "dados": {
+            "texto": "uso ético e responsável da Inteligência Artificial: as iniciativas de TIC que envolvam sistemas de IA observarão os princípios e as diretrizes estabelecidos na PGIA/DF; e",
+            "fundamento": "art. 4º, X, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        },
+        {
+          "codigo": "PR11",
+          "dados": {
+            "texto": "Governança de Dados orientada ao valor público: os dados gerados e tratados no âmbito das iniciativas de TIC serão geridos conforme as diretrizes da PGD/DF, assegurando qualidade, integridade e uso estratégico.",
+            "fundamento": "art. 4º, XI, do Decreto nº 48.900/2026",
+            "criterio_priorizacao": true
+          }
+        }
+      ]
+    },
+    {
+      "escopo": "df",
+      "chave": "diretriz_ciclo",
+      "titulo": "Diretrizes do ciclo",
+      "tipo": "tabela",
+      "prefixo": "DC",
+      "situacao": "obrigatorio",
+      "ajuda": "As diretrizes e prioridades do ciclo de planejamento de TIC que a SGDI propõe para o ano seguinte e leva à deliberação do comitê antes de os órgãos elaborarem os PDTICs (art. 9º, VIII, do Decreto nº 48.899/2026).",
+      "campos": [
+        {
+          "chave": "ano",
+          "rotulo": "Ano do ciclo",
+          "tipo": "numero",
+          "largura": "estreita",
+          "config": {
+            "min": 2025,
+            "max": 2100,
+            "casas": 0
+          },
+          "ajuda": "O ano de planejamento a que a diretriz vale."
+        },
+        {
+          "chave": "texto",
+          "rotulo": "Diretriz ou prioridade",
+          "tipo": "texto_longo",
+          "principal": true,
+          "largura": "larga",
+          "config": {
+            "max": 4000
+          }
+        },
+        {
+          "chave": "situacao_deliberacao",
+          "rotulo": "Situação da deliberação",
+          "tipo": "lista",
+          "largura": "media",
+          "ajuda": "Em que pé está a deliberação do comitê sobre a diretriz.",
+          "opcoes": [
+            {
+              "valor": "proposta",
+              "rotulo": "Proposta pela SGDI",
+              "cor": "cinza"
+            },
+            {
+              "valor": "em_deliberacao",
+              "rotulo": "Em deliberação",
+              "cor": "azul"
+            },
+            {
+              "valor": "aprovada",
+              "rotulo": "Aprovada",
+              "cor": "verde"
+            },
+            {
+              "valor": "devolvida",
+              "rotulo": "Devolvida para ajuste",
+              "cor": "laranja"
+            }
+          ]
+        },
+        {
+          "chave": "observacao",
+          "rotulo": "Observação",
+          "tipo": "texto_longo",
+          "situacao": "opcional",
+          "largura": "larga"
+        }
+      ]
+    },
+    {
+      "escopo": "petic",
+      "chave": "petic_identidade",
+      "titulo": "Missão, visão e valores",
+      "tipo": "formulario",
+      "situacao": "opcional",
+      "ajuda": "A razão de ser da TIC do Distrito Federal (missão), aonde ela quer chegar (visão) e os valores que guiam o trabalho.",
+      "campos": [
+        {
+          "chave": "missao",
+          "rotulo": "Missão",
+          "tipo": "texto_longo",
+          "principal": true,
+          "situacao": "obrigatorio",
+          "config": {
+            "max": 2000
+          }
+        },
+        {
+          "chave": "visao",
+          "rotulo": "Visão",
+          "tipo": "texto_longo",
+          "situacao": "obrigatorio",
+          "config": {
+            "max": 2000
+          }
+        },
+        {
+          "chave": "valores",
+          "rotulo": "Valores",
+          "tipo": "texto_longo",
+          "situacao": "opcional",
+          "config": {
+            "max": 4000
+          }
+        }
+      ]
+    },
+    {
+      "escopo": "petic",
+      "chave": "petic_diretriz",
+      "titulo": "Diretrizes",
+      "tipo": "tabela",
+      "prefixo": "D",
+      "situacao": "obrigatorio",
+      "ajuda": "As orientações gerais do PETIC-DF (art. 11, § 1º, do Decreto nº 48.900/2026).",
+      "campos": [
+        {
+          "chave": "texto",
+          "rotulo": "Diretriz",
+          "tipo": "texto_longo",
+          "principal": true,
+          "largura": "larga",
+          "config": {
+            "max": 4000
+          }
+        },
+        {
+          "chave": "detalhamento",
+          "rotulo": "Detalhamento",
+          "tipo": "texto_longo",
+          "situacao": "opcional",
+          "largura": "larga"
+        }
+      ]
+    },
+    {
+      "escopo": "petic",
+      "chave": "petic_objetivo_programa",
+      "titulo": "Objetivos do programa",
+      "tipo": "tabela",
+      "prefixo": "OP",
+      "situacao": "opcional",
+      "ajuda": "Objetivos amplos que agrupam os objetivos estratégicos. Use só se o PETIC-DF se organizar assim.",
+      "campos": [
+        {
+          "chave": "texto",
+          "rotulo": "Objetivo do programa",
+          "tipo": "texto_longo",
+          "principal": true,
+          "situacao": "obrigatorio",
+          "largura": "larga",
+          "config": {
+            "max": 2000
+          }
+        },
+        {
+          "chave": "descricao",
+          "rotulo": "Descrição",
+          "tipo": "texto_longo",
+          "situacao": "opcional",
+          "largura": "larga"
+        }
+      ]
+    },
+    {
+      "escopo": "petic",
+      "chave": "petic_objetivo",
+      "titulo": "Objetivos estratégicos",
+      "tipo": "tabela",
+      "prefixo": "OE",
+      "situacao": "obrigatorio",
+      "ajuda": "O que a TIC do DF quer alcançar no período. Os órgãos ligam as necessidades e as metas dos PDTICs a estes objetivos.",
+      "campos": [
+        {
+          "chave": "texto",
+          "rotulo": "Objetivo estratégico",
+          "tipo": "texto_longo",
+          "principal": true,
+          "largura": "larga",
+          "config": {
+            "max": 2000
+          }
+        },
+        {
+          "chave": "objetivo_programa",
+          "rotulo": "Objetivo do programa",
+          "tipo": "ligacao_secao",
+          "situacao": "opcional",
+          "largura": "media",
+          "config": {
+            "secao": "petic_objetivo_programa",
+            "multipla": false
+          },
+          "ajuda": "O objetivo do programa a que este objetivo pertence, se houver."
+        },
+        {
+          "chave": "descricao",
+          "rotulo": "Descrição",
+          "tipo": "texto_longo",
+          "situacao": "opcional",
+          "largura": "larga"
+        }
+      ]
+    },
+    {
+      "escopo": "petic",
+      "chave": "petic_prioridade",
+      "titulo": "Prioridades",
+      "tipo": "tabela",
+      "prefixo": "P",
+      "situacao": "obrigatorio",
+      "ajuda": "O que vem primeiro no período (art. 11, § 1º, do Decreto nº 48.900/2026).",
+      "campos": [
+        {
+          "chave": "texto",
+          "rotulo": "Prioridade",
+          "tipo": "texto_longo",
+          "principal": true,
+          "largura": "larga",
+          "config": {
+            "max": 2000
+          }
+        },
+        {
+          "chave": "objetivos",
+          "rotulo": "Objetivos estratégicos ligados",
+          "tipo": "ligacao_secao",
+          "situacao": "opcional",
+          "largura": "media",
+          "config": {
+            "secao": "petic_objetivo",
+            "multipla": true
+          }
+        },
+        {
+          "chave": "detalhamento",
+          "rotulo": "Detalhamento",
+          "tipo": "texto_longo",
+          "situacao": "opcional",
+          "largura": "larga"
+        }
+      ]
+    },
+    {
+      "escopo": "petic",
+      "chave": "petic_indicador",
+      "titulo": "Indicadores estratégicos",
+      "tipo": "tabela",
+      "prefixo": "IE",
+      "situacao": "obrigatorio",
+      "ajuda": "Como medir se os objetivos estratégicos estão sendo alcançados.",
+      "campos": [
+        {
+          "chave": "nome",
+          "rotulo": "Indicador",
+          "tipo": "texto_curto",
+          "principal": true,
+          "largura": "larga",
+          "config": {
+            "max": 300
+          }
+        },
+        {
+          "chave": "objetivo",
+          "rotulo": "Objetivo estratégico",
+          "tipo": "ligacao_secao",
+          "largura": "media",
+          "config": {
+            "secao": "petic_objetivo",
+            "multipla": false
+          },
+          "ajuda": "O objetivo que o indicador mede."
+        },
+        {
+          "chave": "formula",
+          "rotulo": "Fórmula de cálculo",
+          "tipo": "texto_longo",
+          "situacao": "opcional",
+          "largura": "larga",
+          "config": {
+            "max": 2000
+          }
+        },
+        {
+          "chave": "unidade",
+          "rotulo": "Unidade de medida",
+          "tipo": "texto_curto",
+          "situacao": "opcional",
+          "largura": "estreita",
+          "config": {
+            "max": 60
+          }
+        },
+        {
+          "chave": "linha_base",
+          "rotulo": "Linha de base",
+          "tipo": "numero",
+          "situacao": "opcional",
+          "largura": "estreita",
+          "ajuda": "O valor do indicador no começo do período."
+        },
+        {
+          "chave": "meta",
+          "rotulo": "Meta",
+          "tipo": "numero",
+          "situacao": "opcional",
+          "largura": "estreita",
+          "ajuda": "O valor que se quer alcançar até o prazo."
+        },
+        {
+          "chave": "prazo",
+          "rotulo": "Prazo da meta",
+          "tipo": "data",
+          "situacao": "opcional",
+          "largura": "estreita"
+        },
+        {
+          "chave": "fonte",
+          "rotulo": "Fonte dos dados",
+          "tipo": "texto_curto",
+          "situacao": "opcional",
+          "largura": "media",
+          "config": {
+            "max": 300
+          }
+        }
+      ]
+    },
+    {
+      "escopo": "petic",
+      "chave": "petic_iniciativa",
+      "titulo": "Iniciativas",
+      "tipo": "tabela",
+      "prefixo": "IN",
+      "situacao": "obrigatorio",
+      "ajuda": "O que será feito para alcançar os objetivos estratégicos.",
+      "campos": [
+        {
+          "chave": "descricao",
+          "rotulo": "Iniciativa",
+          "tipo": "texto_longo",
+          "principal": true,
+          "largura": "larga",
+          "config": {
+            "max": 2000
+          }
+        },
+        {
+          "chave": "objetivo",
+          "rotulo": "Objetivo estratégico",
+          "tipo": "ligacao_secao",
+          "largura": "media",
+          "config": {
+            "secao": "petic_objetivo",
+            "multipla": false
+          },
+          "ajuda": "O objetivo a que a iniciativa serve."
+        },
+        {
+          "chave": "responsavel",
+          "rotulo": "Responsável",
+          "tipo": "texto_curto",
+          "situacao": "opcional",
+          "largura": "media",
+          "config": {
+            "max": 200
+          }
+        },
+        {
+          "chave": "prazo",
+          "rotulo": "Prazo",
+          "tipo": "data",
+          "situacao": "opcional",
+          "largura": "estreita"
+        }
+      ]
+    },
+    {
+      "escopo": "petic",
+      "chave": "petic_eixo",
+      "titulo": "Eixos de governo",
+      "tipo": "tabela",
+      "prefixo": "EG",
+      "situacao": "opcional",
+      "ajuda": "Os eixos do plano de governo (por exemplo, os do Plano Plurianual, PPA) a que os órgãos ligam as necessidades dos PDTICs.",
+      "campos": [
+        {
+          "chave": "nome",
+          "rotulo": "Eixo",
+          "tipo": "texto_curto",
+          "principal": true,
+          "situacao": "obrigatorio",
+          "largura": "larga",
+          "config": {
+            "max": 300
+          }
+        }
+      ]
+    }
+  ]
+}

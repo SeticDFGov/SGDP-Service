@@ -6,8 +6,9 @@ namespace service.Interface;
 
 /// <summary>
 /// Quem decide pedidos de acesso e de quais módulos: a administração decide todos
-/// os módulos que o sistema libera; a SGDI decide os do PGIA. Lista vazia = não
-/// decide nada.
+/// os módulos que o sistema libera; a SGDI (PapelPgia pgia_sgdi) decide os do PGIA;
+/// o administrador da Governança Estratégica (pe_admin) decide os desse módulo; quem
+/// tem os dois papéis decide os dois. Lista vazia = não decide nada.
 /// </summary>
 public record DecisorPedidos(string Email, IReadOnlyCollection<string> Modulos)
 {
@@ -16,8 +17,9 @@ public record DecisorPedidos(string Email, IReadOnlyCollection<string> Modulos)
 
 /// <summary>
 /// Pedidos de acesso aos módulos: a pessoa pede no card da tela inicial e a
-/// administração (ou a SGDI, no PGIA) aprova ou recusa. Aprovar libera o módulo
-/// na hora, pelo mesmo caminho da tela de gestão de acessos.
+/// administração (ou a SGDI, no PGIA, e o administrador do módulo, na Governança
+/// Estratégica) aprova ou recusa. Aprovar libera o módulo na hora, pelo mesmo caminho
+/// da tela de gestão de acessos.
 /// </summary>
 public interface IPedidoAcessoService
 {

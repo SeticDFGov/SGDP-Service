@@ -58,7 +58,7 @@ public class CtrTramitacaoListasTest : CtrTestBase
     // ══ 5. Nº SEI do Formulário ══════════════════════════════════════════════
 
     [Fact]
-    public async Task NumeroSeiFormulario_Opcional_GravadoNoFormatoSei()
+    public async Task NumeroSeiFormulario_Opcional_GravadoSemEspacosNasPontas()
     {
         var ctx = await ContextoAnalistaAsync();
 
@@ -72,19 +72,37 @@ public class CtrTramitacaoListasTest : CtrTestBase
         Assert.Equal(Formulario, Context.CtrProcessos.Single(p => p.Id == com.Id).NumeroSeiFormulario);
     }
 
+    // Desde 2026-09-25 o campo é o número de um documento dentro do processo SEI (como 213807905),
+    // em qualquer formato: só o tamanho é conferido
     [Theory]
+    [InlineData("213807905")]
+    [InlineData("21380-7905")]
     [InlineData("12345")]
     [InlineData("04044-00009999/26-55")]
-    [InlineData("SEI 04044-00009999/2026-55")]
-    public async Task NumeroSeiFormulario_ForaDoFormato_EhRecusado(string valor)
+    [InlineData("SEI 213807905")]
+    [InlineData("1234567890123456789012345")]
+    public async Task NumeroSeiFormulario_TextoLivre_EhAceito(string valor)
     {
+        var ctx = await ContextoAnalistaAsync();
         var dto = NovoProcessoDto(Numero);
         dto.NumeroSeiFormulario = valor;
+
+        var resposta = await _processos.CriarAsync(dto, ctx);
+
+        Assert.Equal(valor, resposta.NumeroSeiFormulario);
+        Assert.Equal(valor, Context.CtrProcessos.Single(p => p.Id == resposta.Id).NumeroSeiFormulario);
+    }
+
+    [Fact]
+    public async Task NumeroSeiFormulario_AcimaDe25Caracteres_EhRecusado()
+    {
+        var dto = NovoProcessoDto(Numero);
+        dto.NumeroSeiFormulario = "12345678901234567890123456";
 
         var ex = await RecusaAoCriarAsync(dto);
 
         Assert.Equal((int)ErrorCode.CtrProcessoInvalido, ex.Error.Code);
-        Assert.Contains("Nº SEI do Formulário fora do formato SEI", ex.Error.Message);
+        Assert.Equal("O Nº SEI do Formulário tem até 25 caracteres.", ex.Error.Message);
         Assert.Empty(Context.CtrProcessos);
     }
 

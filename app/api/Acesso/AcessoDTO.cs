@@ -35,6 +35,10 @@ public class UsuarioAcessoResponse
     // Papel da Supervisão Contínua das Contratações (PapeisContratacoes) — é o acesso ao módulo
     public string? PapelContratacoes { get; set; }
 
+    // Papel na Governança Estratégica (PapeisPlanejamento), de quem tem a concessão do
+    // módulo; nulo para os demais. Campo novo: o front antigo o ignora
+    public string? PapelPlanejamento { get; set; }
+
     public List<AcessoModuloResponse> Concedidos { get; set; } = new();
 
     public List<AcessoModuloResponse> Keycloak { get; set; } = new();
@@ -62,6 +66,16 @@ public class AcessoUsuarioUpdateDTO
 
     // Supervisão Contínua das Contratações (grava o papel ctr_analise)
     public bool Contratacoes { get; set; }
+
+    // Governança Estratégica, opcional. Ausente ou nulo não muda nada (o front antigo,
+    // que não conhece o módulo, nunca tira o acesso de ninguém). true exige um papel
+    // válido (o que vier em PapelPlanejamento ou o que a pessoa já tem); false tira o
+    // acesso e o papel
+    public bool? Planejamento { get; set; }
+
+    // PapeisPlanejamento.Todos ou nulo (nulo = manter o papel atual); exige Planejamento = true
+    [StringLength(30)]
+    public string? PapelPlanejamento { get; set; }
 }
 
 /// <summary>

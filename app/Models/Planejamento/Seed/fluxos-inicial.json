@@ -1,0 +1,357 @@
+{
+  "fluxos": [
+    {
+      "chave": "macroprocesso",
+      "nome": "Macroprocesso do PDTIC",
+      "figuraGuia": "Figura 4",
+      "definicao": {
+        "PrefixoNumeracao": null,
+        "Raias": [
+          { "Id": "r1", "Nome": "Ciclo de vida do PDTIC", "Ordem": 1 }
+        ],
+        "Elementos": [
+          { "Id": "ini", "Tipo": "inicio", "RaiaId": "r1", "Nome": "" },
+          { "Id": "s1", "Tipo": "subprocesso", "RaiaId": "r1", "Nome": "Elaboração", "Artefatos": ["PDTIC"] },
+          { "Id": "s2", "Tipo": "subprocesso", "RaiaId": "r1", "Nome": "Acompanhamento" },
+          { "Id": "d1", "Tipo": "decisao", "RaiaId": "r1", "Nome": "Revisar o PDTIC?" },
+          { "Id": "fim", "Tipo": "fim", "RaiaId": "r1", "Nome": "" }
+        ],
+        "Ligacoes": [
+          { "Id": "l1", "De": "ini", "Para": "s1" },
+          { "Id": "l2", "De": "s1", "Para": "s2" },
+          { "Id": "l3", "De": "s2", "Para": "d1" },
+          { "Id": "l4", "De": "d1", "Para": "fim", "Rotulo": "Não" },
+          { "Id": "l5", "De": "d1", "Para": "s1", "Rotulo": "Sim" }
+        ]
+      }
+    },
+    {
+      "chave": "elaboracao",
+      "nome": "Processo de elaboração do PDTIC",
+      "figuraGuia": "Figura 5",
+      "definicao": {
+        "PrefixoNumeracao": null,
+        "Raias": [
+          { "Id": "r1", "Nome": "Elaboração", "Ordem": 1 }
+        ],
+        "Elementos": [
+          { "Id": "ini", "Tipo": "inicio", "RaiaId": "r1", "Nome": "" },
+          { "Id": "s1", "Tipo": "subprocesso", "RaiaId": "r1", "Nome": "Preparação" },
+          { "Id": "s2", "Tipo": "subprocesso", "RaiaId": "r1", "Nome": "Diagnóstico [situação atual]" },
+          { "Id": "s3", "Tipo": "subprocesso", "RaiaId": "r1", "Nome": "Planejamento [situação desejada]" },
+          { "Id": "fim", "Tipo": "fim", "RaiaId": "r1", "Nome": "" }
+        ],
+        "Ligacoes": [
+          { "Id": "l1", "De": "ini", "Para": "s1" },
+          { "Id": "l2", "De": "s1", "Para": "s2" },
+          { "Id": "l3", "De": "s2", "Para": "s3" },
+          { "Id": "l4", "De": "s3", "Para": "fim" }
+        ]
+      }
+    },
+    {
+      "chave": "preparacao",
+      "nome": "Preparação",
+      "figuraGuia": "Figura 6",
+      "definicao": {
+        "PrefixoNumeracao": "1",
+        "Raias": [
+          { "Id": "r1", "Nome": "{nomes.comite}", "Ordem": 1 },
+          { "Id": "r2", "Nome": "{nomes.equipe}", "Ordem": 2 }
+        ],
+        "Elementos": [
+          { "Id": "ini", "Tipo": "inicio", "RaiaId": "r1", "Nome": "" },
+          { "Id": "t1", "Tipo": "tarefa", "RaiaId": "r1", "Nome": "Definir a abrangência e o período do PDTIC" },
+          { "Id": "t2", "Tipo": "tarefa", "RaiaId": "r1", "Nome": "Definir a equipe de elaboração", "Artefatos": ["Portaria de designação da equipe"] },
+          { "Id": "t3", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Descrever a metodologia de elaboração" },
+          { "Id": "t4", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Consolidar os documentos de referência", "Artefatos": ["Lista dos documentos de referência"] },
+          { "Id": "t5", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Identificar as estratégias da organização", "Artefatos": ["Lista das estratégias da organização"] },
+          { "Id": "t6", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Identificar os princípios e as diretrizes", "Artefatos": ["Lista dos princípios e diretrizes", "Inventário de necessidades (parcial)"] },
+          { "Id": "t7", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Elaborar o plano de trabalho", "Artefatos": ["Plano de trabalho (PT-PDTIC)"] },
+          { "Id": "t8", "Tipo": "tarefa", "RaiaId": "r1", "Nome": "Aprovar o plano de trabalho", "Artefatos": ["PT-PDTIC aprovado"] },
+          { "Id": "d1", "Tipo": "decisao", "RaiaId": "r1", "Nome": "Plano de trabalho aprovado?" },
+          { "Id": "fim", "Tipo": "fim", "RaiaId": "r1", "Nome": "" }
+        ],
+        "Ligacoes": [
+          { "Id": "l1", "De": "ini", "Para": "t1" },
+          { "Id": "l2", "De": "t1", "Para": "t2" },
+          { "Id": "l3", "De": "t2", "Para": "t3" },
+          { "Id": "l4", "De": "t3", "Para": "t4" },
+          { "Id": "l5", "De": "t4", "Para": "t5" },
+          { "Id": "l6", "De": "t5", "Para": "t6" },
+          { "Id": "l7", "De": "t6", "Para": "t7" },
+          { "Id": "l8", "De": "t7", "Para": "t8" },
+          { "Id": "l9", "De": "t8", "Para": "d1" },
+          { "Id": "l10", "De": "d1", "Para": "fim", "Rotulo": "Sim" },
+          { "Id": "l11", "De": "d1", "Para": "t7", "Rotulo": "Não" }
+        ]
+      }
+    },
+    {
+      "chave": "diagnostico",
+      "nome": "Diagnóstico",
+      "figuraGuia": "Figura 7",
+      "definicao": {
+        "PrefixoNumeracao": "2",
+        "Raias": [
+          { "Id": "r1", "Nome": "{nomes.comite}", "Ordem": 1 },
+          { "Id": "r2", "Nome": "{nomes.equipe}", "Ordem": 2 }
+        ],
+        "Elementos": [
+          { "Id": "ini", "Tipo": "inicio", "RaiaId": "r2", "Nome": "" },
+          { "Id": "k1", "Tipo": "ligacao", "RaiaId": "r2", "Nome": "Revisão do PDTIC [Avaliação intermediária]" },
+          { "Id": "t1", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Analisar os resultados do PDTIC anterior" },
+          { "Id": "t2", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Analisar o referencial estratégico de TIC" },
+          { "Id": "t3", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Analisar a organização da TIC" },
+          { "Id": "t4", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Realizar a análise SWOT da TIC" },
+          { "Id": "t5", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Estimar a capacidade de execução da TIC" },
+          { "Id": "t6", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Planejar o levantamento das necessidades" },
+          { "Id": "t7", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Identificar as necessidades de informação" },
+          { "Id": "t8", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Identificar as necessidades de serviços de TIC" },
+          { "Id": "p1", "Tipo": "paralelo", "RaiaId": "r2", "Nome": "" },
+          { "Id": "t9", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Identificar as necessidades de infraestrutura de TIC" },
+          { "Id": "t10", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Identificar as necessidades de contratação de TIC" },
+          { "Id": "t11", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Identificar as necessidades de pessoal de TIC" },
+          { "Id": "p2", "Tipo": "paralelo", "RaiaId": "r2", "Nome": "" },
+          { "Id": "t12", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Consolidar o inventário de necessidades", "Artefatos": ["Inventário de necessidades (consolidado)"] },
+          { "Id": "t13", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Alinhar as necessidades de TIC às estratégias da organização" },
+          { "Id": "t14", "Tipo": "tarefa", "RaiaId": "r1", "Nome": "Aprovar o inventário de necessidades", "Artefatos": ["Inventário de necessidades (aprovado)"] },
+          { "Id": "d1", "Tipo": "decisao", "RaiaId": "r1", "Nome": "Inventário aprovado?" },
+          { "Id": "fim", "Tipo": "fim", "RaiaId": "r1", "Nome": "" }
+        ],
+        "Ligacoes": [
+          { "Id": "l1", "De": "ini", "Para": "t1" },
+          { "Id": "l2", "De": "k1", "Para": "t1" },
+          { "Id": "l3", "De": "t1", "Para": "t2" },
+          { "Id": "l4", "De": "t2", "Para": "t3" },
+          { "Id": "l5", "De": "t3", "Para": "t4" },
+          { "Id": "l6", "De": "t4", "Para": "t5" },
+          { "Id": "l7", "De": "t5", "Para": "t6" },
+          { "Id": "l8", "De": "t6", "Para": "t7" },
+          { "Id": "l9", "De": "t7", "Para": "t8" },
+          { "Id": "l10", "De": "t8", "Para": "p1" },
+          { "Id": "l11", "De": "p1", "Para": "t9" },
+          { "Id": "l12", "De": "p1", "Para": "t10" },
+          { "Id": "l13", "De": "p1", "Para": "t11" },
+          { "Id": "l14", "De": "t9", "Para": "p2" },
+          { "Id": "l15", "De": "t10", "Para": "p2" },
+          { "Id": "l16", "De": "t11", "Para": "p2" },
+          { "Id": "l17", "De": "p2", "Para": "t12" },
+          { "Id": "l18", "De": "t12", "Para": "t13" },
+          { "Id": "l19", "De": "t13", "Para": "t14" },
+          { "Id": "l20", "De": "t14", "Para": "d1" },
+          { "Id": "l21", "De": "d1", "Para": "fim", "Rotulo": "Sim" },
+          { "Id": "l22", "De": "d1", "Para": "t12", "Rotulo": "Não" }
+        ]
+      }
+    },
+    {
+      "chave": "planejamento",
+      "nome": "Planejamento",
+      "figuraGuia": "Figura 14",
+      "definicao": {
+        "PrefixoNumeracao": "3",
+        "Raias": [
+          { "Id": "r1", "Nome": "{nomes.autoridade_cargo}", "Ordem": 1 },
+          { "Id": "r2", "Nome": "{nomes.comite}", "Ordem": 2 },
+          { "Id": "r3", "Nome": "{nomes.equipe}", "Ordem": 3 }
+        ],
+        "Elementos": [
+          { "Id": "ini", "Tipo": "inicio", "RaiaId": "r2", "Nome": "" },
+          { "Id": "t1", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Atualizar os critérios de priorização" },
+          { "Id": "t2", "Tipo": "tarefa", "RaiaId": "r3", "Nome": "Priorizar as necessidades inventariadas" },
+          { "Id": "t3", "Tipo": "tarefa", "RaiaId": "r3", "Nome": "Definir as metas e as ações", "Artefatos": ["Plano de metas e ações"] },
+          { "Id": "t4", "Tipo": "tarefa", "RaiaId": "r3", "Nome": "Planejar as ações de pessoal", "Artefatos": ["Plano de gestão de pessoas"] },
+          { "Id": "t5", "Tipo": "tarefa", "RaiaId": "r3", "Nome": "Planejar o orçamento das ações", "Artefatos": ["Plano orçamentário"] },
+          { "Id": "t6", "Tipo": "tarefa", "RaiaId": "r3", "Nome": "Identificar os fatores críticos de sucesso", "Artefatos": ["Lista dos fatores críticos de sucesso"] },
+          { "Id": "t7", "Tipo": "tarefa", "RaiaId": "r3", "Nome": "Planejar o gerenciamento de riscos", "Artefatos": ["Plano de gestão de riscos"] },
+          { "Id": "t8", "Tipo": "tarefa", "RaiaId": "r3", "Nome": "Consolidar a minuta do PDTIC", "Artefatos": ["Minuta do PDTIC"] },
+          { "Id": "t9", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Aprovar a minuta do PDTIC" },
+          { "Id": "d1", "Tipo": "decisao", "RaiaId": "r2", "Nome": "Minuta aprovada?" },
+          { "Id": "t10", "Tipo": "tarefa", "RaiaId": "r1", "Nome": "Publicar o PDTIC", "Artefatos": ["Resumo do PDTIC (DODF)", "PDTIC no site do órgão"] },
+          { "Id": "fim", "Tipo": "fim", "RaiaId": "r1", "Nome": "" }
+        ],
+        "Ligacoes": [
+          { "Id": "l1", "De": "ini", "Para": "t1" },
+          { "Id": "l2", "De": "t1", "Para": "t2" },
+          { "Id": "l3", "De": "t2", "Para": "t3" },
+          { "Id": "l4", "De": "t3", "Para": "t4" },
+          { "Id": "l5", "De": "t4", "Para": "t5" },
+          { "Id": "l6", "De": "t5", "Para": "t6" },
+          { "Id": "l7", "De": "t6", "Para": "t7" },
+          { "Id": "l8", "De": "t7", "Para": "t8" },
+          { "Id": "l9", "De": "t8", "Para": "t9" },
+          { "Id": "l10", "De": "t9", "Para": "d1" },
+          { "Id": "l11", "De": "d1", "Para": "t10", "Rotulo": "Sim" },
+          { "Id": "l12", "De": "d1", "Para": "t8", "Rotulo": "Não" },
+          { "Id": "l13", "De": "t10", "Para": "fim" }
+        ]
+      }
+    },
+    {
+      "chave": "acompanhamento",
+      "nome": "Processo de acompanhamento do PDTIC",
+      "figuraGuia": "Figura 17",
+      "definicao": {
+        "PrefixoNumeracao": null,
+        "Raias": [
+          { "Id": "r1", "Nome": "Acompanhamento", "Ordem": 1 }
+        ],
+        "Elementos": [
+          { "Id": "ini", "Tipo": "inicio", "RaiaId": "r1", "Nome": "" },
+          { "Id": "s1", "Tipo": "subprocesso", "RaiaId": "r1", "Nome": "Planejamento do acompanhamento" },
+          { "Id": "p1", "Tipo": "paralelo", "RaiaId": "r1", "Nome": "" },
+          { "Id": "s2", "Tipo": "subprocesso", "RaiaId": "r1", "Nome": "Monitoramento" },
+          { "Id": "s3", "Tipo": "subprocesso", "RaiaId": "r1", "Nome": "Execução" },
+          { "Id": "p2", "Tipo": "paralelo", "RaiaId": "r1", "Nome": "" },
+          { "Id": "d1", "Tipo": "decisao", "RaiaId": "r1", "Nome": "Encerramento do PDTIC?" },
+          { "Id": "s4", "Tipo": "subprocesso", "RaiaId": "r1", "Nome": "Avaliação final" },
+          { "Id": "s5", "Tipo": "subprocesso", "RaiaId": "r1", "Nome": "Avaliação intermediária" },
+          { "Id": "fim", "Tipo": "fim", "RaiaId": "r1", "Nome": "" }
+        ],
+        "Ligacoes": [
+          { "Id": "l1", "De": "ini", "Para": "s1" },
+          { "Id": "l2", "De": "s1", "Para": "p1" },
+          { "Id": "l3", "De": "p1", "Para": "s2" },
+          { "Id": "l4", "De": "p1", "Para": "s3" },
+          { "Id": "l5", "De": "s2", "Para": "p2" },
+          { "Id": "l6", "De": "s3", "Para": "p2" },
+          { "Id": "l7", "De": "p2", "Para": "d1" },
+          { "Id": "l8", "De": "d1", "Para": "s4", "Rotulo": "Sim" },
+          { "Id": "l9", "De": "d1", "Para": "s5", "Rotulo": "Não" },
+          { "Id": "l10", "De": "s4", "Para": "fim" },
+          { "Id": "l11", "De": "s5", "Para": "s1" }
+        ]
+      }
+    },
+    {
+      "chave": "planejamento_acompanhamento",
+      "nome": "Planejamento do acompanhamento",
+      "figuraGuia": "Figura 19",
+      "definicao": {
+        "PrefixoNumeracao": "4",
+        "Raias": [
+          { "Id": "r1", "Nome": "{nomes.comite}", "Ordem": 1 },
+          { "Id": "r2", "Nome": "{nomes.equipe_acompanhamento}", "Ordem": 2 }
+        ],
+        "Elementos": [
+          { "Id": "ini", "Tipo": "inicio", "RaiaId": "r1", "Nome": "" },
+          { "Id": "t1", "Tipo": "tarefa", "RaiaId": "r1", "Nome": "Definir a responsabilidade pelo acompanhamento" },
+          { "Id": "t2", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Planejar a execução", "Artefatos": ["Plano de execução"] },
+          { "Id": "t3", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Planejar o monitoramento", "Artefatos": ["Plano de monitoramento"] },
+          { "Id": "t4", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Planejar a avaliação", "Artefatos": ["Plano de avaliação"] },
+          { "Id": "t5", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Consolidar o plano de acompanhamento", "Artefatos": ["Plano de acompanhamento (PA-PDTIC)"] },
+          { "Id": "t6", "Tipo": "tarefa", "RaiaId": "r1", "Nome": "Aprovar o plano de acompanhamento", "Artefatos": ["PA-PDTIC aprovado"] },
+          { "Id": "d1", "Tipo": "decisao", "RaiaId": "r1", "Nome": "Plano de acompanhamento aprovado?" },
+          { "Id": "fim", "Tipo": "fim", "RaiaId": "r1", "Nome": "" }
+        ],
+        "Ligacoes": [
+          { "Id": "l1", "De": "ini", "Para": "t1" },
+          { "Id": "l2", "De": "t1", "Para": "t2" },
+          { "Id": "l3", "De": "t2", "Para": "t3" },
+          { "Id": "l4", "De": "t3", "Para": "t4" },
+          { "Id": "l5", "De": "t4", "Para": "t5" },
+          { "Id": "l6", "De": "t5", "Para": "t6" },
+          { "Id": "l7", "De": "t6", "Para": "d1" },
+          { "Id": "l8", "De": "d1", "Para": "fim", "Rotulo": "Sim" },
+          { "Id": "l9", "De": "d1", "Para": "t5", "Rotulo": "Não" }
+        ]
+      }
+    },
+    {
+      "chave": "monitoramento",
+      "nome": "Monitoramento",
+      "figuraGuia": "Figura 20",
+      "definicao": {
+        "PrefixoNumeracao": "5",
+        "Raias": [
+          { "Id": "r1", "Nome": "{nomes.comite}", "Ordem": 1 },
+          { "Id": "r2", "Nome": "{nomes.equipe_acompanhamento}", "Ordem": 2 }
+        ],
+        "Elementos": [
+          { "Id": "ini", "Tipo": "inicio", "RaiaId": "r2", "Nome": "" },
+          { "Id": "t1", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Analisar as informações", "Artefatos": ["Painel de acompanhamento (AC-PDTIC)"] },
+          { "Id": "t2", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Consolidar as informações", "Artefatos": ["Relatório de acompanhamento (RA-PDTIC)", "PA-PDTIC atualizado"] },
+          { "Id": "d1", "Tipo": "decisao", "RaiaId": "r2", "Nome": "PA-PDTIC atualizado?" },
+          { "Id": "d2", "Tipo": "decisao", "RaiaId": "r1", "Nome": "PA-PDTIC aprovado?" },
+          { "Id": "fim", "Tipo": "fim", "RaiaId": "r2", "Nome": "" }
+        ],
+        "Ligacoes": [
+          { "Id": "l1", "De": "ini", "Para": "t1" },
+          { "Id": "l2", "De": "t1", "Para": "t2" },
+          { "Id": "l3", "De": "t2", "Para": "d1" },
+          { "Id": "l4", "De": "d1", "Para": "fim", "Rotulo": "Não" },
+          { "Id": "l5", "De": "d1", "Para": "d2", "Rotulo": "Sim" },
+          { "Id": "l6", "De": "d2", "Para": "fim", "Rotulo": "Sim" },
+          { "Id": "l7", "De": "d2", "Para": "t2", "Rotulo": "Não" }
+        ]
+      }
+    },
+    {
+      "chave": "avaliacao_intermediaria",
+      "nome": "Avaliação intermediária",
+      "figuraGuia": "Figura 21",
+      "definicao": {
+        "PrefixoNumeracao": "6",
+        "Raias": [
+          { "Id": "r1", "Nome": "{nomes.comite}", "Ordem": 1 },
+          { "Id": "r2", "Nome": "{nomes.equipe_acompanhamento}", "Ordem": 2 }
+        ],
+        "Elementos": [
+          { "Id": "ini", "Tipo": "inicio", "RaiaId": "r2", "Nome": "" },
+          { "Id": "t1", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Consolidar os resultados" },
+          { "Id": "t2", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Verificar o alcance dos objetivos e das necessidades", "Artefatos": ["PA-PDTIC atualizado", "RA-PDTIC atualizado"] },
+          { "Id": "t3", "Tipo": "tarefa", "RaiaId": "r1", "Nome": "Avaliar os resultados intermediários", "Artefatos": ["PA-PDTIC aprovado", "RA-PDTIC aprovado"] },
+          { "Id": "d1", "Tipo": "decisao", "RaiaId": "r1", "Nome": "RA-PDTIC aprovado?" },
+          { "Id": "d2", "Tipo": "decisao", "RaiaId": "r1", "Nome": "" },
+          { "Id": "fim", "Tipo": "fim", "RaiaId": "r1", "Nome": "" },
+          { "Id": "k1", "Tipo": "ligacao", "RaiaId": "r1", "Nome": "Diagnóstico [Elaboração do PDTIC]" }
+        ],
+        "Ligacoes": [
+          { "Id": "l1", "De": "ini", "Para": "t1" },
+          { "Id": "l2", "De": "t1", "Para": "t2" },
+          { "Id": "l3", "De": "t2", "Para": "t3" },
+          { "Id": "l4", "De": "t3", "Para": "d1" },
+          { "Id": "l5", "De": "d1", "Para": "d2", "Rotulo": "Sim" },
+          { "Id": "l6", "De": "d1", "Para": "t2", "Rotulo": "Não" },
+          { "Id": "l7", "De": "d2", "Para": "fim", "Rotulo": "Prosseguir" },
+          { "Id": "l8", "De": "d2", "Para": "k1", "Rotulo": "Revisão do PDTIC" }
+        ]
+      }
+    },
+    {
+      "chave": "avaliacao_final",
+      "nome": "Avaliação final",
+      "figuraGuia": "Figura 22",
+      "definicao": {
+        "PrefixoNumeracao": "7",
+        "Raias": [
+          { "Id": "r1", "Nome": "{nomes.autoridade_cargo}", "Ordem": 1 },
+          { "Id": "r2", "Nome": "{nomes.comite}", "Ordem": 2 },
+          { "Id": "r3", "Nome": "{nomes.equipe_acompanhamento}", "Ordem": 3 }
+        ],
+        "Elementos": [
+          { "Id": "ini", "Tipo": "inicio", "RaiaId": "r3", "Nome": "" },
+          { "Id": "t1", "Tipo": "tarefa", "RaiaId": "r3", "Nome": "Coletar e consolidar os indicadores finais" },
+          { "Id": "t2", "Tipo": "tarefa", "RaiaId": "r3", "Nome": "Analisar os resultados finais", "Artefatos": ["Relatório de resultados (RR-PDTIC)"] },
+          { "Id": "t3", "Tipo": "tarefa", "RaiaId": "r2", "Nome": "Aprovar o relatório de resultados (preliminar)", "Artefatos": ["RR-PDTIC aprovado (preliminar)"] },
+          { "Id": "d1", "Tipo": "decisao", "RaiaId": "r2", "Nome": "RR-PDTIC aprovado (preliminar)?" },
+          { "Id": "t4", "Tipo": "tarefa", "RaiaId": "r1", "Nome": "Aprovar o relatório de resultados (final)", "Artefatos": ["RR-PDTIC aprovado"] },
+          { "Id": "d2", "Tipo": "decisao", "RaiaId": "r1", "Nome": "RR-PDTIC aprovado (final)?" },
+          { "Id": "fim", "Tipo": "fim", "RaiaId": "r1", "Nome": "" }
+        ],
+        "Ligacoes": [
+          { "Id": "l1", "De": "ini", "Para": "t1" },
+          { "Id": "l2", "De": "t1", "Para": "t2" },
+          { "Id": "l3", "De": "t2", "Para": "t3" },
+          { "Id": "l4", "De": "t3", "Para": "d1" },
+          { "Id": "l5", "De": "d1", "Para": "t4", "Rotulo": "Sim" },
+          { "Id": "l6", "De": "d1", "Para": "t2", "Rotulo": "Não" },
+          { "Id": "l7", "De": "t4", "Para": "d2" },
+          { "Id": "l8", "De": "d2", "Para": "fim", "Rotulo": "Sim" },
+          { "Id": "l9", "De": "d2", "Para": "t3", "Rotulo": "Não" }
+        ]
+      }
+    }
+  ]
+}
