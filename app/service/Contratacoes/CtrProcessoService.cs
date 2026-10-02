@@ -1123,6 +1123,49 @@ public class CtrProcessoService : ICtrProcessoService
             .Select(c => c.Contagem)
             .ToList();
 
+    // ── Painel público ────────────────────────────────────────────────────────
+
+    public async Task<CtrPainelPublicoResponse> MontarPainelPublicoAsync()
+    {
+        // Todos os processos de supervisão contínua, em análise e com contrato assinado (pedido de
+        // 2026-10-02: o sigiloso é o valor, não a contratação); as comunicações do TCDF ficam de
+        // fora. Projeção enxuta: nada além dos campos abertos sai do banco; o valor estimado não sai.
+        var linhas = await _repositorio.QueryAtivos()
+            .Where(p => p.Origem == CtrDominios.Origem.OrgaoComunicante)
+            .Select(p => new
+            {
+                p.Id,
+                p.OrgaoSigla,
+                p.OrgaoNome,
+                p.Objeto,
+                p.CategoriaObjeto,
+                p.ChegadaSgdi,
+                p.DataAssinaturaContrato,
+                Alteracao = p.AlteradoEm ?? p.CriadoEm
+            })
+            .ToListAsync();
+
+        return new CtrPainelPublicoResponse
+        {
+            Contratacoes = linhas
+                .OrderBy(l => l.ChegadaSgdi == null)
+                .ThenByDescending(l => l.ChegadaSgdi)
+                .ThenBy(l => l.OrgaoSigla)
+                .ThenBy(l => l.Id)
+                .Select(l => new CtrContratacaoPublicaResponse
+                {
+                    OrgaoSigla = l.OrgaoSigla,
+                    OrgaoNome = l.OrgaoNome,
+                    Objeto = l.Objeto,
+                    CategoriaObjeto = l.CategoriaObjeto,
+                    ChegadaSgdi = l.ChegadaSgdi,
+                    DataAssinaturaContrato = l.DataAssinaturaContrato
+                })
+                .ToList(),
+            AtualizadoEm = linhas.Count == 0 ? null : linhas.Max(l => l.Alteracao)
+        };
+    }
+
     // ── Mapeamento ────────────────────────────────────────────────────────────
 
     /// <summary>
