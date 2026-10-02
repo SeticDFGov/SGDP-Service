@@ -32,8 +32,8 @@ public interface ICtrProcessoService
     Task<CtrPainelResponse> MontarPainelAsync(int diasSemMovimento);
 
     /// <summary>
-    /// Painel público (anônimo): as contratações com contrato assinado dos processos de
-    /// supervisão contínua, só com os campos abertos.
+    /// Painel público (anônimo): os processos de supervisão contínua, em análise e assinados,
+    /// só com os campos abertos (sem o valor).
     /// </summary>
     Task<CtrPainelPublicoResponse> MontarPainelPublicoAsync();
 }

@@ -6,14 +6,14 @@ using service.Interface;
 namespace Controllers.Contratacoes;
 
 /// <summary>
-/// Superfície pública da Supervisão Contínua das Contratações: o painel aberto das
-/// contratações de TIC com contrato assinado (página /transparencia-contratacoes do front,
-/// que outros sites podem incorporar).
+/// Superfície pública da Supervisão Contínua das Contratações: o painel aberto dos processos
+/// de contratação de TIC em supervisão contínua, em análise e assinados (página
+/// /transparencia-contratacoes do front, que outros sites podem incorporar).
 ///
 /// Único controller anônimo do módulo. Sem [Authorize] na classe e com [AllowAnonymous]
-/// explícito em cada action, de propósito: a resposta traz só órgão, objeto, tipo, datas e
-/// valor estimado das contratações já assinadas. Não acrescente aqui action que devolva dado
-/// interno do processo (trâmite, criticidade, riscos, manifestações, observação ou pessoas).
+/// explícito em cada action, de propósito: a resposta traz só órgão, objeto, tipo e datas dos
+/// processos. Não acrescente aqui action que devolva dado interno do processo (valor, trâmite,
+/// criticidade, riscos, manifestações, observação ou pessoas).
 /// </summary>
 [ApiController]
 [Route("api/contratacoes/publico")]
@@ -31,7 +31,7 @@ public class CtrPublicoController : ControllerBase
     }
 
     /// <summary>
-    /// Contratações com contrato assinado dos processos de supervisão contínua, só com os campos abertos
+    /// Processos de supervisão contínua (em análise e assinados), só com os campos abertos
     /// </summary>
     [HttpGet("painel")]
     [AllowAnonymous]

@@ -4,13 +4,15 @@ namespace api.Contratacoes;
 /// Painel público da Supervisão Contínua das Contratações (GET api/contratacoes/publico/painel,
 /// anônimo; página /transparencia-contratacoes do front, que outros sites podem incorporar).
 ///
-/// Só as contratações com contrato assinado dos processos de supervisão contínua, e só os
-/// campos abertos: órgão, objeto, tipo (a categoria do objeto), as duas datas e o valor
-/// estimado. Os filtros, os totais e a seleção são feitos no navegador, sobre esta lista.
+/// Todos os processos ativos de supervisão contínua (em análise e com contrato assinado; as
+/// comunicações do TCDF ficam de fora), e só os campos abertos: órgão, objeto, tipo (a categoria
+/// do objeto) e as duas datas. O valor estimado NÃO sai (pedido de 2026-10-02: o sigiloso é o
+/// valor, não a contratação). Os filtros, as contagens, o gráfico e a seleção são feitos no
+/// navegador, sobre esta lista.
 /// </summary>
 public class CtrPainelPublicoResponse
 {
-    /// <summary>Do contrato assinado mais recente para o mais antigo.</summary>
+    /// <summary>Da chegada à SGDI mais recente para a mais antiga (sem a data, no fim).</summary>
     public List<CtrContratacaoPublicaResponse> Contratacoes { get; set; } = new();
 
     /// <summary>Última alteração entre as contratações publicadas; nulo quando não há nenhuma.</summary>
@@ -18,9 +20,9 @@ public class CtrPainelPublicoResponse
 }
 
 /// <summary>
-/// Uma contratação no painel público. Não acrescente campo interno do processo (número SEI,
-/// trâmite, criticidade, riscos, manifestações, observação ou quem registrou): o
-/// <c>CtrPainelPublicoTest</c> confere a lista exata de propriedades.
+/// Uma contratação no painel público. Não acrescente campo interno do processo (valor,
+/// número SEI, trâmite, criticidade, riscos, manifestações, observação ou quem registrou):
+/// o <c>CtrPainelPublicoTest</c> confere a lista exata de propriedades.
 /// </summary>
 public class CtrContratacaoPublicaResponse
 {
@@ -35,8 +37,6 @@ public class CtrContratacaoPublicaResponse
 
     public DateOnly? ChegadaSgdi { get; set; }
 
-    public DateOnly DataAssinaturaContrato { get; set; }
-
-    /// <summary>Valor estimado do processo; nulo quando não foi informado.</summary>
-    public decimal? ValorEstimado { get; set; }
+    /// <summary>Nulo enquanto o contrato não foi assinado (processo em análise).</summary>
+    public DateOnly? DataAssinaturaContrato { get; set; }
 }

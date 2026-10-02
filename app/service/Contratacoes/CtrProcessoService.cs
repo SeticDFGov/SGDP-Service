@@ -1127,12 +1127,11 @@ public class CtrProcessoService : ICtrProcessoService
 
     public async Task<CtrPainelPublicoResponse> MontarPainelPublicoAsync()
     {
-        // Só contrato assinado (com a assinatura o processo está Concluído) e só a supervisão
-        // contínua: os processos ainda em análise e as comunicações do TCDF ficam de fora. Numa
-        // licitação em andamento o valor estimado pode ser sigiloso (art. 24 da Lei nº 14.133/2021).
-        // Projeção enxuta: nada além dos campos abertos sai do banco.
+        // Todos os processos de supervisão contínua, em análise e com contrato assinado (pedido de
+        // 2026-10-02: o sigiloso é o valor, não a contratação); as comunicações do TCDF ficam de
+        // fora. Projeção enxuta: nada além dos campos abertos sai do banco; o valor estimado não sai.
         var linhas = await _repositorio.QueryAtivos()
-            .Where(p => p.DataAssinaturaContrato != null && p.Origem == CtrDominios.Origem.OrgaoComunicante)
+            .Where(p => p.Origem == CtrDominios.Origem.OrgaoComunicante)
             .Select(p => new
             {
                 p.Id,
@@ -1141,8 +1140,7 @@ public class CtrProcessoService : ICtrProcessoService
                 p.Objeto,
                 p.CategoriaObjeto,
                 p.ChegadaSgdi,
-                DataAssinaturaContrato = p.DataAssinaturaContrato!.Value,
-                p.ValorEstimado,
+                p.DataAssinaturaContrato,
                 Alteracao = p.AlteradoEm ?? p.CriadoEm
             })
             .ToListAsync();
@@ -1150,7 +1148,8 @@ public class CtrProcessoService : ICtrProcessoService
         return new CtrPainelPublicoResponse
         {
             Contratacoes = linhas
-                .OrderByDescending(l => l.DataAssinaturaContrato)
+                .OrderBy(l => l.ChegadaSgdi == null)
+                .ThenByDescending(l => l.ChegadaSgdi)
                 .ThenBy(l => l.OrgaoSigla)
                 .ThenBy(l => l.Id)
                 .Select(l => new CtrContratacaoPublicaResponse
@@ -1160,8 +1159,7 @@ public class CtrProcessoService : ICtrProcessoService
                     Objeto = l.Objeto,
                     CategoriaObjeto = l.CategoriaObjeto,
                     ChegadaSgdi = l.ChegadaSgdi,
-                    DataAssinaturaContrato = l.DataAssinaturaContrato,
-                    ValorEstimado = l.ValorEstimado
+                    DataAssinaturaContrato = l.DataAssinaturaContrato
                 })
                 .ToList(),
             AtualizadoEm = linhas.Count == 0 ? null : linhas.Max(l => l.Alteracao)
