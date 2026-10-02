@@ -30,4 +30,10 @@ public interface ICtrProcessoService
     Task<CtrProcessoResponse> RegistrarCheckpointAsync(long id, CtrCheckpointDTO dto, CtrUserContext ctx);
 
     Task<CtrPainelResponse> MontarPainelAsync(int diasSemMovimento);
+
+    /// <summary>
+    /// Painel público (anônimo): as contratações com contrato assinado dos processos de
+    /// supervisão contínua, só com os campos abertos.
+    /// </summary>
+    Task<CtrPainelPublicoResponse> MontarPainelPublicoAsync();
 }

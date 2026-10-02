@@ -334,26 +334,36 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 // acrescenta a partir das roles do token e das concessões gravadas no sistema
 builder.Services.AddAuthorization(ModulosSgdp.AdicionarPoliticas);
 
-// Política usada SÓ pela superfície anônima do PGIA ([EnableRateLimiting] no
-// PgiaPublicoController); nenhum endpoint existente passa pelo limitador.
-// Atrás do proxy o IP real vem no X-Forwarded-For (espoofável — é atrito contra
-// abuso, não fronteira de segurança; a credencial real é a entropia do protocolo).
+// Políticas usadas SÓ pelas superfícies anônimas ([EnableRateLimiting] no
+// PgiaPublicoController e no CtrPublicoController); nenhum endpoint autenticado passa
+// pelo limitador. Atrás do proxy o IP real vem no X-Forwarded-For (espoofável: é
+// atrito contra abuso, não fronteira de segurança; a credencial real é a entropia do protocolo).
+static string IpDoCliente(HttpContext httpContext)
+{
+    var ip = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim();
+    return string.IsNullOrEmpty(ip) ? httpContext.Connection.RemoteIpAddress?.ToString() ?? "anon" : ip;
+}
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.AddPolicy("pgia-publico", httpContext =>
-    {
-        var ip = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim();
-        if (string.IsNullOrEmpty(ip))
-            ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "anon";
-
-        return RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions
+        RateLimitPartition.GetFixedWindowLimiter(IpDoCliente(httpContext), _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = 30,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0
-        });
-    });
+        }));
+
+    // Painel público da Supervisão Contínua: uma requisição por visita, mas a página é
+    // incorporada em sites dos órgãos, com muitos visitantes atrás do mesmo IP da rede do GDF
+    options.AddPolicy(Controllers.Contratacoes.CtrPublicoController.PoliticaLimite, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(IpDoCliente(httpContext), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 120,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
 });
 
 var app = builder.Build();

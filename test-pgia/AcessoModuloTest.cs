@@ -479,7 +479,9 @@ public class AcessoModuloTest : PgiaTestBase
             // Pedir acesso é justamente para quem ainda não tem módulo algum
             [typeof(PedidoAcessoController)] = "autenticado",
             [typeof(AuthLocalController)] = "modo-local",
-            [typeof(PgiaPublicoController)] = "publico"
+            [typeof(PgiaPublicoController)] = "publico",
+            // Painel público da Supervisão Contínua: só as contratações assinadas, com os campos abertos
+            [typeof(CtrPublicoController)] = "publico"
         };
 
         var controllers = typeof(AcessoController).Assembly.GetTypes()

@@ -1123,6 +1123,51 @@ public class CtrProcessoService : ICtrProcessoService
             .Select(c => c.Contagem)
             .ToList();
 
+    // ── Painel público ────────────────────────────────────────────────────────
+
+    public async Task<CtrPainelPublicoResponse> MontarPainelPublicoAsync()
+    {
+        // Só contrato assinado (com a assinatura o processo está Concluído) e só a supervisão
+        // contínua: os processos ainda em análise e as comunicações do TCDF ficam de fora. Numa
+        // licitação em andamento o valor estimado pode ser sigiloso (art. 24 da Lei nº 14.133/2021).
+        // Projeção enxuta: nada além dos campos abertos sai do banco.
+        var linhas = await _repositorio.QueryAtivos()
+            .Where(p => p.DataAssinaturaContrato != null && p.Origem == CtrDominios.Origem.OrgaoComunicante)
+            .Select(p => new
+            {
+                p.Id,
+                p.OrgaoSigla,
+                p.OrgaoNome,
+                p.Objeto,
+                p.CategoriaObjeto,
+                p.ChegadaSgdi,
+                DataAssinaturaContrato = p.DataAssinaturaContrato!.Value,
+                p.ValorEstimado,
+                Alteracao = p.AlteradoEm ?? p.CriadoEm
+            })
+            .ToListAsync();
+
+        return new CtrPainelPublicoResponse
+        {
+            Contratacoes = linhas
+                .OrderByDescending(l => l.DataAssinaturaContrato)
+                .ThenBy(l => l.OrgaoSigla)
+                .ThenBy(l => l.Id)
+                .Select(l => new CtrContratacaoPublicaResponse
+                {
+                    OrgaoSigla = l.OrgaoSigla,
+                    OrgaoNome = l.OrgaoNome,
+                    Objeto = l.Objeto,
+                    CategoriaObjeto = l.CategoriaObjeto,
+                    ChegadaSgdi = l.ChegadaSgdi,
+                    DataAssinaturaContrato = l.DataAssinaturaContrato,
+                    ValorEstimado = l.ValorEstimado
+                })
+                .ToList(),
+            AtualizadoEm = linhas.Count == 0 ? null : linhas.Max(l => l.Alteracao)
+        };
+    }
+
     // ── Mapeamento ────────────────────────────────────────────────────────────
 
     /// <summary>
