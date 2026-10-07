@@ -61,6 +61,12 @@ public class CtrPainelResponse
 
     public List<CtrContagem> PorCategoria { get; set; } = new();
 
+    /// <summary>
+    /// Nova contratação, Alteração de contratação vigente e "Não informado", sempre
+    /// presentes (quantidade desc; empate pela ordem do domínio). Só no painel interno.
+    /// </summary>
+    public List<CtrContagem> PorTipoContratacao { get; set; } = new();
+
     public List<CtrContagem> PorOrgao { get; set; } = new();
 
     public CtrTemposMedios TemposMedios { get; set; } = new();

@@ -203,6 +203,8 @@ public class CtrImportacaoService : ICtrImportacaoService
         // está gravado fica sempre. O documento do pedido ainda passa pela validação, que o
         // anula quando o arquivo limpou a data do pedido (é parte do pedido)
         candidato.NumeroSeiFormulario = existente.NumeroSeiFormulario;
+        // O tipo da contratação (pedido de 2026-10-07) também não tem coluna na planilha
+        candidato.TipoContratacao = existente.TipoContratacao;
         candidato.EsclarecimentoDocumentoSei = existente.EsclarecimentoDocumentoSei;
         candidato.AnaliseTecnicaEncaminhadaEm = existente.AnaliseTecnicaEncaminhadaEm;
         candidato.AnaliseTecnicaArea = existente.AnaliseTecnicaArea;

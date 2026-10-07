@@ -110,6 +110,22 @@ public static class CtrDominios
     }
 
     /// <summary>
+    /// Se o processo é de uma contratação nova ou de alteração de uma contratação vigente
+    /// (aditivo, prorrogação, acréscimo etc.). Pedido de 2026-10-07: estatística só do painel
+    /// interno, fora do painel público. Nulo no processo = não informado.
+    /// </summary>
+    public static class TipoContratacao
+    {
+        public const string Nova = "Nova contratação";
+        public const string Alteracao = "Alteração de contratação vigente";
+
+        /// <summary>Rótulo da contagem do painel para os processos sem o tipo (não é valor gravável).</summary>
+        public const string NaoInformado = "Não informado";
+
+        public static readonly string[] Todos = { Nova, Alteracao };
+    }
+
+    /// <summary>
     /// Se a solução contratada fica hospedada no CeTIC-DF. "Não aplicável (SaaS)" é o
     /// software contratado como serviço, que roda na infraestrutura do fornecedor. Nulo no
     /// processo = não informado.

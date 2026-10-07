@@ -100,6 +100,10 @@ public class CtrProcesso
     // CtrDominios.HospedagemCetic; nulo = não informado
     public string? HospedagemCetic { get; set; }
 
+    // CtrDominios.TipoContratacao (nova ou alteração de contratação vigente); nulo = não
+    // informado. A planilha não tem coluna: a importação preserva o gravado
+    public string? TipoContratacao { get; set; }
+
     // Usa a rede GDFNet; nulo = não informado
     public bool? UsaGdfnet { get; set; }
 

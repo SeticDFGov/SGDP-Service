@@ -244,6 +244,13 @@ public class CtrProcessoService : ICtrProcessoService
         if (p.HospedagemCetic != null)
             p.HospedagemCetic = CtrCsv.ResolverHospedagemCetic(p.HospedagemCetic) ?? p.HospedagemCetic;
 
+        // Tipo da contratação na grafia do domínio, pela mesma comparação sem caixa nem acento
+        p.TipoContratacao = Limpar(p.TipoContratacao);
+        if (p.TipoContratacao != null)
+            p.TipoContratacao = CtrDominios.TipoContratacao.Todos
+                .FirstOrDefault(t => CtrCsv.Normalizar(t) == CtrCsv.Normalizar(p.TipoContratacao))
+                ?? p.TipoContratacao;
+
         // Área técnica na grafia do domínio (SUBSIS/SUBINFRA), pela mesma comparação sem caixa
         p.AnaliseTecnicaArea = Limpar(p.AnaliseTecnicaArea);
         if (p.AnaliseTecnicaArea != null)
@@ -345,6 +352,10 @@ public class CtrProcessoService : ICtrProcessoService
         if (p.HospedagemCetic != null && !CtrDominios.HospedagemCetic.Todos.Contains(p.HospedagemCetic))
             throw new ApiException(ErrorCode.CtrDominioInvalido,
                 $"Hospedagem no CeTIC-DF inválida: {p.HospedagemCetic}");
+
+        if (p.TipoContratacao != null && !CtrDominios.TipoContratacao.Todos.Contains(p.TipoContratacao))
+            throw new ApiException(ErrorCode.CtrDominioInvalido,
+                $"Tipo da contratação inválido: {p.TipoContratacao} (use {string.Join(" ou ", CtrDominios.TipoContratacao.Todos)}).");
 
         if (p.AnaliseTecnicaArea != null && !CtrDominios.AreaTecnica.Todos.Contains(p.AnaliseTecnicaArea))
             throw new ApiException(ErrorCode.CtrDominioInvalido,
@@ -601,6 +612,18 @@ public class CtrProcessoService : ICtrProcessoService
             query = CtrDominios.Origem.Todos.Contains(origem)
                 ? query.Where(p => p.Origem == origem)
                 : query.Where(p => false);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filtro.TipoContratacao))
+        {
+            // "Não informado" é a chave do painel para o tipo nulo; o resto, só o domínio
+            var tipo = filtro.TipoContratacao.Trim();
+            if (tipo == CtrDominios.TipoContratacao.NaoInformado)
+                query = query.Where(p => p.TipoContratacao == null);
+            else
+                query = CtrDominios.TipoContratacao.Todos.Contains(tipo)
+                    ? query.Where(p => p.TipoContratacao == tipo)
+                    : query.Where(p => false);
         }
 
         if (filtro.EsclarecimentoPendente != null)
@@ -889,6 +912,8 @@ public class CtrProcessoService : ICtrProcessoService
         processo.ValorEstimado = dto.ValorEstimado;
         processo.HospedagemCetic = dto.HospedagemCetic;
         processo.UsaGdfnet = dto.UsaGdfnet;
+        // Segue o corpo (nulo limpa), como os dados da contratação
+        processo.TipoContratacao = dto.TipoContratacao;
         processo.EsclarecimentoSolicitadoEm = dto.EsclarecimentoSolicitadoEm;
         processo.EsclarecimentoDescricao = dto.EsclarecimentoDescricao;
         processo.EsclarecimentoDocumentoSei = dto.EsclarecimentoDocumentoSei;
@@ -928,6 +953,7 @@ public class CtrProcessoService : ICtrProcessoService
         ValorEstimado = p.ValorEstimado,
         HospedagemCetic = p.HospedagemCetic,
         UsaGdfnet = p.UsaGdfnet,
+        TipoContratacao = p.TipoContratacao,
         EsclarecimentoSolicitadoEm = p.EsclarecimentoSolicitadoEm,
         EsclarecimentoDescricao = p.EsclarecimentoDescricao,
         EsclarecimentoDocumentoSei = p.EsclarecimentoDocumentoSei,
@@ -968,6 +994,7 @@ public class CtrProcessoService : ICtrProcessoService
             {
                 Id = p.Id,
                 CategoriaObjeto = p.CategoriaObjeto,
+                TipoContratacao = p.TipoContratacao,
                 OrgaoSigla = p.OrgaoSigla,
                 Restituido = p.Restituido,
                 ChegadaSgdi = p.ChegadaSgdi,
@@ -1034,6 +1061,11 @@ public class CtrProcessoService : ICtrProcessoService
                 .Select(g => new CtrContagem { Chave = g.Key, Quantidade = g.Count() })
                 .OrderByDescending(c => c.Quantidade).ThenBy(c => c.Chave)
                 .ToList(),
+            // Nova × alteração de contratação vigente, mais "Não informado" (processos sem o
+            // tipo), sempre presentes. Fica só no painel interno: o público não o recebe
+            PorTipoContratacao = ContarNoDominio(
+                CtrDominios.TipoContratacao.Todos.Append(CtrDominios.TipoContratacao.NaoInformado),
+                resumos.Select(r => r.TipoContratacao ?? CtrDominios.TipoContratacao.NaoInformado).ToList()),
             PorOrgao = resumos
                 .GroupBy(r => r.OrgaoSigla)
                 .Select(g => new CtrContagem { Chave = g.Key, Quantidade = g.Count() })
@@ -1305,6 +1337,7 @@ public class CtrProcessoService : ICtrProcessoService
             ValorEstimado = p.ValorEstimado,
             HospedagemCetic = p.HospedagemCetic,
             UsaGdfnet = p.UsaGdfnet,
+            TipoContratacao = p.TipoContratacao,
             EsclarecimentoSolicitadoEm = p.EsclarecimentoSolicitadoEm,
             EsclarecimentoDescricao = p.EsclarecimentoDescricao,
             EsclarecimentoDocumentoSei = p.EsclarecimentoDocumentoSei,
@@ -1333,6 +1366,7 @@ public class CtrProcessoService : ICtrProcessoService
     {
         public long Id { get; set; }
         public string CategoriaObjeto { get; set; } = string.Empty;
+        public string? TipoContratacao { get; set; }
         public string OrgaoSigla { get; set; } = string.Empty;
         public bool Restituido { get; set; }
         public DateOnly? ChegadaSgdi { get; set; }
