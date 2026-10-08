@@ -12,6 +12,7 @@ namespace Controllers.Pgia;
 /// Restrito ao perfil admin do SGDP (mesmo padrão do modificar-unidade).
 /// </summary>
 [ApiController]
+[PgiaErros]
 [Authorize(Roles = "admin")]
 [Route("api/pgia/admin")]
 public class PgiaAdminController : ControllerBase

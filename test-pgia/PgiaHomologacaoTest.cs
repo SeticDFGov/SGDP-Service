@@ -434,7 +434,7 @@ public class PgiaHomologacaoTest : PgiaTestBase
         {
             Tipo = PgiaDominios.TipoDeliberacao.ClassificacaoAltoRisco,
             SistemaIaId = sistema.Id,
-            DataDeliberacao = new DateOnly(2026, 10, 5),
+            DataDeliberacao = new DateOnly(2025, 10, 5),
             Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel,
             NumeroAto = "12/2026"
         }, cgticCtx);
@@ -466,7 +466,7 @@ public class PgiaHomologacaoTest : PgiaTestBase
         {
             Tipo = PgiaDominios.TipoDeliberacao.ClassificacaoAltoRisco,
             SistemaIaId = sistema.Id,
-            DataDeliberacao = new DateOnly(2026, 10, 5),
+            DataDeliberacao = new DateOnly(2025, 10, 5),
             Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel,
             Ementa = "Enquadramento confirmado; implantação autorizada."
         }, cgticCtx);
@@ -603,7 +603,7 @@ public class PgiaHomologacaoTest : PgiaTestBase
         {
             Tipo = "Suspensão de sistema",
             SistemaIaId = sistema.Id,
-            DataDeliberacao = new DateOnly(2026, 10, 5),
+            DataDeliberacao = new DateOnly(2025, 10, 5),
             Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel
         }, cgticCtx);
 
@@ -627,7 +627,7 @@ public class PgiaHomologacaoTest : PgiaTestBase
         var geral = await _governanca.CriarDeliberacaoAsync(new PgiaDeliberacaoCreateDTO
         {
             Tipo = PgiaDominios.TipoDeliberacao.AprovacaoAquisicaoAltoRisco,
-            DataDeliberacao = new DateOnly(2026, 10, 5),
+            DataDeliberacao = new DateOnly(2025, 10, 5),
             Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel
         }, cgticCtx);
 
@@ -656,7 +656,7 @@ public class PgiaHomologacaoTest : PgiaTestBase
         {
             Tipo = PgiaDominios.TipoDeliberacao.ClassificacaoAltoRisco,
             SistemaIaId = sistema.Id,
-            DataDeliberacao = new DateOnly(2026, 10, 5),
+            DataDeliberacao = new DateOnly(2025, 10, 5),
             Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel
         }, cgticCtx);
 
@@ -672,7 +672,7 @@ public class PgiaHomologacaoTest : PgiaTestBase
         {
             Tipo = "Suspensão de sistema",
             SistemaIaId = sistema.Id,
-            DataDeliberacao = new DateOnly(2026, 10, 22),
+            DataDeliberacao = new DateOnly(2025, 10, 22),
             Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel
         }, cgticCtx);
         var aiaSalva = await Context.PgiaAias.FirstAsync(a => a.Id == aia.Id);
@@ -700,7 +700,7 @@ public class PgiaHomologacaoTest : PgiaTestBase
         {
             Tipo = PgiaDominios.TipoDeliberacao.ClassificacaoAltoRisco,
             SistemaIaId = sistemaB.Id,
-            DataDeliberacao = new DateOnly(2026, 10, 5),
+            DataDeliberacao = new DateOnly(2025, 10, 5),
             Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel
         }, cgticCtx);
 

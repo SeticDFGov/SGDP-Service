@@ -271,7 +271,7 @@ public class PgiaContratoTest : PgiaTestBase
         var deliberacao = await _governanca.CriarDeliberacaoAsync(new PgiaDeliberacaoCreateDTO
         {
             Tipo = "Autorização de treinamento com dados do GDF",
-            DataDeliberacao = new DateOnly(2026, 11, 1),
+            DataDeliberacao = new DateOnly(2025, 11, 1),
             Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel
         }, cgticCtx);
 
@@ -305,7 +305,7 @@ public class PgiaContratoTest : PgiaTestBase
         var deliberacao = await _governanca.CriarDeliberacaoAsync(new PgiaDeliberacaoCreateDTO
         {
             Tipo = "Autorização de treinamento com dados do GDF",
-            DataDeliberacao = new DateOnly(2026, 11, 1),
+            DataDeliberacao = new DateOnly(2025, 11, 1),
             Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel
         }, cgticCtx);
 

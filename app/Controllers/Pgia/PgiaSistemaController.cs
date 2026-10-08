@@ -15,6 +15,7 @@ namespace Controllers.Pgia;
 /// e escopo de órgão no PgiaPermissionService.
 /// </summary>
 [ApiController]
+[PgiaErros]
 [Authorize(Policy = ModulosSgdp.PoliticaPgia)]
 [Route("api/pgia/sistema")]
 public class PgiaSistemaController : ControllerBase

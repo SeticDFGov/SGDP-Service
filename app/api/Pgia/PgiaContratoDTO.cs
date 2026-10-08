@@ -84,8 +84,8 @@ public class PgiaContratoResponse : PgiaContratoCreateDTO
 
 public class PgiaLegadoCreateDTO
 {
-    // D30 (PgiaDominios.TipoInstrumentoLegado)
-    [StringLength(30)]
+    // D30 (PgiaDominios.TipoInstrumentoLegado); varchar(40): "Convênio ou instrumento congênere" tem 33
+    [StringLength(40)]
     public string TipoInstrumento { get; set; } = string.Empty;
 
     public string Descricao { get; set; } = string.Empty;
