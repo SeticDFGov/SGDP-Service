@@ -787,7 +787,7 @@ public class PgiaOperacaoTest : PgiaTestBase
             _service.CriarUsoAsync(new PgiaRegistroUsoCreateDTO
             {
                 ProdutoRef = "Ofício 12/2026",
-                DataUso = new DateOnly(2026, 11, 20),
+                DataUso = new DateOnly(2025, 11, 20),
                 RevisaoHumanaConfirmada = true
             }, ctx));
         Assert.Equal((int)ErrorCode.PgiaRegistroUsoInvalido, semFonte.Error.Code);
@@ -798,7 +798,7 @@ public class PgiaOperacaoTest : PgiaTestBase
                 SistemaIaId = sistema.Id,
                 PlataformaId = plataforma.Id,
                 ProdutoRef = "Ofício 12/2026",
-                DataUso = new DateOnly(2026, 11, 20),
+                DataUso = new DateOnly(2025, 11, 20),
                 RevisaoHumanaConfirmada = true
             }, ctx));
         Assert.Equal((int)ErrorCode.PgiaRegistroUsoInvalido, duasFontes.Error.Code);
@@ -815,7 +815,7 @@ public class PgiaOperacaoTest : PgiaTestBase
             {
                 SistemaIaId = sistema.Id,
                 ProdutoRef = "Ofício 12/2026",
-                DataUso = new DateOnly(2026, 11, 20),
+                DataUso = new DateOnly(2025, 11, 20),
                 RevisaoHumanaConfirmada = false
             }, ctx));
 
@@ -834,7 +834,7 @@ public class PgiaOperacaoTest : PgiaTestBase
             {
                 PlataformaId = plataforma.Id,
                 ProdutoRef = "Minuta de parecer",
-                DataUso = new DateOnly(2026, 11, 20),
+                DataUso = new DateOnly(2025, 11, 20),
                 RevisaoHumanaConfirmada = true
             }, ctx));
 
@@ -854,7 +854,7 @@ public class PgiaOperacaoTest : PgiaTestBase
         {
             PlataformaId = plataforma.Id,
             ProdutoRef = "Minuta de parecer",
-            DataUso = new DateOnly(2026, 11, 20),
+            DataUso = new DateOnly(2025, 11, 20),
             RevisaoHumanaConfirmada = true
         }, ctx);
 
@@ -875,7 +875,7 @@ public class PgiaOperacaoTest : PgiaTestBase
             {
                 SistemaIaId = sistemaDaSeec.Id,
                 ProdutoRef = "Ofício 12/2026",
-                DataUso = new DateOnly(2026, 11, 20),
+                DataUso = new DateOnly(2025, 11, 20),
                 RevisaoHumanaConfirmada = true
             }, ctx));
 
@@ -893,7 +893,7 @@ public class PgiaOperacaoTest : PgiaTestBase
             {
                 PlataformaId = plataforma.Id,
                 ProdutoRef = "Minuta",
-                DataUso = new DateOnly(2026, 11, 20),
+                DataUso = new DateOnly(2025, 11, 20),
                 RevisaoHumanaConfirmada = true
             }, ctx));
 
@@ -911,7 +911,7 @@ public class PgiaOperacaoTest : PgiaTestBase
             {
                 SistemaIaId = sistema.Id,
                 ProdutoRef = "   ",
-                DataUso = new DateOnly(2026, 11, 20),
+                DataUso = new DateOnly(2025, 11, 20),
                 RevisaoHumanaConfirmada = true
             }, ctx));
         Assert.Equal((int)ErrorCode.PgiaRegistroUsoInvalido, semProduto.Error.Code);
@@ -940,21 +940,21 @@ public class PgiaOperacaoTest : PgiaTestBase
         {
             SistemaIaId = sistemaSes.Id,
             ProdutoRef = "Ofício do Carlos",
-            DataUso = new DateOnly(2026, 11, 20),
+            DataUso = new DateOnly(2025, 11, 20),
             RevisaoHumanaConfirmada = true
         }, carlosCtx);
         await _service.CriarUsoAsync(new PgiaRegistroUsoCreateDTO
         {
             SistemaIaId = sistemaSes.Id,
             ProdutoRef = "Ofício da Maria",
-            DataUso = new DateOnly(2026, 11, 21),
+            DataUso = new DateOnly(2025, 11, 21),
             RevisaoHumanaConfirmada = true
         }, mariaCtx);
         await _service.CriarUsoAsync(new PgiaRegistroUsoCreateDTO
         {
             SistemaIaId = sistemaSeec.Id,
             ProdutoRef = "Nota da SEEC",
-            DataUso = new DateOnly(2026, 11, 22),
+            DataUso = new DateOnly(2025, 11, 22),
             RevisaoHumanaConfirmada = true
         }, joaoCtx);
 
@@ -982,7 +982,7 @@ public class PgiaOperacaoTest : PgiaTestBase
             {
                 SistemaIaId = sistema.Id,
                 ProdutoRef = $"Ofício do dia {dia}",
-                DataUso = new DateOnly(2026, 11, dia),
+                DataUso = new DateOnly(2025, 11, dia),
                 RevisaoHumanaConfirmada = true
             }, ctx);
         }
@@ -1017,7 +1017,7 @@ public class PgiaOperacaoTest : PgiaTestBase
             {
                 SistemaIaId = sistema.Id,
                 ProdutoRef = $"Anterior {dia}",
-                DataUso = new DateOnly(2026, 11, dia),
+                DataUso = new DateOnly(2025, 11, dia),
                 RevisaoHumanaConfirmada = true
             }, ctx);
         }
@@ -1027,7 +1027,7 @@ public class PgiaOperacaoTest : PgiaTestBase
             SistemaIaId = sistema.Id,
             ProdutoRef = "Ofício mais novo",
             ProcessoSei = "00060-00012121/2026-11",
-            DataUso = new DateOnly(2026, 11, 25),
+            DataUso = new DateOnly(2025, 11, 25),
             RevisaoHumanaConfirmada = true
         }, ctx);
 

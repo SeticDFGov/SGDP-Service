@@ -553,10 +553,13 @@ public class PgiaRelatorioService : IPgiaRelatorioService
             throw new ApiException(ErrorCode.PgiaPeriodoInvalido,
                 "A data de conclusão não pode ser anterior ao início dos trabalhos.");
 
+        if (string.IsNullOrWhiteSpace(dto.Parecer))
+            throw new ApiException(ErrorCode.PgiaDominioInvalido, "Escreva o parecer da auditoria.");
+
         // A entidade designada mexe só nas datas e no parecer
         auditoria.DataInicio = dto.DataInicio;
         auditoria.DataFim = dto.DataFim;
-        auditoria.Parecer = string.IsNullOrWhiteSpace(dto.Parecer) ? null : dto.Parecer.Trim();
+        auditoria.Parecer = dto.Parecer.Trim();
         auditoria.AlteradoEm = DateTime.UtcNow;
         auditoria.AlteradoPor = ctx.Email;
 

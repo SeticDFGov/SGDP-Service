@@ -155,11 +155,16 @@ public class PgiaPublicoService : IPgiaPublicoService
             "Não foi possível gerar o protocolo agora. Tente novamente em instantes.");
     }
 
+    /// <summary>Protocolo como o servidor o gera: sem espaços nas pontas e em caixa alta.</summary>
+    public static string NormalizarProtocolo(string protocolo) =>
+        protocolo.Trim().ToUpperInvariant();
+
     public async Task<PgiaSolicitacaoPublicaResponse?> ConsultarPorProtocoloAsync(string protocolo)
     {
         if (string.IsNullOrWhiteSpace(protocolo)) return null;
 
-        var solicitacao = await _repositorio.GetSolicitacaoPorProtocoloAsync(protocolo.Trim());
+        // O protocolo é gerado em caixa alta: quem digita "pgia-2026-..." com espaços acha igual
+        var solicitacao = await _repositorio.GetSolicitacaoPorProtocoloAsync(NormalizarProtocolo(protocolo));
         // Protocolo desconhecido não distingue "não existe" de "não é seu"
         return solicitacao == null ? null : MapPublica(solicitacao);
     }

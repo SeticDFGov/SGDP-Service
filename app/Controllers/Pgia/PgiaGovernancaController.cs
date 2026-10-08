@@ -18,6 +18,7 @@ namespace Controllers.Pgia;
 /// (arts. 18, § 2º e 21). Toda ação valida papel no PgiaPermissionService.
 /// </summary>
 [ApiController]
+[PgiaErros]
 [Authorize(Policy = ModulosSgdp.PoliticaPgia)]
 [Route("api/pgia/governanca")]
 public class PgiaGovernancaController : ControllerBase
@@ -294,6 +295,24 @@ public class PgiaGovernancaController : ControllerBase
         if (!_permissionService.CanCreate(ctx, PgiaResources.Deliberacao)) return Forbid();
 
         return Ok(await _service.CriarDeliberacaoAsync(dto, ctx));
+    }
+
+    /// <summary>
+    /// Anexa a ata a uma deliberação já registrada (ou troca a que ela tem). Mesmo
+    /// gate de quem registra deliberação; só aceita documento central que exista.
+    /// Devolve a deliberação, no formato da lista.
+    /// </summary>
+    [HttpPut("deliberacao/{id:long}/ata")]
+    public async Task<IActionResult> DefinirAtaDeliberacao(long id, [FromBody] PgiaDeliberacaoAtaDTO dto)
+    {
+        var ctx = await GetContextAsync();
+        if (ctx == null) return Unauthorized();
+        if (!_permissionService.CanCreate(ctx, PgiaResources.Deliberacao)) return Forbid();
+
+        var deliberacao = await _service.GetDeliberacaoEntidadeAsync(id);
+        if (deliberacao == null) return NotFound();
+
+        return Ok(await _service.DefinirAtaDeliberacaoAsync(id, dto, ctx));
     }
 
     // ── Histórico de decisões do CGTIC (relatório de auditoria) ───────────────

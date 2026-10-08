@@ -10,6 +10,8 @@ public interface IPgiaGovernancaService
     Task<List<PgiaDeliberacaoResponse>> ListarDeliberacoesAsync();
     Task<List<PgiaDeliberacaoResponse>> ListarDeliberacoesPorSistemaAsync(long sistemaId);
     Task<PgiaDeliberacaoResponse> CriarDeliberacaoAsync(PgiaDeliberacaoCreateDTO dto, PgiaUserContext ctx);
+    Task<PgiaDeliberacaoCgtic?> GetDeliberacaoEntidadeAsync(long id);
+    Task<PgiaDeliberacaoResponse> DefinirAtaDeliberacaoAsync(long id, PgiaDeliberacaoAtaDTO dto, PgiaUserContext ctx);
 
     // Plataformas públicas de IA generativa (arts. 8º, IV, 18 e 20)
     Task<List<PgiaPlataformaResponse>> ListarPlataformasAsync();
