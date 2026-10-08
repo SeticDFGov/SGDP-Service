@@ -9,7 +9,7 @@ public static class CtrDominios
 {
     /// <summary>
     /// Categoria do objeto contratado: os 12 valores observados na planilha mais
-    /// "Serviços de TIC" (pedido de 2026-09-22).
+    /// "Serviços de TIC" (pedido de 2026-09-22), "Nuvem" e "Tokens de IA" (pedido de 2026-10-07).
     /// </summary>
     public static class CategoriaObjeto
     {
@@ -24,6 +24,8 @@ public static class CtrDominios
         public const string CaptacaoAudiovisual = "Captação Audiovisual";
         public const string TelefoniaVoip = "Telefonia / VoIP";
         public const string ServicosTic = "Serviços de TIC";
+        public const string Nuvem = "Nuvem";
+        public const string TokensIa = "Tokens de IA";
 
         /// <summary>Default da importação quando a célula "Categoria do Objeto" vem vazia.</summary>
         public const string SemObjeto = "Sem objeto / Indefinido";
@@ -34,7 +36,7 @@ public static class CtrDominios
         {
             InfraestruturaRede, DesenvolvimentoSoftware, OutsourcingImpressao, LicenciamentoSoftware,
             InteligenciaArtificial, SegurancaCibernetica, SistemasGestao, CertificacaoDigital,
-            CaptacaoAudiovisual, TelefoniaVoip, ServicosTic, SemObjeto, Outros
+            CaptacaoAudiovisual, TelefoniaVoip, ServicosTic, Nuvem, TokensIa, SemObjeto, Outros
         };
     }
 
@@ -107,6 +109,22 @@ public static class CtrDominios
         public const string Tcdf = "TCDF";
 
         public static readonly string[] Todos = { OrgaoComunicante, Tcdf };
+    }
+
+    /// <summary>
+    /// Se o processo é de uma contratação nova ou de alteração de uma contratação vigente
+    /// (aditivo, prorrogação, acréscimo etc.). Pedido de 2026-10-07: estatística só do painel
+    /// interno, fora do painel público. Nulo no processo = não informado.
+    /// </summary>
+    public static class TipoContratacao
+    {
+        public const string Nova = "Nova contratação";
+        public const string Alteracao = "Alteração de contratação vigente";
+
+        /// <summary>Rótulo da contagem do painel para os processos sem o tipo (não é valor gravável).</summary>
+        public const string NaoInformado = "Não informado";
+
+        public static readonly string[] Todos = { Nova, Alteracao };
     }
 
     /// <summary>

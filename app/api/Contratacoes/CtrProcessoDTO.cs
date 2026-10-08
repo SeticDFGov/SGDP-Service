@@ -30,6 +30,12 @@ public class CtrProcessoFiltro : PagedRequest
     /// </summary>
     public string? Origem { get; set; }
 
+    /// <summary>
+    /// CtrDominios.TipoContratacao (Nova contratação / Alteração de contratação vigente) ou
+    /// "Não informado" (os processos sem o tipo). Fora do domínio, lista vazia.
+    /// </summary>
+    public string? TipoContratacao { get; set; }
+
     /// <summary>true = só os que aguardam esclarecimento; false = só os sem pendência; null = todos.</summary>
     public bool? EsclarecimentoPendente { get; set; }
 
@@ -171,6 +177,14 @@ public class CtrProcessoCreateDTO
 
     /// <summary>Usa a rede GDFNet. Nulo = não informado; na EDIÇÃO, nulo LIMPA.</summary>
     public bool? UsaGdfnet { get; set; }
+
+    /// <summary>
+    /// CtrDominios.TipoContratacao (Nova contratação ou Alteração de contratação vigente),
+    /// comparado sem caixa nem acento e gravado na grafia do domínio. Vazio = não
+    /// informado; na EDIÇÃO, nulo ou vazio LIMPA (o formulário manda sempre).
+    /// </summary>
+    [StringLength(40)]
+    public string? TipoContratacao { get; set; }
 
     /// <summary>Data do pedido de esclarecimentos ao órgão comunicante.</summary>
     public DateOnly? EsclarecimentoSolicitadoEm { get; set; }
@@ -378,6 +392,9 @@ public class CtrProcessoResponse
 
     /// <summary>Usa a rede GDFNet; nulo = não informado.</summary>
     public bool? UsaGdfnet { get; set; }
+
+    /// <summary>CtrDominios.TipoContratacao; nulo = não informado.</summary>
+    public string? TipoContratacao { get; set; }
 
     public DateOnly? EsclarecimentoSolicitadoEm { get; set; }
 
