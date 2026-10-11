@@ -6,43 +6,68 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# Deploys da main entram em fila (nunca dois ao mesmo tempo); builds de PR
+# antigos do mesmo branch são cancelados.
+concurrency:
+  group: deploy-${{ github.event_name == 'push' && 'main' || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE_NAME: sgpd_service
+  MANIFEST: backend/deployment.yaml
+
 jobs:
   build:
-    runs-on: ubuntu-latest   
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout do código
       uses: actions/checkout@v4
 
+    - name: Set Image Tag
+      run: |
+        echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+        echo "IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/${IMAGE_NAME}:${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+    # Em PR só valida o build; imagem e manifesto só saem da main.
+    - name: Build da imagem
+      run: docker build -f Dockerfile.prod -t "$IMAGE" .
+
     - name: Login no Docker Hub
+      if: github.event_name == 'push'
       uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Set Image Tag
-      run: |
-        echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
-
-    - name: Build da imagem
-      run: |
-        docker build -f Dockerfile.prod -t ${{ secrets.DOCKERHUB_USERNAME }}/sgpd_service:${{ env.IMAGE_TAG }} .
-
     - name: Push da imagem
-      run: |
-        docker push ${{ secrets.DOCKERHUB_USERNAME }}/sgpd_service:${{ env.IMAGE_TAG }}
+      if: github.event_name == 'push'
+      run: docker push "$IMAGE"
 
+    # O ArgoCD (auto-sync) aplica o que estiver no k8s-manifests; o push aqui é o deploy.
     - name: Update deployment manifest
+      if: github.event_name == 'push'
       run: |
         git config --global user.email "ci@example.com"
         git config --global user.name "CI Bot"
-        
-        git clone https://${{ secrets.GH_TOKEN }}@github.com/SeticDFGov/k8s-manifests.git
+
+        git clone --depth 1 https://${{ secrets.GH_TOKEN }}@github.com/SeticDFGov/k8s-manifests.git
         cd k8s-manifests
 
-        yq eval ".spec.template.spec.containers[0].image = \"${{ secrets.DOCKERHUB_USERNAME }}/sgpd_service:${{ env.IMAGE_TAG }}\"" \
-          -i backend/deployment.yaml
+        yq eval ".spec.template.spec.containers[0].image = \"$IMAGE\"" -i "$MANIFEST"
 
-        git add backend/deployment.yaml
-        git commit -m "deploy: update sgpd_service to ${{ env.IMAGE_TAG }}"
-        git push origin main
+        if git diff --quiet; then
+          echo "Manifesto já aponta para $IMAGE"; exit 0
+        fi
+
+        git add "$MANIFEST"
+        git commit -m "deploy: update ${IMAGE_NAME} to ${IMAGE_TAG}" \
+          -m "Origem: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+
+        # Front e back escrevem no mesmo repo; se o outro empurrou antes, rebase e tenta de novo.
+        for i in 1 2 3 4 5; do
+          git push origin main && exit 0
+          sleep $((i * 3))
+          git pull --rebase origin main
+        done
+        echo "Falha ao enviar o manifesto após 5 tentativas"; exit 1
