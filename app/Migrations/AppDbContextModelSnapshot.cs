@@ -2132,8 +2132,8 @@ namespace demanda_service.Migrations
 
                     b.Property<string>("TipoInstrumento")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
                         .HasColumnName("tipo_instrumento");
 
                     b.Property<Guid?>("TriadoPor")

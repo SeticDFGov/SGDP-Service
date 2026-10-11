@@ -14,6 +14,7 @@ namespace Controllers.Pgia;
 /// no PgiaPermissionService.
 /// </summary>
 [ApiController]
+[PgiaErros]
 [Authorize(Policy = ModulosSgdp.PoliticaPgia)]
 [Route("api/pgia/orgao")]
 public class PgiaOrgaoController : ControllerBase

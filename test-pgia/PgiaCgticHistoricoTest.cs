@@ -105,7 +105,7 @@ public class PgiaCgticHistoricoTest : PgiaTestBase
         {
             Tipo = tipo,
             SistemaIaId = sistemaId,
-            DataDeliberacao = new DateOnly(2026, 10, dia),
+            DataDeliberacao = new DateOnly(2025, 10, dia),
             Resultado = resultado,
             NumeroAto = $"{dia}/2026"
         }, cgticCtx);
@@ -213,7 +213,7 @@ public class PgiaCgticHistoricoTest : PgiaTestBase
         await _service.CriarDeliberacaoAsync(new PgiaDeliberacaoCreateDTO
         {
             Tipo = "Resolução normativa",
-            DataDeliberacao = new DateOnly(2026, 10, 1),
+            DataDeliberacao = new DateOnly(2025, 10, 1),
             Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel
         }, cgticCtx);
 

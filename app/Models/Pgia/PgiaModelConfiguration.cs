@@ -1025,7 +1025,7 @@ public static class PgiaModelConfiguration
             entity.HasKey(l => l.Id).HasName("pk_pgia_instrumento_legado");
             entity.Property(l => l.Id).HasColumnName("id").UseIdentityByDefaultColumn();
             entity.Property(l => l.OrgaoId).HasColumnName("orgao_id");
-            entity.Property(l => l.TipoInstrumento).HasColumnName("tipo_instrumento").HasMaxLength(30).IsRequired();
+            entity.Property(l => l.TipoInstrumento).HasColumnName("tipo_instrumento").HasMaxLength(40).IsRequired();
             entity.Property(l => l.Descricao).HasColumnName("descricao").IsRequired();
             entity.Property(l => l.Numero).HasColumnName("numero").HasMaxLength(30);
             entity.Property(l => l.EnvolveIa).HasColumnName("envolve_ia").HasMaxLength(10)

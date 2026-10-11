@@ -497,6 +497,10 @@ public class PgiaOperacaoService : IPgiaOperacaoService
         if (dto.DataUso == default)
             throw new ApiException(ErrorCode.PgiaRegistroUsoInvalido, "Informe a data do uso.");
 
+        if (dto.DataUso > DateOnly.FromDateTime(DateTimeHelper.TodayBrasilia()))
+            throw new ApiException(ErrorCode.PgiaRegistroUsoInvalido,
+                "A data do uso não pode ser depois de hoje.");
+
         // Declaração do art. 13, V: sem ela não há registro
         if (!dto.RevisaoHumanaConfirmada)
             throw new ApiException(ErrorCode.PgiaRevisaoHumanaObrigatoria,

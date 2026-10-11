@@ -17,6 +17,7 @@ namespace Controllers.Pgia;
 /// action que devolva dado interno do inventário ou do solicitante.
 /// </summary>
 [ApiController]
+[PgiaErros]
 [Route("api/pgia/publico")]
 [EnableRateLimiting("pgia-publico")]
 public class PgiaPublicoController : ControllerBase

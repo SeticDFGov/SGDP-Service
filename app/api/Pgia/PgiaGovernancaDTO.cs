@@ -30,6 +30,15 @@ public class PgiaDeliberacaoCreateDTO
     public long? DocumentoId { get; set; }
 }
 
+/// <summary>
+/// Anexa (ou troca) a ata de uma deliberação já registrada. A ata é documento
+/// central (sem órgão), como o que a tela cria no registro da deliberação.
+/// </summary>
+public class PgiaDeliberacaoAtaDTO
+{
+    public long? DocumentoId { get; set; }
+}
+
 public class PgiaDeliberacaoResponse
 {
     public long Id { get; set; }

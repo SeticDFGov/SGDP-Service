@@ -283,6 +283,10 @@ public class PgiaGovernancaService : IPgiaGovernancaService
         if (dto.DataDeliberacao == default)
             throw new ApiException(ErrorCode.PgiaDominioInvalido, "Informe a data da deliberação.");
 
+        if (dto.DataDeliberacao > DateOnly.FromDateTime(DateTimeHelper.TodayBrasilia()))
+            throw new ApiException(ErrorCode.PgiaDominioInvalido,
+                "A data da deliberação não pode ser depois de hoje.");
+
         PgiaSistemaIa? sistema = null;
         if (dto.SistemaIaId != null)
         {
@@ -318,6 +322,41 @@ public class PgiaGovernancaService : IPgiaGovernancaService
         await _repositorio.SaveChangesAsync();
 
         AplicarHomologacaoDelegada(sistema, deliberacao, ctx);
+        await _repositorio.SaveChangesAsync();
+
+        return MapDeliberacao(deliberacao);
+    }
+
+    public async Task<PgiaDeliberacaoCgtic?> GetDeliberacaoEntidadeAsync(long id)
+    {
+        return await _repositorio.GetDeliberacaoByIdAsync(id);
+    }
+
+    /// <summary>
+    /// Anexa a ata a uma deliberação já registrada, ou troca a que ela tem. Só vale
+    /// documento central (sem órgão), como a ata que a tela cria no registro: a ata
+    /// é peça do comitê, não de um órgão. O resto da deliberação não muda.
+    /// </summary>
+    public async Task<PgiaDeliberacaoResponse> DefinirAtaDeliberacaoAsync(
+        long id, PgiaDeliberacaoAtaDTO dto, PgiaUserContext ctx)
+    {
+        var deliberacao = await _repositorio.GetDeliberacaoByIdAsync(id)
+            ?? throw new ApiException(ErrorCode.PgiaDeliberacaoNaoEncontrada);
+
+        if (dto.DocumentoId == null)
+            throw new ApiException(ErrorCode.PgiaDominioInvalido, "Escolha o documento da ata.");
+
+        var documento = await _repositorio.GetDocumentoByIdAsync(dto.DocumentoId.Value)
+            ?? throw new ApiException(ErrorCode.PgiaDocumentoNaoEncontrado,
+                "O documento da ata não foi encontrado.");
+
+        if (documento.OrgaoId != null)
+            throw new ApiException(ErrorCode.PgiaDominioInvalido,
+                "A ata da deliberação precisa ser um documento central, sem órgão.");
+
+        deliberacao.DocumentoId = documento.Id;
+        deliberacao.AlteradoEm = DateTime.UtcNow;
+        deliberacao.AlteradoPor = ctx.Email;
         await _repositorio.SaveChangesAsync();
 
         return MapDeliberacao(deliberacao);

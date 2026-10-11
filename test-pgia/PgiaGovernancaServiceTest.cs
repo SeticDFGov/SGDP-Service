@@ -102,7 +102,7 @@ public class PgiaGovernancaServiceTest : PgiaTestBase
         {
             Tipo = PgiaDominios.TipoDeliberacao.ClassificacaoAltoRisco,
             SistemaIaId = sistema.Id,
-            DataDeliberacao = new DateOnly(2026, 10, 5),
+            DataDeliberacao = new DateOnly(2025, 10, 5),
             Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel,
             NumeroAto = "12/2026",
             Ementa = "Enquadramento confirmado."
@@ -129,7 +129,7 @@ public class PgiaGovernancaServiceTest : PgiaTestBase
         {
             Tipo = PgiaDominios.TipoDeliberacao.AprovacaoAquisicaoAltoRisco,
             SistemaIaId = sistema.Id,
-            DataDeliberacao = new DateOnly(2026, 10, 5),
+            DataDeliberacao = new DateOnly(2025, 10, 5),
             Resultado = PgiaDominios.ResultadoDeliberacao.Desfavoravel,
             NumeroAto = "13/2026"
         }, cgticCtx);
@@ -150,7 +150,7 @@ public class PgiaGovernancaServiceTest : PgiaTestBase
         {
             Tipo = PgiaDominios.TipoDeliberacao.ClassificacaoAltoRisco,
             SistemaIaId = sistema.Id,
-            DataDeliberacao = new DateOnly(2026, 10, 5),
+            DataDeliberacao = new DateOnly(2025, 10, 5),
             Resultado = PgiaDominios.ResultadoDeliberacao.EmDiligencia
         }, cgticCtx);
 
@@ -170,7 +170,7 @@ public class PgiaGovernancaServiceTest : PgiaTestBase
         {
             Tipo = "Suspensão de sistema",
             SistemaIaId = sistema.Id,
-            DataDeliberacao = new DateOnly(2026, 10, 5),
+            DataDeliberacao = new DateOnly(2025, 10, 5),
             Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel
         }, cgticCtx);
 
@@ -186,7 +186,7 @@ public class PgiaGovernancaServiceTest : PgiaTestBase
         var deliberacao = await _service.CriarDeliberacaoAsync(new PgiaDeliberacaoCreateDTO
         {
             Tipo = "Aprovação do Guia de Contratações",
-            DataDeliberacao = new DateOnly(2026, 12, 20),
+            DataDeliberacao = new DateOnly(2025, 12, 20),
             Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel
         }, cgticCtx);
 
@@ -206,7 +206,7 @@ public class PgiaGovernancaServiceTest : PgiaTestBase
             _service.CriarDeliberacaoAsync(new PgiaDeliberacaoCreateDTO
             {
                 Tipo = "Conversa de corredor",
-                DataDeliberacao = new DateOnly(2026, 10, 5),
+                DataDeliberacao = new DateOnly(2025, 10, 5),
                 Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel
             }, cgticCtx));
 
@@ -223,7 +223,7 @@ public class PgiaGovernancaServiceTest : PgiaTestBase
             {
                 Tipo = PgiaDominios.TipoDeliberacao.ClassificacaoAltoRisco,
                 SistemaIaId = 9999,
-                DataDeliberacao = new DateOnly(2026, 10, 5),
+                DataDeliberacao = new DateOnly(2025, 10, 5),
                 Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel
             }, cgticCtx));
 
@@ -240,13 +240,13 @@ public class PgiaGovernancaServiceTest : PgiaTestBase
         {
             Tipo = PgiaDominios.TipoDeliberacao.ClassificacaoAltoRisco,
             SistemaIaId = sistema.Id,
-            DataDeliberacao = new DateOnly(2026, 10, 5),
+            DataDeliberacao = new DateOnly(2025, 10, 5),
             Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel
         }, cgticCtx);
         await _service.CriarDeliberacaoAsync(new PgiaDeliberacaoCreateDTO
         {
             Tipo = "Resolução normativa",
-            DataDeliberacao = new DateOnly(2026, 11, 5),
+            DataDeliberacao = new DateOnly(2025, 11, 5),
             Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel
         }, cgticCtx);
 
@@ -268,7 +268,7 @@ public class PgiaGovernancaServiceTest : PgiaTestBase
             {
                 Tipo = "Critérios e requisitos de aquisição",
                 ContratoId = 9999,
-                DataDeliberacao = new DateOnly(2026, 11, 5),
+                DataDeliberacao = new DateOnly(2025, 11, 5),
                 Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel
             }, cgticCtx));
         Assert.Equal((int)ErrorCode.PgiaContratoNaoEncontrado, inexistente.Error.Code);
@@ -287,7 +287,7 @@ public class PgiaGovernancaServiceTest : PgiaTestBase
         {
             Tipo = "Critérios e requisitos de aquisição",
             ContratoId = contrato.Id,
-            DataDeliberacao = new DateOnly(2026, 11, 5),
+            DataDeliberacao = new DateOnly(2025, 11, 5),
             Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel
         }, cgticCtx);
 
@@ -592,7 +592,7 @@ public class PgiaGovernancaServiceTest : PgiaTestBase
         var deliberacao = await _service.CriarDeliberacaoAsync(new PgiaDeliberacaoCreateDTO
         {
             Tipo = "Autorização de treinamento com dados do GDF",
-            DataDeliberacao = new DateOnly(2026, 11, 1),
+            DataDeliberacao = new DateOnly(2025, 11, 1),
             Resultado = PgiaDominios.ResultadoDeliberacao.Favoravel
         }, cgticCtx);
 
