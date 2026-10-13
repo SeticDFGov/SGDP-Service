@@ -348,7 +348,7 @@ public class CtrRevisaoAdversarialTest : CtrTestBase
         var comQuantidade = painel.PorSituacao.Where(c => c.Quantidade > 0).Select(c => c.Chave).ToList();
 
         // Empate em 1: vence a ordem do domínio (Restituído vem antes de Em análise na SGDI)
-        Assert.Equal(new[] { CtrDominios.Situacao.Restituido, CtrDominios.Situacao.EmAnaliseSgdi }, comQuantidade);
+        Assert.Equal(new[] { CtrDominios.Situacao.RestituidoOrgao, CtrDominios.Situacao.EmAnaliseSgdi }, comQuantidade);
 
         var categorias = painel.PorCategoria.Select(c => c.Chave).ToList();
         Assert.Equal(categorias.OrderBy(c => c), categorias); // empate por Chave

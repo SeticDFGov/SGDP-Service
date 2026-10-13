@@ -38,6 +38,11 @@ public class CtrProcessoService : ICtrProcessoService
     // Nº SEI do Formulário: texto livre, até o tamanho da coluna numero_sei_formulario
     public const int TamanhoNumeroSeiFormulario = 25;
 
+    // Nº do contrato e documentos SEI (autorização e nota informativa): texto livre, até o
+    // tamanho das colunas
+    public const int TamanhoNumeroContrato = 60;
+    public const int TamanhoDocumentoSei = 25;
+
     private static readonly string[] OrdenacoesValidas =
     {
         "NumeroProcesso", "OrgaoSigla", "ChegadaSgdi", "CategoriaObjeto", "CriadoEm", "Criticidade"
@@ -63,54 +68,69 @@ public class CtrProcessoService : ICtrProcessoService
     // ── Situação derivada e tempos ────────────────────────────────────────────
 
     /// <summary>
-    /// Situação do processo — FONTE ÚNICA. Nunca é gravada: é sempre função das
-    /// datas e da restituição, na ordem do desenho.
+    /// A condição de cada situação, na ordem de prioridade de <see cref="CtrDominios.Situacao.Todos"/>
+    /// (a primeira que se aplica vale). FONTE ÚNICA da situação: o cálculo em memória
+    /// (<see cref="CalcularSituacao(CtrProcesso)"/>) compila estas expressões e o filtro no banco
+    /// (<see cref="PredicadoSituacao"/>) as combina, então os dois não podem divergir.
     /// </summary>
-    public static string CalcularSituacao(CtrProcesso p) => CalcularSituacao(
-        p.DataAssinaturaContrato, p.Restituido, p.ChegadaSgdi, p.ChegadaSubgd, p.ChegadaUgtic, p.RetornoGabSgdi,
-        p.RetornoOrgao, p.RetornoOrgaoNaoSeAplica);
-
-    /// <inheritdoc cref="CalcularSituacao(CtrProcesso)"/>
-    // Sem valor default de propósito: um chamador que esquecesse um dos flags receberia a
-    // situação ANTIGA em silêncio (o processo com devolução dispensada não concluiria)
-    public static string CalcularSituacao(DateOnly? dataAssinaturaContrato, bool restituido, DateOnly? chegadaSgdi,
-        DateOnly? chegadaSubgd, DateOnly? chegadaUgtic, DateOnly? retornoGabSgdi, DateOnly? retornoOrgao,
-        bool retornoOrgaoNaoSeAplica)
+    private static readonly (string Situacao, Expression<Func<CtrProcesso, bool>> Condicao)[] CondicoesSituacao =
     {
-        // Contrato assinado = processo Concluído, seja qual for o resto do trâmite: é a
-        // data FINAL (o processo sai da lista e vai para a relação de concluídos do painel)
-        if (dataAssinaturaContrato != null) return CtrDominios.Situacao.Concluido;
-        if (restituido) return CtrDominios.Situacao.Restituido;
-        // Análise concluída pela devolução ao órgão OU pela devolução dispensada — mas só
-        // com o retorno ao Gab SGDI: marcar "não se aplica" sozinho não conclui nada,
-        // o processo segue na etapa em que está.
-        if (retornoOrgao != null || (retornoOrgaoNaoSeAplica && retornoGabSgdi != null))
-            return CtrDominios.Situacao.AnaliseConcluida;
-        if (retornoGabSgdi != null) return CtrDominios.Situacao.RetornadoGabSgdi;
-        if (chegadaUgtic != null) return CtrDominios.Situacao.EmAnaliseUgtic;
+        // A assinatura encerra a supervisão, seja qual for o resto do trâmite
+        (CtrDominios.Situacao.ContratoAssinado, p => p.DataAssinaturaContrato != null),
+        (CtrDominios.Situacao.RestituidoOrgao, p => p.Restituido),
+        // A nota informativa encerra a análise da SGDI (depois dela só se espera a assinatura)
+        (CtrDominios.Situacao.NotaInformativaEnviada, p => p.NotaInformativaEnviadaEm != null),
+        // Análise concluída pela devolução ao órgão OU pela devolução dispensada, mas só com o
+        // retorno ao Gab SGDI: marcar "não se aplica" sozinho não conclui nada
+        (CtrDominios.Situacao.AnaliseConcluida,
+            p => p.RetornoOrgao != null || (p.RetornoOrgaoNaoSeAplica && p.RetornoGabSgdi != null)),
+        (CtrDominios.Situacao.EsclarecimentosSolicitados,
+            p => p.EsclarecimentoSolicitadoEm != null && p.EsclarecimentoRespondidoEm == null),
+        (CtrDominios.Situacao.AguardandoAnaliseTecnica,
+            p => p.AnaliseTecnicaEncaminhadaEm != null && p.AnaliseTecnicaRetornoEm == null),
+        (CtrDominios.Situacao.RetornadoGabSgdi, p => p.RetornoGabSgdi != null),
+        (CtrDominios.Situacao.EmAnaliseUgtic, p => p.ChegadaUgtic != null),
         // Vale também quando a UGTIC "não se aplica" (a etapa foi pulada de propósito)
-        if (chegadaSubgd != null) return CtrDominios.Situacao.EmAnaliseSubgd;
-        if (chegadaSgdi != null) return CtrDominios.Situacao.EmAnaliseSgdi;
-        return CtrDominios.Situacao.SemMovimentacao;
-    }
+        (CtrDominios.Situacao.EmAnaliseSubgd, p => p.ChegadaSubgd != null),
+        (CtrDominios.Situacao.EmAnaliseSgdi, p => p.ChegadaSgdi != null),
+        (CtrDominios.Situacao.SemMovimentacao, p => true)
+    };
+
+    private static readonly (string Situacao, Func<CtrProcesso, bool> Condicao)[] CondicoesCompiladas =
+        CondicoesSituacao.Select(c => (c.Situacao, c.Condicao.Compile())).ToArray();
 
     /// <summary>
-    /// Status da contratação na supervisão contínua (coluna STATUS das listas): FONTE
-    /// ÚNICA, nunca gravado. Segue a regra de conclusão que o módulo já tem: contrato
-    /// assinado = processo Concluído = supervisão "Concluída"; o resto está "Em regime de
-    /// supervisão" (inclusive análise concluída e restituído, que seguem acompanhados).
+    /// Situação do processo, FONTE ÚNICA (ver <see cref="CondicoesSituacao"/>). Nunca é
+    /// gravada: é sempre função das datas, da restituição e da nota informativa.
     /// </summary>
-    public static string CalcularStatusSupervisao(CtrProcesso p) => CalcularStatusSupervisao(p.DataAssinaturaContrato);
-
-    /// <inheritdoc cref="CalcularStatusSupervisao(CtrProcesso)"/>
-    public static string CalcularStatusSupervisao(DateOnly? dataAssinaturaContrato) =>
-        dataAssinaturaContrato != null
-            ? CtrDominios.StatusSupervisao.Concluida
-            : CtrDominios.StatusSupervisao.EmRegimeSupervisao;
+    public static string CalcularSituacao(CtrProcesso p) =>
+        CondicoesCompiladas.First(c => c.Condicao(p)).Situacao;
 
     /// <summary>
-    /// Pedido de esclarecimento feito e ainda sem resposta — DERIVADO, nunca gravado.
-    /// Sinal paralelo ao trâmite: não entra na situação.
+    /// Data do fato que define a situação do processo (a resposta a chama SituacaoDesde): a
+    /// assinatura, a restituição, o envio da nota, o retorno ao órgão (ou, com a devolução
+    /// dispensada, o retorno ao Gab SGDI), o pedido de esclarecimento, o encaminhamento à
+    /// análise técnica, o retorno ao Gab SGDI ou a chegada. Nula em "Sem movimentação".
+    /// </summary>
+    public static DateOnly? CalcularSituacaoDesde(CtrProcesso p) => CalcularSituacao(p) switch
+    {
+        CtrDominios.Situacao.ContratoAssinado => p.DataAssinaturaContrato,
+        CtrDominios.Situacao.RestituidoOrgao => p.RestituidoEm,
+        CtrDominios.Situacao.NotaInformativaEnviada => p.NotaInformativaEnviadaEm,
+        CtrDominios.Situacao.AnaliseConcluida => p.RetornoOrgao ?? p.RetornoGabSgdi,
+        CtrDominios.Situacao.EsclarecimentosSolicitados => p.EsclarecimentoSolicitadoEm,
+        CtrDominios.Situacao.AguardandoAnaliseTecnica => p.AnaliseTecnicaEncaminhadaEm,
+        CtrDominios.Situacao.RetornadoGabSgdi => p.RetornoGabSgdi,
+        CtrDominios.Situacao.EmAnaliseUgtic => p.ChegadaUgtic,
+        CtrDominios.Situacao.EmAnaliseSubgd => p.ChegadaSubgd,
+        CtrDominios.Situacao.EmAnaliseSgdi => p.ChegadaSgdi,
+        _ => null
+    };
+
+    /// <summary>
+    /// Pedido de esclarecimento feito e ainda sem resposta — DERIVADO, nunca gravado. Desde
+    /// 2026-10-13 também é uma situação ("Esclarecimentos solicitados"), quando nenhuma de
+    /// prioridade maior se aplica; este sinal continua na resposta para os dias de espera.
     /// </summary>
     public static bool CalcularEsclarecimentoPendente(CtrProcesso p) =>
         CalcularEsclarecimentoPendente(p.EsclarecimentoSolicitadoEm, p.EsclarecimentoRespondidoEm);
@@ -133,14 +153,15 @@ public class CtrProcessoService : ICtrProcessoService
     }
 
     /// <summary>
-    /// Maior data entre os cinco checkpoints, a restituição, o esclarecimento e a análise
-    /// técnica; null sem nenhuma. Pedir e responder esclarecimento, encaminhar para análise
-    /// técnica e receber o retorno dela É movimentação do processo.
+    /// Maior data entre os cinco checkpoints, a restituição, o esclarecimento, a análise
+    /// técnica e a nota informativa; null sem nenhuma. Pedir e responder esclarecimento,
+    /// encaminhar para análise técnica, receber o retorno dela e enviar a nota informativa
+    /// É movimentação do processo.
     /// </summary>
     public static DateOnly? CalcularUltimaMovimentacao(CtrProcesso p) => CalcularUltimaMovimentacao(
         p.ChegadaSgdi, p.ChegadaSubgd, p.ChegadaUgtic, p.RetornoGabSgdi, p.RetornoOrgao, p.RestituidoEm,
         p.EsclarecimentoSolicitadoEm, p.EsclarecimentoRespondidoEm,
-        p.AnaliseTecnicaEncaminhadaEm, p.AnaliseTecnicaRetornoEm);
+        p.AnaliseTecnicaEncaminhadaEm, p.AnaliseTecnicaRetornoEm, p.NotaInformativaEnviadaEm);
 
     /// <inheritdoc cref="CalcularUltimaMovimentacao(CtrProcesso)"/>
     public static DateOnly? CalcularUltimaMovimentacao(params DateOnly?[] datas)
@@ -172,36 +193,39 @@ public class CtrProcessoService : ICtrProcessoService
     /// Traduz a situação derivada em predicado sobre as colunas, para o filtro rodar
     /// no banco (nunca materializando a tabela). Null quando o valor não é do domínio.
     /// </summary>
-    public static Expression<Func<CtrProcesso, bool>>? PredicadoSituacao(string? situacao) => situacao switch
+    public static Expression<Func<CtrProcesso, bool>>? PredicadoSituacao(string? situacao)
     {
-        // A assinatura tem precedência sobre tudo: as demais situações a exigem nula
-        CtrDominios.Situacao.Concluido => p => p.DataAssinaturaContrato != null,
-        CtrDominios.Situacao.Restituido => p => p.DataAssinaturaContrato == null && p.Restituido,
-        // Análise concluída inclui a devolução dispensada com o retorno ao Gab SGDI feito
-        CtrDominios.Situacao.AnaliseConcluida => p =>
-            p.DataAssinaturaContrato == null && !p.Restituido
-            && (p.RetornoOrgao != null || (p.RetornoOrgaoNaoSeAplica && p.RetornoGabSgdi != null)),
-        CtrDominios.Situacao.RetornadoGabSgdi => p =>
-            p.DataAssinaturaContrato == null && !p.Restituido && p.RetornoOrgao == null
-            && !p.RetornoOrgaoNaoSeAplica && p.RetornoGabSgdi != null,
-        // Sem retorno ao Gab SGDI o "não se aplica" não muda nada: as demais
-        // situações já exigem RetornoGabSgdi == null
-        CtrDominios.Situacao.EmAnaliseUgtic => p =>
-            p.DataAssinaturaContrato == null && !p.Restituido && p.RetornoOrgao == null
-            && p.RetornoGabSgdi == null && p.ChegadaUgtic != null,
-        CtrDominios.Situacao.EmAnaliseSubgd => p =>
-            p.DataAssinaturaContrato == null && !p.Restituido && p.RetornoOrgao == null
-            && p.RetornoGabSgdi == null && p.ChegadaUgtic == null && p.ChegadaSubgd != null,
-        CtrDominios.Situacao.EmAnaliseSgdi => p =>
-            p.DataAssinaturaContrato == null && !p.Restituido && p.RetornoOrgao == null
-            && p.RetornoGabSgdi == null && p.ChegadaUgtic == null && p.ChegadaSubgd == null
-            && p.ChegadaSgdi != null,
-        CtrDominios.Situacao.SemMovimentacao => p =>
-            p.DataAssinaturaContrato == null && !p.Restituido && p.RetornoOrgao == null
-            && p.RetornoGabSgdi == null && p.ChegadaUgtic == null && p.ChegadaSubgd == null
-            && p.ChegadaSgdi == null,
-        _ => null
-    };
+        var indice = Array.FindIndex(CondicoesSituacao, c => c.Situacao == situacao);
+        if (indice < 0) return null;
+
+        // A condição da situação E nenhuma das de prioridade maior, sobre um parâmetro só
+        // (sem Invoke: o EF traduz a árvore inteira em SQL)
+        var parametro = Expression.Parameter(typeof(CtrProcesso), "p");
+        Expression CorpoDe(int i) =>
+            new TrocaParametro(CondicoesSituacao[i].Condicao.Parameters[0], parametro)
+                .Visit(CondicoesSituacao[i].Condicao.Body);
+
+        var corpo = CorpoDe(indice);
+        for (var anterior = indice - 1; anterior >= 0; anterior--)
+            corpo = Expression.AndAlso(Expression.Not(CorpoDe(anterior)), corpo);
+
+        return Expression.Lambda<Func<CtrProcesso, bool>>(corpo, parametro);
+    }
+
+    /// <summary>Troca o parâmetro de uma expressão (para juntar as condições num lambda só).</summary>
+    private sealed class TrocaParametro : ExpressionVisitor
+    {
+        private readonly ParameterExpression _de;
+        private readonly ParameterExpression _para;
+
+        public TrocaParametro(ParameterExpression de, ParameterExpression para)
+        {
+            _de = de;
+            _para = para;
+        }
+
+        protected override Expression VisitParameter(ParameterExpression node) => node == _de ? _para : node;
+    }
 
     /// <summary>
     /// Pendência de esclarecimento como predicado sobre as duas colunas (é função
@@ -237,6 +261,13 @@ public class CtrProcessoService : ICtrProcessoService
         p.EsclarecimentoDescricao = Limpar(p.EsclarecimentoDescricao);
         p.EsclarecimentoDocumentoSei = Limpar(p.EsclarecimentoDocumentoSei);
         p.AnaliseTecnicaRetornoResumo = Limpar(p.AnaliseTecnicaRetornoResumo);
+        p.NumeroContrato = Limpar(p.NumeroContrato);
+        p.AutorizacaoDocumentoSei = Limpar(p.AutorizacaoDocumentoSei);
+        p.NotaInformativaDocumentoSei = Limpar(p.NotaInformativaDocumentoSei);
+
+        // O documento SEI da nota faz parte do envio: sem a data ele é anulado (gesto explícito
+        // de quem limpou a data, como o documento do pedido de esclarecimento)
+        if (p.NotaInformativaEnviadaEm == null) p.NotaInformativaDocumentoSei = null;
 
         // Hospedagem comparada sem caixa nem acento (o normalizador da categoria e dos
         // critérios) e gravada na grafia do domínio; o que não casar é recusado abaixo
@@ -349,6 +380,21 @@ public class CtrProcessoService : ICtrProcessoService
         if (!CtrDominios.Origem.Todos.Contains(p.Origem))
             throw new ApiException(ErrorCode.CtrDominioInvalido, $"Origem inválida: {p.Origem}");
 
+        if (p.NumeroContrato is { Length: > TamanhoNumeroContrato })
+            throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                $"O número do contrato tem até {TamanhoNumeroContrato} caracteres.");
+
+        if (p.AutorizacaoDocumentoSei is { Length: > TamanhoDocumentoSei })
+            throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                $"O Nº do documento SEI da autorização tem até {TamanhoDocumentoSei} caracteres.");
+
+        if (p.NotaInformativaDocumentoSei is { Length: > TamanhoDocumentoSei })
+            throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                $"O Nº do documento SEI da nota informativa tem até {TamanhoDocumentoSei} caracteres.");
+
+        if (p.Origem == CtrDominios.Origem.AnteriorAoRegime)
+            ValidarAnteriorAoRegime(p);
+
         if (p.HospedagemCetic != null && !CtrDominios.HospedagemCetic.Todos.Contains(p.HospedagemCetic))
             throw new ApiException(ErrorCode.CtrDominioInvalido,
                 $"Hospedagem no CeTIC-DF inválida: {p.HospedagemCetic}");
@@ -400,6 +446,46 @@ public class CtrProcessoService : ICtrProcessoService
                 "Processo restituído exige o motivo da restituição.");
 
         ValidarCronologia(p);
+    }
+
+    /// <summary>
+    /// Registro histórico (origem "Anterior ao regime"): exige o contrato assinado e o número
+    /// dele (o número do processo, o órgão, o objeto e a categoria já são exigidos de todos).
+    /// As datas do trâmite são opcionais, com a mesma cronologia. Os blocos que não existiam no
+    /// regime anterior são RECUSADOS, não anulados (decisão de 2026-10-13: dado enviado e
+    /// apagado em silêncio esconderia perda): critérios de criticidade, pedido de
+    /// esclarecimentos, análise técnica, nota informativa e o Nº SEI do Formulário (o
+    /// formulário de comunicação). Os riscos da contratação são recusados por quem grava
+    /// (CriarAsync e AtualizarAsync); a marcação de um processo existente os apaga
+    /// (<see cref="MarcarAnteriorAoRegimeAsync"/>).
+    /// </summary>
+    private static void ValidarAnteriorAoRegime(CtrProcesso p)
+    {
+        if (p.DataAssinaturaContrato == null)
+            throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                "Informe a data de assinatura do contrato: a contratação anterior ao regime tem sempre contrato assinado.");
+
+        if (p.NumeroContrato == null)
+            throw new ApiException(ErrorCode.CtrProcessoInvalido, "Informe o número do contrato.");
+
+        var naoAplicaveis = BlocosForaDoRegistroHistorico(p);
+        if (naoAplicaveis.Count > 0)
+            throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                "A contratação anterior ao regime não leva estes dados: "
+                + string.Join(", ", naoAplicaveis) + ". Retire-os do registro.");
+    }
+
+    /// <summary>Os blocos que o registro histórico não leva e que estão preenchidos no processo.</summary>
+    private static List<string> BlocosForaDoRegistroHistorico(CtrProcesso p)
+    {
+        var blocos = new List<string>();
+        if (p.CriteriosCriticidade != null || p.Criticidade != null) blocos.Add("critérios de criticidade");
+        if (p.EsclarecimentoSolicitadoEm != null || p.EsclarecimentoRespondidoEm != null)
+            blocos.Add("pedido de esclarecimentos");
+        if (p.AnaliseTecnicaEncaminhadaEm != null || p.AnaliseTecnicaRetornoEm != null) blocos.Add("análise técnica");
+        if (p.NotaInformativaEnviadaEm != null) blocos.Add("nota informativa");
+        if (p.NumeroSeiFormulario != null) blocos.Add("Nº SEI do Formulário");
+        return blocos;
     }
 
     private static void ValidarCronologia(CtrProcesso p)
@@ -468,6 +554,18 @@ public class CtrProcessoService : ICtrProcessoService
             throw new ApiException(ErrorCode.CtrDatasIncoerentes,
                 $"A data do retorno da área técnica ({p.AnaliseTecnicaRetornoEm.Value:dd/MM/yyyy}) não pode ser "
                 + $"anterior à data do encaminhamento ({p.AnaliseTecnicaEncaminhadaEm.Value:dd/MM/yyyy}).");
+
+        // Nota informativa: fora da cronologia do trâmite (encerra a análise em qualquer etapa),
+        // mas não é futura nem anterior à chegada à SGDI
+        if (p.NotaInformativaEnviadaEm != null && p.NotaInformativaEnviadaEm.Value > hoje)
+            throw new ApiException(ErrorCode.CtrDatasIncoerentes,
+                $"A data do envio da nota informativa ({p.NotaInformativaEnviadaEm.Value:dd/MM/yyyy}) não pode ser futura.");
+
+        if (p.NotaInformativaEnviadaEm != null && p.ChegadaSgdi != null
+            && p.NotaInformativaEnviadaEm.Value < p.ChegadaSgdi.Value)
+            throw new ApiException(ErrorCode.CtrDatasIncoerentes,
+                $"A data do envio da nota informativa ({p.NotaInformativaEnviadaEm.Value:dd/MM/yyyy}) não pode ser "
+                + $"anterior à data de chegada à SGDI ({p.ChegadaSgdi.Value:dd/MM/yyyy}).");
 
         // Cada etapa preenchida deve ser >= todas as anteriores preenchidas (lacunas são permitidas)
         for (var atual = 1; atual < etapas.Length; atual++)
@@ -547,11 +645,14 @@ public class CtrProcessoService : ICtrProcessoService
         if (!string.IsNullOrWhiteSpace(filtro.Filtro))
         {
             var termo = filtro.Filtro.Trim().ToLower();
+            // O número do contrato entra na busca (é o que identifica o registro histórico); o
+            // teste de nulo vem antes do ToLower por causa do InMemory
             query = query.Where(p =>
                 p.NumeroProcesso.ToLower().Contains(termo) ||
                 p.OrgaoNome.ToLower().Contains(termo) ||
                 p.OrgaoSigla.ToLower().Contains(termo) ||
-                p.Objeto.ToLower().Contains(termo));
+                p.Objeto.ToLower().Contains(termo) ||
+                (p.NumeroContrato != null && p.NumeroContrato.ToLower().Contains(termo)));
         }
 
         if (!string.IsNullOrWhiteSpace(filtro.Categoria))
@@ -585,9 +686,11 @@ public class CtrProcessoService : ICtrProcessoService
             query = predicado != null ? query.Where(predicado) : query.Where(p => false);
         }
 
-        // Concluídos (contrato assinado) ficam FORA da lista e do export por padrão: entram
-        // só quando pedidos (IncluirConcluidos) ou quando a situação filtrada é a deles
-        if (!filtro.IncluirConcluidos && string.IsNullOrWhiteSpace(filtro.Situacao))
+        // Os de contrato assinado ficam FORA da lista e do export por padrão: entram só quando
+        // pedidos (IncluirConcluidos), quando a situação filtrada é a deles ou na lista dos
+        // registros históricos (origem "Anterior ao regime"), que têm todos o contrato assinado
+        if (!filtro.IncluirConcluidos && string.IsNullOrWhiteSpace(filtro.Situacao)
+            && filtro.Origem?.Trim() != CtrDominios.Origem.AnteriorAoRegime)
             query = query.Where(p => p.DataAssinaturaContrato == null);
 
         if (!string.IsNullOrWhiteSpace(filtro.EtapaPlanejamento))
@@ -702,6 +805,7 @@ public class CtrProcessoService : ICtrProcessoService
         AplicarDto(processo, dto);
 
         ValidarProcesso(processo, await _repositorio.NumeroDuplicadoAsync(processo.NumeroProcesso, null));
+        RecusarRiscosNoRegistroHistorico(processo, dto.ClassificacaoRisco);
 
         // Nula ou vazia = processo sem riscos da contratação; enviada, cada risco é validado
         var riscos = dto.ClassificacaoRisco != null
@@ -735,6 +839,8 @@ public class CtrProcessoService : ICtrProcessoService
         // de um processo do TCDF numa edição qualquer é perda de dado silenciosa)
         if (string.IsNullOrWhiteSpace(dto.Origem)) candidato.Origem = processo.Origem;
 
+        ValidarMudancaDeOrigem(processo.Origem, candidato.Origem);
+
         // Respostas aos critérios ausentes no corpo PRESERVAM as gravadas (o front só as
         // manda quando o usuário as avaliou); com elas gravadas a criticidade é recalculada
         // na validação, e o Criticidade do corpo só vale para processo ainda sem respostas.
@@ -747,6 +853,7 @@ public class CtrProcessoService : ICtrProcessoService
         ValidarProcesso(candidato, await _repositorio.NumeroDuplicadoAsync(candidato.NumeroProcesso, processo.Id));
         ValidarCriticidadeNaoRemovida(processo.Criticidade, candidato.Criticidade,
             await _repositorio.TemManifestacaoIncisoIAsync(processo.Id));
+        RecusarRiscosNoRegistroHistorico(candidato, dto.ClassificacaoRisco);
 
         // Os riscos também são validados por inteiro ANTES de qualquer escrita (Avaliar é
         // pura). Limpar equivale a mandar a lista vazia. Sem nenhum dos dois, os gravados
@@ -786,6 +893,100 @@ public class CtrProcessoService : ICtrProcessoService
         return await MapearDetalheAsync(processo);
     }
 
+    /// <summary>
+    /// Entrar ou sair do registro histórico tem regra própria (exige o contrato assinado e apaga
+    /// o que o histórico não leva): só pela ação de marcar e desfazer. Vale para o PUT do
+    /// processo e para a importação de processo existente.
+    /// </summary>
+    public static void ValidarMudancaDeOrigem(string anterior, string? nova)
+    {
+        if ((nova?.Trim() == CtrDominios.Origem.AnteriorAoRegime) != (anterior == CtrDominios.Origem.AnteriorAoRegime))
+            throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                "Para marcar ou desfazer a contratação anterior ao regime, use a ação própria do processo.");
+    }
+
+    /// <summary>
+    /// O registro histórico não leva riscos da contratação: a lista enviada com algum risco é
+    /// recusada (nula ou vazia passa; vazia só confirma que não há nenhum).
+    /// </summary>
+    private static void RecusarRiscosNoRegistroHistorico(CtrProcesso processo, CtrClassificacaoRiscoDTO? riscos)
+    {
+        if (processo.Origem == CtrDominios.Origem.AnteriorAoRegime && riscos is { RiscosDeclarados.Count: > 0 })
+            throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                "A contratação anterior ao regime não leva estes dados: riscos da contratação. Retire-os do registro.");
+    }
+
+    public async Task<CtrProcessoResponse> MarcarAnteriorAoRegimeAsync(long id, CtrAnteriorAoRegimeDTO dto,
+        CtrUserContext ctx)
+    {
+        var processo = await GetEntidadeAsync(id)
+            ?? throw new ApiException(ErrorCode.CtrProcessoNaoEncontrado);
+
+        if (processo.Origem != CtrDominios.Origem.OrgaoComunicante
+            && processo.Origem != CtrDominios.Origem.AnteriorAoRegime)
+            throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                "Só um processo de supervisão contínua (origem Órgão comunicante) pode ser marcado como "
+                + "contratação anterior ao regime.");
+
+        var candidato = Clonar(processo);
+        var apagaRiscos = false;
+
+        if (dto.Anterior)
+        {
+            if (processo.DataAssinaturaContrato == null)
+                throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                    "Só um processo com contrato assinado pode ser marcado como contratação anterior ao regime. "
+                    + "Registre antes a data de assinatura do contrato.");
+
+            candidato.NumeroContrato = Limpar(dto.NumeroContrato) ?? processo.NumeroContrato;
+            if (candidato.NumeroContrato == null)
+                throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                    "Informe o número do contrato para marcar a contratação como anterior ao regime.");
+
+            // Marcar é o gesto explícito que tira do processo o que o registro histórico não
+            // leva (a validação da origem os recusaria). Desfazer não os traz de volta
+            candidato.Origem = CtrDominios.Origem.AnteriorAoRegime;
+            candidato.CriteriosCriticidade = null;
+            candidato.Criticidade = null;
+            candidato.EsclarecimentoSolicitadoEm = null;
+            candidato.EsclarecimentoRespondidoEm = null;
+            candidato.AnaliseTecnicaEncaminhadaEm = null;
+            candidato.AnaliseTecnicaRetornoEm = null;
+            candidato.NotaInformativaEnviadaEm = null;
+            candidato.NumeroSeiFormulario = null;
+            apagaRiscos = processo.Origem != CtrDominios.Origem.AnteriorAoRegime;
+
+            // A manifestação do inciso I reporta a criticidade ao TCDF: com ela, não se apaga
+            if (processo.Criticidade != null && await _repositorio.TemManifestacaoIncisoIAsync(processo.Id))
+                throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                    "Não é possível marcar como contratação anterior ao regime: o processo já tem manifestação "
+                    + "do inciso I, que reporta a criticidade ao TCDF.");
+        }
+        else
+        {
+            // Desfazer devolve o processo à supervisão contínua
+            candidato.Origem = CtrDominios.Origem.OrgaoComunicante;
+        }
+
+        ValidarProcesso(candidato, await _repositorio.NumeroDuplicadoAsync(candidato.NumeroProcesso, processo.Id));
+
+        var mudou = candidato.Origem != processo.Origem || candidato.NumeroContrato != processo.NumeroContrato;
+        if (!mudou) return await MapearDetalheAsync(processo);
+
+        AplicarDto(processo, DtoDe(candidato));
+        processo.AlteradoEm = DateTime.UtcNow;
+        processo.AlteradoPor = ctx.Email;
+
+        if (apagaRiscos)
+        {
+            DescartarQuestionarioLegado(processo);
+            _repositorio.RemoverRiscosDeclarados(await _repositorio.ListarRiscosDeclaradosAsync(processo.Id));
+        }
+
+        await _repositorio.SaveChangesAsync();
+        return await MapearDetalheAsync(processo);
+    }
+
     public async Task ExcluirAsync(long id, CtrUserContext ctx)
     {
         var processo = await GetEntidadeAsync(id)
@@ -812,6 +1013,12 @@ public class CtrProcessoService : ICtrProcessoService
             && etapa != CtrDominios.Etapa.ChegadaUgtic && etapa != CtrDominios.Etapa.RetornoOrgao)
             throw new ApiException(ErrorCode.CtrProcessoInvalido,
                 "\"Não se aplica\" só vale para a chegada à UGTIC e para o retorno ao órgão comunicante.");
+
+        // O documento SEI só acompanha a nota informativa (ausente ou vazio nas outras etapas
+        // não muda nada: o front pode mandar a chave vazia)
+        if (!string.IsNullOrWhiteSpace(dto.DocumentoSei) && etapa != CtrDominios.Etapa.NotaInformativa)
+            throw new ApiException(ErrorCode.CtrProcessoInvalido,
+                "O número do documento SEI só vale para a nota informativa.");
 
         // Aplica no candidato e só grava depois de validar (checkpoint incoerente
         // não pode deixar rastro na entidade rastreada)
@@ -857,8 +1064,13 @@ public class CtrProcessoService : ICtrProcessoService
                 }
                 break;
             case CtrDominios.Etapa.AssinaturaContrato:
-                // A data final: com ela o processo fica Concluído (limpar reabre)
+                // A data final: com ela a supervisão termina (limpar reabre)
                 candidato.DataAssinaturaContrato = dto.Data;
+                break;
+            case CtrDominios.Etapa.NotaInformativa:
+                // A data e o documento seguem o corpo; sem a data, a validação anula o documento
+                candidato.NotaInformativaEnviadaEm = dto.Data;
+                candidato.NotaInformativaDocumentoSei = dto.DocumentoSei;
                 break;
         }
 
@@ -902,6 +1114,12 @@ public class CtrProcessoService : ICtrProcessoService
         processo.AnaliseTecnicaRetornoResumo = dto.AnaliseTecnicaRetornoResumo;
         processo.EtapaPlanejamento = dto.EtapaPlanejamento;
         processo.DataAssinaturaContrato = dto.DataAssinaturaContrato;
+        // Os quatro de 2026-10-13 seguem o corpo (nulo limpa), como os outros campos novos; o
+        // checkpoint passa o DtoDe do próprio processo (só a etapa da nota muda a nota)
+        processo.NumeroContrato = dto.NumeroContrato;
+        processo.AutorizacaoDocumentoSei = dto.AutorizacaoDocumentoSei;
+        processo.NotaInformativaEnviadaEm = dto.NotaInformativaEnviadaEm;
+        processo.NotaInformativaDocumentoSei = dto.NotaInformativaDocumentoSei;
         processo.Criticidade = dto.Criticidade;
         processo.CriteriosCriticidade = dto.CriteriosCriticidade == null
             ? null
@@ -947,6 +1165,10 @@ public class CtrProcessoService : ICtrProcessoService
         AnaliseTecnicaRetornoResumo = p.AnaliseTecnicaRetornoResumo,
         EtapaPlanejamento = p.EtapaPlanejamento,
         DataAssinaturaContrato = p.DataAssinaturaContrato,
+        NumeroContrato = p.NumeroContrato,
+        AutorizacaoDocumentoSei = p.AutorizacaoDocumentoSei,
+        NotaInformativaEnviadaEm = p.NotaInformativaEnviadaEm,
+        NotaInformativaDocumentoSei = p.NotaInformativaDocumentoSei,
         Criticidade = p.Criticidade,
         CriteriosCriticidade = CtrCriticidade.Desserializar(p.CriteriosCriticidade),
         Origem = p.Origem,
@@ -987,12 +1209,14 @@ public class CtrProcessoService : ICtrProcessoService
         var limiteDias = Math.Max(0, diasSemMovimento);
         var hoje = HojeBrasilia();
 
-        // Uma consulta com projeção enxuta (sem os campos de texto longo) resolve
-        // contagens, médias e a seleção dos gargalos.
-        var resumos = await _repositorio.QueryAtivos()
-            .Select(p => new ResumoProcesso
+        // Uma consulta com projeção enxuta (sem os campos de texto longo) resolve contagens,
+        // médias e a seleção dos gargalos. A projeção é a própria entidade (solta, só com as
+        // colunas usadas), para a situação e a movimentação saírem das mesmas fontes únicas
+        var todos = await _repositorio.QueryAtivos()
+            .Select(p => new CtrProcesso
             {
                 Id = p.Id,
+                Origem = p.Origem,
                 CategoriaObjeto = p.CategoriaObjeto,
                 TipoContratacao = p.TipoContratacao,
                 OrgaoSigla = p.OrgaoSigla,
@@ -1004,6 +1228,7 @@ public class CtrProcessoService : ICtrProcessoService
                 RetornoOrgao = p.RetornoOrgao,
                 RetornoOrgaoNaoSeAplica = p.RetornoOrgaoNaoSeAplica,
                 DataAssinaturaContrato = p.DataAssinaturaContrato,
+                NotaInformativaEnviadaEm = p.NotaInformativaEnviadaEm,
                 RestituidoEm = p.RestituidoEm,
                 EsclarecimentoSolicitadoEm = p.EsclarecimentoSolicitadoEm,
                 EsclarecimentoRespondidoEm = p.EsclarecimentoRespondidoEm,
@@ -1012,6 +1237,11 @@ public class CtrProcessoService : ICtrProcessoService
                 CriadoEm = p.CriadoEm
             })
             .ToListAsync();
+
+        // As estatísticas da supervisão medem o regime atual: os registros históricos
+        // (contratações anteriores ao regime) ficam de fora e ganham o bloco próprio
+        var historicos = todos.Where(r => r.Origem == CtrDominios.Origem.AnteriorAoRegime).ToList();
+        var resumos = todos.Where(r => r.Origem != CtrDominios.Origem.AnteriorAoRegime).ToList();
 
         // Nível máximo declarado de cada processo: UMA consulta enxuta (sem os textos)
         var nivelMaximoPorProcesso = (await _repositorio.ListarEscalasDeRiscoDeProcessosAtivosAsync())
@@ -1022,33 +1252,18 @@ public class CtrProcessoService : ICtrProcessoService
         var comSituacao = resumos.Select(r => new
         {
             Resumo = r,
-            Situacao = CalcularSituacao(r.DataAssinaturaContrato, r.Restituido, r.ChegadaSgdi, r.ChegadaSubgd,
-                r.ChegadaUgtic, r.RetornoGabSgdi, r.RetornoOrgao, r.RetornoOrgaoNaoSeAplica),
-            Dias = CalcularDiasSemMovimento(
-                CalcularUltimaMovimentacao(r.ChegadaSgdi, r.ChegadaSubgd, r.ChegadaUgtic,
-                    r.RetornoGabSgdi, r.RetornoOrgao, r.RestituidoEm,
-                    r.EsclarecimentoSolicitadoEm, r.EsclarecimentoRespondidoEm,
-                    r.AnaliseTecnicaEncaminhadaEm, r.AnaliseTecnicaRetornoEm),
-                r.CriadoEm, hoje)
+            Situacao = CalcularSituacao(r),
+            Dias = CalcularDiasSemMovimento(CalcularUltimaMovimentacao(r), r.CriadoEm, hoje)
         }).ToList();
 
         var painel = new CtrPainelResponse
         {
             TotalAtivos = resumos.Count,
             LimiteDias = limiteDias,
-            TotalEsclarecimentoPendente = resumos.Count(r => CalcularEsclarecimentoPendente(
-                r.EsclarecimentoSolicitadoEm, r.EsclarecimentoRespondidoEm)),
-            // As 8 situações aparecem sempre, mesmo com zero. Ordem determinística:
-            // quantidade desc e, no empate, a ordem do domínio (do trâmite)
-            PorSituacao = CtrDominios.Situacao.Todos
-                .Select((s, ordem) => new
-                {
-                    Contagem = new CtrContagem { Chave = s, Quantidade = comSituacao.Count(x => x.Situacao == s) },
-                    Ordem = ordem
-                })
-                .OrderByDescending(c => c.Contagem.Quantidade).ThenBy(c => c.Ordem)
-                .Select(c => c.Contagem)
-                .ToList(),
+            TotalEsclarecimentoPendente = resumos.Count(CalcularEsclarecimentoPendente),
+            // As 11 situações aparecem sempre, mesmo com zero. Ordem determinística:
+            // quantidade desc e, no empate, a ordem do domínio (a da prioridade)
+            PorSituacao = ContarNoDominio(CtrDominios.Situacao.Todos, comSituacao.Select(x => x.Situacao).ToList()),
             TotalConcluidos = resumos.Count(r => r.DataAssinaturaContrato != null),
             // Nível MÁXIMO dos riscos por processo: Baixo..Extremo + "Sem riscos declarados",
             // sempre presentes, com o mesmo desempate
@@ -1079,15 +1294,27 @@ public class CtrProcessoService : ICtrProcessoService
                 RetornoGabParaOrgao = Media(resumos, r => r.RetornoGabSgdi, r => r.RetornoOrgao),
                 ChegadaParaConclusao = Media(resumos, r => r.ChegadaSgdi, r => r.RetornoOrgao),
                 ChegadaParaAssinatura = Media(resumos, r => r.ChegadaSgdi, r => r.DataAssinaturaContrato)
+            },
+            Historicos = new CtrPainelHistoricos
+            {
+                Total = historicos.Count,
+                PorCategoria = historicos
+                    .GroupBy(r => r.CategoriaObjeto)
+                    .Select(g => new CtrContagem { Chave = g.Key, Quantidade = g.Count() })
+                    .OrderByDescending(c => c.Quantidade).ThenBy(c => c.Chave)
+                    .ToList(),
+                PorOrgao = historicos
+                    .GroupBy(r => r.OrgaoSigla)
+                    .Select(g => new CtrContagem { Chave = g.Key, Quantidade = g.Count() })
+                    .OrderByDescending(c => c.Quantidade).ThenBy(c => c.Chave)
+                    .ToList()
             }
         };
 
-        // Parados: nem os concluídos, nem os de análise concluída, nem os restituídos
+        // Parados: fora das situações em que a SGDI não age mais (os dias passam esperando o
+        // órgão, não a SGDI)
         var gargalos = comSituacao
-            .Where(x => x.Situacao != CtrDominios.Situacao.Concluido
-                        && x.Situacao != CtrDominios.Situacao.AnaliseConcluida
-                        && x.Situacao != CtrDominios.Situacao.Restituido
-                        && x.Dias >= limiteDias)
+            .Where(x => !CtrDominios.Situacao.Terminais.Contains(x.Situacao) && x.Dias >= limiteDias)
             .OrderByDescending(x => x.Dias)
             .ThenBy(x => x.Resumo.Id)
             .Take(LimiteGargalos)
@@ -1129,8 +1356,8 @@ public class CtrProcessoService : ICtrProcessoService
         return painel;
     }
 
-    private static double? Media(List<ResumoProcesso> resumos,
-        Func<ResumoProcesso, DateOnly?> de, Func<ResumoProcesso, DateOnly?> ate)
+    private static double? Media(List<CtrProcesso> resumos,
+        Func<CtrProcesso, DateOnly?> de, Func<CtrProcesso, DateOnly?> ate)
     {
         var amostra = resumos
             .Where(r => de(r) != null && ate(r) != null)
@@ -1160,7 +1387,8 @@ public class CtrProcessoService : ICtrProcessoService
     public async Task<CtrPainelPublicoResponse> MontarPainelPublicoAsync()
     {
         // Todos os processos de supervisão contínua, em análise e com contrato assinado (pedido de
-        // 2026-10-02: o sigiloso é o valor, não a contratação); as comunicações do TCDF ficam de
+        // 2026-10-02: o sigiloso é o valor, não a contratação); as comunicações do TCDF e os
+        // registros históricos (contratações anteriores ao regime, decisão de 2026-10-13) ficam de
         // fora. Projeção enxuta: nada além dos campos abertos sai do banco; o valor estimado não sai.
         var linhas = await _repositorio.QueryAtivos()
             .Where(p => p.Origem == CtrDominios.Origem.OrgaoComunicante)
@@ -1328,6 +1556,10 @@ public class CtrProcessoService : ICtrProcessoService
             AnaliseTecnicaRetornoResumo = p.AnaliseTecnicaRetornoResumo,
             EtapaPlanejamento = p.EtapaPlanejamento,
             DataAssinaturaContrato = p.DataAssinaturaContrato,
+            NumeroContrato = p.NumeroContrato,
+            AutorizacaoDocumentoSei = p.AutorizacaoDocumentoSei,
+            NotaInformativaEnviadaEm = p.NotaInformativaEnviadaEm,
+            NotaInformativaDocumentoSei = p.NotaInformativaDocumentoSei,
             Criticidade = p.Criticidade,
             CriteriosCriticidade = criterios,
             PontosCriticidade = criterios == null ? null : CtrCriticidade.PontosTotais(criterios),
@@ -1350,7 +1582,7 @@ public class CtrProcessoService : ICtrProcessoService
             RestituidoMotivo = p.RestituidoMotivo,
             Observacao = p.Observacao,
             Situacao = CalcularSituacao(p),
-            StatusSupervisao = CalcularStatusSupervisao(p),
+            SituacaoDesde = CalcularSituacaoDesde(p),
             UltimaMovimentacao = ultimaMovimentacao,
             DiasSemMovimento = CalcularDiasSemMovimento(ultimaMovimentacao, p.CriadoEm, hoje),
             // O nível máximo e os riscos aninhados dependem dos riscos: quem chama resolve
@@ -1359,28 +1591,5 @@ public class CtrProcessoService : ICtrProcessoService
             AlteradoEm = p.AlteradoEm,
             AlteradoPor = p.AlteradoPor
         };
-    }
-
-    /// <summary>Projeção enxuta usada pelo painel (sem os campos de texto longo).</summary>
-    private sealed class ResumoProcesso
-    {
-        public long Id { get; set; }
-        public string CategoriaObjeto { get; set; } = string.Empty;
-        public string? TipoContratacao { get; set; }
-        public string OrgaoSigla { get; set; } = string.Empty;
-        public bool Restituido { get; set; }
-        public DateOnly? ChegadaSgdi { get; set; }
-        public DateOnly? ChegadaSubgd { get; set; }
-        public DateOnly? ChegadaUgtic { get; set; }
-        public DateOnly? RetornoGabSgdi { get; set; }
-        public DateOnly? RetornoOrgao { get; set; }
-        public bool RetornoOrgaoNaoSeAplica { get; set; }
-        public DateOnly? DataAssinaturaContrato { get; set; }
-        public DateOnly? RestituidoEm { get; set; }
-        public DateOnly? EsclarecimentoSolicitadoEm { get; set; }
-        public DateOnly? EsclarecimentoRespondidoEm { get; set; }
-        public DateOnly? AnaliseTecnicaEncaminhadaEm { get; set; }
-        public DateOnly? AnaliseTecnicaRetornoEm { get; set; }
-        public DateTime CriadoEm { get; set; }
     }
 }

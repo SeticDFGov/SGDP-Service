@@ -111,7 +111,7 @@ public class CtrListagemTest : CtrTestBase
     [InlineData(CtrDominios.Situacao.EmAnaliseUgtic, 1)]
     [InlineData(CtrDominios.Situacao.RetornadoGabSgdi, 1)]
     [InlineData(CtrDominios.Situacao.AnaliseConcluida, 1)]
-    [InlineData(CtrDominios.Situacao.Restituido, 1)]
+    [InlineData(CtrDominios.Situacao.RestituidoOrgao, 1)]
     public async Task Listar_FiltraPorSituacaoDerivada(string situacao, int esperado)
     {
         var pagina = await _service.ListarAsync(new CtrProcessoFiltro { Situacao = situacao, PageSize = 50 });
@@ -288,7 +288,7 @@ public class CtrListagemTest : CtrTestBase
         var restituido = previa.Linhas.Single(l => l.NumeroProcesso == "00480-00000007/2026-17");
         Assert.True(restituido.Dados!.Restituido);
         Assert.Equal(DiasAtras(3), restituido.Dados.RestituidoEm);
-        Assert.Equal(CtrDominios.Situacao.Restituido, restituido.Situacao);
+        Assert.Equal(CtrDominios.Situacao.RestituidoOrgao, restituido.Situacao);
 
         var semUgtic = previa.Linhas.Single(l => l.NumeroProcesso == "00080-00000003/2026-13");
         Assert.True(semUgtic.Dados!.UgticNaoSeAplica);

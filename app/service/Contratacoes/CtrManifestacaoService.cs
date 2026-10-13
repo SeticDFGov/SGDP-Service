@@ -363,12 +363,27 @@ public class CtrManifestacaoService : ICtrManifestacaoService
             CriadoPor = ctx.Email
         };
         AplicarDto(manifestacao, dto);
+        RecusarIncisoINoRegistroHistorico(manifestacao, processo);
         ValidarManifestacao(manifestacao, processo.Criticidade, exigirComunicacao: true);
 
         _repositorio.AddManifestacao(manifestacao);
         await _repositorio.SaveChangesAsync();
 
         return Map(manifestacao);
+    }
+
+    /// <summary>
+    /// A contratação anterior ao regime (registro histórico) recebe comunicação e manifestação
+    /// ao TCDF, mas não tem criticidade, que o inciso I reporta: a mensagem diz o caminho em vez
+    /// de mandar definir uma criticidade que o registro não leva.
+    /// </summary>
+    private static void RecusarIncisoINoRegistroHistorico(CtrManifestacaoTcdf m, CtrProcesso? processo)
+    {
+        if (processo?.Origem == CtrDominios.Origem.AnteriorAoRegime
+            && m.SituacaoPortfolio?.Trim() == CtrDominios.SituacaoPortfolio.ComunicadaPreviamente)
+            throw new ApiException(ErrorCode.CtrManifestacaoInvalida,
+                "A contratação anterior ao regime não tem criticidade, que o inciso I reporta: registre a "
+                + "manifestação pelo inciso II (não comunicada previamente).");
     }
 
     public async Task<bool> ProcessoAtivoExisteAsync(long processoId) =>
@@ -444,6 +459,7 @@ public class CtrManifestacaoService : ICtrManifestacaoService
         // a entidade rastreada com o estado inválido (mesma disciplina do processo)
         var candidato = Clonar(manifestacao);
         AplicarDto(candidato, dto);
+        RecusarIncisoINoRegistroHistorico(candidato, manifestacao.Processo);
         // Registrada antes dos dados da comunicação do TCDF, pode seguir sem eles
         ValidarManifestacao(candidato, manifestacao.Processo?.Criticidade,
             exigirComunicacao: TemComunicacao(manifestacao));

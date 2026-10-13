@@ -44,6 +44,14 @@ public static class CtrModelConfiguration
                     "criticidade IS NULL OR " + EmLista("criticidade", CtrDominios.Criticidade.Todos));
                 t.HasCheckConstraint("ck_ctr_processo_origem",
                     EmLista("origem", CtrDominios.Origem.Todos));
+                // O registro histórico (contratação anterior ao regime) tem sempre o contrato
+                // assinado e o número dele (o service valida antes, com mensagem)
+                t.HasCheckConstraint("ck_ctr_processo_anterior_regime",
+                    $"origem <> '{CtrDominios.Origem.AnteriorAoRegime}' "
+                    + "OR (data_assinatura_contrato IS NOT NULL AND numero_contrato IS NOT NULL)");
+                // O documento SEI da nota informativa só existe com a data do envio
+                t.HasCheckConstraint("ck_ctr_processo_nota_informativa",
+                    "nota_informativa_documento_sei IS NULL OR nota_informativa_enviada_em IS NOT NULL");
                 t.HasCheckConstraint("ck_ctr_processo_hospedagem_cetic",
                     "hospedagem_cetic IS NULL OR " + EmLista("hospedagem_cetic", CtrDominios.HospedagemCetic.Todos));
                 t.HasCheckConstraint("ck_ctr_processo_tipo_contratacao",
@@ -105,6 +113,11 @@ public static class CtrModelConfiguration
                 .HasColumnName("analise_tecnica_retorno_resumo").HasMaxLength(1000);
             entity.Property(p => p.EtapaPlanejamento).HasColumnName("etapa_planejamento").HasMaxLength(10);
             entity.Property(p => p.DataAssinaturaContrato).HasColumnName("data_assinatura_contrato");
+            entity.Property(p => p.NumeroContrato).HasColumnName("numero_contrato").HasMaxLength(60);
+            entity.Property(p => p.AutorizacaoDocumentoSei).HasColumnName("autorizacao_documento_sei").HasMaxLength(25);
+            entity.Property(p => p.NotaInformativaEnviadaEm).HasColumnName("nota_informativa_enviada_em");
+            entity.Property(p => p.NotaInformativaDocumentoSei)
+                .HasColumnName("nota_informativa_documento_sei").HasMaxLength(25);
             entity.Property(p => p.Criticidade).HasColumnName("criticidade").HasMaxLength(10);
             entity.Property(p => p.CriteriosCriticidade).HasColumnName("criticidade_criterios").HasColumnType("jsonb");
             entity.Property(p => p.Origem).HasColumnName("origem").HasMaxLength(20).IsRequired()

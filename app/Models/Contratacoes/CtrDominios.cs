@@ -41,34 +41,50 @@ public static class CtrDominios
     }
 
     /// <summary>
-    /// Situação derivada do processo — NUNCA gravada. Fonte única do cálculo:
-    /// <c>CtrProcessoService.CalcularSituacao</c>. Desde 2026-09-22 a assinatura do
-    /// contrato é a data FINAL do trâmite: com ela o processo está Concluído (sai da
-    /// lista e vai para a relação de concluídos do painel). A devolução ao órgão, que
-    /// até então se chamava "Concluído", passou a "Análise concluída".
+    /// Situação derivada do processo, NUNCA gravada. Fonte única do cálculo e do filtro:
+    /// <c>CtrProcessoService.CalcularSituacao</c> e <c>CtrProcessoService.PredicadoSituacao</c>,
+    /// que leem a mesma lista de condições. Desde 2026-10-13 são 11, na ordem de prioridade
+    /// abaixo (a primeira que se aplica vale): a assinatura do contrato encerra a supervisão,
+    /// a nota informativa encerra a análise da SGDI, e o pedido de esclarecimento e o
+    /// encaminhamento à análise técnica deixaram de ser sinais paralelos.
     /// </summary>
     public static class Situacao
     {
-        public const string Concluido = "Concluído";
-        public const string Restituido = "Restituído";
+        public const string ContratoAssinado = "Contrato assinado";
+        public const string RestituidoOrgao = "Restituído ao órgão";
+        public const string NotaInformativaEnviada = "Nota informativa enviada";
         public const string AnaliseConcluida = "Análise concluída";
+        public const string EsclarecimentosSolicitados = "Esclarecimentos solicitados";
+        public const string AguardandoAnaliseTecnica = "Aguardando análise técnica";
         public const string RetornadoGabSgdi = "Retornado ao Gab SGDI";
         public const string EmAnaliseUgtic = "Em análise na UGTIC";
         public const string EmAnaliseSubgd = "Em análise na SUBGD";
         public const string EmAnaliseSgdi = "Em análise na SGDI";
         public const string SemMovimentacao = "Sem movimentação";
 
+        /// <summary>As 11, na ordem de prioridade (é também a ordem do painel no empate).</summary>
         public static readonly string[] Todos =
         {
-            Concluido, Restituido, AnaliseConcluida, RetornadoGabSgdi, EmAnaliseUgtic,
+            ContratoAssinado, RestituidoOrgao, NotaInformativaEnviada, AnaliseConcluida,
+            EsclarecimentosSolicitados, AguardandoAnaliseTecnica, RetornadoGabSgdi, EmAnaliseUgtic,
             EmAnaliseSubgd, EmAnaliseSgdi, SemMovimentacao
+        };
+
+        /// <summary>
+        /// As situações em que a SGDI não age mais (os dias passam esperando o órgão): ficam
+        /// fora dos gargalos do painel.
+        /// </summary>
+        public static readonly string[] Terminais =
+        {
+            ContratoAssinado, RestituidoOrgao, NotaInformativaEnviada, AnaliseConcluida
         };
     }
 
     /// <summary>
     /// Checkpoints do trâmite, na ordem cronológica esperada. A assinatura do contrato é a
-    /// sexta e última data: fora da cronologia dos outros cinco (o TCDF também analisa
-    /// contrato já assinado), mas conclui o processo.
+    /// data final: fora da cronologia dos outros cinco (o TCDF também analisa contrato já
+    /// assinado), mas encerra a supervisão. A nota informativa (2026-10-13) também é
+    /// registrada pelo checkpoint, com o número do documento SEI.
     /// </summary>
     public static class Etapa
     {
@@ -78,10 +94,12 @@ public static class CtrDominios
         public const string RetornoGabSgdi = "RetornoGabSgdi";
         public const string RetornoOrgao = "RetornoOrgao";
         public const string AssinaturaContrato = "AssinaturaContrato";
+        public const string NotaInformativa = "NotaInformativa";
 
         public static readonly string[] Todos =
         {
-            ChegadaSgdi, ChegadaSubgd, ChegadaUgtic, RetornoGabSgdi, RetornoOrgao, AssinaturaContrato
+            ChegadaSgdi, ChegadaSubgd, ChegadaUgtic, RetornoGabSgdi, RetornoOrgao, AssinaturaContrato,
+            NotaInformativa
         };
     }
 
@@ -100,15 +118,18 @@ public static class CtrDominios
     }
 
     /// <summary>
-    /// Como o processo chegou à SGDI: comunicado pelo órgão (o caminho normal) ou
-    /// cadastrado a partir de análise do próprio TCDF sobre o contrato.
+    /// Como o processo chegou à SGDI: comunicado pelo órgão (o caminho normal), cadastrado a
+    /// partir de análise do próprio TCDF sobre o contrato ou, desde 2026-10-13, registro
+    /// histórico de contratação anterior ao regime (chegou à SGDI quando ainda era
+    /// autorização e já tem contrato assinado). A origem é o que separa as listas.
     /// </summary>
     public static class Origem
     {
         public const string OrgaoComunicante = "Órgão comunicante";
         public const string Tcdf = "TCDF";
+        public const string AnteriorAoRegime = "Anterior ao regime";
 
-        public static readonly string[] Todos = { OrgaoComunicante, Tcdf };
+        public static readonly string[] Todos = { OrgaoComunicante, Tcdf, AnteriorAoRegime };
     }
 
     /// <summary>
@@ -282,19 +303,6 @@ public static class CtrDominios
         public const string Subinfra = "SUBINFRA";
 
         public static readonly string[] Todos = { Subsis, Subinfra };
-    }
-
-    /// <summary>
-    /// Status da contratação na supervisão contínua, DERIVADO pela regra de conclusão do
-    /// módulo (contrato assinado = processo Concluído) e nunca gravado. Fonte única do
-    /// cálculo: <c>CtrProcessoService.CalcularStatusSupervisao</c>.
-    /// </summary>
-    public static class StatusSupervisao
-    {
-        public const string EmRegimeSupervisao = "Em regime de supervisão";
-        public const string Concluida = "Concluída";
-
-        public static readonly string[] Todos = { EmRegimeSupervisao, Concluida };
     }
 
     /// <summary>Resultado da análise e providência adotada (inciso I do despacho).</summary>

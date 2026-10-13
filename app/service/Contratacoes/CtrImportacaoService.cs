@@ -124,8 +124,12 @@ public class CtrImportacaoService : ICtrImportacaoService
                 // Mesma guarda do PUT: a planilha não pode apagar a criticidade de
                 // processo que já tem manifestação do inciso I
                 if (existente != null)
+                {
                     CtrProcessoService.ValidarCriticidadeNaoRemovida(existente.Criticidade,
                         candidato.Criticidade, comIncisoI.Contains(existente.Id));
+                    // Como no PUT: a planilha não marca nem desfaz o registro histórico
+                    CtrProcessoService.ValidarMudancaDeOrigem(existente.Origem, candidato.Origem);
+                }
             }
             catch (ApiException ex)
             {
@@ -215,6 +219,14 @@ public class CtrImportacaoService : ICtrImportacaoService
         if (!colunas.ValorEstimado) candidato.ValorEstimado = existente.ValorEstimado;
         if (!colunas.HospedagemCetic) candidato.HospedagemCetic = existente.HospedagemCetic;
         if (!colunas.UsaGdfnet) candidato.UsaGdfnet = existente.UsaGdfnet;
+
+        // Os quatro de 2026-10-13, também cada um pela sua coluna (o documento da nota sem a
+        // data é anulado pela validação, como na tela)
+        if (!colunas.NotaInformativaEnviadaEm) candidato.NotaInformativaEnviadaEm = existente.NotaInformativaEnviadaEm;
+        if (!colunas.NotaInformativaDocumentoSei)
+            candidato.NotaInformativaDocumentoSei = existente.NotaInformativaDocumentoSei;
+        if (!colunas.NumeroContrato) candidato.NumeroContrato = existente.NumeroContrato;
+        if (!colunas.AutorizacaoDocumentoSei) candidato.AutorizacaoDocumentoSei = existente.AutorizacaoDocumentoSei;
 
         // Bloco inteiro: herdar só parte dele produziria estado que o CHECK recusa
         if (!colunas.Esclarecimento)

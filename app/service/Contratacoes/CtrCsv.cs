@@ -47,6 +47,16 @@ public class CtrCsvColunasOpcionais
 
     public bool UsaGdfnet { get; init; }
 
+    // As quatro de 2026-10-13 (nota informativa, contrato e autorização): cada uma por si. O
+    // documento da nota sem a data é anulado pela validação, então não precisam de bloco
+    public bool NotaInformativaEnviadaEm { get; init; }
+
+    public bool NotaInformativaDocumentoSei { get; init; }
+
+    public bool NumeroContrato { get; init; }
+
+    public bool AutorizacaoDocumentoSei { get; init; }
+
     /// <summary>Nenhuma delas (planilha legada de 12 colunas) — o default conservador.</summary>
     public static readonly CtrCsvColunasOpcionais Nenhuma = new();
 
@@ -61,7 +71,11 @@ public class CtrCsvColunasOpcionais
         CriteriosCriticidade = true,
         ValorEstimado = true,
         HospedagemCetic = true,
-        UsaGdfnet = true
+        UsaGdfnet = true,
+        NotaInformativaEnviadaEm = true,
+        NotaInformativaDocumentoSei = true,
+        NumeroContrato = true,
+        AutorizacaoDocumentoSei = true
     };
 }
 
@@ -113,11 +127,12 @@ public class CtrCsvLinha
 public static class CtrCsv
 {
     /// <summary>
-    /// Cabeçalho do export (32 colunas): os 12 nomes originais da planilha, os 3 da
+    /// Cabeçalho do export (36 colunas): os 12 nomes originais da planilha, os 3 da
     /// restituição e, AO FINAL (a ordem já existente é preservada), os 4 da rodada de
     /// planejamento e status no TCDF, os 3 do esclarecimento, os 7 dos critérios de
-    /// criticidade e os 3 dos dados da contratação (valor, hospedagem e GDFNet). Na
-    /// importação, da 16ª em diante são opcionais.
+    /// criticidade, os 3 dos dados da contratação (valor, hospedagem e GDFNet) e os 4 de
+    /// 2026-10-13 (data e documento da nota informativa, número do contrato e documento da
+    /// autorização). Na importação, da 16ª em diante são opcionais.
     /// </summary>
     public static readonly string[] Cabecalho =
     {
@@ -135,7 +150,9 @@ public static class CtrCsv
         "Critério V - Tecnologias emergentes, nuvem ou IA",
         "Critério VI - Riscos de segurança, dados pessoais ou continuidade",
         "Critério VII - Valor estimado no limite do inciso VII",
-        "Valor estimado (R$)", "Hospedagem no CeTIC-DF", "Usa a rede GDFNet"
+        "Valor estimado (R$)", "Hospedagem no CeTIC-DF", "Usa a rede GDFNet",
+        "Nota informativa enviada em", "Documento SEI da nota informativa", "Número do contrato",
+        "Documento SEI da autorização"
     };
 
     // As sete colunas dos critérios de criticidade, na ordem dos incisos (bloco: as sete ou nenhuma)
@@ -158,6 +175,12 @@ public static class CtrCsv
     private const int ColunaValorEstimado = 29;
     private const int ColunaHospedagemCetic = 30;
     private const int ColunaUsaGdfnet = 31;
+
+    // Os quatro de 2026-10-13, no fim (cada coluna independente)
+    private const int ColunaNotaInformativaEnviadaEm = 32;
+    private const int ColunaNotaInformativaDocumentoSei = 33;
+    private const int ColunaNumeroContrato = 34;
+    private const int ColunaAutorizacaoDocumentoSei = 35;
 
     private static readonly string[] FormatosData = { "dd/MM/yyyy", "d/M/yyyy", "dd/M/yyyy", "d/MM/yyyy" };
 
@@ -245,7 +268,11 @@ public static class CtrCsv
                         // Cada uma por si: nenhum CHECK amarra as três
                         ValorEstimado = TemColuna(campos, ColunaValorEstimado),
                         HospedagemCetic = TemColuna(campos, ColunaHospedagemCetic),
-                        UsaGdfnet = TemColuna(campos, ColunaUsaGdfnet)
+                        UsaGdfnet = TemColuna(campos, ColunaUsaGdfnet),
+                        NotaInformativaEnviadaEm = TemColuna(campos, ColunaNotaInformativaEnviadaEm),
+                        NotaInformativaDocumentoSei = TemColuna(campos, ColunaNotaInformativaDocumentoSei),
+                        NumeroContrato = TemColuna(campos, ColunaNumeroContrato),
+                        AutorizacaoDocumentoSei = TemColuna(campos, ColunaAutorizacaoDocumentoSei)
                     };
                 }
                 continue; // o título (linha 1) e o próprio cabeçalho não viram dados
@@ -436,6 +463,21 @@ public static class CtrCsv
         if (!TentarSimNao(gdfnetBruto, out var usaGdfnet))
             return Rejeitar(linha, $"valor inválido em {Cabecalho[ColunaUsaGdfnet]}: {gdfnetBruto}");
 
+        // ── Colunas 33-36 (nota informativa, contrato e autorização) ──────────
+        // Mesma regra: ausente nem é lida, presente e vazia limpa. A data inválida (ou o "-",
+        // que não existe para a nota) rejeita nomeando a coluna; os três textos são livres e
+        // passam pela proteção contra fórmula (o tamanho fica com o ValidarProcesso)
+        var notaBruta = colunas.NotaInformativaEnviadaEm ? Campo(ColunaNotaInformativaEnviadaEm) : string.Empty;
+        if (!TentarData(notaBruta, out var notaEnviadaEm, out var notaNaoSeAplica) || notaNaoSeAplica)
+            return Rejeitar(linha, $"data inválida em {Cabecalho[ColunaNotaInformativaEnviadaEm]}: {notaBruta}");
+
+        string? TextoOpcional(bool presente, int indice)
+        {
+            if (!presente) return null;
+            var valor = Texto(indice);
+            return string.IsNullOrWhiteSpace(valor) ? null : valor;
+        }
+
         var dados = new CtrProcessoCreateDTO
         {
             NumeroProcesso = numero,
@@ -460,6 +502,10 @@ public static class CtrCsv
             ValorEstimado = valorEstimado,
             HospedagemCetic = hospedagemCetic,
             UsaGdfnet = usaGdfnet,
+            NotaInformativaEnviadaEm = notaEnviadaEm,
+            NotaInformativaDocumentoSei = TextoOpcional(colunas.NotaInformativaDocumentoSei, ColunaNotaInformativaDocumentoSei),
+            NumeroContrato = TextoOpcional(colunas.NumeroContrato, ColunaNumeroContrato),
+            AutorizacaoDocumentoSei = TextoOpcional(colunas.AutorizacaoDocumentoSei, ColunaAutorizacaoDocumentoSei),
             EsclarecimentoSolicitadoEm = esclarecimentoSolicitadoEm,
             EsclarecimentoDescricao = esclarecimentoDescricao,
             EsclarecimentoRespondidoEm = esclarecimentoRespondidoEm
@@ -891,7 +937,12 @@ public static class CtrCsv
                 // Os dados da contratação: vazios quando não informados
                 (Valor(p.ValorEstimado), false),
                 (p.HospedagemCetic ?? string.Empty, false),
-                (SimNao(p.UsaGdfnet), false)
+                (SimNao(p.UsaGdfnet), false),
+                // Os quatro de 2026-10-13: os três textos são livres (proteção contra fórmula)
+                (Data(p.NotaInformativaEnviadaEm), false),
+                (p.NotaInformativaDocumentoSei ?? string.Empty, true),
+                (p.NumeroContrato ?? string.Empty, true),
+                (p.AutorizacaoDocumentoSei ?? string.Empty, true)
             };
 
             csv.Linha(celulas);

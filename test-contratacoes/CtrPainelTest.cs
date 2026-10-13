@@ -80,20 +80,20 @@ public class CtrPainelTest : CtrTestBase
     }
 
     [Fact]
-    public async Task Painel_ContaSoOsAtivosECobreAsOitoSituacoes()
+    public async Task Painel_ContaSoOsAtivosECobreAsOnzeSituacoes()
     {
         var painel = await _service.MontarPainelAsync(15);
 
         Assert.Equal(5, painel.TotalAtivos);
         Assert.Equal(15, painel.LimiteDias);
-        Assert.Equal(8, painel.PorSituacao.Count);
+        Assert.Equal(11, painel.PorSituacao.Count);
         Assert.Equal(CtrDominios.Situacao.Todos.OrderBy(s => s),
             painel.PorSituacao.Select(c => c.Chave).OrderBy(s => s));
 
         Assert.Equal(2, painel.PorSituacao.Single(c => c.Chave == CtrDominios.Situacao.AnaliseConcluida).Quantidade);
         Assert.Equal(1, painel.PorSituacao.Single(c => c.Chave == CtrDominios.Situacao.EmAnaliseSubgd).Quantidade);
         Assert.Equal(1, painel.PorSituacao.Single(c => c.Chave == CtrDominios.Situacao.EmAnaliseSgdi).Quantidade);
-        Assert.Equal(1, painel.PorSituacao.Single(c => c.Chave == CtrDominios.Situacao.Restituido).Quantidade);
+        Assert.Equal(1, painel.PorSituacao.Single(c => c.Chave == CtrDominios.Situacao.RestituidoOrgao).Quantidade);
         // As situações sem nenhum processo aparecem com zero
         Assert.Equal(0, painel.PorSituacao.Single(c => c.Chave == CtrDominios.Situacao.EmAnaliseUgtic).Quantidade);
     }

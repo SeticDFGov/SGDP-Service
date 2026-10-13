@@ -372,6 +372,11 @@ namespace demanda_service.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("ativo");
 
+                    b.Property<string>("AutorizacaoDocumentoSei")
+                        .HasMaxLength(25)
+                        .HasColumnType("character varying(25)")
+                        .HasColumnName("autorizacao_documento_sei");
+
                     b.Property<string>("CategoriaObjeto")
                         .IsRequired()
                         .HasMaxLength(60)
@@ -455,6 +460,20 @@ namespace demanda_service.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("hospedagem_cetic");
+
+                    b.Property<string>("NotaInformativaDocumentoSei")
+                        .HasMaxLength(25)
+                        .HasColumnType("character varying(25)")
+                        .HasColumnName("nota_informativa_documento_sei");
+
+                    b.Property<DateOnly?>("NotaInformativaEnviadaEm")
+                        .HasColumnType("date")
+                        .HasColumnName("nota_informativa_enviada_em");
+
+                    b.Property<string>("NumeroContrato")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("numero_contrato");
 
                     b.Property<string>("NumeroProcesso")
                         .IsRequired()
@@ -582,6 +601,8 @@ namespace demanda_service.Migrations
 
                             t.HasCheckConstraint("ck_ctr_processo_analise_tecnica_area", "analise_tecnica_area IS NULL OR analise_tecnica_area IN ('SUBSIS','SUBINFRA')");
 
+                            t.HasCheckConstraint("ck_ctr_processo_anterior_regime", "origem <> 'Anterior ao regime' OR (data_assinatura_contrato IS NOT NULL AND numero_contrato IS NOT NULL)");
+
                             t.HasCheckConstraint("ck_ctr_processo_categoria", "categoria_objeto IN ('Infraestrutura de Rede','Desenvolvimento / Fábrica de Software','Outsourcing de Impressão','Licenciamento de Software','Inteligência Artificial','Segurança Cibernética','Sistemas de Gestão','Certificação Digital','Captação Audiovisual','Telefonia / VoIP','Serviços de TIC','Nuvem','Tokens de IA','Sem objeto / Indefinido','Outros')");
 
                             t.HasCheckConstraint("ck_ctr_processo_classificacao", "(checklist_risco IS NULL AND risco_classificado IS NULL AND pontuacao_risco IS NULL AND risco_classificado_em IS NULL) OR (checklist_risco IS NOT NULL AND risco_classificado IS NOT NULL AND pontuacao_risco IS NOT NULL AND risco_classificado_em IS NOT NULL)");
@@ -596,7 +617,9 @@ namespace demanda_service.Migrations
 
                             t.HasCheckConstraint("ck_ctr_processo_hospedagem_cetic", "hospedagem_cetic IS NULL OR hospedagem_cetic IN ('Sim','Não','Parcialmente','Não aplicável (SaaS)')");
 
-                            t.HasCheckConstraint("ck_ctr_processo_origem", "origem IN ('Órgão comunicante','TCDF')");
+                            t.HasCheckConstraint("ck_ctr_processo_nota_informativa", "nota_informativa_documento_sei IS NULL OR nota_informativa_enviada_em IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_ctr_processo_origem", "origem IN ('Órgão comunicante','TCDF','Anterior ao regime')");
 
                             t.HasCheckConstraint("ck_ctr_processo_restituicao", "NOT restituido OR (restituido_em IS NOT NULL AND restituido_motivo IS NOT NULL)");
 

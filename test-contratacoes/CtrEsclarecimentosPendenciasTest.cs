@@ -68,8 +68,9 @@ public class CtrEsclarecimentosPendenciasTest : CtrTestBase
         Assert.True(resposta.EsclarecimentoPendente);
         Assert.Equal(9, resposta.DiasEsclarecimentoPendente);
         Assert.Equal("Detalhar a memória de cálculo do quantitativo", resposta.EsclarecimentoDescricao);
-        // A situação do trâmite NÃO muda: esclarecimento é sinal paralelo
-        Assert.Equal(CtrDominios.Situacao.EmAnaliseSgdi, resposta.Situacao);
+        // Desde 2026-10-13 o pedido sem resposta é a situação (era um sinal paralelo)
+        Assert.Equal(CtrDominios.Situacao.EsclarecimentosSolicitados, resposta.Situacao);
+        Assert.Equal(DiasAtras(9), resposta.SituacaoDesde);
     }
 
     [Fact]
@@ -288,8 +289,8 @@ public class CtrEsclarecimentosPendenciasTest : CtrTestBase
     {
         // 22 colunas até a rodada dos esclarecimentos; as 7 dos critérios de criticidade
         // vieram depois delas (CtrCriticidadeConclusaoTest) e, no fim, as 3 dos dados da
-        // contratação (CtrValorHospedagemGdfnetTest)
-        Assert.Equal(32, CtrCsv.Cabecalho.Length);
+        // contratação (CtrValorHospedagemGdfnetTest) e as 4 de 2026-10-13
+        Assert.Equal(36, CtrCsv.Cabecalho.Length);
         Assert.Equal(
             new[] { "Pedido de esclarecimento em", "Esclarecimento solicitado", "Esclarecimento respondido em" },
             CtrCsv.Cabecalho[19..22]);

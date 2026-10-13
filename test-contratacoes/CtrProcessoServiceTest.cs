@@ -253,7 +253,7 @@ public class CtrProcessoServiceTest : CtrTestBase
             { ChegadaSgdi = d, ChegadaSubgd = d, ChegadaUgtic = d, RetornoGabSgdi = d, RetornoOrgao = d }));
 
         // Restituído tem precedência sobre tudo
-        Assert.Equal(CtrDominios.Situacao.Restituido,
+        Assert.Equal(CtrDominios.Situacao.RestituidoOrgao,
             CtrProcessoService.CalcularSituacao(new CtrProcesso
             { ChegadaSgdi = d, RetornoOrgao = d, Restituido = true }));
     }

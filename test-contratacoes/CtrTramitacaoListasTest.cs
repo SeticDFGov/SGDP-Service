@@ -415,7 +415,7 @@ public class CtrTramitacaoListasTest : CtrTestBase
         Assert.True(resposta.Restituido);
         Assert.Equal(DiasAtras(10), resposta.RestituidoEm);
         Assert.Equal("Faltou o ETP", resposta.RestituidoMotivo);
-        Assert.Equal(CtrDominios.Situacao.Restituido, resposta.Situacao);
+        Assert.Equal(CtrDominios.Situacao.RestituidoOrgao, resposta.Situacao);
     }
 
     // ══ 9. Duas listas pela origem ═══════════════════════════════════════════
@@ -486,68 +486,8 @@ public class CtrTramitacaoListasTest : CtrTestBase
     }
 
     // ══ 10. Coluna STATUS ════════════════════════════════════════════════════
-
-    [Fact]
-    public void Status_SegueARegraDeConclusaoDoModulo()
-    {
-        Assert.Equal(new[] { "Em regime de supervisão", "Concluída" }, CtrDominios.StatusSupervisao.Todos);
-        Assert.Equal(CtrDominios.StatusSupervisao.EmRegimeSupervisao, CtrProcessoService.CalcularStatusSupervisao((DateOnly?)null));
-        Assert.Equal(CtrDominios.StatusSupervisao.Concluida, CtrProcessoService.CalcularStatusSupervisao(DiasAtras(1)));
-    }
-
-    [Fact]
-    public async Task Status_NaLista_ConcluidaSoComOContratoAssinado()
-    {
-        // Uma amostra de cada situação: só o contrato assinado conclui a supervisão
-        SemearProcesso("04044-00000820/2026-11");
-        SemearProcesso("04044-00000821/2026-12", p => p.ChegadaSgdi = DiasAtras(10));
-        SemearProcesso("04044-00000822/2026-13", p =>
-        {
-            p.ChegadaSgdi = DiasAtras(10);
-            p.RetornoGabSgdi = DiasAtras(5);
-            p.RetornoOrgao = DiasAtras(2);   // Análise concluída: segue em supervisão
-        });
-        SemearProcesso("04044-00000823/2026-14", p =>
-        {
-            p.ChegadaSgdi = DiasAtras(10);
-            p.Restituido = true;
-            p.RestituidoEm = DiasAtras(3);
-            p.RestituidoMotivo = "Faltou documento";
-        });
-        SemearProcesso("04044-00000824/2026-15", p =>
-        {
-            p.ChegadaSgdi = DiasAtras(10);
-            p.DataAssinaturaContrato = DiasAtras(1);
-        });
-
-        var lista = await _processos.ListarAsync(new CtrProcessoFiltro { IncluirConcluidos = true, PageSize = 50 });
-
-        Assert.Equal(5, lista.TotalItems);
-        Assert.All(lista.Items, p => Assert.Equal(
-            p.Situacao == CtrDominios.Situacao.Concluido
-                ? CtrDominios.StatusSupervisao.Concluida
-                : CtrDominios.StatusSupervisao.EmRegimeSupervisao,
-            p.StatusSupervisao));
-        Assert.Equal(CtrDominios.StatusSupervisao.Concluida,
-            lista.Items.Single(p => p.NumeroProcesso == "04044-00000824/2026-15").StatusSupervisao);
-        Assert.Equal(CtrDominios.StatusSupervisao.EmRegimeSupervisao,
-            lista.Items.Single(p => p.NumeroProcesso == "04044-00000822/2026-13").StatusSupervisao);
-    }
-
-    [Fact]
-    public async Task Status_MudaComACheckpointDaAssinatura()
-    {
-        var ctx = await ContextoAnalistaAsync();
-        var processo = SemearProcesso(Numero, p => p.ChegadaSgdi = DiasAtras(10));
-
-        var assinado = await _processos.RegistrarCheckpointAsync(processo.Id, new CtrCheckpointDTO
-        { Etapa = CtrDominios.Etapa.AssinaturaContrato, Data = DiasAtras(1) }, ctx);
-        Assert.Equal(CtrDominios.StatusSupervisao.Concluida, assinado.StatusSupervisao);
-
-        var reaberto = await _processos.RegistrarCheckpointAsync(processo.Id, new CtrCheckpointDTO
-        { Etapa = CtrDominios.Etapa.AssinaturaContrato, Data = null }, ctx);
-        Assert.Equal(CtrDominios.StatusSupervisao.EmRegimeSupervisao, reaberto.StatusSupervisao);
-    }
+    // Saiu em 2026-10-13 (desenho da lista revista): os testes da remoção estão no
+    // CtrSituacoesHistoricosTest.
 
     // ══ Contrato: os DTOs só ganharam campos ═════════════════════════════════
 
@@ -569,7 +509,9 @@ public class CtrTramitacaoListasTest : CtrTestBase
 
         Assert.Contains("PontosPorCriterio", saida);
         Assert.Contains("RespostaPerguntaAnteriorII", saida);
-        Assert.Contains("StatusSupervisao", saida);
+        // O STATUS saiu da resposta em 2026-10-13 (a situação de 11 valores o cobre)
+        Assert.DoesNotContain("StatusSupervisao", saida);
+        Assert.Contains("SituacaoDesde", saida);
 
         // Os de antes continuam (inclusive a restituição, que as telas deixaram de pedir)
         foreach (var antigo in new[]

@@ -71,7 +71,7 @@ public class CtrRodadaChefiaTest : CtrTestBase
             RestituidoMotivo = "Devolvido por falta de documentos"
         };
 
-        Assert.Equal(CtrDominios.Situacao.Restituido, CtrProcessoService.CalcularSituacao(processo));
+        Assert.Equal(CtrDominios.Situacao.RestituidoOrgao, CtrProcessoService.CalcularSituacao(processo));
     }
 
     [Fact]
@@ -223,7 +223,7 @@ public class CtrRodadaChefiaTest : CtrTestBase
         Assert.Equal(CtrDominios.Situacao.SemMovimentacao,
             CtrProcessoService.CalcularSituacao(new CtrProcesso()));
 
-        Assert.Equal(CtrDominios.Situacao.Concluido,
+        Assert.Equal(CtrDominios.Situacao.ContratoAssinado,
             CtrProcessoService.CalcularSituacao(new CtrProcesso { DataAssinaturaContrato = DiasAtras(1) }));
 
         // Vence tudo: trâmite no meio, restituição e devolução ao órgão
@@ -233,7 +233,7 @@ public class CtrRodadaChefiaTest : CtrTestBase
             ChegadaSubgd = DiasAtras(20),
             DataAssinaturaContrato = DiasAtras(1)
         };
-        Assert.Equal(CtrDominios.Situacao.Concluido, CtrProcessoService.CalcularSituacao(noMeio));
+        Assert.Equal(CtrDominios.Situacao.ContratoAssinado, CtrProcessoService.CalcularSituacao(noMeio));
 
         var restituido = new CtrProcesso
         {
@@ -243,7 +243,7 @@ public class CtrRodadaChefiaTest : CtrTestBase
             RestituidoMotivo = "Devolvido por falta de documentos",
             DataAssinaturaContrato = DiasAtras(1)
         };
-        Assert.Equal(CtrDominios.Situacao.Concluido, CtrProcessoService.CalcularSituacao(restituido));
+        Assert.Equal(CtrDominios.Situacao.ContratoAssinado, CtrProcessoService.CalcularSituacao(restituido));
 
         // A etapa do planejamento NÃO é anulada pela assinatura: é onde ele parou
         var assinado = new CtrProcesso
@@ -251,7 +251,7 @@ public class CtrRodadaChefiaTest : CtrTestBase
             EtapaPlanejamento = CtrDominios.EtapaPlanejamento.Tr,
             DataAssinaturaContrato = DiasAtras(1)
         };
-        Assert.Equal(CtrDominios.Situacao.Concluido, CtrProcessoService.CalcularSituacao(assinado));
+        Assert.Equal(CtrDominios.Situacao.ContratoAssinado, CtrProcessoService.CalcularSituacao(assinado));
         Assert.Equal(CtrDominios.EtapaPlanejamento.Tr, assinado.EtapaPlanejamento);
     }
 
@@ -270,7 +270,7 @@ public class CtrRodadaChefiaTest : CtrTestBase
         dto.NumeroProcesso = "04044-00000121/2026-12";
         dto.DataAssinaturaContrato = DiasAtras(2);
         var concluido = await _processos.CriarAsync(dto, ctx);
-        Assert.Equal(CtrDominios.Situacao.Concluido, concluido.Situacao);
+        Assert.Equal(CtrDominios.Situacao.ContratoAssinado, concluido.Situacao);
         Assert.Equal(DiasAtras(2), concluido.DataAssinaturaContrato);
         Assert.Equal(CtrDominios.EtapaPlanejamento.Etp, concluido.EtapaPlanejamento);
     }
@@ -287,7 +287,7 @@ public class CtrRodadaChefiaTest : CtrTestBase
 
         var resposta = await _processos.CriarAsync(dto, ctx);
 
-        Assert.Equal(CtrDominios.Situacao.Concluido, resposta.Situacao);
+        Assert.Equal(CtrDominios.Situacao.ContratoAssinado, resposta.Situacao);
         Assert.Equal(DiasAtras(200), resposta.DataAssinaturaContrato);
     }
 
@@ -350,8 +350,8 @@ public class CtrRodadaChefiaTest : CtrTestBase
         Assert.Equal(2, painel.TotalConcluidos);
         Assert.Equal(new[] { "04044-00000141/2026-12", "04044-00000142/2026-13" },
             painel.Concluidos.Select(c => c.NumeroProcesso).ToArray());
-        Assert.All(painel.Concluidos, c => Assert.Equal(CtrDominios.Situacao.Concluido, c.Situacao));
-        Assert.Equal(2, painel.PorSituacao.Single(c => c.Chave == CtrDominios.Situacao.Concluido).Quantidade);
+        Assert.All(painel.Concluidos, c => Assert.Equal(CtrDominios.Situacao.ContratoAssinado, c.Situacao));
+        Assert.Equal(2, painel.PorSituacao.Single(c => c.Chave == CtrDominios.Situacao.ContratoAssinado).Quantidade);
         // Concluído não é gargalo, por mais parado que esteja
         Assert.DoesNotContain(painel.Gargalos, g => g.DataAssinaturaContrato != null);
     }
@@ -366,7 +366,7 @@ public class CtrRodadaChefiaTest : CtrTestBase
         Assert.Equal(0, painel.TotalConcluidos);
         Assert.Empty(painel.Concluidos);
         Assert.Null(painel.TemposMedios.ChegadaParaAssinatura);
-        Assert.Equal(0, painel.PorSituacao.Single(c => c.Chave == CtrDominios.Situacao.Concluido).Quantidade);
+        Assert.Equal(0, painel.PorSituacao.Single(c => c.Chave == CtrDominios.Situacao.ContratoAssinado).Quantidade);
     }
 
     // ══ 2.2 Criticidade no processo ═══════════════════════════════════════════
@@ -607,7 +607,7 @@ public class CtrRodadaChefiaTest : CtrTestBase
 
         Assert.Equal(CtrDominios.Origem.Tcdf, resposta.Origem);
         // Já assinado = já Concluído (só aparece na lista quando pedido); nasce sem trâmite
-        Assert.Equal(CtrDominios.Situacao.Concluido, resposta.Situacao);
+        Assert.Equal(CtrDominios.Situacao.ContratoAssinado, resposta.Situacao);
         Assert.Null(resposta.ChegadaSgdi);
     }
 
@@ -805,7 +805,7 @@ public class CtrRodadaChefiaTest : CtrTestBase
         var tcdf = Context.CtrProcessos.Single(p => p.NumeroProcesso == "04044-00000190/2026-11");
         Assert.Equal(CtrDominios.Origem.Tcdf, tcdf.Origem);
         Assert.True(tcdf.RetornoOrgaoNaoSeAplica);
-        Assert.Equal(CtrDominios.Situacao.Concluido, CtrProcessoService.CalcularSituacao(tcdf));
+        Assert.Equal(CtrDominios.Situacao.ContratoAssinado, CtrProcessoService.CalcularSituacao(tcdf));
     }
 
     // ══ 6. Coluna AUSENTE × coluna VAZIA na importação ════════════════════════
