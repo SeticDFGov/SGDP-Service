@@ -29,9 +29,29 @@ public class CtrTemposMedios
     public double? ChegadaParaAssinatura { get; set; }
 }
 
-/// <summary>Indicadores agregados dos processos ativos (GET api/contratacoes/painel).</summary>
+/// <summary>
+/// Bloco dos registros históricos (contratações anteriores ao regime) do painel interno:
+/// fora das estatísticas da supervisão, que medem o regime atual.
+/// </summary>
+public class CtrPainelHistoricos
+{
+    public int Total { get; set; }
+
+    /// <summary>Quantidade desc; empate pela chave.</summary>
+    public List<CtrContagem> PorCategoria { get; set; } = new();
+
+    /// <summary>Pela sigla do órgão; quantidade desc, empate pela chave.</summary>
+    public List<CtrContagem> PorOrgao { get; set; } = new();
+}
+
+/// <summary>
+/// Indicadores agregados dos processos ativos (GET api/contratacoes/painel). Desde 2026-10-13
+/// as estatísticas da supervisão contam só as origens da supervisão (Órgão comunicante e TCDF);
+/// os registros históricos ficam no bloco <see cref="Historicos"/>.
+/// </summary>
 public class CtrPainelResponse
 {
+    /// <summary>Ativos da supervisão (sem os registros históricos).</summary>
     public int TotalAtivos { get; set; }
 
     /// <summary>Corte de dias sem movimento usado nos gargalos.</summary>
@@ -40,15 +60,15 @@ public class CtrPainelResponse
     /// <summary>Ativos com pedido de esclarecimento feito e ainda sem resposta.</summary>
     public int TotalEsclarecimentoPendente { get; set; }
 
-    /// <summary>As 8 situações, mesmo as com zero.</summary>
+    /// <summary>As 11 situações, mesmo as com zero.</summary>
     public List<CtrContagem> PorSituacao { get; set; } = new();
 
-    /// <summary>Ativos com contrato assinado (situação Concluído).</summary>
+    /// <summary>Ativos da supervisão com contrato assinado (situação "Contrato assinado").</summary>
     public int TotalConcluidos { get; set; }
 
     /// <summary>
-    /// Relação de concluídos: os de assinatura mais recente primeiro, no máximo 50, com os
-    /// mesmos dados da lista.
+    /// Relação dos de contrato assinado: os de assinatura mais recente primeiro, no máximo 50,
+    /// com os mesmos dados da lista (sem os registros históricos).
     /// </summary>
     public List<CtrProcessoResponse> Concluidos { get; set; } = new();
 
@@ -72,8 +92,12 @@ public class CtrPainelResponse
     public CtrTemposMedios TemposMedios { get; set; } = new();
 
     /// <summary>
-    /// Ativos fora de Concluído/Análise concluída/Restituído com DiasSemMovimento >= LimiteDias,
+    /// Ativos da supervisão fora das situações terminais (Contrato assinado, Restituído ao
+    /// órgão, Nota informativa enviada e Análise concluída) com DiasSemMovimento >= LimiteDias,
     /// do mais parado para o menos, no máximo 50.
     /// </summary>
     public List<CtrProcessoResponse> Gargalos { get; set; } = new();
+
+    /// <summary>Registros históricos (origem "Anterior ao regime"): total, por categoria e por órgão.</summary>
+    public CtrPainelHistoricos Historicos { get; set; } = new();
 }

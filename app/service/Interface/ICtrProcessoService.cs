@@ -29,6 +29,12 @@ public interface ICtrProcessoService
 
     Task<CtrProcessoResponse> RegistrarCheckpointAsync(long id, CtrCheckpointDTO dto, CtrUserContext ctx);
 
+    /// <summary>
+    /// Marca o processo como contratação anterior ao regime (registro histórico) ou desfaz a
+    /// marca, devolvendo-o à supervisão contínua.
+    /// </summary>
+    Task<CtrProcessoResponse> MarcarAnteriorAoRegimeAsync(long id, CtrAnteriorAoRegimeDTO dto, CtrUserContext ctx);
+
     Task<CtrPainelResponse> MontarPainelAsync(int diasSemMovimento);
 
     /// <summary>

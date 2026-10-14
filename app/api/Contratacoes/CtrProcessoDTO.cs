@@ -24,9 +24,11 @@ public class CtrProcessoFiltro : PagedRequest
     public string? Criticidade { get; set; }
 
     /// <summary>
-    /// CtrDominios.Origem (Órgão comunicante / TCDF). Desde 2026-09-24 é o que separa as duas
-    /// listas do front: "Processos de supervisão contínua" (Órgão comunicante) e
-    /// "Comunicações do TCDF" (os processos que nasceram de uma comunicação do Tribunal).
+    /// CtrDominios.Origem (Órgão comunicante / TCDF / Anterior ao regime). É o que separa as
+    /// listas do front: "Processos de supervisão contínua" (Órgão comunicante), "Comunicações
+    /// do TCDF" (os processos que nasceram de uma comunicação do Tribunal) e, desde 2026-10-13,
+    /// "Contratações anteriores ao regime" (os registros históricos, que entram todos na lista
+    /// mesmo sem <see cref="IncluirConcluidos"/>: têm sempre o contrato assinado).
     /// </summary>
     public string? Origem { get; set; }
 
@@ -51,8 +53,9 @@ public class CtrProcessoFiltro : PagedRequest
     public bool? Restituidos { get; set; }
 
     /// <summary>
-    /// true traz também os Concluídos (contrato assinado), que por padrão ficam fora da lista
-    /// e do export. O filtro Situacao = "Concluído" também os traz.
+    /// true traz também os de contrato assinado (situação "Contrato assinado"), que por padrão
+    /// ficam fora da lista e do export. O filtro Situacao = "Contrato assinado" e o filtro
+    /// Origem = "Anterior ao regime" também os trazem.
     /// </summary>
     public bool IncluirConcluidos { get; set; }
 
@@ -130,10 +133,40 @@ public class CtrProcessoCreateDTO
     public string? EtapaPlanejamento { get; set; }
 
     /// <summary>
-    /// Assinatura do contrato: a data final do trâmite. Preenchida, o processo fica Concluído
-    /// (sai da lista e vai para a relação de concluídos do painel). Não pode ser futura.
+    /// Assinatura do contrato: a data final do trâmite. Preenchida, o processo fica em
+    /// "Contrato assinado" (sai da lista e vai para a relação do painel). Não pode ser futura.
+    /// Obrigatória na origem "Anterior ao regime".
     /// </summary>
     public DateOnly? DataAssinaturaContrato { get; set; }
+
+    /// <summary>
+    /// Nº do contrato assinado: texto livre até 60, vazio = não informado. Opcional nas
+    /// origens da supervisão e obrigatório na origem "Anterior ao regime". Na EDIÇÃO, nulo
+    /// ou vazio LIMPA (o formulário manda sempre).
+    /// </summary>
+    [StringLength(60)]
+    public string? NumeroContrato { get; set; }
+
+    /// <summary>
+    /// Nº do documento SEI da autorização dada pela SGDI no regime anterior: texto livre até
+    /// 25, opcional, vazio = não informado. Na EDIÇÃO, nulo ou vazio LIMPA.
+    /// </summary>
+    [StringLength(25)]
+    public string? AutorizacaoDocumentoSei { get; set; }
+
+    /// <summary>
+    /// Data do envio da nota informativa ao órgão (encerra a análise da SGDI): não pode ser
+    /// futura nem anterior à chegada à SGDI. Recusada na origem "Anterior ao regime". Na
+    /// EDIÇÃO, nula LIMPA (e limpa também o documento).
+    /// </summary>
+    public DateOnly? NotaInformativaEnviadaEm { get; set; }
+
+    /// <summary>
+    /// Nº do documento SEI da nota informativa: texto livre até 25, vazio = não informado; sem
+    /// a data do envio é anulado. Na EDIÇÃO, nulo ou vazio LIMPA.
+    /// </summary>
+    [StringLength(25)]
+    public string? NotaInformativaDocumentoSei { get; set; }
 
     /// <summary>
     /// CtrDominios.Criticidade (art. 11 da IN). Com <see cref="CriteriosCriticidade"/> no
@@ -154,8 +187,10 @@ public class CtrProcessoCreateDTO
     public Dictionary<string, string>? CriteriosCriticidade { get; set; }
 
     /// <summary>
-    /// CtrDominios.Origem; vazia = "Órgão comunicante" na CRIAÇÃO. Na edição, vazia
-    /// PRESERVA a origem gravada (o front antigo não manda o campo).
+    /// CtrDominios.Origem; vazia = "Órgão comunicante" na CRIAÇÃO ("Anterior ao regime" cria o
+    /// registro histórico). Na edição, vazia PRESERVA a origem gravada (o front antigo não manda
+    /// o campo); a passagem de e para "Anterior ao regime" é feita só pelo PUT
+    /// processo/{id}/anterior-ao-regime.
     /// </summary>
     [StringLength(20)]
     public string? Origem { get; set; }
@@ -297,7 +332,8 @@ public class CtrClassificacaoRiscoResponse
 
 /// <summary>
 /// Edição rápida de um checkpoint (registrar a chegada em cada instância).
-/// Data nula limpa o checkpoint; NaoSeAplica só vale para ChegadaUgtic e RetornoOrgao.
+/// Data nula limpa o checkpoint; NaoSeAplica só vale para ChegadaUgtic e RetornoOrgao;
+/// DocumentoSei só vale para NotaInformativa.
 /// </summary>
 public class CtrCheckpointDTO
 {
@@ -308,6 +344,31 @@ public class CtrCheckpointDTO
     public DateOnly? Data { get; set; }
 
     public bool? NaoSeAplica { get; set; }
+
+    /// <summary>
+    /// Só na etapa NotaInformativa: o nº do documento SEI da nota (texto livre até 25). Segue o
+    /// corpo: ausente ou vazio grava sem documento, e limpar a data limpa o documento. Nas
+    /// outras etapas, preenchido é recusado (ausente ou vazio não muda nada).
+    /// </summary>
+    [StringLength(25)]
+    public string? DocumentoSei { get; set; }
+}
+
+/// <summary>
+/// Marcar um processo existente como registro histórico (contratação anterior ao regime) ou
+/// desfazer a marca (PUT processo/{id}/anterior-ao-regime).
+/// </summary>
+public class CtrAnteriorAoRegimeDTO
+{
+    /// <summary>true marca (origem "Anterior ao regime"); false desfaz (volta a "Órgão comunicante").</summary>
+    public bool Anterior { get; set; }
+
+    /// <summary>
+    /// Nº do contrato, ao marcar: vale o enviado; ausente ou vazio usa o já gravado (marcar
+    /// exige um dos dois). Ao desfazer, é ignorado (o número gravado fica).
+    /// </summary>
+    [StringLength(60)]
+    public string? NumeroContrato { get; set; }
 }
 
 public class CtrProcessoResponse
@@ -355,6 +416,18 @@ public class CtrProcessoResponse
     public string? EtapaPlanejamento { get; set; }
 
     public DateOnly? DataAssinaturaContrato { get; set; }
+
+    /// <summary>Nº do contrato assinado; nulo = não informado.</summary>
+    public string? NumeroContrato { get; set; }
+
+    /// <summary>Nº do documento SEI da autorização do regime anterior; nulo = não informado.</summary>
+    public string? AutorizacaoDocumentoSei { get; set; }
+
+    /// <summary>Data do envio da nota informativa; nula = não enviada.</summary>
+    public DateOnly? NotaInformativaEnviadaEm { get; set; }
+
+    /// <summary>Nº do documento SEI da nota informativa; nulo = não informado.</summary>
+    public string? NotaInformativaDocumentoSei { get; set; }
 
     public string? Criticidade { get; set; }
 
@@ -420,21 +493,21 @@ public class CtrProcessoResponse
     public string? Observacao { get; set; }
 
     /// <summary>
-    /// Derivada das datas (CtrProcessoService.CalcularSituacao); nunca gravada. Concluído =
-    /// contrato assinado.
+    /// Derivada (CtrProcessoService.CalcularSituacao; CtrDominios.Situacao, 11 valores); nunca
+    /// gravada.
     /// </summary>
     public string Situacao { get; set; } = string.Empty;
 
     /// <summary>
-    /// Derivado (CtrProcessoService.CalcularStatusSupervisao; CtrDominios.StatusSupervisao):
-    /// "Concluída" com o contrato assinado (a regra de conclusão do módulo) e "Em regime de
-    /// supervisão" nos demais. Nunca gravado.
+    /// Derivada: a data do fato que define a <see cref="Situacao"/> (assinatura, restituição,
+    /// envio da nota, retorno ao órgão, pedido de esclarecimento, encaminhamento técnico,
+    /// retorno ao Gab ou a chegada). Nula em "Sem movimentação".
     /// </summary>
-    public string StatusSupervisao { get; set; } = string.Empty;
+    public DateOnly? SituacaoDesde { get; set; }
 
     /// <summary>
-    /// Maior data entre os cinco checkpoints, a restituição, o esclarecimento e a análise
-    /// técnica (encaminhamento e retorno).
+    /// Maior data entre os cinco checkpoints, a restituição, o esclarecimento, a análise
+    /// técnica (encaminhamento e retorno) e o envio da nota informativa.
     /// </summary>
     public DateOnly? UltimaMovimentacao { get; set; }
 

@@ -74,6 +74,23 @@ public class CtrProcesso
     // contrato já assinado. Só não pode ser futura.
     public DateOnly? DataAssinaturaContrato { get; set; }
 
+    // Nº do contrato assinado (2026-10-13): texto livre até 60, opcional em qualquer origem e
+    // obrigatório no registro histórico (origem "Anterior ao regime"), junto da assinatura
+    public string? NumeroContrato { get; set; }
+
+    // Nº do documento SEI da autorização dada pela SGDI no regime anterior (2026-10-13): texto
+    // livre até 25, opcional (é dado do registro histórico)
+    public string? AutorizacaoDocumentoSei { get; set; }
+
+    // ── Nota informativa (2026-10-13) ─────────────────────────────────────────
+    // Avisa ao órgão que o processo entrou no portfólio e que a SGDI só vai acompanhar: encerra
+    // a análise da SGDI (situação "Nota informativa enviada"). A data não pode ser futura nem
+    // anterior à chegada à SGDI; o documento SEI (texto livre até 25) só existe com a data e é
+    // anulado sem ela. Enviar a nota é movimentação do processo.
+    public DateOnly? NotaInformativaEnviadaEm { get; set; }
+
+    public string? NotaInformativaDocumentoSei { get; set; }
+
     // CtrDominios.Criticidade (art. 11 da IN SGDI nº 1/2026): atributo da
     // CONTRATAÇÃO, não da resposta ao TCDF — o despacho apenas a reporta. Com as
     // respostas aos critérios (abaixo) é DERIVADA delas (CtrCriticidade.Calcular) e

@@ -125,7 +125,8 @@ public class CtrProcessoController : ControllerBase
     }
 
     /// <summary>
-    /// Cadastra um processo em análise
+    /// Cadastra um processo em análise (ou, com Origem = "Anterior ao regime", o registro
+    /// histórico de uma contratação anterior ao regime)
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> Criar([FromBody] CtrProcessoCreateDTO dto)
@@ -181,6 +182,23 @@ public class CtrProcessoController : ControllerBase
         if (await _service.GetEntidadeAsync(id) == null) return NotFound();
 
         return Ok(await _service.RegistrarCheckpointAsync(id, dto, ctx));
+    }
+
+    /// <summary>
+    /// Marca o processo como contratação anterior ao regime (Anterior = true; exige contrato
+    /// assinado e o número do contrato, o do corpo ou o já gravado) ou desfaz a marca
+    /// (Anterior = false; a origem volta a Órgão comunicante)
+    /// </summary>
+    [HttpPut("{id:long}/anterior-ao-regime")]
+    public async Task<IActionResult> MarcarAnteriorAoRegime(long id, [FromBody] CtrAnteriorAoRegimeDTO dto)
+    {
+        var ctx = await GetContextAsync();
+        if (ctx == null) return Unauthorized();
+        if (!_permissionService.CanEdit(ctx, CtrResources.Processo)) return Forbid();
+
+        if (await _service.GetEntidadeAsync(id) == null) return NotFound();
+
+        return Ok(await _service.MarcarAnteriorAoRegimeAsync(id, dto, ctx));
     }
 
     /// <summary>

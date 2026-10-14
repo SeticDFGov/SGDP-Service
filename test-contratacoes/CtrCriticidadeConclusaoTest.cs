@@ -274,12 +274,12 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
         Assert.Equal(3, comConcluidos.TotalItems);
 
         var soConcluidos = await _processos.ListarAsync(new CtrProcessoFiltro
-        { Situacao = CtrDominios.Situacao.Concluido, PageSize = 50 });
+        { Situacao = CtrDominios.Situacao.ContratoAssinado, PageSize = 50 });
         Assert.Equal(2, soConcluidos.TotalItems);
-        Assert.All(soConcluidos.Items, p => Assert.Equal(CtrDominios.Situacao.Concluido, p.Situacao));
+        Assert.All(soConcluidos.Items, p => Assert.Equal(CtrDominios.Situacao.ContratoAssinado, p.Situacao));
 
         var restituidos = await _processos.ListarAsync(new CtrProcessoFiltro
-        { Situacao = CtrDominios.Situacao.Restituido, PageSize = 50 });
+        { Situacao = CtrDominios.Situacao.RestituidoOrgao, PageSize = 50 });
         Assert.Equal(0, restituidos.TotalItems);
 
         var emAnalise = await _processos.ListarAsync(new CtrProcessoFiltro
@@ -305,7 +305,7 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
             Data = DiasAtras(1)
         }, ctx);
         Assert.Equal(DiasAtras(1), concluido.DataAssinaturaContrato);
-        Assert.Equal(CtrDominios.Situacao.Concluido, concluido.Situacao);
+        Assert.Equal(CtrDominios.Situacao.ContratoAssinado, concluido.Situacao);
 
         var reaberto = await _processos.RegistrarCheckpointAsync(processo.Id, new CtrCheckpointDTO
         {
@@ -340,8 +340,8 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
     public void Csv_Cabecalho_TrazAsSeteColunasDosCriteriosDepoisDoEsclarecimento()
     {
         // Eram as últimas até chegarem os 3 dados da contratação, que vêm depois delas
-        // (CtrValorHospedagemGdfnetTest)
-        Assert.Equal(32, CtrCsv.Cabecalho.Length);
+        // (CtrValorHospedagemGdfnetTest), e depois deles as 4 de 2026-10-13
+        Assert.Equal(36, CtrCsv.Cabecalho.Length);
         Assert.Equal(7, CtrCsv.ColunasCriterios.Length);
         Assert.Equal(CtrCsv.ColunasCriterios, CtrCsv.Cabecalho[22..29]);
         Assert.StartsWith("Critério I - ", CtrCsv.ColunasCriterios[0]);
@@ -463,11 +463,11 @@ public class CtrCriticidadeConclusaoTest : CtrTestBase
         var bytes = await _processos.ExportarCsvAsync(new CtrProcessoFiltro());
         var texto = System.Text.Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
         var celulas = texto.Split("\r\n", StringSplitOptions.RemoveEmptyEntries)[1].Split(';');
-        Assert.Equal(32, celulas.Length);
+        Assert.Equal(36, celulas.Length);
         Assert.Equal("Alta", celulas[17]);
         Assert.Equal(new[] { "Não", "Desconhecido", "Sim", "Médio", "Não", "Alto", "Não" }, celulas[22..29]);
         // Os dados da contratação, não informados neste processo, saem vazios
-        Assert.Equal(new[] { "", "", "" }, celulas[29..]);
+        Assert.Equal(new[] { "", "", "" }, celulas[29..32]);
 
         var previa = await NovoImportacaoService().PreviaAsync(bytes);
         var linha = Assert.Single(previa.Linhas);

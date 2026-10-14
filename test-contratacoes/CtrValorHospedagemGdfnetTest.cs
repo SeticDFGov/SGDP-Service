@@ -379,9 +379,10 @@ public class CtrValorHospedagemGdfnetTest : CtrTestBase
     [Fact]
     public void Csv_Cabecalho_TerminaComOsTresDadosDaContratacao()
     {
-        Assert.Equal(32, CtrCsv.Cabecalho.Length);
+        // Eram as últimas até chegarem as 4 de 2026-10-13 (CtrSituacoesHistoricosTest)
+        Assert.Equal(36, CtrCsv.Cabecalho.Length);
         Assert.Equal(new[] { "Valor estimado (R$)", "Hospedagem no CeTIC-DF", "Usa a rede GDFNet" },
-            CtrCsv.Cabecalho[ColunaValor..]);
+            CtrCsv.Cabecalho[ColunaValor..(ColunaValor + 3)]);
 
         // Os sete critérios continuam no lugar e não engolem as colunas novas
         Assert.Equal(CtrCsv.Cabecalho[22..29], CtrCsv.ColunasCriterios);
@@ -432,10 +433,10 @@ public class CtrValorHospedagemGdfnetTest : CtrTestBase
             Resposta(TerceiroNumero, null, null, null)
         });
 
-        Assert.Equal(new[] { "1234567,89", "Não aplicável (SaaS)", "Sim" }, Celulas(bytes, 1)[ColunaValor..]);
-        Assert.Equal(new[] { "1500000,00", "Não", "Não" }, Celulas(bytes, 2)[ColunaValor..]);
-        Assert.Equal(new[] { "", "", "" }, Celulas(bytes, 3)[ColunaValor..]);
-        Assert.All(new[] { 1, 2, 3 }, linha => Assert.Equal(32, Celulas(bytes, linha).Length));
+        Assert.Equal(new[] { "1234567,89", "Não aplicável (SaaS)", "Sim" }, Celulas(bytes, 1)[ColunaValor..(ColunaValor + 3)]);
+        Assert.Equal(new[] { "1500000,00", "Não", "Não" }, Celulas(bytes, 2)[ColunaValor..(ColunaValor + 3)]);
+        Assert.Equal(new[] { "", "", "" }, Celulas(bytes, 3)[ColunaValor..(ColunaValor + 3)]);
+        Assert.All(new[] { 1, 2, 3 }, linha => Assert.Equal(36, Celulas(bytes, linha).Length));
     }
 
     [Fact]
