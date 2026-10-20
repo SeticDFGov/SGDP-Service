@@ -21,7 +21,7 @@ namespace test.planejamento;
 public class PeF3ConsolidadoTest : PePaineisTestBase
 {
     private const string AjudaDoNivelAlcancado =
-        "O nível que o PDTIC da linha alcançou, pela régua dos níveis (a mesma da conformidade). Fica vazio quando o PDTIC "
+        "O nível que o PDTIC da linha alcançou, pela régua da conformidade. Vazio quando o PDTIC "
         + "ainda não completa o primeiro nível ou foi aprovado fora do sistema.";
 
     private void Livre() => DefinirModoNiveis(PeDominios.ModoNiveis.Livre);
@@ -112,7 +112,7 @@ public class PeF3ConsolidadoTest : PePaineisTestBase
             var leiaMe = Aba(livro, "Leia-me").Descendants<Cell>().Select(Texto).ToList();
             Assert.Contains(AjudaDoNivelAlcancado, leiaMe);
             Assert.Contains(leiaMe, t => t.StartsWith("Cada linha é um registro do PDTIC de um órgão. As primeiras colunas dizem o órgão, "
-                                                      + "o nível que o PDTIC alcançou (vazio quando ele ainda não completa o primeiro nível"));
+                                                      + "o nível que o PDTIC alcançou (vazio quando ainda não completa o primeiro nível"));
             Assert.DoesNotContain(leiaMe, t => t.Contains("Nível de maturidade do órgão hoje"));
             SemErros(documento);
         }

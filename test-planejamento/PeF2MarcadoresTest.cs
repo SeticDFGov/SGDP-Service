@@ -32,8 +32,8 @@ public class PeF2MarcadoresTest : PeAcompanhamentoTestBase
         Assert.Equal(((string?)null, "planejamento.deliberacao-cgtic", (string?)null), Onde(lista, "aprovacao.cgtic.ato"));
         Assert.Equal(("publicacao", "planejamento.publicacao", (string?)null), Onde(lista, "publicacao.data"));
         Assert.Equal(("publicacao", "planejamento.publicacao", (string?)null), Onde(lista, "publicacao.endereco"));
-        Assert.Equal(("nomes", "preparacao.nomes", (string?)null), Onde(lista, "nomes.comite"));
-        Assert.Equal(("nomes", "preparacao.nomes", (string?)null), Onde(lista, "orgao.sigla"));
+        Assert.Equal(("nomes", "preparacao.abrangencia", (string?)null), Onde(lista, "nomes.comite"));
+        Assert.Equal(("nomes", "preparacao.abrangencia", (string?)null), Onde(lista, "orgao.sigla"));
         Assert.Equal(("abrangencia", "preparacao.abrangencia", (string?)null), Onde(lista, "vigencia.inicio"));
         // O que vem do sistema não tem passo
         foreach (var chave in new[] { "orgao.nome", "pdtic.versao", "hoje" })
@@ -43,17 +43,17 @@ public class PeF2MarcadoresTest : PeAcompanhamentoTestBase
     }
 
     [Fact]
-    public async Task DocumentoNoAvancado_AsAprovacoesEAPublicacao_NosPassos311_312E313()
+    public async Task DocumentoNoAvancado_AsAprovacoesEAPublicacao_NosPassos310_311E312()
     {
         await DefinirNivelDoOrgaoAsync(OrgaoSes, "avancado");
         var pdtic = await AbrirSesAsync();
 
         var documento = await DocumentoAsync(pdtic.Id);
         var lista = documento.Marcadores;
-        Assert.Equal(("aprovacao_sgtic", "planejamento.aprovacao-sgtic", "3.11"), Onde(lista, "aprovacao.sgtic.data"));
-        Assert.Equal(((string?)null, "planejamento.deliberacao-cgtic", "3.12"), Onde(lista, "aprovacao.cgtic.ato"));
-        Assert.Equal(("publicacao", "planejamento.publicacao", "3.13"), Onde(lista, "publicacao.endereco"));
-        Assert.Equal(("nomes", "preparacao.nomes", "1.2"), Onde(lista, "nomes.comite"));
+        Assert.Equal(("aprovacao_sgtic", "planejamento.aprovacao-sgtic", "3.10"), Onde(lista, "aprovacao.sgtic.data"));
+        Assert.Equal(((string?)null, "planejamento.deliberacao-cgtic", "3.11"), Onde(lista, "aprovacao.cgtic.ato"));
+        Assert.Equal(("publicacao", "planejamento.publicacao", "3.12"), Onde(lista, "publicacao.endereco"));
+        Assert.Equal(("nomes", "preparacao.abrangencia", "1.1"), Onde(lista, "nomes.comite"));
         Assert.Equal(("abrangencia", "preparacao.abrangencia", "1.1"), Onde(lista, "vigencia.fim"));
         Assert.DoesNotContain(lista, m => m.Chave.StartsWith("ciclo.", StringComparison.Ordinal));
 
@@ -73,13 +73,13 @@ public class PeF2MarcadoresTest : PeAcompanhamentoTestBase
         foreach (var (chave, passo) in new[]
                  {
                      ("aprovacao.sgtic.data", "planejamento.aprovacao-sgtic"), ("aprovacao.cgtic.data", "planejamento.deliberacao-cgtic"),
-                     ("publicacao.data", "planejamento.publicacao"), ("nomes.autoridade", "preparacao.nomes")
+                     ("publicacao.data", "planejamento.publicacao"), ("nomes.autoridade", "preparacao.abrangencia")
                  })
             Assert.Equal((passo, NaTrilha(trilha, passo)!.Numero), (M(lista, chave).PassoChave, M(lista, chave).PassoNumero));
 
         // O passo do dicionário de nomes desligado para o órgão: a chave fica, sem o número (a prévia não mostra o link)
-        await AjustarPassosAsync(OrgaoSes, ("preparacao.nomes", "desligado"));
-        Assert.Equal(("nomes", "preparacao.nomes", (string?)null), Onde((await DocumentoAsync(pdtic.Id)).Marcadores, "nomes.comite"));
+        await AjustarPassosAsync(OrgaoSes, ("preparacao.abrangencia", "desligado"));
+        Assert.Equal(("nomes", "preparacao.abrangencia", (string?)null), Onde((await DocumentoAsync(pdtic.Id)).Marcadores, "nomes.comite"));
     }
 
     [Fact]

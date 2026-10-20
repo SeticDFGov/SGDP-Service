@@ -128,7 +128,7 @@ public class PeReferenciaisCargaTest : PeReferenciaisTestBase
     }
 
     [Fact]
-    public async Task VersaoNova_NaoMexeNoQueOAdministradorFez_NemNaSequencia()
+    public async Task VersaoNova_NaoMexeNosRegistrosNemNaSequencia_ERegravaOTitulo()
     {
         // O administrador acrescenta um princípio (PR12) e renomeia a seção
         var criado = await Registros.CriarAsync(PeDono.Df, "principio",
@@ -141,7 +141,8 @@ public class PeReferenciaisCargaTest : PeReferenciaisTestBase
         seed.Versao++;
         await new PeCarregadorModelo(Context).CarregarAsync(seed);
 
-        Assert.Equal("Princípios", Secao("principio").Titulo);
+        // Desde a versão 9, os textos do sistema voltam aos do JSON; os registros e a sequência ficam
+        Assert.Equal(seed.SecoesForaDoPdtic.Single(s => s.Chave == "principio").Titulo, Secao("principio").Titulo);
         Assert.Equal(12, Context.PeRegistros.Count(r => r.SecaoId == Secao("principio").Id));
         Assert.Equal(12, Context.PeRegistroSequencias.AsNoTracking().Single(s => s.SecaoId == Secao("principio").Id).Ultimo);
     }

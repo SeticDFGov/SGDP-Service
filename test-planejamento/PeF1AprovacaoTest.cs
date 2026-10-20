@@ -61,7 +61,7 @@ public class PeF1AprovacaoTest : PeAprovacaoTestBase
         Assert.False(envio.PodeEnviar);
         var pendencia = Assert.Single(envio.Pendencias);
         Assert.Equal(PePdticAprovacaoService.PendenciaSgticDepoisDaDevolucao, pendencia.Motivo);
-        Assert.Equal("Registre de novo a aprovação do SGTIC: a versão ajustada depois da devolução do CGTIC precisa passar pelo comitê interno.",
+        Assert.Equal("Registre a aprovação do SGTIC de novo: o PDTIC ajustado depois da devolução do CGTIC volta ao SGTIC.",
             pendencia.Motivo);
         Assert.Equal("planejamento.aprovacao-sgtic", Context.PePassos.AsNoTracking().Single(p => p.Id == pendencia.PassoId).Chave);
 

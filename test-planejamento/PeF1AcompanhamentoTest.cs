@@ -47,7 +47,7 @@ public class PeF1AcompanhamentoTest : PeAcompanhamentoTestBase
         var passo = await PassoDaSituacaoAsync(pdtic.Id, "monitoramento.ciclo-monitoramento");
         Assert.Equal(PeDominios.SituacaoPasso.NaoSeAplica, passo.Situacao);
         Assert.Equal(PePdticService.MotivoVigenciaTerminada(new DateOnly(2023, 12, 31)), passo.Motivo);
-        Assert.StartsWith("A vigência do PDTIC terminou em 31/12/2023", passo.Motivo);
+        Assert.StartsWith("A vigência terminou em 31/12/2023", passo.Motivo);
         Assert.Null(passo.NaoSeAplica);
         // Não é o próximo passo recomendado
         Assert.NotEqual(passo.Numero, (await SituacaoAsync(pdtic.Id)).ProximoPasso);

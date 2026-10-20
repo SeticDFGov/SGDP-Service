@@ -129,7 +129,7 @@ public static partial class PeValores
             {
                 // JSON do TipTap conferido contra a lista fechada de nós e marcas (E4)
                 if (entrada.ValueKind != JsonValueKind.Object)
-                    return Resultado.Falha("O texto formatado veio num formato que não serve. Atualize a tela e tente de novo.");
+                    return Resultado.Falha("O texto formatado não foi aceito. Atualize a tela e tente de novo.");
                 if (entrada.GetRawText().Length > MaximoTextoRico) return Resultado.Falha("O texto formatado passou do tamanho máximo.");
                 var rico = PeTextoRico.Validar(entrada);
                 if (rico.Erro != null) return Resultado.Falha(rico.Erro);

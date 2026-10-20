@@ -293,7 +293,8 @@ public class PeModeloService : IPeModeloService
         var etapa = await _context.PeEtapas.AsNoTracking().FirstOrDefaultAsync(e => e.Id == dto.EtapaId)
             ?? throw Dados("A etapa do passo não existe.");
         var titulo = Obrigatorio(dto.Titulo, 200, "o título do passo");
-        var oQueFazer = Obrigatorio(dto.OQueFazer, 2000, "o que fazer no passo");
+        // Desde a revisão de 2026-10-20, o "o que fazer" pode ficar vazio: grava texto vazio (a coluna não aceita nulo)
+        var oQueFazer = Opcional(dto.OQueFazer, 2000, "O que fazer no passo") ?? string.Empty;
 
         var chaves = await _context.PePassos.Select(p => p.Chave).ToListAsync();
         var parte = PeChaves.Slug(titulo, '-', PeChaves.MaximoPasso - etapa.Chave.Length - 1);
@@ -356,7 +357,7 @@ public class PeModeloService : IPeModeloService
         }
 
         if (dto.Informou(nameof(dto.Titulo))) passo.Titulo = Obrigatorio(dto.Titulo, 200, "o título do passo");
-        if (dto.Informou(nameof(dto.OQueFazer))) passo.OQueFazer = Obrigatorio(dto.OQueFazer, 2000, "o que fazer no passo");
+        if (dto.Informou(nameof(dto.OQueFazer))) passo.OQueFazer = Opcional(dto.OQueFazer, 2000, "O que fazer no passo") ?? string.Empty;
         if (dto.Informou(nameof(dto.BaseLegal))) passo.BaseLegal = Opcional(dto.BaseLegal, 200, "A base legal");
         if (dto.Informou(nameof(dto.ReferenciaGuia))) passo.ReferenciaGuia = Opcional(dto.ReferenciaGuia, 100, "A referência do guia");
         if (dto.Informou(nameof(dto.AceitaNaoSeAplica)) && dto.AceitaNaoSeAplica != null)

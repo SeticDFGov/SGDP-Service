@@ -50,10 +50,10 @@ public static partial class PeCiclos
     {
         if (ciclo.Situacao == PeDominios.SituacaoCiclo.Fechado)
             return ciclo.FechadoEm is DateTime fechado
-                ? $"O ciclo {ciclo.Rotulo} foi fechado em {PePdticService.DataBrasilia(fechado)}. Para mudar os dados dele, reabra o ciclo."
-                : $"O ciclo {ciclo.Rotulo} está fechado. Para mudar os dados dele, reabra o ciclo.";
+                ? $"O ciclo {ciclo.Rotulo} foi fechado em {PePdticService.DataBrasilia(fechado)}. Reabra o ciclo para mudar os dados."
+                : $"O ciclo {ciclo.Rotulo} está fechado. Reabra o ciclo para mudar os dados.";
         if (ciclo.Inicio > hoje)
-            return $"O ciclo {ciclo.Rotulo} começa em {Data(ciclo.Inicio)}. Os dados entram a partir do início do ciclo.";
+            return $"O ciclo {ciclo.Rotulo} começa em {Data(ciclo.Inicio)}. Os dados entram a partir dessa data.";
         return null;
     }
 

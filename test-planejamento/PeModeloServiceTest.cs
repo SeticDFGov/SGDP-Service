@@ -73,7 +73,7 @@ public class PeModeloServiceTest : PeModeloTestBase
     [Fact]
     public async Task ItemDoSistema_NaoMudaTipoNemChave_ENaoEhApagado()
     {
-        var passo = Passo("preparacao.nomes").Id;
+        var passo = Passo("preparacao.abrangencia").Id;
         var secao = Secao("nomes").Id;
         var campo = Campo("nomes", "comite").Id;
 
@@ -103,7 +103,7 @@ public class PeModeloServiceTest : PeModeloTestBase
     [Fact]
     public async Task ItemDoSistema_RenomeiaGanhaAjudaEMudaDeSituacao_ComHistorico()
     {
-        var id = Passo("preparacao.nomes").Id;
+        var id = Passo("preparacao.abrangencia").Id;
 
         var atualizado = await Modelo.AtualizarPassoAsync(id, new PePassoAtualizarDTO
         {
@@ -118,7 +118,7 @@ public class PeModeloServiceTest : PeModeloTestBase
         var historico = HistoricoDe("passo", id);
         Assert.Equal(new[] { "alteracao", "situacao" }, historico.Select(h => h.Acao));
         Assert.All(historico, h => Assert.Equal(EmailAdmin, h.AlteradoPor));
-        Assert.Contains("Defina os nomes do órgão", historico[0].Antes);
+        Assert.Contains(service.Planejamento.PeCarregadorModelo.LerSeed().Etapas[0].Passos[0].Titulo, historico[0].Antes);
         Assert.Contains("Defina os nomes que o órgão usa", historico[0].Depois);
         Assert.Contains("\"obrigatorio\"", historico[1].Antes);
         Assert.Contains("\"opcional\"", historico[1].Depois);
@@ -129,7 +129,7 @@ public class PeModeloServiceTest : PeModeloTestBase
     [Fact]
     public async Task Put_CampoAusenteNaoMuda_NuloLimpaOOpcional_VazioRecusaOObrigatorio()
     {
-        var id = Passo("preparacao.sgtic").Id;
+        var id = Passo("preparacao.equipe").Id;
 
         var soTitulo = await Modelo.AtualizarPassoAsync(id,
             new PePassoAtualizarDTO { Titulo = "Registre o SGTIC", Informados = Inf("Titulo") }, EmailAdmin);
@@ -145,10 +145,27 @@ public class PeModeloServiceTest : PeModeloTestBase
     }
 
     [Fact]
+    public async Task OQueFazer_PodeFicarVazio_NoPutENaCriacao_EVoltaComoTextoVazio()
+    {
+        // Desde a revisão de 2026-10-20: vazio ou nulo vira texto vazio (a coluna não aceita nulo)
+        var id = Passo("preparacao.equipe").Id;
+        var vazio = await Modelo.AtualizarPassoAsync(id, new PePassoAtualizarDTO { OQueFazer = "  ", Informados = Inf("OQueFazer") }, EmailAdmin);
+        Assert.Equal(string.Empty, vazio.OQueFazer);
+        var nulo = await Modelo.AtualizarPassoAsync(id, new PePassoAtualizarDTO { OQueFazer = null, Informados = Inf("OQueFazer") }, EmailAdmin);
+        Assert.Equal(string.Empty, nulo.OQueFazer);
+        Assert.Equal(string.Empty, Passo("preparacao.equipe").OQueFazer);
+
+        var criado = await Modelo.CriarPassoAsync(new PePassoCriarDTO { EtapaId = Passo("preparacao.equipe").EtapaId, Titulo = "Liste os parceiros" },
+            EmailAdmin);
+        Assert.Equal(string.Empty, criado.OQueFazer);
+        Assert.Equal(string.Empty, Assert.Single((await TrilhaAsync(OrgaoSes)).Etapas.SelectMany(e => e.Passos), p => p.Id == id).OQueFazer);
+    }
+
+    [Fact]
     public async Task Put_SemMudancaDeFato_NaoGravaHistorico()
     {
-        var id = Passo("preparacao.sgtic").Id;
-        await Modelo.AtualizarPassoAsync(id, new PePassoAtualizarDTO { Titulo = Passo("preparacao.sgtic").Titulo, Informados = Inf("Titulo") },
+        var id = Passo("preparacao.equipe").Id;
+        await Modelo.AtualizarPassoAsync(id, new PePassoAtualizarDTO { Titulo = Passo("preparacao.equipe").Titulo, Informados = Inf("Titulo") },
             EmailAdmin);
 
         Assert.Empty(HistoricoDe("passo", id));
@@ -161,7 +178,7 @@ public class PeModeloServiceTest : PeModeloTestBase
     {
         var criado = await Modelo.CriarPassoAsync(new PePassoCriarDTO
         {
-            EtapaId = Passo("preparacao.nomes").EtapaId,
+            EtapaId = Passo("preparacao.abrangencia").EtapaId,
             Titulo = "Faça o levantamento de soluções",
             OQueFazer = "Liste as soluções."
         }, EmailAdmin);
@@ -170,14 +187,14 @@ public class PeModeloServiceTest : PeModeloTestBase
         Assert.Equal("dados", criado.Tipo);
         Assert.False(criado.Sistema);
         Assert.True(criado.AceitaNaoSeAplica);
-        Assert.Equal(11, criado.Ordem);
+        Assert.Equal(6, criado.Ordem);
         Assert.Equal("d d p", SituacoesDoPasso(criado.Chave));
         Assert.Equal("criacao", Assert.Single(HistoricoDe("passo", criado.Id)).Acao);
 
         // Mesmo título de novo: chave com sufixo
         var outro = await Modelo.CriarPassoAsync(new PePassoCriarDTO
         {
-            EtapaId = Passo("preparacao.nomes").EtapaId, Titulo = "Faça o levantamento de soluções", OQueFazer = "Outra vez."
+            EtapaId = Passo("preparacao.abrangencia").EtapaId, Titulo = "Faça o levantamento de soluções", OQueFazer = "Outra vez."
         }, EmailAdmin);
         Assert.Equal("preparacao.faca-o-levantamento-de-solucoes-2", outro.Chave);
     }
@@ -230,7 +247,7 @@ public class PeModeloServiceTest : PeModeloTestBase
         Assert.Equal(Codigo(ErrorCode.PeChaveDuplicada), await ErroAsync(() => Modelo.CriarCampoAsync(
             new PeCampoCriarDTO { SecaoId = Secao("nomes").Id, Chave = "comite", Rotulo = "Outro", Tipo = "texto_curto" }, EmailAdmin)));
         Assert.Equal(Codigo(ErrorCode.PeChaveDuplicada), await ErroAsync(() => Modelo.CriarSecaoAsync(
-            new PeSecaoCriarDTO { PassoId = Passo("preparacao.nomes").Id, Chave = "nomes", Titulo = "Outra", Tipo = "formulario" }, EmailAdmin)));
+            new PeSecaoCriarDTO { PassoId = Passo("preparacao.abrangencia").Id, Chave = "nomes", Titulo = "Outra", Tipo = "formulario" }, EmailAdmin)));
         Assert.Equal(Codigo(ErrorCode.PeChaveDuplicada), await ErroAsync(() => Modelo.CriarNivelAsync(
             new PeNivelCriarDTO { Nome = "Outro", Codigo = "basico" }, EmailAdmin)));
         Assert.Equal(Codigo(ErrorCode.PeChaveDuplicada), await ErroAsync(() => Modelo.CriarOpcaoAsync(
@@ -261,7 +278,7 @@ public class PeModeloServiceTest : PeModeloTestBase
     {
         var passo = await Modelo.CriarPassoAsync(new PePassoCriarDTO
         {
-            EtapaId = Passo("preparacao.nomes").EtapaId, Titulo = "Liste os parceiros", OQueFazer = "Liste."
+            EtapaId = Passo("preparacao.abrangencia").EtapaId, Titulo = "Liste os parceiros", OQueFazer = "Liste."
         }, EmailAdmin);
         var secao = await Modelo.CriarSecaoAsync(new PeSecaoCriarDTO { PassoId = passo.Id, Titulo = "Parceiros", Tipo = "tabela" }, EmailAdmin);
         await Modelo.CriarCampoAsync(new PeCampoCriarDTO { SecaoId = secao.Id, Rotulo = "Nome", Tipo = "texto_curto" }, EmailAdmin);
@@ -485,7 +502,7 @@ public class PeModeloServiceTest : PeModeloTestBase
     [Fact]
     public async Task SecaoLigada_NaoEhApagada()
     {
-        var alvo = await Modelo.CriarSecaoAsync(new PeSecaoCriarDTO { PassoId = Passo("preparacao.nomes").Id, Titulo = "Parceiros", Tipo = "tabela" }, EmailAdmin);
+        var alvo = await Modelo.CriarSecaoAsync(new PeSecaoCriarDTO { PassoId = Passo("preparacao.abrangencia").Id, Titulo = "Parceiros", Tipo = "tabela" }, EmailAdmin);
         await Modelo.CriarCampoAsync(new PeCampoCriarDTO
         {
             SecaoId = Secao("sgtic_membros").Id, Rotulo = "Parceiro", Tipo = "ligacao_secao", Config = Corpo(new { secao = alvo.Chave })
@@ -519,7 +536,7 @@ public class PeModeloServiceTest : PeModeloTestBase
     public async Task OrdemDosPassos_ListaInteiraDaEtapa_ERenumeraATrilha()
     {
         await DefinirNivelDoOrgaoAsync(OrgaoSes, "avancado");
-        var ids = Context.PePassos.AsNoTracking().Where(p => p.EtapaId == Passo("preparacao.nomes").EtapaId)
+        var ids = Context.PePassos.AsNoTracking().Where(p => p.EtapaId == Passo("preparacao.abrangencia").EtapaId)
             .OrderBy(p => p.Ordem).Select(p => p.Id).ToList();
 
         Assert.Equal(Codigo(ErrorCode.PeOrdemInvalida), await ErroAsync(() => Modelo.OrdenarPassosAsync(
@@ -531,7 +548,7 @@ public class PeModeloServiceTest : PeModeloTestBase
         var etapa = await Modelo.OrdenarPassosAsync(new PeOrdemDTO { Ids = invertida }, EmailAdmin);
 
         Assert.Equal(invertida, etapa.Passos.Select(p => p.Id));
-        Assert.Equal("1.10", NaTrilha(await TrilhaAsync(OrgaoSes), "preparacao.abrangencia")!.Numero);
+        Assert.Equal("1.5", NaTrilha(await TrilhaAsync(OrgaoSes), "preparacao.abrangencia")!.Numero);
         Assert.Equal("ordem", HistoricoDe("passo", ids[0]).Single().Acao);
     }
 
@@ -610,7 +627,7 @@ public class PeModeloServiceTest : PeModeloTestBase
     [Fact]
     public async Task Historico_FiltraPorEntidadeEId_DoMaisNovo_EPagina()
     {
-        var id = Passo("preparacao.nomes").Id;
+        var id = Passo("preparacao.abrangencia").Id;
         for (var i = 1; i <= 3; i++)
             await Modelo.AtualizarPassoAsync(id, new PePassoAtualizarDTO { Titulo = $"Título {i}", Informados = Inf("Titulo") }, EmailAdmin);
         await Modelo.AtualizarNivelAsync(NivelId("basico"), new PeNivelAtualizarDTO { Nome = "Inicial", Informados = Inf("Nome") }, EmailAdmin);

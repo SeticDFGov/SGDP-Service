@@ -87,7 +87,7 @@ public class PeCiclosTest : PeAcompanhamentoTestBase
         VersaoDoModelo(5);
         var ex = await Assert.ThrowsAsync<ApiException>(() => CiclosAsync(id));
         Assert.Equal(Codigo(ErrorCode.PeModeloIndisponivel), ex.Error.Code);
-        Assert.Contains("acompanhamento do PDTIC está sendo preparado", ex.Error.Message);
+        Assert.Contains("acompanhamento está sendo atualizado", ex.Error.Message);
     }
 
     [Fact]
@@ -220,8 +220,9 @@ public class PeCiclosTest : PeAcompanhamentoTestBase
         var id = await AcompanhadoAsync();
         var avaliacao = await AbrirAvaliacaoAsync(id);
 
+        // Desde a versão 9, a avaliação intermediária é um passo só: uma pendência, a do passo
         var ex = await Assert.ThrowsAsync<PePendenciasException>(() => FecharAsync(avaliacao.Id));
-        Assert.Equal(3, ex.Pendencias.Count);
+        Assert.Single(ex.Pendencias);
 
         await IncluirNoPdticAsync(id, "resultados_intermediarios",
             new { valor_alcancado = "40%", data = "2026-09-01", situacao = "em_andamento" }, new { meta = new[] { IdDe(id, "M01") } }, cicloId: avaliacao.Id);

@@ -47,7 +47,7 @@ public sealed record PeAcompanhamentoAtivo(bool Ativo, int PrazoFechamentoDias, 
     public PeAcompanhamentoAtivo Exigir() => Ativo
         ? this
         : throw new ApiException(ErrorCode.PeModeloIndisponivel,
-            "O acompanhamento do PDTIC está sendo preparado nesta atualização. Tente de novo em alguns minutos.");
+            "O acompanhamento está sendo atualizado. Tente de novo em alguns minutos.");
 
     internal static int? Inteiro(string? json)
     {

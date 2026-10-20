@@ -250,8 +250,8 @@ public static class PeNivelAlcancado
             {
                 PeDominios.TipoPasso.ConferenciaTemas =>
                     PePdticService.FaltaNaConferencia(passo, porSecao, _temas[nivel] ??= PePdticService.Temas(degrau.Trilha, _analises[nivel]!)),
-                PeDominios.TipoPasso.Aprovacao => PePdticService.FaltaNaAprovacao(passo, porSecao, new List<string>()),
-                _ => PePdticService.FaltaNasSecoes(passo, porSecao)
+                // Dados e aprovação: desde a versão 9, a aprovação pode ser a última seção de um passo de dados
+                _ => PePdticService.FaltaNaAprovacao(passo, porSecao, new List<string>())
             };
             _faltas[(nivel, passoId)] = falta;
             return falta;

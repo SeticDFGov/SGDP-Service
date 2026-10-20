@@ -17,6 +17,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- O modelo inicial da versão 8 (antes da revisão de 2026-10-20), para o teste da atualização do banco -->
+    <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\app\demanda_service.csproj" />
   </ItemGroup>
 

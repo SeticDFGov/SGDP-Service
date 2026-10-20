@@ -29,7 +29,7 @@ namespace test.planejamento;
 /// </summary>
 public class PeF3PrintsDoManualTest : PePaineisTestBase
 {
-    private const string FaltaDoCronograma = "Cronograma da elaboração: preencha \"Início\" e \"Término\"";
+    private const string FaltaDoCronograma = "Cronograma: preencha \"Início\" e \"Término\"";
 
     private void Livre() => DefinirModoNiveis(PeDominios.ModoNiveis.Livre);
 
@@ -130,49 +130,51 @@ public class PeF3PrintsDoManualTest : PePaineisTestBase
     {
         await DefinirNivelDoOrgaoAsync(OrgaoSes, "basico");
         var pdtic = await ProntoParaEnviarAsync();
-        // A equipe de elaboração opcional para a SES (ajuste), com a equipe preenchida: um opcional feito
-        await AjustarPassosAsync(OrgaoSes, ("preparacao.equipe", "opcional"));
+        // As estratégias opcionais para a SES (ajuste), com os objetivos do PETIC-DF preenchidos: um opcional
+        // feito (desde a versão 9, a etapa 1 tem 5 passos no Básico)
+        await AjustarPassosAsync(OrgaoSes, ("preparacao.estrategias", "opcional"));
 
         var etapa1 = (await ResumoAsync(OrgaoSes)).Andamento[0];
-        Assert.Equal(("Prepare o PDTIC", 6, 6, 1), (etapa1.Titulo, etapa1.Feitos, etapa1.Total, etapa1.OpcionaisFeitos));
+        Assert.Equal(("Prepare o PDTIC", 4, 4, 1), (etapa1.Titulo, etapa1.Feitos, etapa1.Total, etapa1.OpcionaisFeitos));
 
-        // Sem a equipe, o passo opcional fica sem conteúdo: os obrigatórios continuam todos resolvidos
-        // (antes a etapa dizia "6 de 7")
-        var equipe = (await Registros.ListarAsync(PeDono.DoPdtic(pdtic.Id), "equipe_elaboracao", await Orgao())).Registros.Single();
-        await Registros.ExcluirAsync(PeDono.DoPdtic(pdtic.Id), "equipe_elaboracao", equipe.Id, await Orgao());
-        Assert.Equal(PeDominios.SituacaoPasso.Opcional, (await PassoAsync(pdtic.Id, "preparacao.equipe")).Situacao);
+        // Sem o registro, o passo opcional fica sem conteúdo: os obrigatórios continuam todos resolvidos
+        // (antes a etapa dizia "4 de 5")
+        var alinhamento = (await Registros.ListarAsync(PeDono.DoPdtic(pdtic.Id), "alinhamento_petic", await Orgao())).Registros.Single();
+        await Registros.ExcluirAsync(PeDono.DoPdtic(pdtic.Id), "alinhamento_petic", alinhamento.Id, await Orgao());
+        Assert.Equal(PeDominios.SituacaoPasso.Opcional, (await PassoAsync(pdtic.Id, "preparacao.estrategias")).Situacao);
         etapa1 = (await ResumoAsync(OrgaoSes)).Andamento[0];
-        Assert.Equal((6, 6, 0), (etapa1.Feitos, etapa1.Total, etapa1.OpcionaisFeitos));
+        Assert.Equal((4, 4, 0), (etapa1.Feitos, etapa1.Total, etapa1.OpcionaisFeitos));
     }
 
     [Fact]
-    public async Task Andamento_Livre_AEtapa1ComOsSeteObrigatoriosResolvidos_EOsOpcionaisAParte()
+    public async Task Andamento_Livre_AEtapa1ComOsObrigatoriosResolvidos_EOsOpcionaisAParte()
     {
         Livre();
         var pdtic = await ProntoParaEnviarAsync();
 
-        // No modo livre, a etapa 1 tem os 10 passos do Guia, 7 obrigatórios (os do Básico) e 3 opcionais
+        // No modo livre, desde a versão 9, a etapa 1 tem 5 passos, todos obrigatórios (os do Básico): os
+        // documentos de referência, o plano de trabalho e a aprovação dele viraram seções de passos dela
         var trilha = await TrilhaAsync(OrgaoSes);
         var situacao = await SituacaoAsync(pdtic.Id);
         var daEtapa1 = trilha.Etapas[0].Passos.Select(p => situacao.Passos.Single(s => s.PassoId == p.Id)).ToList();
-        Assert.Equal((10, 7), (daEtapa1.Count, daEtapa1.Count(p => p.Obrigatorio)));
-
-        // Antes, "7 de 10" com todos os obrigatórios resolvidos (o caso do órgão TESTE)
+        Assert.Equal((5, 5), (daEtapa1.Count, daEtapa1.Count(p => p.Obrigatorio)));
         var etapa1 = (await ResumoAsync(OrgaoSes)).Andamento[0];
-        Assert.Equal((7, 7, 0), (etapa1.Feitos, etapa1.Total, etapa1.OpcionaisFeitos));
+        Assert.Equal((5, 5, 0), (etapa1.Feitos, etapa1.Total, etapa1.OpcionaisFeitos));
 
-        // Um passo opcional preenchido conta nos opcionais feitos, sem mexer nos obrigatórios
-        await IncluirNoPdticAsync(pdtic.Id, "documentos_referencia", new { identificacao = "Plano Plurianual 2024 a 2027", tipo = "ppa" });
-        Assert.Equal(PeDominios.SituacaoPasso.Feito, (await PassoAsync(pdtic.Id, "preparacao.documentos-referencia")).Situacao);
-        etapa1 = (await ResumoAsync(OrgaoSes)).Andamento[0];
-        Assert.Equal((7, 7, 1), (etapa1.Feitos, etapa1.Total, etapa1.OpcionaisFeitos));
+        // Um passo opcional (o PDTIC anterior, da etapa 2, que o Básico não pede) preenchido conta nos opcionais feitos
+        var antesDoOpcional = (await ResumoAsync(OrgaoSes)).Andamento[1];
+        await IncluirNoPdticAsync(pdtic.Id, "resultados_pdtic_anterior", new { resultados = "As metas de 2025 foram cumpridas.", teve_anterior = true });
+        Assert.Equal(PeDominios.SituacaoPasso.Feito, (await PassoAsync(pdtic.Id, "diagnostico.pdtic-anterior")).Situacao);
+        var etapa2 = (await ResumoAsync(OrgaoSes)).Andamento[1];
+        Assert.Equal((antesDoOpcional.Feitos, antesDoOpcional.Total, antesDoOpcional.OpcionaisFeitos + 1),
+            (etapa2.Feitos, etapa2.Total, etapa2.OpcionaisFeitos));
 
         // Um obrigatório pendente sai dos Feitos (o Total continua o dos obrigatórios)
         var principios = (await Registros.ListarAsync(PeDono.DoPdtic(pdtic.Id), "principios_diretrizes", await Orgao())).Registros;
         foreach (var principio in principios)
             await Registros.ExcluirAsync(PeDono.DoPdtic(pdtic.Id), "principios_diretrizes", principio.Id, await Orgao());
         etapa1 = (await ResumoAsync(OrgaoSes)).Andamento[0];
-        Assert.Equal((6, 7, 1), (etapa1.Feitos, etapa1.Total, etapa1.OpcionaisFeitos));
+        Assert.Equal((4, 5, 0), (etapa1.Feitos, etapa1.Total, etapa1.OpcionaisFeitos));
     }
 
     // ── 3. O que falta nas linhas sem código ─────────────────────────────────────
@@ -182,6 +184,8 @@ public class PeF3PrintsDoManualTest : PePaineisTestBase
     {
         await DefinirNivelDoOrgaoAsync(OrgaoSes, "avancado");
         var id = (await AbrirSesAsync()).Id;
+        // Desde a versão 9, o plano de trabalho e o cronograma são seções do passo da metodologia
+        await IncluirNoPdticAsync(id, "metodologia", new { metodologia_adotada = "guia_sisp", descricao = "Oficinas com as áreas." });
         await IncluirNoPdticAsync(id, "plano_trabalho", new
         {
             objetivo = "Elaborar o PDTIC 2027 a 2030.",
@@ -214,21 +218,23 @@ public class PeF3PrintsDoManualTest : PePaineisTestBase
         var (id, linhas) = await CronogramaSemDatasAsync();
 
         // As 32 linhas sem as datas: uma frase só (antes, a mesma frase a cada linha e "E mais 30 pendências")
-        Assert.Equal($"{FaltaDoCronograma} em 32 linhas.", await MotivoNoEnvioAsync(id, "preparacao.plano-trabalho"));
+        Assert.Equal($"{FaltaDoCronograma} em 32 linhas.", await MotivoNoEnvioAsync(id, "preparacao.metodologia"));
 
         // Campos diferentes não se juntam; a linha sozinha continua sem a contagem
         foreach (var linha in linhas.Skip(3)) DatasNoBanco(linha.Id, "2026-02-01", "2026-02-28");
         DatasNoBanco(linhas[1].Id, "2026-02-01", null);
         DatasNoBanco(linhas[2].Id, "2026-02-01", null);
-        Assert.Equal($"{FaltaDoCronograma}. Cronograma da elaboração: preencha \"Término\" em 2 linhas.",
-            await MotivoNoEnvioAsync(id, "preparacao.plano-trabalho"));
+        Assert.Equal($"{FaltaDoCronograma}. Cronograma: preencha \"Término\" em 2 linhas.",
+            await MotivoNoEnvioAsync(id, "preparacao.metodologia"));
 
         DatasNoBanco(linhas[1].Id, null, "2026-02-28");
         DatasNoBanco(linhas[2].Id, null, "2026-02-28");
-        Assert.Equal($"{FaltaDoCronograma}.", await MotivoNoEnvioAsync(id, "preparacao.plano-trabalho"));
+        Assert.Equal($"{FaltaDoCronograma}.", await MotivoNoEnvioAsync(id, "preparacao.metodologia"));
 
+        // Com o cronograma completo, falta a aprovação do plano de trabalho (a última seção do passo, desde a versão 9)
         DatasNoBanco(linhas[0].Id, "2026-02-01", "2026-02-28");
-        Assert.DoesNotContain(await Pendencias(id), p => p.PassoId == Passo("preparacao.plano-trabalho").Id);
+        Assert.Equal("Registre a decisão e a data.", await MotivoNoEnvioAsync(id, "preparacao.metodologia"));
+        Assert.Contains(await Pendencias(id), p => p.PassoId == Passo("preparacao.metodologia").Id);
     }
 
     private async Task<List<PePendenciaResponse>> Pendencias(long pdticId) => (await Aprovacao.EnvioAsync(pdticId, await Orgao())).Pendencias;
@@ -236,15 +242,18 @@ public class PeF3PrintsDoManualTest : PePaineisTestBase
     [Fact]
     public async Task LinhasSemCodigo_AMesmaFraseNoNivelAlcancado()
     {
-        // O plano de trabalho obrigatório também no Básico: o passo entra na régua do primeiro nível
-        await Modelo.DefinirSituacaoPassoAsync(Passo("preparacao.plano-trabalho").Id, So("basico", "obrigatorio"), EmailAdmin);
+        // O plano de trabalho e o cronograma obrigatórios também no Básico: desde a versão 9 eles são seções
+        // do passo da metodologia, e a forma do Básico desse passo passa a pedi-los
+        // (nos três níveis: a forma de um nível acima também atende ao Básico)
+        await Modelo.DefinirSituacaoSecaoAsync(Secao("plano_trabalho").Id, Todos("obrigatorio"), EmailAdmin);
+        await Modelo.DefinirSituacaoSecaoAsync(Secao("cronograma_elaboracao").Id, Todos("obrigatorio"), EmailAdmin);
         var (id, _) = await CronogramaSemDatasAsync();
 
         var nivel = (await SituacaoAsync(id)).Nivel;
         Assert.Equal("Básico", nivel.ProximoNome);
-        var falta = Assert.Single(nivel.Faltam, f => f.PassoId == Passo("preparacao.plano-trabalho").Id);
+        var falta = Assert.Single(nivel.Faltam, f => f.PassoId == Passo("preparacao.metodologia").Id);
         Assert.Equal($"{FaltaDoCronograma} em 32 linhas.", falta.Motivo);
-        Assert.Equal(falta.Motivo, await MotivoNoEnvioAsync(id, "preparacao.plano-trabalho"));
+        Assert.Equal(falta.Motivo, await MotivoNoEnvioAsync(id, "preparacao.metodologia"));
     }
 
     // ── 4. Os textos do modelo inicial na linguagem das formas ───────────────────
@@ -259,12 +268,14 @@ public class PeF3PrintsDoManualTest : PePaineisTestBase
             .ToList();
         Assert.DoesNotContain(textos, t => t!.Contains("No nível") || t.Contains("nos níveis") || t.Contains("nível do órgão"));
 
-        Assert.EndsWith(" Na forma do nível Básico, o mínimo do decreto, bastam o nome, o tipo e a situação.", Secao("ativos").Ajuda);
-        Assert.Equal("Na forma do nível Básico, diga só se a prioridade é alta, média ou baixa.", Campo("necessidades", "prioridade_simples").Ajuda);
-        Assert.Equal("Obrigatório nas formas dos níveis Intermediário e Avançado, quando há PETIC-DF vigente.", Campo("necessidades", "objetivo_petic").Ajuda);
-        Assert.Equal("A cada ciclo, atualize a situação de cada ação. Na forma do nível Básico, o mínimo do decreto, basta a situação; nas formas "
-                     + "dos outros níveis, o passo pede também a execução, o valor dos indicadores e os riscos que ocorreram.",
-            Passo("monitoramento.ciclo-monitoramento").OQueFazer);
+        // A revisão de 2026-10-20 tirou das ajudas e do "o que fazer" a frase sobre a forma de cada nível (o que cada
+        // nível pede continua nas situações dos campos): nenhum texto cita o nível pelo nome, e a ajuda do objetivo do
+        // PETIC-DF fala da vigência do PETIC-DF, não do nível
+        Assert.DoesNotContain(textos, t => t!.Contains("Básico") || t.Contains("Intermediário") || t.Contains("Avançado"));
+        Assert.Null(Secao("ativos").Ajuda);
+        Assert.Null(Campo("necessidades", "prioridade_simples").Ajuda);
+        Assert.Equal("Preencha quando há PETIC-DF vigente.", Campo("necessidades", "objetivo_petic").Ajuda);
+        Assert.Equal("", Passo("monitoramento.ciclo-monitoramento").OQueFazer);
     }
 
     // ── 5. O comentário aberto não tira o passo da régua ─────────────────────────

@@ -66,24 +66,24 @@ public class PePlanilhaDoPassoTest : PePaineisTestBase
     [Fact]
     public async Task UmaSecao_OCsvDaSecao_EOXlsxComALeiaMe()
     {
+        // Desde a versão 9, o passo dos princípios (1.5) é um dos que têm uma seção só (o PDTIC nasce com os do art. 4º)
         var id = (await AbrirSesAsync()).Id;
-        await PreencherAbrangenciaAsync(id);
 
-        var csv = await PassoAsync(id, "preparacao.abrangencia", "csv");
-        Assert.Equal((PePlanilhaService.MimeCsv, $"PDTIC_SES_passo-1.1_{Iso(HojeData())}.csv"), (csv.TipoMime, csv.NomeArquivo));
-        var daSecao = await Planilhas.PdticSecaoAsync(id, "abrangencia", "csv", await Orgao());
+        var csv = await PassoAsync(id, "preparacao.principios", "csv");
+        Assert.Equal((PePlanilhaService.MimeCsv, $"PDTIC_SES_passo-1.5_{Iso(HojeData())}.csv"), (csv.TipoMime, csv.NomeArquivo));
+        var daSecao = await Planilhas.PdticSecaoAsync(id, "principios_diretrizes", "csv", await Orgao());
         Assert.Equal(TextoCsv(daSecao.Conteudo), TextoCsv(csv.Conteudo));
 
-        var xlsx = await PassoAsync(id, "preparacao.abrangencia", null, user: UserConsultaSes);
-        Assert.Equal((PePlanilhaService.MimeXlsx, $"PDTIC_SES_passo-1.1_{Iso(HojeData())}.xlsx"), (xlsx.TipoMime, xlsx.NomeArquivo));
+        var xlsx = await PassoAsync(id, "preparacao.principios", null, user: UserConsultaSes);
+        Assert.Equal((PePlanilhaService.MimeXlsx, $"PDTIC_SES_passo-1.5_{Iso(HojeData())}.xlsx"), (xlsx.TipoMime, xlsx.NomeArquivo));
         // A aba oculta Listas guarda os valores das listas (validação de dados), como na planilha da seção
-        Assert.Equal(new[] { "Abrangência e vigência", "Leia-me", "Listas" }, Abas(xlsx.Conteudo));
+        Assert.Equal(new[] { Secao("principios_diretrizes").Titulo, "Leia-me", "Listas" }, Abas(xlsx.Conteudo));
         var leiaMe = Linhas(xlsx.Conteudo, "Leia-me");
-        Assert.Contains(leiaMe, l => l.Count >= 2 && l[0] == "Passo" && l[1] == "1.1 · Diga o que o PDTIC abrange e por quanto tempo vale");
+        Assert.Contains(leiaMe, l => l.Count >= 2 && l[0] == "Passo" && l[1] == "1.5 · " + Passo("preparacao.principios").Titulo);
         Assert.Contains(leiaMe, l => l.Count >= 2 && l[0] == "Órgão" && l[1] == "SES · Secretaria de Estado de Saúde");
         Assert.DoesNotContain(leiaMe, l => l.Count >= 1 && l[0] == "Ciclo");
         // A ajuda de cada coluna também vai para a Leia-me
-        Assert.Contains(leiaMe, l => l.Any(c => c == "Início da vigência"));
+        Assert.Contains(leiaMe, l => l.Any(c => c == Campo("principios_diretrizes", "principio").Rotulo));
     }
 
     [Fact]
@@ -94,20 +94,22 @@ public class PePlanilhaDoPassoTest : PePaineisTestBase
         await IncluirNoPdticAsync(id, "sgtic_membros", new { nome = "=Maria da Silva", papel = "presidente" });
         await IncluirNoPdticAsync(id, "sgtic_membros", new { nome = "João Souza", papel = "membro" });
 
-        var xlsx = await PassoAsync(id, "preparacao.sgtic", "xlsx");
-        var esperadas = PeXlsx.NomesUnicos(new[] { Secao("sgtic").Titulo, Secao("sgtic_membros").Titulo, PeXlsx.NomeLeiaMe, PeXlsx.NomeListas }).Take(3);
-        Assert.Equal(esperadas, Abas(xlsx.Conteudo).Take(3));
+        // Desde a versão 9, o SGTIC e a equipe de elaboração estão no passo 1.2
+        var xlsx = await PassoAsync(id, "preparacao.equipe", "xlsx");
+        var esperadas = PeXlsx.NomesUnicos(new[] { Secao("sgtic").Titulo, Secao("sgtic_membros").Titulo, Secao("equipe_elaboracao").Titulo,
+            PeXlsx.NomeLeiaMe, PeXlsx.NomeListas }).Take(4);
+        Assert.Equal(esperadas, Abas(xlsx.Conteudo).Take(4));
         Assert.Equal(3, Linhas(xlsx.Conteudo, Abas(xlsx.Conteudo)[1]).Count);
 
-        var zip = await PassoAsync(id, "preparacao.sgtic", "csv");
-        Assert.Equal((PePlanilhaService.MimeZip, $"PDTIC_SES_passo-1.3_{Iso(HojeData())}.zip"), (zip.TipoMime, zip.NomeArquivo));
+        var zip = await PassoAsync(id, "preparacao.equipe", "csv");
+        Assert.Equal((PePlanilhaService.MimeZip, $"PDTIC_SES_passo-1.2_{Iso(HojeData())}.zip"), (zip.TipoMime, zip.NomeArquivo));
         var arquivos = Zip(zip.Conteudo);
-        Assert.Equal(new[] { "1.3-sgtic.csv", "1.3-sgtic_membros.csv" }, arquivos.Keys.OrderBy(k => k, StringComparer.Ordinal));
-        var membros = TextoCsv(arquivos["1.3-sgtic_membros.csv"]).Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(new[] { "1.2-equipe_elaboracao.csv", "1.2-sgtic.csv", "1.2-sgtic_membros.csv" }, arquivos.Keys.OrderBy(k => k, StringComparer.Ordinal));
+        var membros = TextoCsv(arquivos["1.2-sgtic_membros.csv"]).Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal(3, membros.Length);
         // A proteção contra fórmula vale no CSV de dentro do ZIP
         Assert.StartsWith("'=Maria da Silva", membros[1]);
-        Assert.Equal(TextoCsv((await Planilhas.PdticSecaoAsync(id, "sgtic", "csv", await Orgao())).Conteudo), TextoCsv(arquivos["1.3-sgtic.csv"]));
+        Assert.Equal(TextoCsv((await Planilhas.PdticSecaoAsync(id, "sgtic", "csv", await Orgao())).Conteudo), TextoCsv(arquivos["1.2-sgtic.csv"]));
     }
 
     [Fact]
@@ -116,25 +118,29 @@ public class PePlanilhaDoPassoTest : PePaineisTestBase
         var id = (await AbrirSesAsync()).Id;
         await IncluirNoPdticAsync(id, "equipe_elaboracao", new { nome = "Ana Souza" });
 
-        // No Básico, o ato de designação da equipe está desligado: sobra uma seção (o CSV dela)
+        // No Básico, o ato de designação da equipe está desligado: sobram o SGTIC, os membros e a equipe
         var basico = await PassoAsync(id, "preparacao.equipe", "csv");
-        Assert.Equal(PePlanilhaService.MimeCsv, basico.TipoMime);
-        Assert.StartsWith("Nome", TextoCsv(basico.Conteudo));
-        Assert.Contains("\r\nAna Souza", TextoCsv(basico.Conteudo));
+        Assert.Equal(PePlanilhaService.MimeZip, basico.TipoMime);
+        var doBasico = Zip(basico.Conteudo);
+        Assert.Equal(new[] { "1.2-equipe_elaboracao.csv", "1.2-sgtic.csv", "1.2-sgtic_membros.csv" }, doBasico.Keys.OrderBy(k => k, StringComparer.Ordinal));
+        Assert.StartsWith("Nome", TextoCsv(doBasico["1.2-equipe_elaboracao.csv"]));
+        Assert.Contains("\r\nAna Souza", TextoCsv(doBasico["1.2-equipe_elaboracao.csv"]));
 
-        // No Avançado, as duas
+        // No Avançado, as quatro
         await DefinirNivelDoOrgaoAsync(OrgaoSes, "avancado");
         var avancado = await PassoAsync(id, "preparacao.equipe", "csv");
         Assert.Equal(PePlanilhaService.MimeZip, avancado.TipoMime);
-        Assert.Equal(new[] { "1.4-equipe_designacao.csv", "1.4-equipe_elaboracao.csv" }, Zip(avancado.Conteudo).Keys.OrderBy(k => k, StringComparer.Ordinal));
+        Assert.Equal(new[] { "1.2-equipe_designacao.csv", "1.2-equipe_elaboracao.csv", "1.2-sgtic.csv", "1.2-sgtic_membros.csv" },
+            Zip(avancado.Conteudo).Keys.OrderBy(k => k, StringComparer.Ordinal));
 
         // Seção que o administrador deixou fora da planilha também fica de fora
         var designacao = Context.PeSecoes.Single(s => s.Chave == "equipe_designacao");
         designacao.NaPlanilha = false;
         Context.SaveChanges();
         Context.ChangeTracker.Clear();
-        Assert.Equal(PePlanilhaService.MimeCsv, (await PassoAsync(id, "preparacao.equipe", "csv")).TipoMime);
-        Assert.Equal(new[] { Secao("equipe_elaboracao").Titulo, PeXlsx.NomeLeiaMe }, Abas((await PassoAsync(id, "preparacao.equipe", "xlsx")).Conteudo).Take(2));
+        Assert.Equal(3, Zip((await PassoAsync(id, "preparacao.equipe", "csv")).Conteudo).Count);
+        Assert.Equal(new[] { Secao("sgtic").Titulo, Secao("sgtic_membros").Titulo, Secao("equipe_elaboracao").Titulo, PeXlsx.NomeLeiaMe },
+            Abas((await PassoAsync(id, "preparacao.equipe", "xlsx")).Conteudo).Take(4));
     }
 
     [Fact]
@@ -174,8 +180,8 @@ public class PePlanilhaDoPassoTest : PePaineisTestBase
         Assert.StartsWith($"{Trimestre2};", linhas[1]);
 
         // Passo sem seção por ciclo: o cicloId é ignorado (e o nome fica sem o ciclo)
-        var semCiclo = await PassoAsync(id, "preparacao.abrangencia", "csv", t1.Id);
-        Assert.Equal($"PDTIC_SES_passo-1.1_{Iso(HojeData())}.csv", semCiclo.NomeArquivo);
+        var semCiclo = await PassoAsync(id, "preparacao.principios", "csv", t1.Id);
+        Assert.Equal($"PDTIC_SES_passo-1.5_{Iso(HojeData())}.csv", semCiclo.NomeArquivo);
     }
 
     [Fact]
@@ -199,10 +205,9 @@ public class PePlanilhaDoPassoTest : PePaineisTestBase
     public async Task QuemLeOPdtic_BaixaAPlanilhaDoPasso()
     {
         var id = (await AbrirSesAsync()).Id;
-        await PreencherAbrangenciaAsync(id);
 
         foreach (var user in new[] { UserOrgaoSes, UserConsultaSes, UserPeSgdi, UserPeCgtic, UserPeAdmin, UserAdminGeral })
-            Assert.Equal(PePlanilhaService.MimeCsv, (await PassoAsync(id, "preparacao.abrangencia", "csv", user: user)).TipoMime);
+            Assert.Equal(PePlanilhaService.MimeCsv, (await PassoAsync(id, "preparacao.principios", "csv", user: user)).TipoMime);
         foreach (var user in new[] { UserOrgaoSeec, UserSemPapel })
             Assert.Equal(Codigo(ErrorCode.PeSemPermissao), await ErroAsync(() => PassoAsync(id, "preparacao.abrangencia", "csv", user: user)));
         Assert.Equal(Codigo(ErrorCode.PePdticNaoEncontrado), await ErroAsync(() => PassoAsync(999999, "preparacao.abrangencia", "csv")));
@@ -215,12 +220,12 @@ public class PePlanilhaDoPassoTest : PePaineisTestBase
         await IncluirNoPdticAsync(id, "sgtic", new { forma = "subcomite", ato_tipo = "portaria", ato_numero = "12/2026", ato_data = "2026-01-10" });
         var controlador = ControladorPdtic(UserConsultaSes);
 
-        var arquivo = Assert.IsType<FileContentResult>(await controlador.PlanilhaDoPasso(id, "preparacao.sgtic", "csv", null));
-        Assert.Equal((PePlanilhaService.MimeZip, $"PDTIC_SES_passo-1.3_{Iso(HojeData())}.zip"), (arquivo.ContentType, arquivo.FileDownloadName));
+        var arquivo = Assert.IsType<FileContentResult>(await controlador.PlanilhaDoPasso(id, "preparacao.equipe", "csv", null));
+        Assert.Equal((PePlanilhaService.MimeZip, $"PDTIC_SES_passo-1.2_{Iso(HojeData())}.zip"), (arquivo.ContentType, arquivo.FileDownloadName));
 
         var (status, corpo) = Resultado(await controlador.PlanilhaDoPasso(id, "planejamento.documento", null, null));
         Assert.Equal((StatusCodes.Status404NotFound, Codigo(ErrorCode.PePassoSemPlanilha)), (status, CodigoDe(corpo)));
-        (status, corpo) = Resultado(await ControladorPdtic(UserOrgaoSeec).PlanilhaDoPasso(id, "preparacao.sgtic", "csv", null));
+        (status, corpo) = Resultado(await ControladorPdtic(UserOrgaoSeec).PlanilhaDoPasso(id, "preparacao.equipe", "csv", null));
         Assert.Equal((StatusCodes.Status403Forbidden, Codigo(ErrorCode.PeSemPermissao)), (status, CodigoDe(corpo)));
     }
 }

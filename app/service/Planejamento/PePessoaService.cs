@@ -133,7 +133,7 @@ public class PePessoaService : IPePessoaService
         if (!autor.EhAdminGeral && autor.UserId == userId
             && autor.Papel == PapeisPlanejamento.Admin && papelNovo != PapeisPlanejamento.Admin)
             throw new ApiException(ErrorCode.PeAutoRebaixamento,
-                "Você não pode tirar nem trocar o seu próprio papel de administrador do módulo. Se precisar, peça a outro administrador.");
+                "Você não pode mudar o seu próprio papel de administrador do módulo. Peça a outro administrador.");
 
         await _acessos.DefinirPapelPlanejamentoAsync(userId, papelNovo, autor.Email, PeDominios.OrigemPapel.Pessoas);
         return await ObterAsync(userId);

@@ -32,7 +32,7 @@ public class PeEnvioTest : PeAprovacaoTestBase
         Assert.Equal("feito", situacao.Passos.Single(p => p.Chave == "preparacao.principios").Situacao);
         Assert.Equal(new[]
         {
-            Numero("preparacao.abrangencia"), Numero("preparacao.nomes"), Numero("preparacao.sgtic"), Numero("preparacao.equipe"),
+            Numero("preparacao.abrangencia"), Numero("preparacao.equipe"),
             Numero("preparacao.metodologia"), Numero("preparacao.estrategias"),
             Numero("diagnostico.ambiente-tecnologico"), Numero("diagnostico.ativos"), Numero("diagnostico.necessidades-tic"),
             Numero("planejamento.metas-acoes"), Numero("planejamento.acoes-tematicas"), Numero("planejamento.contratacoes"),
@@ -40,8 +40,9 @@ public class PeEnvioTest : PeAprovacaoTestBase
         }, envio.Pendencias.Select(p => p.PassoNumero));
         var abrangencia = envio.Pendencias[0];
         Assert.Equal(Passo("preparacao.abrangencia").Id, abrangencia.PassoId);
-        Assert.Equal("Diga o que o PDTIC abrange e por quanto tempo vale", abrangencia.PassoTitulo);
-        Assert.Equal("Preencha \"Abrangência e vigência\".", abrangencia.Motivo);
+        Assert.Equal(Passo("preparacao.abrangencia").Titulo, abrangencia.PassoTitulo);
+        // Versão 9: a abrangência e o dicionário de nomes no mesmo passo
+        Assert.Equal("Preencha \"Abrangência e vigência\". Preencha \"Nomes do órgão\".", abrangencia.Motivo);
         Assert.Equal("Inclua pelo menos um item em \"Soluções e ativos de TIC\".",
             envio.Pendencias.Single(p => p.PassoId == Passo("diagnostico.ativos").Id).Motivo);
         Assert.StartsWith("Inclua uma ação com o tema ou justifique o tema sem ação:",

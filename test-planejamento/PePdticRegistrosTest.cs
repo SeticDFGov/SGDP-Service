@@ -147,6 +147,9 @@ public class PePdticRegistrosTest : PePdticTestBase
             gravidade = 5, urgencia = 4, tendencia = 3, priorizada = true
         };
 
+        // Desde a versão 9, as necessidades de informação estão no mesmo passo (obrigatórias no Intermediário)
+        await IncluirNoPdticAsync(pdtic.Id, "necessidades_informacao", new { descricao = "Ocupação dos leitos", areas = "Regulação" });
+
         // Sem vigente: opcional no motor, no GET e na trilha
         var semLigacao = await IncluirNoPdticAsync(pdtic.Id, "necessidades", necessidade);
         Assert.Equal("60", Valor(semLigacao, "prioridade"));

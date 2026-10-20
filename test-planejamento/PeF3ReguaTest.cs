@@ -46,6 +46,8 @@ public class PeF3ReguaTest : PePaineisTestBase
         var ctx = await Orgao();
         var antiga = (await Registros.ListarAsync(dono, "necessidades", ctx)).Registros.Single();
         await FormaAsync("diagnostico.necessidades-tic", "intermediario");
+        // Desde a versão 9, as necessidades de informação (obrigatórias na forma do Intermediário) estão no mesmo passo
+        await IncluirNoPdticAsync(pdticId, "necessidades_informacao", new { descricao = "Ocupação dos leitos", areas = "Regulação" });
         var nova = await IncluirNoPdticAsync(pdticId, "necessidades", NecessidadeComGut);
         var meta = (await Registros.ListarAsync(dono, "metas", ctx)).Registros.Single();
         await Registros.AtualizarAsync(dono, "metas", meta.Id, Salvar(vinculos: new { necessidades = new[] { nova.Id } }), ctx);
@@ -160,7 +162,11 @@ public class PeF3ReguaTest : PePaineisTestBase
         Livre();
         var pdtic = await AbrirSesAsync();
         await FormaAsync("diagnostico.necessidades-tic", "intermediario");
+        await IncluirNoPdticAsync(pdtic.Id, "necessidades_informacao", new { descricao = "Ocupação dos leitos", areas = "Regulação" });
         await IncluirNoPdticAsync(pdtic.Id, "necessidades", NecessidadeComGut);
+        // Desde a versão 9, o SGTIC está no passo da equipe: preenchido, o que falta é só da equipe
+        await IncluirNoPdticAsync(pdtic.Id, "sgtic", new { forma = "subcomite", ato_tipo = "portaria", ato_numero = "12/2026", ato_data = "2026-01-10" });
+        await IncluirNoPdticAsync(pdtic.Id, "sgtic_membros", new { nome = "Maria da Silva", papel = "presidente", cargo = "Secretária-adjunta", unidade = "Gabinete" });
         await FormaAsync("preparacao.equipe", "avancado");
 
         var nivel = await NivelAsync(pdtic.Id);

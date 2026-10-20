@@ -167,7 +167,7 @@
         {
           "chave": "documentos_referencia",
           "titulo": "Documentos de referência",
-          "passo": "preparacao.documentos-referencia",
+          "passo": "preparacao.estrategias",
           "blocos": [
             {"tipo": "texto", "texto": ["Documentos usados como base para este plano:"]},
             {"tipo": "tabela_secao", "secao": "documentos_referencia"}
@@ -253,7 +253,7 @@
             {
               "chave": "diagnostico_capacidade",
               "titulo": "Capacidade estimada de execução",
-              "passo": "diagnostico.capacidade",
+              "passo": "diagnostico.ambiente-tecnologico",
               "blocos": [
                 {
                   "tipo": "texto",
@@ -317,7 +317,7 @@
             {
               "chave": "necessidades_levantamento",
               "titulo": "Levantamento das necessidades",
-              "passo": "diagnostico.necessidades-informacao",
+              "passo": "diagnostico.necessidades-tic",
               "blocos": [
                 {"tipo": "tabela_secao", "secao": "plano_levantamento"},
                 {"tipo": "tabela_secao", "secao": "necessidades_informacao"}
@@ -487,7 +487,7 @@
         {
           "chave": "orcamento",
           "titulo": "Plano orçamentário",
-          "passo": "planejamento.orcamento",
+          "passo": "planejamento.pessoas",
           "blocos": [
             {
               "tipo": "texto",
@@ -593,7 +593,7 @@
               "chave": "anexo_plano_trabalho",
               "titulo": "Plano de trabalho e cronograma",
               "numerado": false,
-              "passo": "preparacao.plano-trabalho",
+              "passo": "preparacao.metodologia",
               "blocos": [
                 {"tipo": "tabela_secao", "secao": "plano_trabalho"},
                 {"tipo": "tabela_secao", "secao": "partes_interessadas"},
@@ -739,7 +739,7 @@
         {
           "chave": "avaliacao_metas",
           "titulo": "Avaliação intermediária das metas e ações",
-          "passo": "avaliacao-intermediaria.resultados-intermediarios",
+          "passo": "avaliacao-intermediaria.avaliacao-comite",
           "blocos": [
             {
               "tipo": "texto",
@@ -754,7 +754,7 @@
         {
           "chave": "execucao_orcamentaria",
           "titulo": "Avaliação da execução orçamentária",
-          "passo": "avaliacao-intermediaria.comparacao-metas",
+          "passo": "avaliacao-intermediaria.avaliacao-comite",
           "blocos": [
             {"tipo": "texto", "texto": ["O parecer da equipe de acompanhamento sobre a execução física e orçamentária das ações."]},
             {"tipo": "tabela_secao", "secao": "analise_intermediaria", "colunas": ["parecer_execucao"]}
@@ -784,7 +784,7 @@
         {
           "chave": "pessoas",
           "titulo": "Avaliação do plano de gestão de pessoas",
-          "passo": "avaliacao-intermediaria.comparacao-metas",
+          "passo": "avaliacao-intermediaria.avaliacao-comite",
           "blocos": [
             {"tipo": "texto", "texto": ["O parecer sobre as ações de pessoas do PDTIC: o quadro, as capacitações e a contratação de serviços."]},
             {"tipo": "tabela_secao", "secao": "analise_intermediaria", "colunas": ["parecer_pessoas"]}

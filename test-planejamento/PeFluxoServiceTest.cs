@@ -332,7 +332,7 @@ public class PeFluxoServiceTest : PeFluxoTestBase
 
         // As datas ficam para o órgão: o passo do plano de trabalho fica pendente
         Assert.All(linhas, l => Assert.False(l.Dados.ContainsKey("inicio")));
-        Assert.Equal(PeDominios.SituacaoPasso.Pendente, (await PassoAsync(id, "preparacao.plano-trabalho")).Situacao);
+        Assert.Equal(PeDominios.SituacaoPasso.Pendente, (await PassoAsync(id, "preparacao.metodologia")).Situacao);
 
         // Só no cronograma vazio
         Assert.Equal((int)ErrorCode.PeCronogramaPreenchido, await ErroAsync(async () => await Fluxos.SugerirCronogramaAsync(id, await Orgao())));

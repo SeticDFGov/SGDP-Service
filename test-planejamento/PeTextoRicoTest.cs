@@ -120,7 +120,7 @@ public class PeTextoRicoTest
     [InlineData("{\"semTipo\":true}")]
     public void EstruturaFora_DoLugar_Recusada(string no)
     {
-        Assert.Equal("O texto formatado veio num formato que não serve. Atualize a tela e tente de novo.", Validar(Doc(no)).Erro);
+        Assert.Equal("O texto formatado não foi aceito. Atualize a tela e tente de novo.", Validar(Doc(no)).Erro);
     }
 
     [Fact]
@@ -157,7 +157,7 @@ public class PeTextoRicoTest
         var json = Paragrafo;
         for (var i = 0; i < 13; i++)
             json = "{\"type\":\"bulletList\",\"content\":[{\"type\":\"listItem\",\"content\":[" + json + "]}]}";
-        Assert.Contains("níveis demais", Validar(Doc(json)).Erro);
+        Assert.Contains("aninhadas demais", Validar(Doc(json)).Erro);
     }
 
     [Fact]

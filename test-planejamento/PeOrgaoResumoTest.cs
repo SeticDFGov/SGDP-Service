@@ -23,10 +23,11 @@ public class PeOrgaoResumoTest : PePaineisTestBase
     {
         await DefinirNivelDoOrgaoAsync(OrgaoSes, "basico");
         var pdtic = await ProntoParaEnviarAsync();
-        // A equipe de elaboração opcional para a SES, marcada como "não se aplica"
-        await AjustarPassosAsync(OrgaoSes, ("preparacao.equipe", "opcional"));
-        await Pdtics.MarcarNaoSeAplicaAsync(pdtic.Id, Passo("preparacao.equipe").Id,
-            new PeNaoSeAplicaDTO { Justificativa = "A equipe é a mesma do SGTIC." }, await Orgao());
+        // A metodologia opcional para a SES, marcada como "não se aplica" (desde a versão 9, o passo da
+        // equipe tem o SGTIC, que não aceita "não se aplica")
+        await AjustarPassosAsync(OrgaoSes, ("preparacao.metodologia", "opcional"));
+        await Pdtics.MarcarNaoSeAplicaAsync(pdtic.Id, Passo("preparacao.metodologia").Id,
+            new PeNaoSeAplicaDTO { Justificativa = "A metodologia é a do SGTIC." }, await Orgao());
         await Comentarios.CriarAsync(pdtic.Id, new PeComentarioCriarDTO { PassoId = Passo("diagnostico.ativos").Id, Texto = "Faltou o datacenter." }, await Sgdi());
         InadimplenciaNoBanco(OrgaoSes, "notificado");
 
@@ -40,11 +41,11 @@ public class PeOrgaoResumoTest : PePaineisTestBase
         Assert.Equal((pdtic.Id, "em_elaboracao"), (resumo.Pdtic!.Id, resumo.Pdtic.Situacao));
         Assert.Single(resumo.Versoes);
 
-        // Básico: 6 etapas; a etapa 1 com os 6 obrigatórios feitos (F3: a equipe, opcional pelo ajuste e
+        // Básico: 6 etapas; a etapa 1 com os 4 obrigatórios feitos (F3: a metodologia, opcional pelo ajuste e
         // marcada como "não se aplica", fica fora da conta dos obrigatórios e dos opcionais feitos); a
         // 2 com os ativos em atenção
         Assert.Equal(new[] { 1, 2, 3, 4, 5, 6 }, resumo.Andamento.Select(e => e.Etapa));
-        Assert.Equal(("Prepare o PDTIC", 6, 6, 0), (resumo.Andamento[0].Titulo, resumo.Andamento[0].Feitos, resumo.Andamento[0].Total,
+        Assert.Equal(("Prepare o PDTIC", 4, 4, 0), (resumo.Andamento[0].Titulo, resumo.Andamento[0].Feitos, resumo.Andamento[0].Total,
             resumo.Andamento[0].OpcionaisFeitos));
         Assert.Equal((3, 4), (resumo.Andamento[1].Feitos, resumo.Andamento[1].Total));
         // Etapa 3: o envio e a deliberação pendentes; a publicação aguardando a aprovação
@@ -54,7 +55,7 @@ public class PeOrgaoResumoTest : PePaineisTestBase
 
         Assert.Equal((pdtic.Id, "em_elaboracao"), (resumo.Conformidade.PdticId!.Value, resumo.Conformidade.PdticSituacao));
         var naoSeAplica = Assert.Single(resumo.NaoSeAplica);
-        Assert.Equal(("1.4", "Monte a equipe de elaboração", "A equipe é a mesma do SGTIC.", UserOrgaoSes.Email),
+        Assert.Equal(("1.3", Passo("preparacao.metodologia").Titulo, "A metodologia é a do SGTIC.", UserOrgaoSes.Email),
             (naoSeAplica.PassoNumero, naoSeAplica.PassoTitulo, naoSeAplica.Justificativa, naoSeAplica.MarcadoPor));
         var comentario = Assert.Single(resumo.ComentariosAbertos);
         Assert.Equal((Passo("diagnostico.ativos").Id, "2.2", "Faltou o datacenter.", "Sérgio da SGDI"),
@@ -62,7 +63,7 @@ public class PeOrgaoResumoTest : PePaineisTestBase
 
         // A aprovação do SGTIC, no passo do envio (3.6 no Básico)
         var aprovacao = Assert.Single(resumo.Aprovacoes);
-        Assert.Equal(("3.6", "Aprovação do SGTIC", "aprovado", new DateOnly(2026, 9, 1)),
+        Assert.Equal(("3.6", "Aprovação do PDTIC pelo SGTIC", "aprovado", new DateOnly(2026, 9, 1)),
             (aprovacao.PassoNumero, aprovacao.Rotulo, aprovacao.DecisaoValor, aprovacao.Data!.Value));
         Assert.Equal("Aprovado", aprovacao.Decisao);
         Assert.EndsWith("nº 3/2026", aprovacao.Ato);

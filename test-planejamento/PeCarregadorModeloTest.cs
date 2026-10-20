@@ -18,70 +18,50 @@ namespace test.planejamento;
 public class PeCarregadorModeloTest : PeModeloTestBase
 {
     /// <summary>
-    /// A trilha da seção 7 do plano, na ordem: chave, título exatamente como no plano, e a
-    /// situação em Básico, Intermediário e Avançado ("sim" e "trav." = obrigatório; célula
-    /// vazia = desligado; "lista", "padrão", "simples" e afins = passo ligado, simplificado
-    /// pelos campos).
+    /// A trilha do órgão desde a versão 9 do modelo inicial (a seção 7 do plano com os passos
+    /// juntados: 31 no Avançado), na ordem: chave, título e a situação em Básico, Intermediário e
+    /// Avançado (o = obrigatório, d = desligado). O passo juntado é obrigatório num nível quando
+    /// algum dos passos de origem era.
     /// </summary>
     public static readonly (string Chave, string Titulo, string Niveis)[] TrilhaDoPlano =
     {
-        ("preparacao.abrangencia", "Diga o que o PDTIC abrange e por quanto tempo vale", "o o o"),
-        ("preparacao.nomes", "Defina os nomes do órgão: comitê, equipes, autoridade máxima, unidade de TIC", "o o o"),
-        ("preparacao.sgtic", "Registre o SGTIC: ato de criação ou a estrutura que faz esse papel, e os membros", "o o o"),
-        ("preparacao.equipe", "Monte a equipe de elaboração", "o o o"),
-        ("preparacao.metodologia", "Descreva a metodologia e ajuste o fluxo", "o o o"),
-        ("preparacao.documentos-referencia", "Liste os documentos de referência", "d o o"),
-        ("preparacao.estrategias", "Mostre as estratégias do órgão: PETIC-DF, EGD/DF, PEI, PPA, competências", "o o o"),
+        ("preparacao.abrangencia", "Defina o escopo e os nomes", "o o o"),
+        ("preparacao.equipe", "Registre o SGTIC e a equipe", "o o o"),
+        ("preparacao.metodologia", "Planeje a elaboração", "o o o"),
+        ("preparacao.estrategias", "Liste referências e estratégias", "o o o"),
         ("preparacao.principios", "Escolha princípios e diretrizes", "o o o"),
-        ("preparacao.plano-trabalho", "Faça o plano de trabalho e o cronograma", "d d o"),
-        ("preparacao.aprovacao-plano-trabalho", "Registre a aprovação do plano de trabalho", "d d o"),
-        ("diagnostico.pdtic-anterior", "Veja o que o PDTIC anterior entregou", "d o o"),
-        ("diagnostico.referencial-estrategico", "Descreva o referencial estratégico da TIC: missão, visão, valores e objetivos", "d o o"),
-        ("diagnostico.ambiente-tecnologico", "Descreva o ambiente tecnológico e a organização da TIC", "o o o"),
+        ("diagnostico.pdtic-anterior", "Analise o PDTIC anterior", "d o o"),
+        ("diagnostico.referencial-estrategico", "Descreva o referencial estratégico da TIC", "d o o"),
+        ("diagnostico.ambiente-tecnologico", "Descreva a organização e a capacidade da TIC", "o o o"),
         ("diagnostico.ativos", "Liste as soluções e os ativos de TIC", "o o o"),
         ("diagnostico.swot", "Faça a análise SWOT da TIC", "d o o"),
-        ("diagnostico.capacidade", "Estime a capacidade de execução", "d d o"),
-        ("diagnostico.plano-levantamento", "Planeje o levantamento das necessidades", "d d o"),
-        ("diagnostico.necessidades-informacao", "Levante as necessidades de informação", "d o o"),
-        ("diagnostico.necessidades-tic", "Levante as necessidades de TIC: serviços, infraestrutura, contratação e pessoal", "o o o"),
-        ("diagnostico.sistemas-ia", "Confira os sistemas de IA (vêm do PGIA) e planeje as aquisições", "o o o"),
-        ("diagnostico.inventario", "Consolide o inventário e ligue as necessidades às estratégias", "d o o"),
-        ("diagnostico.aprovacao-inventario", "Registre a aprovação do inventário", "d d o"),
+        ("diagnostico.necessidades-tic", "Levante as necessidades", "o o o"),
+        ("diagnostico.sistemas-ia", "Confira os sistemas de IA e planeje aquisições", "o o o"),
         ("planejamento.criterios-priorizacao", "Confirme os critérios de priorização", "d o o"),
         ("planejamento.priorizacao", "Priorize as necessidades", "o o o"),
-        ("planejamento.metas-acoes", "Defina metas, indicadores e ações", "o o o"),
-        ("planejamento.acoes-tematicas", "Confira as ações de segurança, transformação digital e dados", "o o o"),
-        ("planejamento.contratacoes", "Planeje as contratações de TIC, ligadas ao Plano de Contratações Anual", "o o o"),
-        ("planejamento.pessoas", "Planeje as pessoas", "d o o"),
-        ("planejamento.orcamento", "Planeje o orçamento", "d o o"),
+        ("planejamento.metas-acoes", "Defina as metas e as ações", "o o o"),
+        ("planejamento.acoes-tematicas", "Confira os temas do decreto", "o o o"),
+        ("planejamento.contratacoes", "Planeje as contratações de TIC", "o o o"),
+        ("planejamento.pessoas", "Planeje as pessoas e o orçamento", "d o o"),
         ("planejamento.fatores-criticos", "Liste os fatores críticos de sucesso", "d d o"),
         ("planejamento.riscos", "Planeje os riscos", "d o o"),
-        ("planejamento.documento", "Monte o documento e confira a prévia", "o o o"),
-        ("planejamento.aprovacao-sgtic", "Registre a aprovação do SGTIC e envie à SGDI", "o o o"),
+        ("planejamento.documento", "Confira a prévia do documento", "o o o"),
+        ("planejamento.aprovacao-sgtic", "Registre a aprovação do SGTIC e envie ao CGTIC", "o o o"),
         ("planejamento.deliberacao-cgtic", "Acompanhe a deliberação do CGTIC", "o o o"),
         ("planejamento.publicacao", "Registre a publicação", "o o o"),
-        ("plano-acompanhamento.quem-acompanha", "Diga quem acompanha: a mesma equipe ou outra, com o ato", "o o o"),
-        ("plano-acompanhamento.plano-execucao", "Planeje a execução: projetos de cada ação e quanto cada um contribui", "d d o"),
-        ("plano-acompanhamento.plano-monitoramento", "Planeje o monitoramento: periodicidade, indicadores e valores de referência", "d o o"),
-        ("plano-acompanhamento.plano-avaliacao", "Planeje a avaliação: indicadores de resultado e metas intermediárias", "d d o"),
-        ("plano-acompanhamento.plano-acompanhamento", "Feche o plano de acompanhamento: riscos atualizados e comunicação", "d d o"),
-        ("plano-acompanhamento.aprovacao-acompanhamento", "Registre a aprovação do plano de acompanhamento", "d d o"),
-        // F1 (C18): o título do 5.1 serve a todos os níveis (o Básico não registra medições nem riscos)
-        ("monitoramento.ciclo-monitoramento", "Atualize a situação das ações no ciclo", "o o o"),
-        ("monitoramento.relatorio-acompanhamento", "Feche o ciclo no relatório de acompanhamento", "d o o"),
-        ("avaliacao-intermediaria.resultados-intermediarios", "Consolide os resultados intermediários", "d o o"),
-        ("avaliacao-intermediaria.comparacao-metas", "Compare com as metas e proponha ajustes", "d o o"),
-        ("avaliacao-intermediaria.avaliacao-comite", "Registre a avaliação do comitê: seguir ou revisar o PDTIC", "d o o"),
-        ("fechamento.indicadores-finais", "Colete os indicadores finais", "d o o"),
-        ("fechamento.licoes-aprendidas", "Analise os resultados e registre as lições aprendidas", "o o o"),
-        ("fechamento.aprovacao-comite", "Registre a aprovação do comitê", "d o o"),
-        ("fechamento.aprovacao-autoridade", "Registre a aprovação da autoridade máxima", "o o o"),
+        ("plano-acompanhamento.quem-acompanha", "Defina quem acompanha e os projetos", "o o o"),
+        ("plano-acompanhamento.plano-monitoramento", "Planeje o monitoramento e a avaliação", "d o o"),
+        ("monitoramento.ciclo-monitoramento", "Registre o andamento do ciclo", "o o o"),
+        ("monitoramento.relatorio-acompanhamento", "Feche o ciclo e gere o relatório", "d o o"),
+        ("avaliacao-intermediaria.avaliacao-comite", "Faça a avaliação intermediária", "d o o"),
+        ("fechamento.licoes-aprendidas", "Registre os resultados finais", "o o o"),
+        ("fechamento.aprovacao-autoridade", "Registre as aprovações finais", "o o o"),
     };
 
     // ── Conteúdo ──────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Carga_TresNiveis_SeteEtapas_CinquentaPassos_ESecoesCamposEOpcoesDaSecao8()
+    public void Carga_TresNiveis_SeteEtapas_TrintaEUmPassos_ESecoesCamposEOpcoesDaSecao8()
     {
         Assert.Equal(new[] { "basico", "intermediario", "avancado" },
             Context.PeNiveis.OrderBy(n => n.Ordem).Select(n => n.Codigo));
@@ -89,12 +69,13 @@ public class PeCarregadorModeloTest : PeModeloTestBase
             Context.PeNiveis.OrderBy(n => n.Ordem).Select(n => n.Nome));
 
         Assert.Equal(new[] { "Prepare o PDTIC", "Faça o diagnóstico", "Planeje", "Planeje o acompanhamento", "Monitore",
-                "Avalie no meio do caminho", "Feche o ciclo" },
+                "Avalie no meio do caminho", "Encerre o PDTIC" },
             Context.PeEtapas.OrderBy(e => e.Ordem).Select(e => e.Titulo));
         var etapas = Context.PeEtapas.OrderBy(e => e.Ordem).ToList();
-        Assert.Equal(new[] { 10, 12, 13, 6, 2, 3, 4 }, etapas.Select(e => Context.PePassos.Count(p => p.EtapaId == e.Id)));
+        // Versão 9: os passos juntados (eram 10, 12, 13, 6, 2, 3 e 4, 50 no total)
+        Assert.Equal(new[] { 5, 7, 12, 2, 2, 1, 2 }, etapas.Select(e => Context.PePassos.Count(p => p.EtapaId == e.Id)));
 
-        Assert.Equal(50, Context.PePassos.Count());
+        Assert.Equal(31, Context.PePassos.Count());
         // Do PDTIC; as seções do DF e do PETIC-DF (versão 2) têm teste próprio no PeReferenciaisCargaTest
         Assert.Equal(68, Context.PeSecoes.Count(s => s.Escopo == PeDominios.Escopo.Pdtic));
         // 345 da E2 e o logotipo do dicionário de nomes (versão 3, E5)
@@ -104,7 +85,7 @@ public class PeCarregadorModeloTest : PeModeloTestBase
         Assert.All(Context.PeCampos.ToList(), c => Assert.True(c.Sistema));
 
         // Cada item tem uma linha por nível
-        Assert.Equal(50 * 3, Context.PePassosNivel.Count());
+        Assert.Equal(31 * 3, Context.PePassosNivel.Count());
         Assert.Equal(68 * 3, Context.PeSecoesNivel.Count());
         Assert.Equal(346 * 3, Context.PeCamposNivel.Count());
     }
@@ -125,11 +106,15 @@ public class PeCarregadorModeloTest : PeModeloTestBase
 
     [Theory]
     [InlineData("preparacao.abrangencia", "1.1", null, "dados")]
-    [InlineData("preparacao.sgtic", null, "art. 8º, §§ 1º e 2º", "dados")]
-    [InlineData("preparacao.estrategias", "1.5", "art. 9º, § 1º, do Decreto nº 48.899/2026", "dados")]
-    [InlineData("preparacao.aprovacao-plano-trabalho", "1.8", null, "aprovacao")]
+    [InlineData("preparacao.equipe", "1.2", "art. 8º, §§ 1º e 2º", "dados")]
+    [InlineData("preparacao.metodologia", "1.3, 1.7 e 1.8", null, "dados")]
+    [InlineData("preparacao.estrategias", "1.4 e 1.5", "art. 9º, § 1º, do Decreto nº 48.899/2026", "dados")]
+    [InlineData("diagnostico.ambiente-tecnologico", "2.3 e 2.5", "art. 12, § 2º, I", "dados")]
     [InlineData("diagnostico.ativos", "Anexo X, item 19", "art. 12, § 2º, II", "dados")]
-    [InlineData("diagnostico.necessidades-tic", "2.8 a 2.11", "art. 12, § 2º, III", "dados")]
+    [InlineData("diagnostico.necessidades-tic", "2.6 a 2.14", "art. 12, § 2º, III, e art. 9º, § 1º, do Decreto nº 48.899/2026", "dados")]
+    [InlineData("planejamento.pessoas", "3.4 e 3.5", null, "dados")]
+    [InlineData("plano-acompanhamento.quem-acompanha", "4.1 e 4.2", null, "dados")]
+    [InlineData("plano-acompanhamento.plano-monitoramento", "4.3 a 4.6", null, "dados")]
     [InlineData("planejamento.acoes-tematicas", null, "art. 12, § 2º, V, VI e IX", "conferencia_temas")]
     [InlineData("planejamento.contratacoes", "2.10 e 3.5", "art. 12, § 1º, e § 2º, IV", "dados")]
     [InlineData("planejamento.documento", "3.8", null, "documento")]
@@ -137,7 +122,9 @@ public class PeCarregadorModeloTest : PeModeloTestBase
     [InlineData("planejamento.deliberacao-cgtic", null, "art. 5º", "deliberacao")]
     [InlineData("planejamento.publicacao", "3.10", null, "publicacao")]
     [InlineData("monitoramento.ciclo-monitoramento", "5.1", null, "monitoramento")]
-    [InlineData("avaliacao-intermediaria.avaliacao-comite", "6.3", null, "aprovacao")]
+    [InlineData("avaliacao-intermediaria.avaliacao-comite", "6.1 a 6.3", null, "dados")]
+    [InlineData("fechamento.licoes-aprendidas", "7.1 e 7.2", null, "dados")]
+    [InlineData("fechamento.aprovacao-autoridade", "7.3 e 7.4", null, "aprovacao")]
     public void Passo_TemGuiaBaseLegalETipo(string chave, string? guia, string? baseLegal, string tipo)
     {
         var passo = Passo(chave);
@@ -145,7 +132,8 @@ public class PeCarregadorModeloTest : PeModeloTestBase
         Assert.Equal(guia, passo.ReferenciaGuia);
         Assert.Equal(baseLegal, passo.BaseLegal);
         Assert.Equal(tipo, passo.Tipo);
-        Assert.False(string.IsNullOrWhiteSpace(passo.OQueFazer));
+        // Desde a versão 9, o "o que fazer" pode ficar vazio (quando o título já diz tudo)
+        Assert.NotNull(passo.OQueFazer);
     }
 
     [Fact]
@@ -275,9 +263,13 @@ public class PeCarregadorModeloTest : PeModeloTestBase
     [Fact]
     public void Configuracoes_VersaoDoModeloEPeriodicidadeTrimestral()
     {
-        // Versão 8 (F3): o modo dos níveis (a 7, da F1, trouxe as correções da revisão final; a 6, da
-        // E7 rodada B, as seções por ciclo, os modelos do RA e do RR e as configurações do acompanhamento)
-        Assert.Equal("8", Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChaveVersaoModelo).Valor);
+        // Versão 9: a trilha com os passos juntados (a 8, da F3, trouxe o modo dos níveis; a 7, da F1, as
+        // correções da revisão final; a 6, da E7 rodada B, as seções por ciclo, os modelos do RA e do RR
+        // e as configurações do acompanhamento)
+        Assert.Equal("9", Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChaveVersaoModelo).Valor);
+        // E o resumo do JSON carregado (a mesma versão com outro JSON regrava os textos)
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(PeCarregadorModelo.Resumo(PeCarregadorModelo.LerSeed())),
+            Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChaveHashModelo).Valor);
         Assert.Equal("\"trimestral\"",
             Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChavePeriodicidadeMonitoramento).Valor);
         Assert.Equal("15", Context.PeConfiguracoes.Single(c => c.Chave == PeConfiguracao.ChavePrazoFechamentoCiclo).Valor);
@@ -293,7 +285,7 @@ public class PeCarregadorModeloTest : PeModeloTestBase
 
         Assert.DoesNotContain('\u2014', texto);
         Assert.DoesNotContain('\u2013', texto);
-        Assert.Equal(PeCarregadorModelo.VersaoDoModoLivre, PeCarregadorModelo.LerSeed(texto).Versao);
+        Assert.Equal(PeCarregadorModelo.VersaoDaReestruturacao, PeCarregadorModelo.LerSeed(texto).Versao);
     }
 
     // ── Idempotência e "nunca sobrescreve" ────────────────────────────────────
@@ -304,18 +296,18 @@ public class PeCarregadorModeloTest : PeModeloTestBase
         var resultado = await new PeCarregadorModelo(Context).CarregarAsync();
 
         Assert.False(resultado.Executou);
-        Assert.Equal(PeCarregadorModelo.VersaoDoModoLivre, resultado.VersaoAnterior);
-        Assert.Equal(50, Context.PePassos.Count());
+        Assert.Equal(PeCarregadorModelo.VersaoDaReestruturacao, resultado.VersaoAnterior);
+        Assert.Equal(31, Context.PePassos.Count());
         // 346 do PDTIC (com o logotipo da versão 3) e 33 do DF e do PETIC-DF (versão 2)
         Assert.Equal(379, Context.PeCampos.Count());
         Assert.Equal(3, Context.PeNiveis.Count());
     }
 
     [Fact]
-    public async Task VersaoNova_SoAcrescentaOQueFalta_ENaoSobrescreveOQueOAdministradorMudou()
+    public async Task VersaoNova_SoAcrescentaOQueFalta_NaoMudaAEstruturaQueOAdministradorMudou_ERegravaOsTextos()
     {
         // O administrador renomeia um passo, muda a situação de um campo e desativa uma opção
-        await Modelo.AtualizarPassoAsync(Passo("preparacao.nomes").Id, new api.Planejamento.PePassoAtualizarDTO
+        await Modelo.AtualizarPassoAsync(Passo("preparacao.abrangencia").Id, new api.Planejamento.PePassoAtualizarDTO
         {
             Titulo = "Defina os nomes usados pelo órgão",
             Informados = new HashSet<string> { "Titulo" }
@@ -338,8 +330,9 @@ public class PeCarregadorModeloTest : PeModeloTestBase
         Assert.Equal("o o o", SituacoesDoCampo("ativos", "fornecedor"));
         Assert.Equal(seed.Versao.ToString(), Context.PeConfiguracoes.AsNoTracking().Single(c => c.Chave == PeConfiguracao.ChaveVersaoModelo).Valor);
 
-        // Nada do que o administrador mudou voltou atrás
-        Assert.Equal("Defina os nomes usados pelo órgão", Passo("preparacao.nomes").Titulo);
+        // A estrutura que o administrador mudou fica; desde a versão 9, os textos voltam aos do JSON
+        Assert.Equal(seed.Etapas[0].Passos[0].Titulo, Passo("preparacao.abrangencia").Titulo);
+        Assert.Equal(1, resultado.Textos);
         Assert.Equal("o o o", SituacoesDoCampo("ativos", "descricao"));
         Assert.False(Opcao("ativos", "tipo", "licenca").Ativa);
     }
@@ -435,10 +428,10 @@ public class PeCarregadorModeloTest : PeModeloTestBase
             NullLogger<PeCarregadorModeloHostedService>.Instance);
 
         Assert.True(await servico.TentarAsync(CancellationToken.None));
-        Assert.Equal(50, vazio.Context.PePassos.Count());
+        Assert.Equal(31, vazio.Context.PePassos.Count());
         // A segunda tentativa (outra réplica subindo) é só a leitura da versão
         Assert.True(await servico.TentarAsync(CancellationToken.None));
-        Assert.Equal(50, vazio.Context.PePassos.Count());
+        Assert.Equal(31, vazio.Context.PePassos.Count());
     }
 
     [Fact]

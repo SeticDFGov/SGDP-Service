@@ -12,6 +12,8 @@ namespace Models.Planejamento;
 public class PeConfiguracao : IPeAuditavel
 {
     public const string ChaveVersaoModelo = "seed_modelo_versao";
+    // Desde a versão 9 do modelo inicial: o resumo (SHA-256) do JSON carregado; mudou na mesma versão = regravar os textos
+    public const string ChaveHashModelo = "seed_modelo_hash";
     public const string ChavePeriodicidadeMonitoramento = "periodicidade_monitoramento_padrao";
     public const string ChavePrazoFechamentoCiclo = "prazo_fechamento_ciclo_dias";
     public const string ChaveDiasAvaliacaoFinal = "dias_avaliacao_final";

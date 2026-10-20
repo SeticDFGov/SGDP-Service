@@ -78,6 +78,10 @@ public class PePlanilhaTest : PeReferenciaisTestBase
     public async Task Xlsx_AbreNoOpenXml_ComCabecalhoFixoFiltroNumeroValidacaoELeiaMe()
     {
         var ctx = await Admin();
+        // O modelo inicial não traz ajuda nas colunas desta seção (revisão de 2026-10-20): a ajuda de uma coluna
+        // vem do administrador, e é ela que a Leia-me repete
+        await Modelo.AtualizarCampoAsync(Campo("diretriz_ciclo", "ano").Id,
+            new PeCampoAtualizarDTO { Ajuda = "Ano de planejamento a que a diretriz vale.", Informados = new HashSet<string> { "Ajuda" } }, EmailAdmin);
         await Registros.CriarAsync(PeDono.Df, "diretriz_ciclo",
             Salvar(new { ano = 2027, texto = "Priorizar a nuvem do CeTIC-DF.", situacao_deliberacao = "proposta" }), ctx);
         await Registros.CriarAsync(PeDono.Df, "diretriz_ciclo",
@@ -90,10 +94,10 @@ public class PePlanilhaTest : PeReferenciaisTestBase
         using var documento = SpreadsheetDocument.Open(new MemoryStream(planilha.Conteudo), false);
         var livro = documento.WorkbookPart!;
         var abas = livro.Workbook!.Sheets!.Elements<Sheet>().ToList();
-        Assert.Equal(new[] { "Diretrizes do ciclo", "Leia-me", "Listas" }, abas.Select(a => a.Name!.Value));
+        Assert.Equal(new[] { "Diretrizes e prioridades", "Leia-me", "Listas" }, abas.Select(a => a.Name!.Value));
         Assert.Equal(SheetStateValues.Hidden, abas[2].State!.Value);
 
-        var dados = Aba(livro, "Diretrizes do ciclo");
+        var dados = Aba(livro, "Diretrizes e prioridades");
         // Cabeçalho destacado (negrito com fundo) e fixo (painel congelado na linha 1)
         Assert.Equal(new[] { "Código", "Ano do ciclo", "Diretriz ou prioridade", "Situação da deliberação", "Observação" },
             dados.Descendants<Row>().First().Elements<Cell>().Select(c => Texto(livro, c)));
@@ -125,14 +129,14 @@ public class PePlanilhaTest : PeReferenciaisTestBase
         Assert.Equal("D2:D10000", validacao.SequenceOfReferences!.InnerText);
         Assert.Equal("'Listas'!$A$2:$A$5", validacao.Formula1!.Text);
         var listas = Aba(livro, "Listas");
-        Assert.Equal(new[] { "Diretrizes do ciclo · Situação da deliberação", "Proposta pela SGDI", "Em deliberação", "Aprovada", "Devolvida para ajuste" },
+        Assert.Equal(new[] { "Diretrizes e prioridades · Situação da deliberação", "Proposta pela SGDI", "Em deliberação", "Aprovada", "Devolvida para ajuste" },
             listas.Descendants<Cell>().Where(c => c.CellReference!.Value!.StartsWith("A")).Select(c => Texto(livro, c)));
 
         // Leia-me: o dono, a data da extração e a ajuda de cada coluna
         var leiaMe = Aba(livro, "Leia-me").Descendants<Cell>().Select(c => Texto(livro, c)).ToList();
         Assert.Contains("Catálogo do DF (princípios e diretrizes do ciclo)", leiaMe);
         Assert.Contains("Extraído em", leiaMe);
-        Assert.Contains("O ano de planejamento a que a diretriz vale.", leiaMe);
+        Assert.Contains("Ano de planejamento a que a diretriz vale.", leiaMe);
         Assert.Contains("Código do registro, dado pelo sistema. Não se repete, nem depois de apagado.", leiaMe);
     }
 
