@@ -28,6 +28,7 @@ namespace Models
         public DbSet<PgiaAgenteInfo> PgiaAgenteInfos { get; set; }
         public DbSet<PgiaResponsavelIa> PgiaResponsaveisIa { get; set; }
         public DbSet<PgiaEncarregadoDados> PgiaEncarregadosDados { get; set; }
+        public DbSet<PgiaCuradorDados> PgiaCuradoresDados { get; set; }
         public DbSet<PgiaPrazoConformidade> PgiaPrazosConformidade { get; set; }
         public DbSet<PgiaSistemaIa> PgiaSistemasIa { get; set; }
         public DbSet<PgiaClassificacaoRisco> PgiaClassificacoesRisco { get; set; }

@@ -4,9 +4,10 @@ namespace Models.Pgia;
 
 /// <summary>
 /// Designações de Responsável de IA (arts. 2º, IX, 10 e 35, I). Ao menos um por órgão;
-/// no máximo uma designação ativa por órgão (índice único parcial). O histórico fica preservado.
+/// no máximo um titular e um suplente vigentes por órgão (índice único parcial por órgão e
+/// posição). O histórico fica preservado.
 /// </summary>
-public class PgiaResponsavelIa
+public class PgiaResponsavelIa : IPgiaDesignacao
 {
     public long Id { get; set; }
 
@@ -19,17 +20,23 @@ public class PgiaResponsavelIa
 
     public User? Agente { get; set; }
 
-    public string AtoTipo { get; set; } = string.Empty;
+    // Titular ou suplente (PgiaDominios.PosicaoDesignacao)
+    public string Posicao { get; set; } = PgiaDominios.PosicaoDesignacao.Titular;
 
-    public string AtoNumero { get; set; } = string.Empty;
+    // Importado da planilha da SGDI com o ato a completar (só a carga SQL liga)
+    public bool AtoPendente { get; set; }
 
-    public DateOnly AtoData { get; set; }
+    public string? AtoTipo { get; set; }
+
+    public string? AtoNumero { get; set; }
+
+    public DateOnly? AtoData { get; set; }
 
     // Canal oficial de comunicação com a SGDI (art. 10, § 1º)
-    public string ProcessoSeiComunicacao { get; set; } = string.Empty;
+    public string? ProcessoSeiComunicacao { get; set; }
 
     // Até 02/08/2026 e a cada alteração (arts. 10, § 1º e 35, I)
-    public DateOnly DataComunicacaoSgdi { get; set; }
+    public DateOnly? DataComunicacaoSgdi { get; set; }
 
     // Acumulação com a função de TIC é permitida pela PGTIC/DF (art. 10, § 2º)
     public bool AcumulaFuncaoTic { get; set; }
@@ -40,7 +47,7 @@ public class PgiaResponsavelIa
     // Cópia do ato de designação anexada (pgia_documento); opcional
     public long? DocumentoId { get; set; }
 
-    public DateOnly InicioVigencia { get; set; }
+    public DateOnly? InicioVigencia { get; set; }
 
     public DateOnly? FimVigencia { get; set; }
 

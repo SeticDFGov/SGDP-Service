@@ -38,6 +38,9 @@ public static class PgiaResources
     public const string Orgao = "orgao";               // cadastro de órgãos (admin)
     public const string OrgaoDados = "orgao_dados";    // dados do órgão (etapa 1) — edição da SGDI
     public const string Designacao = "designacao";     // Responsável de IA e Encarregado de Dados
+    // Curador de Dados de Negócio: designação do órgão no mesmo desenho do Encarregado
+    // (o órgão designa no próprio órgão; SGDI e admin veem e completam o ato da carga)
+    public const string CuradorDados = "curador_dados";
     public const string AgenteInfo = "agente_info";    // matrícula, cargo e vínculo das pessoas
     // Papel PGIA e unidade de um usuário. Sem visualização própria na matriz
     // (CanView é permissivo por papel): quem administra o vínculo é quem o enxerga,
@@ -144,7 +147,7 @@ public class PgiaPermissionService : IPgiaPermissionService
             PapeisPgia.Cgtic => resource is PgiaResources.Deliberacao or PgiaResources.Norma
                 or PgiaResources.Documento,
             // O inventário, a classificação, a AIA e a operação contínua são do órgão
-            PapeisPgia.Orgao => resource is PgiaResources.Designacao
+            PapeisPgia.Orgao => resource is PgiaResources.Designacao or PgiaResources.CuradorDados
                 or PgiaResources.Sistema or PgiaResources.Classificacao or PgiaResources.Documento
                 or PgiaResources.Aia or PgiaResources.Incidente or PgiaResources.NaoConformidade
                 or PgiaResources.Capacitacao or PgiaResources.Contrato or PgiaResources.Legado
@@ -166,12 +169,15 @@ public class PgiaPermissionService : IPgiaPermissionService
                 or PgiaResources.Homologacao or PgiaResources.Publicacao
                 or PgiaResources.Apuracao or PgiaResources.NaoConformidade
                 or PgiaResources.Relatorio or PgiaResources.AuditoriaTecnica
-                or PgiaResources.Documento,
+                or PgiaResources.Documento
+                // Completar (ou corrigir) o ato das designações importadas da planilha da
+                // SGDI: a edição do ato é da SGDI também; designar continua só do órgão
+                or PgiaResources.Designacao or PgiaResources.CuradorDados,
             PapeisPgia.Cgtic => resource is PgiaResources.Deliberacao or PgiaResources.Norma
                 or PgiaResources.Documento,
             // Ao órgão restam as designações e a operação: ele vê os próprios dados
             // e as próprias pessoas (CanView), mas não edita orgao_dados nem agente_info
-            PapeisPgia.Orgao => resource is PgiaResources.Designacao
+            PapeisPgia.Orgao => resource is PgiaResources.Designacao or PgiaResources.CuradorDados
                 or PgiaResources.Prazo or PgiaResources.Sistema
                 or PgiaResources.Aia or PgiaResources.Incidente or PgiaResources.NaoConformidade
                 or PgiaResources.Capacitacao or PgiaResources.Contrato or PgiaResources.Legado

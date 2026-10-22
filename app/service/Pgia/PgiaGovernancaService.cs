@@ -75,9 +75,16 @@ public class PgiaGovernancaService : IPgiaGovernancaService
         // Cap sempre: qualquer combinação de filtro devolve no máximo LimitePessoas
         var usuarios = await _repositorio.ListarUsuariosAsync(filtro, unidadeId, LimitePessoas);
         var infos = await _repositorio.ListarAgenteInfosAsync(usuarios.Select(u => u.Id));
+        // Funções vigentes de todas as pessoas da página em lote (três consultas fixas)
+        var funcoes = await FuncoesPorPessoaAsync(usuarios.Select(u => u.Id));
 
         return usuarios
-            .Select(u => MapPessoaAcesso(u, ResolverOrgao(orgaoPorUnidade, u), InfoDe(infos, u.Id)))
+            .Select(u =>
+            {
+                var pessoa = MapPessoaAcesso(u, ResolverOrgao(orgaoPorUnidade, u), InfoDe(infos, u.Id));
+                pessoa.Funcoes = funcoes.TryGetValue(u.Id, out var lista) ? lista : new List<PgiaPessoaFuncao>();
+                return pessoa;
+            })
             .ToList();
     }
 
@@ -173,24 +180,48 @@ public class PgiaGovernancaService : IPgiaGovernancaService
     }
 
     /// <summary>
-    /// Trocar a unidade de quem é Responsável de IA ou Encarregado de Dados VIGENTE
-    /// deixaria a designação órfã (apontando para fora do órgão). Recusa a troca; a
-    /// designação precisa ser encerrada antes (art. 10). Sem troca de órgão (nova
-    /// unidade == a do órgão da designação) nada é barrado.
+    /// Trocar a unidade de quem é Responsável de IA, Encarregado de Dados ou Curador de
+    /// Dados de Negócio VIGENTE (titular ou suplente) deixaria a designação órfã
+    /// (apontando para fora do órgão). Recusa a troca; a designação precisa ser
+    /// encerrada antes (art. 10). Sem troca de órgão (nova unidade == a do órgão da
+    /// designação) nada é barrado.
     /// </summary>
     private async Task GarantirQueNaoOrfanizaDesignacaoAsync(Guid agenteId, Guid? novaUnidadeId)
     {
-        var responsavel = await _repositorio.GetResponsavelVigenteDoAgenteAsync(agenteId);
-        if (responsavel != null && responsavel.Orgao?.UnidadeId != novaUnidadeId)
-            throw new ApiException(ErrorCode.PgiaDesignacaoVigenteImpedeTroca,
-                $"Esta pessoa é Responsável de IA vigente da {responsavel.Orgao?.Sigla}; " +
-                "encerre a designação antes de mudar o órgão dela.");
+        var funcoes = await _repositorio.ListarFuncoesVigentesAsync(new[] { agenteId });
+        var orfa = funcoes
+            .OrderBy(f => PgiaDominios.TipoDesignacao.Ordem(f.Tipo))
+            .FirstOrDefault(f => f.OrgaoUnidadeId != novaUnidadeId);
+        if (orfa == null) return;
 
-        var encarregado = await _repositorio.GetEncarregadoVigenteDoAgenteAsync(agenteId);
-        if (encarregado != null && encarregado.Orgao?.UnidadeId != novaUnidadeId)
-            throw new ApiException(ErrorCode.PgiaDesignacaoVigenteImpedeTroca,
-                $"Esta pessoa é Encarregado de Dados vigente da {encarregado.Orgao?.Sigla}; " +
-                "encerre a designação antes de mudar o órgão dela.");
+        var nome = PgiaDominios.TipoDesignacao.Rotulo(orfa.Tipo);
+        var suplente = orfa.Posicao == PgiaDominios.PosicaoDesignacao.Suplente ? " suplente" : string.Empty;
+        throw new ApiException(ErrorCode.PgiaDesignacaoVigenteImpedeTroca,
+            $"Esta pessoa é {nome}{suplente} vigente da {orfa.OrgaoSigla}; " +
+            "encerre a designação antes de mudar o órgão dela.");
+    }
+
+    /// <summary>Funções vigentes de cada pessoa, na ordem Responsável, Encarregado, Curador e titular antes do suplente.</summary>
+    private async Task<Dictionary<Guid, List<PgiaPessoaFuncao>>> FuncoesPorPessoaAsync(IEnumerable<Guid> userIds)
+    {
+        var funcoes = await _repositorio.ListarFuncoesVigentesAsync(userIds);
+        return funcoes
+            .GroupBy(f => f.AgenteId)
+            .ToDictionary(g => g.Key, g => g
+                .OrderBy(f => PgiaDominios.TipoDesignacao.Ordem(f.Tipo))
+                .ThenBy(f => f.Posicao == PgiaDominios.PosicaoDesignacao.Titular ? 0 : 1)
+                .ThenBy(f => f.OrgaoSigla)
+                .Select(f => new PgiaPessoaFuncao
+                {
+                    Designacao = f.Tipo,
+                    DesignacaoNome = PgiaDominios.TipoDesignacao.Rotulo(f.Tipo),
+                    DesignacaoId = f.DesignacaoId,
+                    Posicao = f.Posicao,
+                    AtoPendente = f.AtoPendente,
+                    OrgaoId = f.OrgaoId,
+                    OrgaoSigla = f.OrgaoSigla
+                })
+                .ToList());
     }
 
     /// <summary>
@@ -221,7 +252,10 @@ public class PgiaGovernancaService : IPgiaGovernancaService
     {
         var orgaoPorUnidade = await MapaOrgaoPorUnidadeAsync();
         var info = await _repositorio.GetAgenteInfoAsync(user.Id);
-        return MapPessoaAcesso(user, ResolverOrgao(orgaoPorUnidade, user), info);
+        var pessoa = MapPessoaAcesso(user, ResolverOrgao(orgaoPorUnidade, user), info);
+        var funcoes = await FuncoesPorPessoaAsync(new[] { user.Id });
+        pessoa.Funcoes = funcoes.TryGetValue(user.Id, out var lista) ? lista : new List<PgiaPessoaFuncao>();
+        return pessoa;
     }
 
     private async Task<Dictionary<Guid, PgiaOrgao>> MapaOrgaoPorUnidadeAsync()

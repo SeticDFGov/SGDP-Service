@@ -19,7 +19,10 @@ public class PgiaDesignacaoRepositorio : IPgiaDesignacaoRepositorio
     {
         return await _context.PgiaResponsaveisIa
             .Include(r => r.Agente)
-            .FirstOrDefaultAsync(r => r.OrgaoId == orgaoId && r.Ativo);
+            .Where(r => r.OrgaoId == orgaoId && r.Ativo)
+            .OrderBy(r => r.Posicao == PgiaDominios.PosicaoDesignacao.Titular ? 0 : 1)
+            .ThenBy(r => r.Id)
+            .FirstOrDefaultAsync();
     }
 
     public async Task<List<PgiaResponsavelIa>> ListarResponsaveisAsync(long orgaoId)
@@ -41,7 +44,10 @@ public class PgiaDesignacaoRepositorio : IPgiaDesignacaoRepositorio
     {
         return await _context.PgiaEncarregadosDados
             .Include(e => e.Agente)
-            .FirstOrDefaultAsync(e => e.OrgaoId == orgaoId && e.Ativo);
+            .Where(e => e.OrgaoId == orgaoId && e.Ativo)
+            .OrderBy(e => e.Posicao == PgiaDominios.PosicaoDesignacao.Titular ? 0 : 1)
+            .ThenBy(e => e.Id)
+            .FirstOrDefaultAsync();
     }
 
     public async Task<List<PgiaEncarregadoDados>> ListarEncarregadosAsync(long orgaoId)
@@ -57,6 +63,53 @@ public class PgiaDesignacaoRepositorio : IPgiaDesignacaoRepositorio
     public void AddEncarregado(PgiaEncarregadoDados designacao)
     {
         _context.PgiaEncarregadosDados.Add(designacao);
+    }
+
+    // ── Genéricos das três designações ──────────────────────────────────────
+    // Include por nome: a navegação vem da interface IPgiaDesignacao, e o Include
+    // com expressão sobre um tipo genérico não é aceito pelo EF.
+
+    public async Task<T?> GetVigenteAsync<T>(long orgaoId, string posicao) where T : class, IPgiaDesignacao
+    {
+        return await _context.Set<T>()
+            .Include(nameof(IPgiaDesignacao.Agente))
+            .Where(d => d.OrgaoId == orgaoId && d.Ativo && d.Posicao == posicao)
+            .OrderBy(d => d.Id)
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<List<T>> ListarVigentesAsync<T>(long orgaoId) where T : class, IPgiaDesignacao
+    {
+        return await _context.Set<T>()
+            .Include(nameof(IPgiaDesignacao.Agente))
+            .Where(d => d.OrgaoId == orgaoId && d.Ativo)
+            .OrderBy(d => d.Id)
+            .ToListAsync();
+    }
+
+    public async Task<List<T>> ListarAsync<T>(long orgaoId) where T : class, IPgiaDesignacao
+    {
+        // Mesma ordem de sempre (início da vigência, depois o Id). Sem início da
+        // vigência (ato pendente da carga), o PostgreSQL põe a linha no topo (DESC
+        // com NULLS FIRST), que é onde a tela quer o que falta completar.
+        return await _context.Set<T>()
+            .Include(nameof(IPgiaDesignacao.Agente))
+            .Where(d => d.OrgaoId == orgaoId)
+            .OrderByDescending(d => d.InicioVigencia)
+            .ThenByDescending(d => d.Id)
+            .ToListAsync();
+    }
+
+    public async Task<T?> GetByIdAsync<T>(long orgaoId, long id) where T : class, IPgiaDesignacao
+    {
+        return await _context.Set<T>()
+            .Include(nameof(IPgiaDesignacao.Agente))
+            .FirstOrDefaultAsync(d => d.Id == id && d.OrgaoId == orgaoId);
+    }
+
+    public void Add<T>(T designacao) where T : class, IPgiaDesignacao
+    {
+        _context.Set<T>().Add(designacao);
     }
 
     public async Task<User?> GetUserByIdAsync(Guid userId)

@@ -1561,6 +1561,120 @@ namespace demanda_service.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Models.Pgia.PgiaCuradorDados", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("AgenteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agente_id");
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("alterado_em");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("alterado_por");
+
+                    b.Property<bool>("Ativo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("ativo");
+
+                    b.Property<DateOnly?>("AtoData")
+                        .HasColumnType("date")
+                        .HasColumnName("ato_data");
+
+                    b.Property<string>("AtoNumero")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("ato_numero");
+
+                    b.Property<bool>("AtoPendente")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("ato_pendente");
+
+                    b.Property<string>("AtoTipo")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("ato_tipo");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("CriadoPor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("criado_por");
+
+                    b.Property<DateOnly?>("DataComunicacaoSgdi")
+                        .HasColumnType("date")
+                        .HasColumnName("data_comunicacao_sgdi");
+
+                    b.Property<long?>("DocumentoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("documento_id");
+
+                    b.Property<DateOnly?>("FimVigencia")
+                        .HasColumnType("date")
+                        .HasColumnName("fim_vigencia");
+
+                    b.Property<DateOnly?>("InicioVigencia")
+                        .HasColumnType("date")
+                        .HasColumnName("inicio_vigencia");
+
+                    b.Property<long>("OrgaoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("orgao_id");
+
+                    b.Property<string>("Posicao")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("Titular")
+                        .HasColumnName("posicao");
+
+                    b.Property<string>("ProcessoSeiComunicacao")
+                        .HasMaxLength(25)
+                        .HasColumnType("character varying(25)")
+                        .HasColumnName("processo_sei_comunicacao");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pgia_curador_dados");
+
+                    b.HasIndex("AgenteId")
+                        .HasDatabaseName("ix_pgia_curador_dados_agente");
+
+                    b.HasIndex("DocumentoId")
+                        .HasDatabaseName("ix_pgia_curador_dados_doc");
+
+                    b.HasIndex("OrgaoId", "Posicao")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pgia_curador_dados_vigente")
+                        .HasFilter("ativo");
+
+                    b.ToTable("pgia_curador_dados", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pgia_curador_dados_ato_pendente", "ato_pendente OR (ato_tipo IS NOT NULL AND ato_numero IS NOT NULL AND ato_data IS NOT NULL AND processo_sei_comunicacao IS NOT NULL AND data_comunicacao_sgdi IS NOT NULL AND inicio_vigencia IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_pgia_curador_dados_posicao", "posicao IN ('Titular','Suplente')");
+                        });
+                });
+
             modelBuilder.Entity("Models.Pgia.PgiaDeliberacaoCgtic", b =>
                 {
                     b.Property<long>("Id")
@@ -1786,18 +1900,22 @@ namespace demanda_service.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("ativo");
 
-                    b.Property<DateOnly>("AtoData")
+                    b.Property<DateOnly?>("AtoData")
                         .HasColumnType("date")
                         .HasColumnName("ato_data");
 
                     b.Property<string>("AtoNumero")
-                        .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("ato_numero");
 
+                    b.Property<bool>("AtoPendente")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("ato_pendente");
+
                     b.Property<string>("AtoTipo")
-                        .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("ato_tipo");
@@ -1813,7 +1931,7 @@ namespace demanda_service.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("criado_por");
 
-                    b.Property<DateOnly>("DataComunicacaoSgdi")
+                    b.Property<DateOnly?>("DataComunicacaoSgdi")
                         .HasColumnType("date")
                         .HasColumnName("data_comunicacao_sgdi");
 
@@ -1825,7 +1943,7 @@ namespace demanda_service.Migrations
                         .HasColumnType("date")
                         .HasColumnName("fim_vigencia");
 
-                    b.Property<DateOnly>("InicioVigencia")
+                    b.Property<DateOnly?>("InicioVigencia")
                         .HasColumnType("date")
                         .HasColumnName("inicio_vigencia");
 
@@ -1833,8 +1951,15 @@ namespace demanda_service.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("orgao_id");
 
-                    b.Property<string>("ProcessoSeiComunicacao")
+                    b.Property<string>("Posicao")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("Titular")
+                        .HasColumnName("posicao");
+
+                    b.Property<string>("ProcessoSeiComunicacao")
                         .HasMaxLength(25)
                         .HasColumnType("character varying(25)")
                         .HasColumnName("processo_sei_comunicacao");
@@ -1848,12 +1973,17 @@ namespace demanda_service.Migrations
                     b.HasIndex("DocumentoId")
                         .HasDatabaseName("ix_pgia_encarregado_dados_doc");
 
-                    b.HasIndex("OrgaoId")
+                    b.HasIndex("OrgaoId", "Posicao")
                         .IsUnique()
                         .HasDatabaseName("ux_pgia_encarregado_vigente")
                         .HasFilter("ativo");
 
-                    b.ToTable("pgia_encarregado_dados", (string)null);
+                    b.ToTable("pgia_encarregado_dados", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pgia_encarregado_dados_ato_pendente", "ato_pendente OR (ato_tipo IS NOT NULL AND ato_numero IS NOT NULL AND ato_data IS NOT NULL AND processo_sei_comunicacao IS NOT NULL AND data_comunicacao_sgdi IS NOT NULL AND inicio_vigencia IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_pgia_encarregado_dados_posicao", "posicao IN ('Titular','Suplente')");
+                        });
                 });
 
             modelBuilder.Entity("Models.Pgia.PgiaIncidente", b =>
@@ -2916,18 +3046,22 @@ namespace demanda_service.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("ativo");
 
-                    b.Property<DateOnly>("AtoData")
+                    b.Property<DateOnly?>("AtoData")
                         .HasColumnType("date")
                         .HasColumnName("ato_data");
 
                     b.Property<string>("AtoNumero")
-                        .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("ato_numero");
 
+                    b.Property<bool>("AtoPendente")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("ato_pendente");
+
                     b.Property<string>("AtoTipo")
-                        .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("ato_tipo");
@@ -2947,7 +3081,7 @@ namespace demanda_service.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("criado_por");
 
-                    b.Property<DateOnly>("DataComunicacaoSgdi")
+                    b.Property<DateOnly?>("DataComunicacaoSgdi")
                         .HasColumnType("date")
                         .HasColumnName("data_comunicacao_sgdi");
 
@@ -2959,7 +3093,7 @@ namespace demanda_service.Migrations
                         .HasColumnType("date")
                         .HasColumnName("fim_vigencia");
 
-                    b.Property<DateOnly>("InicioVigencia")
+                    b.Property<DateOnly?>("InicioVigencia")
                         .HasColumnType("date")
                         .HasColumnName("inicio_vigencia");
 
@@ -2967,8 +3101,15 @@ namespace demanda_service.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("orgao_id");
 
-                    b.Property<string>("ProcessoSeiComunicacao")
+                    b.Property<string>("Posicao")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("Titular")
+                        .HasColumnName("posicao");
+
+                    b.Property<string>("ProcessoSeiComunicacao")
                         .HasMaxLength(25)
                         .HasColumnType("character varying(25)")
                         .HasColumnName("processo_sei_comunicacao");
@@ -2982,12 +3123,17 @@ namespace demanda_service.Migrations
                     b.HasIndex("DocumentoId")
                         .HasDatabaseName("ix_pgia_responsavel_ia_doc");
 
-                    b.HasIndex("OrgaoId")
+                    b.HasIndex("OrgaoId", "Posicao")
                         .IsUnique()
                         .HasDatabaseName("ux_pgia_responsavel_ia_vigente")
                         .HasFilter("ativo");
 
-                    b.ToTable("pgia_responsavel_ia", (string)null);
+                    b.ToTable("pgia_responsavel_ia", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pgia_responsavel_ia_ato_pendente", "ato_pendente OR (ato_tipo IS NOT NULL AND ato_numero IS NOT NULL AND ato_data IS NOT NULL AND processo_sei_comunicacao IS NOT NULL AND data_comunicacao_sgdi IS NOT NULL AND inicio_vigencia IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_pgia_responsavel_ia_posicao", "posicao IN ('Titular','Suplente')");
+                        });
                 });
 
             modelBuilder.Entity("Models.Pgia.PgiaRiscoOutro", b =>
@@ -6443,6 +6589,33 @@ namespace demanda_service.Migrations
                     b.Navigation("Orgao");
 
                     b.Navigation("Sistema");
+                });
+
+            modelBuilder.Entity("Models.Pgia.PgiaCuradorDados", b =>
+                {
+                    b.HasOne("app.Models.User", "Agente")
+                        .WithMany()
+                        .HasForeignKey("AgenteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pgia_curador_dados_agente");
+
+                    b.HasOne("Models.Pgia.PgiaDocumento", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_pgia_curador_dados_doc");
+
+                    b.HasOne("Models.Pgia.PgiaOrgao", "Orgao")
+                        .WithMany()
+                        .HasForeignKey("OrgaoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pgia_curador_dados_orgao");
+
+                    b.Navigation("Agente");
+
+                    b.Navigation("Orgao");
                 });
 
             modelBuilder.Entity("Models.Pgia.PgiaDeliberacaoCgtic", b =>
