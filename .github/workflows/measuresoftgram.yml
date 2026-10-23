@@ -1,0 +1,42 @@
+name: MeasureSoftGram
+
+# Envia métricas (SonarCloud + GitHub) para o MSG da SETIC depois de cada build da main.
+on:
+  workflow_run:
+    workflows: ["Build and push image"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  msgram:
+    # Só builds de push na main; workflow_run de PR (inclusive de fork) não roda no self-hosted.
+    if: github.event.workflow_run.event == 'push'
+    # O MSG está em IP privado: só o runner da VM alcança.
+    runs-on: self-hosted
+    env:
+      MSGRAM_SERVICE_HOST: https://msgram.10.233.159.150.nip.io
+
+    steps:
+    - name: Checkout do código
+      uses: actions/checkout@v4
+
+    # Confia só na CA interna da SETIC (certificado do MSG); GitHub e SonarCloud seguem verificados normalmente.
+    - name: Confiar na CA interna da SETIC
+      run: |
+        curl -fsSL https://raw.githubusercontent.com/SeticDFGov/k8s-manifests/main/measuresoftgram/setic-ca.crt \
+          -o "$RUNNER_TEMP/setic-ca.crt"
+        echo "NODE_EXTRA_CA_CERTS=$RUNNER_TEMP/setic-ca.crt" >> "$GITHUB_ENV"
+
+    # Fixado em commit: a release 2.1.5 tem o host do MSG hardcoded (Heroku);
+    # só a main lê MSGRAM_SERVICE_HOST.
+    - name: MeasureSoftGram
+      uses: fga-eps-mds/MeasureSoftGram-Action@b5ce7ec73bb160a505a51f3fe6d15bff32822966
+      with:
+        githubToken: ${{ secrets.GITHUB_TOKEN }}
+        msgramServiceToken: ${{ secrets.MSGRAM_SERVICE_TOKEN }}
+        productName: SGDP
+        workflowName: Build and push image
+        sonarProjectKey: SeticDFGov_SGDP-Service
+        sonartoken: ${{ secrets.SONAR_TOKEN }}
+        collectSonarqubeMetrics: true
+        collectGithubMetrics: true
