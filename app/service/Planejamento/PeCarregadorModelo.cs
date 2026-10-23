@@ -49,7 +49,8 @@ public sealed class PeSeedPasso
 {
     public string Chave { get; set; } = string.Empty;
     public string Titulo { get; set; } = string.Empty;
-    public string OQueFazer { get; set; } = string.Empty;
+    // Pode ficar vazio desde a versão 9 (o título diz tudo)
+    public string? OQueFazer { get; set; } = string.Empty;
     public string? BaseLegal { get; set; }
     public string? ReferenciaGuia { get; set; }
     public string Tipo { get; set; } = PeDominios.TipoPasso.Dados;
@@ -139,7 +140,8 @@ public sealed class PeSeedOpcao
 public sealed record PeCarregamentoResultado(
     int VersaoAnterior, int Versao, bool Executou,
     int Niveis, int Etapas, int Passos, int Secoes, int Campos, int Opcoes, int Configuracoes, int Registros = 0,
-    int Documentos = 0, int Capitulos = 0, int Blocos = 0, int Fluxos = 0, int SecoesPorCiclo = 0, int Correcoes = 0);
+    int Documentos = 0, int Capitulos = 0, int Blocos = 0, int Fluxos = 0, int SecoesPorCiclo = 0, int Correcoes = 0,
+    int Reestruturados = 0, int Textos = 0);
 
 /// <summary>
 /// Carregador do modelo inicial do módulo Governança Estratégica: a trilha da seção 7 do
@@ -164,15 +166,20 @@ public sealed record PeCarregamentoResultado(
 /// próprio carregador gravou e que ninguém mudou (a ajuda de "Quem decidiu" em cada aprovação, os
 /// textos do passo 5.1 e a capa do RA); na versão 8 (F3, o retorno do dono do produto), a
 /// configuração modo_niveis = "livre" quando ela ainda não existe (só carrega com a migration
-/// PeModoLivreValidacao aplicada). O conteúdo fica em JSON embutido na aplicação.
+/// PeModoLivreValidacao aplicada); na versão 9 (revisão dos textos e dos passos, 2026-10-20), a
+/// trilha do órgão com os passos juntados, a reestruturação do banco que já tinha o modelo e a
+/// regravação dos textos sempre que o JSON muda. O conteúdo fica em JSON embutido na aplicação.
 /// <list type="bullet">
 /// <item>Idempotente: se a versão gravada em pe_configuracao (seed_modelo_versao) já é a do
 /// JSON, não faz nada; senão insere só o que falta, achando cada item pela chave (nível
 /// pelo código, etapa, passo e seção pela chave, campo pela chave na seção, opção pelo
 /// valor no campo), e grava a versão.</item>
-/// <item>Nunca sobrescreve: item que já existe não é tocado (nem título, nem situação, nem
-/// ordem), inclusive o que o administrador mudou ou desativou. Itens do sistema nunca
-/// são apagados de verdade, então não voltam por engano.</item>
+/// <item>Não sobrescreve a estrutura: item que já existe não muda de situação, de ordem nem
+/// de config (inclusive o que o administrador mudou ou desativou), salvo a reestruturação
+/// única da versão 9 (<see cref="VersaoDaReestruturacao"/>). Os textos, desde a versão 9,
+/// são regravados a partir do JSON sempre que ele muda (versão nova ou o mesmo número com
+/// outro conteúdo). Itens do sistema nunca são apagados de verdade, então não voltam por
+/// engano.</item>
 /// <item>Uma transação só, com trava (advisory lock) no PostgreSQL: duas instâncias da API
 /// subindo juntas não carregam em dobro.</item>
 /// </list>
@@ -229,6 +236,21 @@ public sealed class PeCarregadorModelo
     /// a validação da equipe na API (<see cref="PeModoNiveis"/>).
     /// </summary>
     public const int VersaoDoModoLivre = 8;
+
+    /// <summary>
+    /// Versão do modelo inicial da revisão dos textos e dos passos (2026-10-20): a trilha do órgão
+    /// com os passos juntados (50 para 30 no Avançado) e a aprovação como a última seção do passo que
+    /// ela aprova. Num banco com uma versão anterior, a carga reestrutura a trilha
+    /// (<see cref="ReestruturarAsync"/>): leva cada seção para o passo dela no JSON, regrava o passo
+    /// do sistema (tipo, trava, guia, situação nos níveis e ordem) e a situação das seções, apaga
+    /// (exclusão lógica) os passos do sistema que sumiram e leva para o passo novo o que é do órgão
+    /// (comentários e o passo dos capítulos do documento) ou descarta (o "não se aplica", a validação,
+    /// a forma escolhida e os ajustes do passo que sumiu). Desde ela, toda carga que acha o JSON
+    /// mudado (versão nova, ou a mesma versão com outro conteúdo: o resumo fica em
+    /// pe_configuracao.seed_modelo_hash) regrava os textos de todos os itens do sistema a partir do
+    /// JSON (<see cref="SincronizarTextosAsync"/>).
+    /// </summary>
+    public const int VersaoDaReestruturacao = 9;
 
     // Trava do carregador no PostgreSQL: segura até o fim da transação
     private const string SqlTrava = "SELECT pg_advisory_xact_lock(4890020260924)";
@@ -294,8 +316,8 @@ public sealed class PeCarregadorModelo
                     Falha($"passo \"{passo.Chave}\" repetido ou fora do formato.");
                 if (!PeDominios.TipoPasso.Todos.Contains(passo.Tipo)) Falha($"tipo do passo \"{passo.Chave}\".");
                 if (passo.Inciso != null && !PeDominios.Inciso.EhValido(passo.Inciso)) Falha($"inciso do passo \"{passo.Chave}\".");
-                if (string.IsNullOrWhiteSpace(passo.Titulo) || string.IsNullOrWhiteSpace(passo.OQueFazer))
-                    Falha($"passo \"{passo.Chave}\" sem título ou sem o que fazer.");
+                // Desde a versão 9, o "o que fazer" pode ficar vazio (quando o título já diz tudo)
+                if (string.IsNullOrWhiteSpace(passo.Titulo)) Falha($"passo \"{passo.Chave}\" sem título.");
                 var sitPasso = Situacoes(passo.Niveis, codigos, null, $"passo {passo.Chave}");
                 if (passo.Travado && sitPasso.ContainsValue(PeDominios.Situacao.Desligado)) Falha($"passo travado \"{passo.Chave}\" desligado.");
 
@@ -447,8 +469,20 @@ public sealed class PeCarregadorModelo
         var configuracoes = await _context.PeConfiguracoes.ToListAsync(ct);
         var registroVersao = configuracoes.FirstOrDefault(c => c.Chave == PeConfiguracao.ChaveVersaoModelo);
         var versaoAnterior = LerVersao(registroVersao?.Valor);
+        var hash = Resumo(seed);
         if (versaoAnterior >= seed.Versao)
-            return new PeCarregamentoResultado(versaoAnterior, versaoAnterior, false, 0, 0, 0, 0, 0, 0, 0);
+        {
+            // Versão 9: a mesma versão com o JSON mudado (os textos reescritos sem subir a versão):
+            // só os textos são regravados. Estrutura nova (item novo, situação, ordem) pede versão nova
+            if (versaoAnterior != seed.Versao || seed.Versao < VersaoDaReestruturacao || ResumoGravado(configuracoes) == hash)
+                return new PeCarregamentoResultado(versaoAnterior, versaoAnterior, false, 0, 0, 0, 0, 0, 0, 0);
+            var mesmaVersao = DateTime.UtcNow;
+            var nTextosMesmaVersao = await SincronizarTextosAsync(seed, mesmaVersao, ct);
+            GravarResumo(configuracoes, hash, mesmaVersao);
+            await _context.SaveChangesAsync(ct);
+            if (transacao != null) await transacao.CommitAsync(ct);
+            return new PeCarregamentoResultado(versaoAnterior, versaoAnterior, true, 0, 0, 0, 0, 0, 0, 0, Textos: nTextosMesmaVersao);
+        }
 
         // Versão 8 (F3): lê a tabela nova e as colunas novas de pe_pdtic_passo. No intervalo do
         // deploy (o código novo sem a migration), a leitura falha antes de qualquer gravação e o
@@ -487,6 +521,11 @@ public sealed class PeCarregadorModelo
         }
         var codigos = seed.Niveis.Select(n => n.Codigo).ToList();
         var nivelPorCodigo = niveis.ToDictionary(n => n.Codigo);
+
+        // Versão 9: o banco com a trilha de antes passa à trilha do JSON (os passos juntados)
+        var nReestruturados = versaoAnterior > 0 && versaoAnterior < VersaoDaReestruturacao && seed.Versao >= VersaoDaReestruturacao
+            ? await ReestruturarAsync(seed, nivelPorCodigo, agora, ct)
+            : 0;
 
         // Configurações gerais (pela chave)
         foreach (var (chave, valor) in seed.Configuracoes)
@@ -535,7 +574,7 @@ public sealed class PeCarregadorModelo
                         Etapa = etapa,
                         Chave = sp.Chave,
                         Titulo = sp.Titulo,
-                        OQueFazer = sp.OQueFazer,
+                        OQueFazer = sp.OQueFazer?.Trim() ?? string.Empty,
                         BaseLegal = sp.BaseLegal,
                         ReferenciaGuia = sp.ReferenciaGuia,
                         Tipo = sp.Tipo,
@@ -800,6 +839,13 @@ public sealed class PeCarregadorModelo
             ? await CarregarFluxosAsync(fluxos ?? PeFluxoSeed.Ler(), agora, ct)
             : 0;
 
+        // Versão 9: os textos de todos os itens do sistema, a partir do JSON (no banco que já tinha o
+        // modelo; no banco novo, tudo acabou de entrar com os textos do JSON)
+        var nTextos = versaoAnterior > 0 && seed.Versao >= VersaoDaReestruturacao
+            ? await SincronizarTextosAsync(seed, agora, ct)
+            : 0;
+        if (seed.Versao >= VersaoDaReestruturacao) GravarResumo(configuracoes, hash, agora);
+
         // A versão carregada
         if (registroVersao == null)
         {
@@ -822,7 +868,283 @@ public sealed class PeCarregadorModelo
         if (transacao != null) await transacao.CommitAsync(ct);
 
         return new PeCarregamentoResultado(versaoAnterior, seed.Versao, true, nNiveis, nEtapas, nPassos, nSecoes, nCampos, nOpcoes, nConfig,
-            nRegistros, nDocumentos, nCapitulos, nBlocos, nFluxos, nPorCiclo, nCorrecoes);
+            nRegistros, nDocumentos, nCapitulos, nBlocos, nFluxos, nPorCiclo, nCorrecoes, nReestruturados, nTextos);
+    }
+
+    // ── Versão 9: o resumo do JSON, os textos e a reestruturação da trilha ────
+
+    /// <summary>O resumo (SHA-256, em hexadecimal) do modelo inicial: muda com qualquer mudança no JSON.</summary>
+    public static string Resumo(PeSeedModelo seed)
+    {
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(seed, OpcoesDoResumo);
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
+    }
+
+    private static readonly JsonSerializerOptions OpcoesDoResumo = new() { Converters = { new ElementoDoResumo() } };
+
+    // O "niveis" ausente (seção fora do PDTIC) é um JsonElement vazio, que o serializador não escreve sozinho
+    private sealed class ElementoDoResumo : System.Text.Json.Serialization.JsonConverter<JsonElement>
+    {
+        public override JsonElement Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            JsonElement.ParseValue(ref reader);
+
+        public override void Write(Utf8JsonWriter writer, JsonElement value, JsonSerializerOptions options)
+        {
+            if (value.ValueKind == JsonValueKind.Undefined) writer.WriteNullValue();
+            else value.WriteTo(writer);
+        }
+    }
+
+    private static string? ResumoGravado(IEnumerable<PeConfiguracao> configuracoes)
+    {
+        var valor = configuracoes.FirstOrDefault(c => c.Chave == PeConfiguracao.ChaveHashModelo)?.Valor;
+        if (string.IsNullOrWhiteSpace(valor)) return null;
+        try
+        {
+            using var documento = JsonDocument.Parse(valor);
+            return documento.RootElement.ValueKind == JsonValueKind.String ? documento.RootElement.GetString() : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private void GravarResumo(List<PeConfiguracao> configuracoes, string hash, DateTime agora)
+    {
+        var valor = JsonSerializer.Serialize(hash);
+        var registro = configuracoes.FirstOrDefault(c => c.Chave == PeConfiguracao.ChaveHashModelo);
+        if (registro == null)
+        {
+            registro = new PeConfiguracao { Chave = PeConfiguracao.ChaveHashModelo, Valor = valor, CriadoEm = agora, CriadoPor = Autor };
+            _context.PeConfiguracoes.Add(registro);
+            configuracoes.Add(registro);
+        }
+        else if (registro.Valor != valor)
+        {
+            registro.Valor = valor;
+            registro.AlteradoEm = agora;
+            registro.AlteradoPor = Autor;
+        }
+    }
+
+    // Troca o valor quando é diferente; devolve se trocou
+    private static bool Trocar<T>(T atual, T novo, Action<T> gravar)
+    {
+        if (EqualityComparer<T>.Default.Equals(atual, novo)) return false;
+        gravar(novo);
+        return true;
+    }
+
+    private static string? SemVazio(string? texto) => string.IsNullOrWhiteSpace(texto) ? null : texto;
+
+    /// <summary>
+    /// Regrava, a partir do JSON, os textos de todos os itens do sistema que o JSON traz (achados pela
+    /// chave, como na carga): o nome e a descrição dos níveis; o título, a descrição e a atividade do
+    /// guia das etapas; o título, o "o que fazer", a base legal e a atividade do guia dos passos; o
+    /// título e a ajuda das seções (as do PDTIC e as de fora dele); o rótulo e a ajuda dos campos; e o
+    /// rótulo das opções. Só texto: a estrutura (situação nos níveis, ordem, tipo, config, opção
+    /// ativa) não muda aqui. O texto que o administrador mudou também é regravado (pedido de
+    /// 2026-10-20: o JSON é a fonte dos textos). Devolve quantos itens mudaram.
+    /// </summary>
+    public async Task<int> SincronizarTextosAsync(PeSeedModelo seed, DateTime agora, CancellationToken ct = default)
+    {
+        var niveis = await _context.PeNiveis.ToListAsync(ct);
+        var etapas = await _context.PeEtapas.ToListAsync(ct);
+        var passos = await _context.PePassos.ToListAsync(ct);
+        var secoes = await _context.PeSecoes.ToListAsync(ct);
+        var campos = await _context.PeCampos.ToListAsync(ct);
+        var opcoes = await _context.PeOpcoes.ToListAsync(ct);
+        var mudados = 0;
+
+        void Marcar(IPeAuditavel item, bool mudou)
+        {
+            if (!mudou) return;
+            item.AlteradoEm = agora;
+            item.AlteradoPor = Autor;
+            mudados++;
+        }
+
+        foreach (var sn in seed.Niveis)
+            if (niveis.FirstOrDefault(n => n.Codigo == sn.Codigo) is { } nivel)
+                Marcar(nivel, Trocar(nivel.Nome, sn.Nome, v => nivel.Nome = v)
+                              | Trocar(nivel.Descricao, SemVazio(sn.Descricao), v => nivel.Descricao = v));
+
+        void Secao(PeSeedSecao ss)
+        {
+            if (secoes.FirstOrDefault(s => s.Chave == ss.Chave) is not { } secao) return;
+            Marcar(secao, Trocar(secao.Titulo, ss.Titulo, v => secao.Titulo = v) | Trocar(secao.Ajuda, SemVazio(ss.Ajuda), v => secao.Ajuda = v));
+            foreach (var sc in ss.Campos)
+            {
+                if (campos.FirstOrDefault(c => c.SecaoId == secao.Id && c.Chave == sc.Chave) is not { } campo) continue;
+                Marcar(campo, Trocar(campo.Rotulo, sc.Rotulo, v => campo.Rotulo = v) | Trocar(campo.Ajuda, SemVazio(sc.Ajuda), v => campo.Ajuda = v));
+                foreach (var so in sc.Opcoes)
+                    if (opcoes.FirstOrDefault(o => o.CampoId == campo.Id && o.Valor == so.Valor) is { } opcao)
+                        Marcar(opcao, Trocar(opcao.Rotulo, so.Rotulo, v => opcao.Rotulo = v));
+            }
+        }
+
+        foreach (var se in seed.Etapas)
+        {
+            if (etapas.FirstOrDefault(e => e.Chave == se.Chave) is { } etapa)
+                Marcar(etapa, Trocar(etapa.Titulo, se.Titulo, v => etapa.Titulo = v)
+                              | Trocar(etapa.Descricao, SemVazio(se.Descricao), v => etapa.Descricao = v)
+                              | Trocar(etapa.ReferenciaGuia, SemVazio(se.ReferenciaGuia), v => etapa.ReferenciaGuia = v));
+            foreach (var sp in se.Passos)
+            {
+                if (passos.FirstOrDefault(p => p.Chave == sp.Chave) is { } passo)
+                    Marcar(passo, Trocar(passo.Titulo, sp.Titulo, v => passo.Titulo = v)
+                                  | Trocar(passo.OQueFazer, sp.OQueFazer?.Trim() ?? string.Empty, v => passo.OQueFazer = v)
+                                  | Trocar(passo.BaseLegal, SemVazio(sp.BaseLegal), v => passo.BaseLegal = v)
+                                  | Trocar(passo.ReferenciaGuia, SemVazio(sp.ReferenciaGuia), v => passo.ReferenciaGuia = v));
+                foreach (var ss in sp.Secoes) Secao(ss);
+            }
+        }
+        foreach (var ss in seed.SecoesForaDoPdtic) Secao(ss);
+        return mudados;
+    }
+
+    /// <summary>
+    /// A reestruturação da trilha do órgão da versão 9, num banco com uma versão anterior. Deixa a
+    /// trilha igual à do JSON: cada seção do PDTIC que o JSON traz vai para o passo dela (na ordem do
+    /// JSON) com a situação de cada nível do JSON; cada passo do JSON é regravado (etapa, tipo, trava,
+    /// inciso, "não se aplica", ordem e a situação de cada nível; os textos ficam com a
+    /// <see cref="SincronizarTextosAsync"/>). Os passos do sistema que o JSON não traz mais saem como
+    /// o módulo apaga item (exclusão lógica: ExcluidoEm), e o que é deles vai para o passo que recebeu
+    /// as seções deles: as seções que o administrador criou nele, os comentários dos PDTICs e o passo
+    /// dos capítulos do documento. O que valia só para o passo que sumiu é descartado: o "não se
+    /// aplica" e a validação da equipe (pe_pdtic_passo), a forma escolhida (pe_orgao_passo_detalhe) e
+    /// o ajuste do órgão sobre o passo; e sai a validação da equipe dos passos que receberam seções (o
+    /// conteúdo deles mudou). Passo criado pelo administrador fica, depois dos do sistema na etapa.
+    /// Idempotente: num banco que já está como o JSON, não muda nada. Devolve quantos itens mudaram.
+    /// </summary>
+    private async Task<int> ReestruturarAsync(PeSeedModelo seed, Dictionary<string, PeNivel> nivelPorCodigo, DateTime agora,
+        CancellationToken ct)
+    {
+        var codigos = seed.Niveis.Select(n => n.Codigo).ToList();
+        var etapas = await _context.PeEtapas.ToListAsync(ct);
+        var passos = await _context.PePassos.Include(p => p.Niveis).ToListAsync(ct);
+        var secoes = await _context.PeSecoes.Include(s => s.Niveis).Where(s => s.Escopo == PeDominios.Escopo.Pdtic).ToListAsync(ct);
+        var passoAntes = secoes.ToDictionary(s => s.Id, s => s.PassoId);
+        var mudados = new HashSet<IPeAuditavel>();
+
+        void Marcar(IPeAuditavel item, bool mudou)
+        {
+            if (mudou) mudados.Add(item);
+        }
+
+        bool Niveis<TNivel>(List<TNivel> linhas, Dictionary<string, string> situacoes, Func<long, TNivel> nova) where TNivel : IPeSituacaoNivel
+        {
+            var mudou = false;
+            foreach (var (codigo, situacao) in situacoes)
+            {
+                if (!nivelPorCodigo.TryGetValue(codigo, out var nivel) || nivel.Id == 0) continue;
+                var linha = linhas.FirstOrDefault(l => l.NivelId == nivel.Id);
+                if (linha == null)
+                {
+                    var criada = nova(nivel.Id);
+                    criada.Situacao = situacao;
+                    linhas.Add(criada);
+                    mudou = true;
+                }
+                else if (linha.Situacao != situacao)
+                {
+                    linha.Situacao = situacao;
+                    mudou = true;
+                }
+            }
+            return mudou;
+        }
+
+        var doSeed = new HashSet<string>();
+        foreach (var se in seed.Etapas)
+        {
+            var etapa = etapas.FirstOrDefault(e => e.Chave == se.Chave);
+            if (etapa == null) continue;
+            foreach (var (sp, ip) in se.Passos.Select((p, i) => (p, i)))
+            {
+                doSeed.Add(sp.Chave);
+                var passo = passos.FirstOrDefault(p => p.Chave == sp.Chave);
+                if (passo == null) continue;
+                Marcar(passo, Trocar(passo.EtapaId, etapa.Id, v => passo.EtapaId = v)
+                              | Trocar(passo.Tipo, sp.Tipo, v => passo.Tipo = v)
+                              | Trocar(passo.Travado, sp.Travado, v => passo.Travado = v)
+                              | Trocar(passo.IncisoDecreto, sp.Inciso, v => passo.IncisoDecreto = v)
+                              | Trocar(passo.AceitaNaoSeAplica, sp.AceitaNaoSeAplica, v => passo.AceitaNaoSeAplica = v)
+                              | Trocar(passo.Ordem, ip + 1, v => passo.Ordem = v)
+                              | Trocar(passo.ExcluidoEm, null, v => passo.ExcluidoEm = v)
+                              | Niveis(passo.Niveis, Situacoes(sp.Niveis, codigos, null, sp.Chave),
+                                  nivelId => new PePassoNivel { PassoId = passo.Id, NivelId = nivelId }));
+                foreach (var (ss, iss) in sp.Secoes.Select((s, i) => (s, i)))
+                {
+                    var secao = secoes.FirstOrDefault(s => s.Chave == ss.Chave);
+                    if (secao == null) continue;
+                    Marcar(secao, Trocar(secao.PassoId, passo.Id, v => secao.PassoId = v)
+                                  | Trocar(secao.Ordem, iss + 1, v => secao.Ordem = v)
+                                  | Niveis(secao.Niveis, Situacoes(ss.Niveis, codigos, null, ss.Chave),
+                                      nivelId => new PeSecaoNivel { SecaoId = secao.Id, NivelId = nivelId }));
+                }
+            }
+            // O passo criado pelo administrador fica depois dos do sistema, na ordem de antes
+            var ordem = se.Passos.Count;
+            foreach (var passo in passos.Where(p => p.EtapaId == etapa.Id && !p.Sistema).OrderBy(p => p.Ordem).ThenBy(p => p.Id))
+                Marcar(passo, Trocar(passo.Ordem, ++ordem, v => passo.Ordem = v));
+        }
+
+        // Os passos do sistema que sumiram, e o passo que recebeu as seções de cada um
+        var sumiram = passos.Where(p => p.Sistema && p.ExcluidoEm == null && !doSeed.Contains(p.Chave)).ToList();
+        var destino = new Dictionary<long, PePasso>();
+        foreach (var velho in sumiram)
+        {
+            var novoId = secoes.Where(s => passoAntes[s.Id] == velho.Id && s.PassoId != velho.Id).Select(s => s.PassoId).FirstOrDefault();
+            if (novoId is long id && passos.FirstOrDefault(p => p.Id == id) is { } novo) destino[velho.Id] = novo;
+            velho.ExcluidoEm = agora;
+            mudados.Add(velho);
+            // As seções que ficaram nele (criadas pelo administrador) vão junto, depois das do sistema
+            if (!destino.TryGetValue(velho.Id, out var alvo)) continue;
+            var ordemNoAlvo = secoes.Where(s => s.PassoId == alvo.Id).Select(s => s.Ordem).DefaultIfEmpty(0).Max();
+            foreach (var resto in secoes.Where(s => s.PassoId == velho.Id).OrderBy(s => s.Ordem).ThenBy(s => s.Id).ToList())
+            {
+                resto.PassoId = alvo.Id;
+                resto.Ordem = ++ordemNoAlvo;
+                mudados.Add(resto);
+            }
+        }
+        foreach (var item in mudados)
+        {
+            item.AlteradoEm = agora;
+            item.AlteradoPor = Autor;
+        }
+
+        // Os passos que receberam seções de outro passo (o conteúdo deles mudou)
+        var receberam = secoes.Where(s => s.PassoId != null && s.PassoId != passoAntes[s.Id]).Select(s => s.PassoId!.Value).ToHashSet();
+        var velhos = sumiram.Select(p => p.Id).ToList();
+        if (velhos.Count == 0 && receberam.Count == 0) return mudados.Count;
+
+        // O que é do órgão: os comentários e o passo dos capítulos do documento vão para o passo novo
+        foreach (var comentario in await _context.PeComentarios.Where(c => velhos.Contains(c.PassoId)).ToListAsync(ct))
+            if (destino.TryGetValue(comentario.PassoId, out var alvo)) comentario.PassoId = alvo.Id;
+        var chaves = sumiram.Where(p => destino.ContainsKey(p.Id)).ToDictionary(p => p.Chave, p => destino[p.Id].Chave);
+        if (chaves.Count > 0)
+        {
+            var antigas = chaves.Keys.ToList();
+            foreach (var capitulo in await _context.PeDocCapitulos.Where(c => c.PassoChave != null && antigas.Contains(c.PassoChave)).ToListAsync(ct))
+            {
+                capitulo.PassoChave = chaves[capitulo.PassoChave!];
+                capitulo.AlteradoEm = agora;
+                capitulo.AlteradoPor = Autor;
+            }
+        }
+
+        // O que valia só para o passo que sumiu: o "não se aplica", a validação, a forma e o ajuste; e
+        // a validação dos passos que receberam seções
+        var semValidacao = velhos.Concat(receberam).ToList();
+        _context.PePdticPassosValidacao.RemoveRange(await _context.PePdticPassosValidacao.Where(v => semValidacao.Contains(v.PassoId)).ToListAsync(ct));
+        _context.PePdticPassos.RemoveRange(await _context.PePdticPassos.Where(m => velhos.Contains(m.PassoId)).ToListAsync(ct));
+        _context.PeOrgaosPassoDetalhe.RemoveRange(await _context.PeOrgaosPassoDetalhe.Where(d => velhos.Contains(d.PassoId)).ToListAsync(ct));
+        _context.PeOrgaosAjuste.RemoveRange(await _context.PeOrgaosAjuste
+            .Where(a => a.AlvoTipo == PeDominios.AlvoAjuste.Passo && velhos.Contains(a.AlvoId)).ToListAsync(ct));
+        return mudados.Count;
     }
 
     // ── Correções da versão 7 (F1) ──────────────────────────────────────────
@@ -839,7 +1161,7 @@ public sealed class PeCarregadorModelo
         }
         if (sp.Antes.OQueFazer?.Contains(passo.OQueFazer) == true && passo.OQueFazer != sp.OQueFazer)
         {
-            passo.OQueFazer = sp.OQueFazer;
+            passo.OQueFazer = sp.OQueFazer ?? string.Empty;
             mudou = true;
         }
         if (!mudou) return 0;

@@ -435,12 +435,12 @@ public static class PeDominios
         public const string InstanciaOutra = "outra";
         public const string AtoTipoOutro = "outro";
 
-        // Passos que o PDTIC registrado fora do sistema preenche para acompanhar (3.3 e 3.9)
+        // Passos que o PDTIC registrado fora do sistema preenche para acompanhar (3.2 e 3.7 no Avançado, desde a versão 9)
         public const string PassoMetasAcoes = "planejamento.metas-acoes";
         public const string PassoRiscos = "planejamento.riscos";
-        // A avaliação do comitê (6.3): a decisão "revisar" libera a revisão
+        // A avaliação intermediária (6.1 desde a versão 9; termina com a avaliação do comitê): a decisão "revisar" libera a revisão
         public const string PassoAvaliacaoComite = "avaliacao-intermediaria.avaliacao-comite";
-        // A metodologia de elaboração (1.5): mostra os fluxos do órgão; gravar ou restaurar um fluxo
+        // A metodologia de elaboração (1.3 desde a versão 9, com o plano de trabalho): mostra os fluxos do órgão; gravar ou restaurar um fluxo
         // é mudança no conteúdo dela (F3, a validação pela equipe)
         public const string PassoMetodologia = "preparacao.metodologia";
     }

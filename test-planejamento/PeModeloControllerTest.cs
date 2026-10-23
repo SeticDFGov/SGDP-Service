@@ -120,7 +120,7 @@ public class PeModeloControllerTest : PeModeloTestBase
     {
         var passo = await Modelo.CriarPassoAsync(new PePassoCriarDTO
         {
-            EtapaId = Passo("preparacao.nomes").EtapaId, Titulo = "Registre os parceiros", OQueFazer = "Registre."
+            EtapaId = Passo("preparacao.abrangencia").EtapaId, Titulo = "Registre os parceiros", OQueFazer = "Registre."
         }, EmailAdmin);
         await Modelo.ExcluirPassoAsync(passo.Id, EmailAdmin);
 
@@ -201,14 +201,14 @@ public class PeModeloControllerTest : PeModeloTestBase
     public async Task Escrita_SoAdministradorDoModuloEAdminGeral(string email)
     {
         var controller = ControladorModelo(UserPorEmail[email]);
-        var id = Passo("preparacao.nomes").Id;
+        var id = Passo("preparacao.abrangencia").Id;
 
         var (status, valor) = Resultado(await controller.AtualizarPasso(id, Corpo(new { Titulo = "Outro" })));
         Assert.Equal(403, status);
         Assert.Equal(Codigo(ErrorCode.PeSemPermissao), CodigoDe(valor));
         Assert.Equal(403, Resultado(await controller.SituacaoPasso(id, Todos("opcional"))).Status);
         Assert.Equal(403, Resultado(await controller.CriarNivel(new PeNivelCriarDTO { Nome = "Outro" })).Status);
-        Assert.Equal("Defina os nomes do órgão: comitê, equipes, autoridade máxima, unidade de TIC", Passo("preparacao.nomes").Titulo);
+        Assert.Equal(service.Planejamento.PeCarregadorModelo.LerSeed().Etapas[0].Passos[0].Titulo, Passo("preparacao.abrangencia").Titulo);
     }
 
     [Theory]
@@ -218,7 +218,7 @@ public class PeModeloControllerTest : PeModeloTestBase
     {
         var controller = ControladorModelo(UserPorEmail[email]);
 
-        var (atualizado, passo) = Resultado(await controller.AtualizarPasso(Passo("preparacao.nomes").Id, Corpo(new { Titulo = "Novo título" })));
+        var (atualizado, passo) = Resultado(await controller.AtualizarPasso(Passo("preparacao.abrangencia").Id, Corpo(new { Titulo = "Novo título" })));
         Assert.Equal(200, atualizado);
         Assert.Equal("Novo título", Assert.IsType<PePassoResponse>(passo).Titulo);
 
@@ -232,7 +232,7 @@ public class PeModeloControllerTest : PeModeloTestBase
     public async Task Put_CorpoJson_AusenteNaoMuda_NuloLimpa()
     {
         var controller = ControladorModelo(UserPeAdmin);
-        var id = Passo("preparacao.sgtic").Id;
+        var id = Passo("preparacao.equipe").Id;
 
         var soTitulo = (PePassoResponse)Resultado(await controller.AtualizarPasso(id, Corpo(new { Titulo = "Registre o SGTIC" }))).Valor!;
         Assert.Equal("art. 8º, §§ 1º e 2º", soTitulo.BaseLegal);
@@ -244,6 +244,10 @@ public class PeModeloControllerTest : PeModeloTestBase
         // Nome da propriedade sem diferenciar maiúsculas, como o resto da API
         var minusculas = (PePassoResponse)Resultado(await controller.AtualizarPasso(id, Corpo(new { titulo = "Registre o SGTIC do órgão" }))).Valor!;
         Assert.Equal("Registre o SGTIC do órgão", minusculas.Titulo);
+
+        // Desde a revisão de 2026-10-20, o "o que fazer" aceita vazio e nulo (volta como texto vazio)
+        Assert.Equal(string.Empty, ((PePassoResponse)Resultado(await controller.AtualizarPasso(id, Corpo(new { OQueFazer = "" }))).Valor!).OQueFazer);
+        Assert.Equal(string.Empty, ((PePassoResponse)Resultado(await controller.AtualizarPasso(id, Corpo(new { OQueFazer = (string?)null }))).Valor!).OQueFazer);
 
         var (status, valor) = Resultado(await controller.AtualizarPasso(id, Corpo(new[] { 1, 2 })));
         Assert.Equal(400, status);
@@ -263,7 +267,7 @@ public class PeModeloControllerTest : PeModeloTestBase
         Assert.Equal(404, naoEncontrado);
         Assert.Equal(Codigo(ErrorCode.PeItemNaoEncontrado), CodigoDe(corpoNaoEncontrado));
 
-        var (sistema, corpoSistema) = Resultado(await controller.ExcluirPasso(Passo("preparacao.nomes").Id));
+        var (sistema, corpoSistema) = Resultado(await controller.ExcluirPasso(Passo("preparacao.abrangencia").Id));
         Assert.Equal(409, sistema);
         Assert.Equal(Codigo(ErrorCode.PeItemDoSistema), CodigoDe(corpoSistema));
 

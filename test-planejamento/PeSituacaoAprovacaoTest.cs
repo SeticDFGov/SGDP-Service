@@ -37,8 +37,20 @@ public class PeSituacaoAprovacaoTest : PeAprovacaoTestBase
     {
         await DefinirNivelDoOrgaoAsync(OrgaoSes, "avancado");
         var pdtic = await AbrirSesAsync();
-        const string chave = "preparacao.aprovacao-plano-trabalho";
+        // Desde a versão 9, a aprovação do plano de trabalho é a última seção do passo da metodologia:
+        // primeiro falta o que é de dados; com os dados completos, a decisão
+        const string chave = "preparacao.metodologia";
         Assert.Equal(PeDominios.SituacaoPasso.Pendente, (await PassoDaSituacaoAsync(pdtic.Id, chave)).Situacao);
+        async Task<string> Falta() =>
+            (await Aprovacao.EnvioAsync(pdtic.Id, await Orgao())).Pendencias.Single(p => p.PassoId == Passo(chave).Id).Motivo;
+        Assert.StartsWith("Preencha \"Metodologia\".", await Falta());
+        await Modelo.DefinirSituacaoSecaoAsync(Secao("cronograma_elaboracao").Id, Todos("opcional"), EmailAdmin);
+        await IncluirNoPdticAsync(pdtic.Id, "metodologia", new { metodologia_adotada = "guia_sisp", descricao = "Oficinas com as áreas." });
+        await IncluirNoPdticAsync(pdtic.Id, "plano_trabalho", new
+        {
+            objetivo = "Elaborar o PDTIC 2027 a 2030.", justificativa = "O PDTIC anterior terminou.", premissas_restricoes = "Dedicação parcial."
+        });
+        Assert.Equal("Registre a decisão e a data.", await Falta());
 
         var registro = await IncluirNoPdticAsync(pdtic.Id, "aprovacao_plano_trabalho", new { decisao = "devolvido", data = "2026-03-01", observacao = "Rever o cronograma." });
         var devolvido = await PassoDaSituacaoAsync(pdtic.Id, chave);
@@ -64,6 +76,11 @@ public class PeSituacaoAprovacaoTest : PeAprovacaoTestBase
         Assert.Equal((PeDominios.SituacaoPasso.Aguardando, PePdticService.MotivoSemAvaliacao), (antes.Situacao, antes.Motivo));
 
         var avaliacao = await Acompanhamento.CriarCicloAsync(pdtic.Id, new PeCicloCriarDTO { Tipo = "avaliacao" }, await Orgao());
+        // Desde a versão 9, a avaliação do comitê é a última seção do passo da avaliação intermediária; aqui
+        // só ela conta (as seções de dados do passo ficam opcionais)
+        await Modelo.DefinirSituacaoSecaoAsync(Secao("resultados_intermediarios").Id, Todos("opcional"), EmailAdmin);
+        await Modelo.DefinirSituacaoSecaoAsync(Secao("analise_intermediaria").Id, Todos("opcional"), EmailAdmin);
+        Assert.Equal(PeDominios.SituacaoPasso.Pendente, (await PassoDaSituacaoAsync(pdtic.Id, chave)).Situacao);
         var registro = await IncluirNoPdticAsync(pdtic.Id, "avaliacao_comite", new { decisao = "seguir", data = "2026-06-30" }, cicloId: avaliacao.Id);
         Assert.Equal(PeDominios.SituacaoPasso.Feito, (await PassoDaSituacaoAsync(pdtic.Id, chave)).Situacao);
         await Registros.AtualizarAsync(PeDono.DoPdtic(pdtic.Id), "avaliacao_comite", registro.Id,
@@ -126,12 +143,12 @@ public class PeSituacaoAprovacaoTest : PeAprovacaoTestBase
     [Fact]
     public async Task ProximoPasso_NaoRecomendaOPendenteDeUmaEtapaFechada_NemOAguardando()
     {
-        // Os documentos de referência, opcionais para a SES (fora do Básico): não exigidos no envio. Desde
+        // O PDTIC anterior, opcional para a SES (fora do Básico): não exigido no envio. Desde
         // a F3, o passo opcional sem conteúdo fica "opcional" (não é cobrado) e o opcional nunca é o
         // próximo passo por pendente (antes, pendente e recomendado)
-        await AjustarPassosAsync(OrgaoSes, ("preparacao.documentos-referencia", "opcional"));
+        await AjustarPassosAsync(OrgaoSes, ("diagnostico.pdtic-anterior", "opcional"));
         var pdtic = await ProntoParaEnviarAsync();
-        var referencias = await PassoDaSituacaoAsync(pdtic.Id, "preparacao.documentos-referencia");
+        var referencias = await PassoDaSituacaoAsync(pdtic.Id, "diagnostico.pdtic-anterior");
         Assert.Equal(PeDominios.SituacaoPasso.Opcional, referencias.Situacao);
         Assert.False(referencias.Obrigatorio);
         Assert.NotEqual(referencias.Numero, (await SituacaoAsync(pdtic.Id)).ProximoPasso);
@@ -166,7 +183,8 @@ public class PeSituacaoAprovacaoTest : PeAprovacaoTestBase
         var entidade = PdticNoBanco(pdtic.Id);
         var trilha = await PeTrilhaOrgao.CarregarAsync(Context, OrgaoSes.Id, soAtivo: false);
         var situacao = await Pdtics.CalcularSituacaoAsync(entidade, trilha);
-        Assert.Equal(23, situacao.Passos.Count);
+        // Versão 9: 21 passos no Básico (eram 23)
+        Assert.Equal(21, situacao.Passos.Count);
         Assert.All(situacao.Passos, p => Assert.False(p.PodeEditar));
         Assert.Equal("1.1", situacao.ProximoPasso);
     }

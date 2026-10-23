@@ -73,18 +73,23 @@ public class PePublicacaoEncerramentoTest : PeAprovacaoTestBase
     [Fact]
     public async Task AprovacaoDoPlanoDeAcompanhamento_ComAprovado_PoeOPdticEmAcompanhamento()
     {
-        // O passo 4.6 não está no Básico: ligado para a SES por ajuste
-        await AjustarPassosAsync(OrgaoSes, ("plano-acompanhamento.aprovacao-acompanhamento", "opcional"));
+        // A aprovação do plano de acompanhamento (desde a versão 9, a última seção do passo do monitoramento e
+        // da avaliação) não está no Básico: o passo e a seção ligados para a SES por ajuste
+        await Orgaos.DefinirAjustesAsync(OrgaoSes.Id, new List<PeOrgaoAjusteDTO>
+        {
+            new() { AlvoTipo = "passo", AlvoId = Passo("plano-acompanhamento.plano-monitoramento").Id, Situacao = "opcional" },
+            new() { AlvoTipo = "secao", AlvoId = Secao("aprovacao_plano_acompanhamento").Id, Situacao = "obrigatorio" }
+        }, EmailAdmin);
         var pdtic = await PublicadoAsync();
         var dono = PeDono.DoPdtic(pdtic.Id);
 
         var registro = await IncluirNoPdticAsync(pdtic.Id, "aprovacao_plano_acompanhamento", new { decisao = "devolvido", data = "2026-09-01" });
         Assert.Equal(PeDominios.SituacaoPdtic.Publicado, PdticNoBanco(pdtic.Id).Situacao);
-        Assert.Contains(PePdticService.AvisoDevolvido, (await PassoDaSituacaoAsync(pdtic.Id, "plano-acompanhamento.aprovacao-acompanhamento")).Avisos);
+        Assert.Contains(PePdticService.AvisoDevolvido, (await PassoDaSituacaoAsync(pdtic.Id, "plano-acompanhamento.plano-monitoramento")).Avisos);
 
         await Registros.AtualizarAsync(dono, "aprovacao_plano_acompanhamento", registro.Id, Salvar(new { decisao = "aprovado", data = "2026-09-05" }), await Orgao());
         Assert.Equal(PeDominios.SituacaoPdtic.EmAcompanhamento, PdticNoBanco(pdtic.Id).Situacao);
-        Assert.Equal(PeDominios.SituacaoPasso.Feito, (await PassoDaSituacaoAsync(pdtic.Id, "plano-acompanhamento.aprovacao-acompanhamento")).Situacao);
+        Assert.Equal(PeDominios.SituacaoPasso.Feito, (await PassoDaSituacaoAsync(pdtic.Id, "plano-acompanhamento.plano-monitoramento")).Situacao);
 
         // Em acompanhamento: a publicação não muda mais; as etapas 4 a 7 continuam editáveis
         var publicacao = (await Registros.ListarAsync(dono, "publicacao", await Orgao()));
@@ -130,7 +135,7 @@ public class PePublicacaoEncerramentoTest : PeAprovacaoTestBase
         Assert.Equal(Codigo(ErrorCode.PeJustificativaObrigatoria), await ErroAsync(() => Aprovacao.EncerrarAsync(pdtic.Id, new PeEncerrarDTO(), admin)));
         var ex = await Assert.ThrowsAsync<ApiException>(() => Aprovacao.EncerrarAsync(pdtic.Id, new PeEncerrarDTO { Motivo = "Vigência vencida." }, admin));
         Assert.Equal((int)ErrorCode.PeEncerramentoRecusado, ex.Error.Code);
-        Assert.Equal("A vigência do PDTIC vai até 31/12/2029. O administrador encerra o PDTIC só depois do fim da vigência.", ex.Error.Message);
+        Assert.Equal("A vigência vai até 31/12/2029. O administrador só encerra o PDTIC depois dessa data.", ex.Error.Message);
 
         Situacao(pdtic.Id, PeDominios.SituacaoPdtic.Publicado, new DateOnly(2025, 12, 31));
         var encerrado = await Aprovacao.EncerrarAsync(pdtic.Id, new PeEncerrarDTO { Motivo = "  O órgão não fechou o ciclo.  " }, admin);

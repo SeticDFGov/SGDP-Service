@@ -21,7 +21,7 @@ public class PeF3ModoNiveisTest : PeModeloTestBase
     {
         using var vazio = new PeBancoVazio();
         var resultado = await new PeCarregadorModelo(vazio.Context).CarregarAsync();
-        Assert.Equal(8, resultado.Versao);
+        Assert.Equal(PeCarregadorModelo.VersaoDaReestruturacao, resultado.Versao);
         Assert.Equal(8, PeCarregadorModelo.VersaoDoModoLivre);
         Assert.Equal("\"livre\"", vazio.Context.PeConfiguracoes.AsNoTracking().Single(c => c.Chave == PeConfiguracao.ChaveModoNiveis).Valor);
         Assert.True((await PeModoNiveis.LerAsync(vazio.Context)).Livre);
@@ -44,7 +44,7 @@ public class PeF3ModoNiveisTest : PeModeloTestBase
         await outro.Context.SaveChangesAsync();
 
         var carga = await new PeCarregadorModelo(outro.Context).CarregarAsync();
-        Assert.Equal((7, 8, 0), (carga.VersaoAnterior, carga.Versao, carga.Configuracoes));
+        Assert.Equal((7, PeCarregadorModelo.VersaoDaReestruturacao, 0), (carga.VersaoAnterior, carga.Versao, carga.Configuracoes));
         Assert.Equal("\"definido\"", outro.Context.PeConfiguracoes.AsNoTracking().Single(c => c.Chave == PeConfiguracao.ChaveModoNiveis).Valor);
         var modo = await PeModoNiveis.LerAsync(outro.Context);
         Assert.True(modo.Ativo);
@@ -61,7 +61,10 @@ public class PeF3ModoNiveisTest : PeModeloTestBase
         await new PeCarregadorModelo(vazio.Context).CarregarAsync(v7);
 
         var resultado = await new PeCarregadorModelo(vazio.Context).CarregarAsync();
-        Assert.Equal((7, 8, 1), (resultado.VersaoAnterior, resultado.Versao, resultado.Configuracoes));
+        // Desde a versão 9, a carga vai da 7 direto à 9: a configuração do modo e nada mais na estrutura (a
+        // trilha do JSON de hoje já é a da versão 9; a reestruturação não acha nada a mudar)
+        Assert.Equal((7, PeCarregadorModelo.VersaoDaReestruturacao, 1), (resultado.VersaoAnterior, resultado.Versao, resultado.Configuracoes));
+        Assert.Equal((0, 0), (resultado.Reestruturados, resultado.Textos));
         Assert.Equal(0, resultado.Niveis + resultado.Etapas + resultado.Passos + resultado.Secoes + resultado.Campos + resultado.Opcoes
                         + resultado.Registros + resultado.Documentos + resultado.Capitulos + resultado.Blocos + resultado.Fluxos
                         + resultado.SecoesPorCiclo + resultado.Correcoes);
@@ -128,7 +131,7 @@ public class PeF3ModoNiveisTest : PeModeloTestBase
         var trilha = await TrilhaAsync(OrgaoSes);
         Assert.Equal(PeDominios.ModoNiveis.Definido, trilha.ModoNiveis);
         Assert.All(PassosDa(trilha), p => Assert.Null(p.Detalhe));
-        Assert.Equal(23, PassosDa(trilha).Count);
+        Assert.Equal(21, PassosDa(trilha).Count);
 
         Assert.Equal(Codigo(ErrorCode.PeModeloIndisponivel),
             await ErroAsync(() => Modelo.DefinirModoNiveisAsync(new PeModoNiveisDTO { Modo = "definido" }, EmailAdmin)));

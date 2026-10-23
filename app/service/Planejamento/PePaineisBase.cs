@@ -402,7 +402,7 @@ public static class PeConformidadeRegras
         if (!PeDominios.SituacaoPdtic.Vigentes.Contains(pdtic.Situacao))
             return Item(null, "O acompanhamento começa depois da publicação do PDTIC");
         if (!acompanhamentoAtivo)
-            return Item(null, "O acompanhamento do PDTIC está sendo preparado nesta atualização");
+            return Item(null, "O acompanhamento está sendo atualizado");
 
         var monitoramento = situacao.Ciclos.Where(c => c.Tipo == PeDominios.TipoCiclo.Monitoramento).OrderBy(c => c.Inicio).ToList();
         var atrasados = monitoramento.Where(c => PeCiclos.Exibida(c, hoje) == PeDominios.SituacaoCicloExibida.Atrasado).ToList();

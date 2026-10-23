@@ -214,15 +214,13 @@ public class PeF1ModeloTest : PeReferenciaisTestBase
     [Fact]
     public void Seed_AjudaDeQuemDecidiu_CertaParaCadaAprovacao()
     {
-        const string doSgtic = "Em geral, o SGTIC. Mude quando outra instância decidiu.";
+        // Desde a revisão de 2026-10-20, a ajuda não repete o nome da seção: o SGTIC decide em quatro das
+        // cinco aprovações do PDTIC e a autoridade máxima, na do fechamento
+        const string doSgtic = "Em geral, o SGTIC. Mude se outra instância decidiu.";
         Assert.Equal(doSgtic, Campo("aprovacao_sgtic", "instancia").Ajuda);
         foreach (var secao in new[] { "aprovacao_plano_trabalho", "aprovacao_inventario", "aprovacao_plano_acompanhamento", "aprovacao_resultados_comite" })
-        {
-            var ajuda = Campo(secao, "instancia").Ajuda!;
-            Assert.NotEqual(doSgtic, ajuda);
-            Assert.Contains("comitê interno de TIC (SGTIC)", ajuda);
-        }
-        Assert.Equal("Em geral, quem aprova o relatório de resultados final é a autoridade máxima do órgão. Mude quando outra instância decidiu.",
+            Assert.Equal(doSgtic, Campo(secao, "instancia").Ajuda);
+        Assert.Equal("Em geral, a autoridade máxima do órgão. Mude se outra instância decidiu.",
             Campo("aprovacao_resultados_autoridade", "instancia").Ajuda);
     }
 
@@ -230,10 +228,12 @@ public class PeF1ModeloTest : PeReferenciaisTestBase
     public void Seed_OPasso51ServeATodosOsNiveis()
     {
         var passo = Passo("monitoramento.ciclo-monitoramento");
-        Assert.Equal("Atualize a situação das ações no ciclo", passo.Titulo);
-        // F3: na linguagem das formas, que vale nos dois modos dos níveis
-        Assert.StartsWith("A cada ciclo, atualize a situação de cada ação. Na forma do nível Básico, o mínimo do decreto, basta a situação;",
-            passo.OQueFazer);
+        // O título serve a todos os níveis (o Básico não registra medições nem riscos) e, desde a revisão de
+        // 2026-10-20, o "o que fazer" fica vazio: o mínimo do decreto (a situação de cada ação) está na ajuda da seção
+        Assert.Equal("Registre o andamento do ciclo", passo.Titulo);
+        Assert.Equal("", passo.OQueFazer);
+        Assert.Equal("Registre todas as ações, inclusive as que estão em dia. O mínimo do decreto é a situação de cada uma.",
+            Secao("monitoramento_acoes").Ajuda);
         // A observação da grade continua opcional no Básico
         Assert.Equal("p p p", SituacoesDoCampo("monitoramento_acoes", "observacao"));
     }

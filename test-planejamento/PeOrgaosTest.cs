@@ -91,7 +91,7 @@ public class PeOrgaosTest : PeModeloTestBase
     [Fact]
     public async Task Ajustes_ListaInteira_NuloOuAusenteSai_ComHistorico()
     {
-        var nomes = Passo("preparacao.nomes").Id;
+        var nomes = Passo("preparacao.abrangencia").Id;
         var equipe = Secao("equipe_designacao").Id;
         var cargo = Campo("equipe_elaboracao", "cargo").Id;
 
@@ -103,8 +103,7 @@ public class PeOrgaosTest : PeModeloTestBase
         }, EmailAdmin);
 
         Assert.Equal(3, gravados.Count);
-        Assert.Equal("Defina os nomes do órgão: comitê, equipes, autoridade máxima, unidade de TIC",
-            gravados.Single(a => a.AlvoTipo == "passo").AlvoTitulo);
+        Assert.Equal(Passo("preparacao.abrangencia").Titulo, gravados.Single(a => a.AlvoTipo == "passo").AlvoTitulo);
         Assert.Equal(3, (await Orgaos.ListarAsync(new PeOrgaosConsulta { Filtro = "SES" })).Single().Ajustes);
 
         // Lista nova: o campo sai por ausência, a seção por situação nula, o passo muda
@@ -155,10 +154,10 @@ public class PeOrgaosTest : PeModeloTestBase
         Assert.Equal(Codigo(ErrorCode.PeDadosInvalidos), await ErroAsync(() => Orgaos.DefinirAjustesAsync(OrgaoSes.Id,
             new List<PeOrgaoAjusteDTO> { new() { AlvoTipo = "etapa", AlvoId = 1, Situacao = "opcional" } }, EmailAdmin)));
         Assert.Equal(Codigo(ErrorCode.PeDadosInvalidos), await ErroAsync(() => Orgaos.DefinirAjustesAsync(OrgaoSes.Id,
-            new List<PeOrgaoAjusteDTO> { new() { AlvoTipo = "passo", AlvoId = Passo("preparacao.nomes").Id, Situacao = "talvez" } },
+            new List<PeOrgaoAjusteDTO> { new() { AlvoTipo = "passo", AlvoId = Passo("preparacao.abrangencia").Id, Situacao = "talvez" } },
             EmailAdmin)));
 
-        var nomes = Passo("preparacao.nomes").Id;
+        var nomes = Passo("preparacao.abrangencia").Id;
         Assert.Equal(Codigo(ErrorCode.PeDadosInvalidos), await ErroAsync(() => Orgaos.DefinirAjustesAsync(OrgaoSes.Id,
             new List<PeOrgaoAjusteDTO>
             {
@@ -176,7 +175,7 @@ public class PeOrgaosTest : PeModeloTestBase
     {
         var passo = await Modelo.CriarPassoAsync(new PePassoCriarDTO
         {
-            EtapaId = Passo("preparacao.nomes").EtapaId, Titulo = "Registre os parceiros", OQueFazer = "Registre."
+            EtapaId = Passo("preparacao.abrangencia").EtapaId, Titulo = "Registre os parceiros", OQueFazer = "Registre."
         }, EmailAdmin);
         await Orgaos.DefinirAjustesAsync(OrgaoSes.Id,
             new List<PeOrgaoAjusteDTO> { new() { AlvoTipo = "passo", AlvoId = passo.Id, Situacao = "obrigatorio" } }, EmailAdmin);

@@ -81,8 +81,8 @@ public class PeCarregadorAcompanhamentoTest : PeDocumentoTestBase
         Assert.Equal(new[] { "texto", "metas_por_resultado", "acoes_por_situacao", "tabela_secao", "riscos_ocorridos", "tabela_secao" },
             TiposDosBlocos("avaliacao_metas", PeDominios.TipoDocumento.Rr));
         // Os capítulos da avaliação intermediária no RA (os que ficam em branco no RA de um monitoramento)
-        Assert.Equal("avaliacao-intermediaria.resultados-intermediarios", CapituloDoModelo("avaliacao_metas", PeDominios.TipoDocumento.Ra).PassoChave);
-        Assert.Equal("avaliacao-intermediaria.comparacao-metas", CapituloDoModelo("pessoas", PeDominios.TipoDocumento.Ra).PassoChave);
+        Assert.Equal("avaliacao-intermediaria.avaliacao-comite", CapituloDoModelo("avaliacao_metas", PeDominios.TipoDocumento.Ra).PassoChave);
+        Assert.Equal("avaliacao-intermediaria.avaliacao-comite", CapituloDoModelo("pessoas", PeDominios.TipoDocumento.Ra).PassoChave);
         Assert.Equal("monitoramento.ciclo-monitoramento", CapituloDoModelo("monitoramento_acoes", PeDominios.TipoDocumento.Ra).PassoChave);
 
         // Os blocos novos só têm a página deitada no config

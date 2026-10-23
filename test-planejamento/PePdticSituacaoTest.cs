@@ -23,14 +23,19 @@ public class PePdticSituacaoTest : PePdticTestBase
         periodicidade_revisao = "anual"
     };
 
+    private static readonly object Nomes = new
+    {
+        comite = "SGTIC", equipe_elaboracao = "Equipe do PDTIC", autoridade_cargo = "Secretário", autoridade_nome = "Fulano", unidade_tic = "SUTIC"
+    };
+
     [Fact]
     public async Task NovoPdtic_PendenteNosDados_AguardandoDepoisDoEnvio_EOProximoE11()
     {
         var pdtic = await AbrirSesAsync();
         var situacao = await SituacaoAsync(pdtic.Id);
 
-        // Básico: 23 passos, na ordem e com a numeração da trilha
-        Assert.Equal(23, situacao.Passos.Count);
+        // Básico: 21 passos (desde a versão 9; eram 23), na ordem e com a numeração da trilha
+        Assert.Equal(21, situacao.Passos.Count);
         Assert.Equal("1.1", situacao.Passos[0].Numero);
         Assert.Equal("preparacao.abrangencia", situacao.Passos[0].Chave);
         Assert.Equal("1.1", situacao.ProximoPasso);
@@ -55,8 +60,8 @@ public class PePdticSituacaoTest : PePdticTestBase
         });
 
         // Consulta e papéis globais leem; a equipe de outro órgão, não
-        Assert.Equal(23, (await SituacaoAsync(pdtic.Id, UserConsultaSes)).Passos.Count);
-        Assert.Equal(23, (await SituacaoAsync(pdtic.Id, UserPeCgtic)).Passos.Count);
+        Assert.Equal(21, (await SituacaoAsync(pdtic.Id, UserConsultaSes)).Passos.Count);
+        Assert.Equal(21, (await SituacaoAsync(pdtic.Id, UserPeCgtic)).Passos.Count);
         Assert.Equal(Codigo(ErrorCode.PeSemPermissao), await ErroAsync(() => SituacaoAsync(pdtic.Id, UserOrgaoSeec)));
     }
 
@@ -65,6 +70,9 @@ public class PePdticSituacaoTest : PePdticTestBase
     {
         var pdtic = await AbrirSesAsync();
         await IncluirNoPdticAsync(pdtic.Id, "abrangencia", Abrangencia);
+        // Desde a versão 9, o dicionário de nomes está no passo 1.1
+        Assert.Equal(PeDominios.SituacaoPasso.Pendente, (await SituacaoAsync(pdtic.Id)).Passos[0].Situacao);
+        await IncluirNoPdticAsync(pdtic.Id, "nomes", Nomes);
 
         var situacao = await SituacaoAsync(pdtic.Id);
         Assert.Equal(PeDominios.SituacaoPasso.Feito, situacao.Passos[0].Situacao);
@@ -88,6 +96,7 @@ public class PePdticSituacaoTest : PePdticTestBase
     {
         var pdtic = await AbrirSesAsync();
         await IncluirNoPdticAsync(pdtic.Id, "abrangencia", Abrangencia);
+        await IncluirNoPdticAsync(pdtic.Id, "nomes", Nomes);
         var passo = Passo("preparacao.abrangencia");
 
         var comentario = await Comentarios.CriarAsync(pdtic.Id, new PeComentarioCriarDTO
@@ -113,24 +122,25 @@ public class PePdticSituacaoTest : PePdticTestBase
     public async Task NaoSeAplica_SoEmPassoOpcionalQueAceite_ComJustificativa_TravadoNunca()
     {
         var pdtic = await AbrirSesAsync();
-        var equipe = Passo("preparacao.equipe").Id;
-        var dto = new PeNaoSeAplicaDTO { Justificativa = "O órgão usa a equipe do SGTIC." };
+        // Desde a versão 9, o passo do SGTIC e da equipe não aceita "não se aplica" (o SGTIC não aceitava): a metodologia aceita
+        var equipe = Passo("preparacao.metodologia").Id;
+        var dto = new PeNaoSeAplicaDTO { Justificativa = "O órgão usa a metodologia do SGTIC." };
 
         // No Básico o passo é obrigatório
         Assert.Equal(Codigo(ErrorCode.PeNaoSeAplicaRecusado),
             await ErroAsync(async () => await Pdtics.MarcarNaoSeAplicaAsync(pdtic.Id, equipe, dto, await Orgao())));
 
         // Opcional para o órgão (ajuste): pede justificativa, marca e desfaz
-        await AjustarPassosAsync(OrgaoSes, ("preparacao.equipe", "opcional"), ("diagnostico.ativos", "opcional"),
+        await AjustarPassosAsync(OrgaoSes, ("preparacao.metodologia", "opcional"), ("diagnostico.ativos", "opcional"),
             ("preparacao.abrangencia", "opcional"));
         Assert.Equal(Codigo(ErrorCode.PeJustificativaObrigatoria), await ErroAsync(async () =>
             await Pdtics.MarcarNaoSeAplicaAsync(pdtic.Id, equipe, new PeNaoSeAplicaDTO { Justificativa = "  " }, await Orgao())));
 
         var marcado = await Pdtics.MarcarNaoSeAplicaAsync(pdtic.Id, equipe, dto, await Orgao());
         Assert.Equal(PeDominios.SituacaoPasso.NaoSeAplica, marcado.Situacao);
-        Assert.Equal("O órgão usa a equipe do SGTIC.", marcado.NaoSeAplica!.Justificativa);
+        Assert.Equal("O órgão usa a metodologia do SGTIC.", marcado.NaoSeAplica!.Justificativa);
         Assert.Equal(UserOrgaoSes.Email, marcado.NaoSeAplica.MarcadoPor);
-        Assert.Equal(PeDominios.SituacaoPasso.NaoSeAplica, (await PassoAsync(pdtic.Id, "preparacao.equipe")).Situacao);
+        Assert.Equal(PeDominios.SituacaoPasso.NaoSeAplica, (await PassoAsync(pdtic.Id, "preparacao.metodologia")).Situacao);
 
         var desfeito = await Pdtics.DesmarcarNaoSeAplicaAsync(pdtic.Id, equipe, await Orgao());
         // F3: opcional para o órgão e sem conteúdo, o passo não é cobrado (antes, pendente)
@@ -156,25 +166,29 @@ public class PePdticSituacaoTest : PePdticTestBase
         // A marca deixa de valer quando o passo volta a ser obrigatório (e volta com o ajuste)
         await Pdtics.MarcarNaoSeAplicaAsync(pdtic.Id, equipe, dto, await Orgao());
         await Orgaos.DefinirAjustesAsync(OrgaoSes.Id, new List<PeOrgaoAjusteDTO>(), EmailAdmin);
-        var obrigatorio = await PassoAsync(pdtic.Id, "preparacao.equipe");
+        var obrigatorio = await PassoAsync(pdtic.Id, "preparacao.metodologia");
         Assert.Equal(PeDominios.SituacaoPasso.Pendente, obrigatorio.Situacao);
         Assert.Null(obrigatorio.NaoSeAplica);
+        await AjustarPassosAsync(OrgaoSes, ("preparacao.metodologia", "opcional"));
+        Assert.Equal(PeDominios.SituacaoPasso.NaoSeAplica, (await PassoAsync(pdtic.Id, "preparacao.metodologia")).Situacao);
+        // O passo juntado com o SGTIC (que não aceitava) não aceita, nem opcional
         await AjustarPassosAsync(OrgaoSes, ("preparacao.equipe", "opcional"));
-        Assert.Equal(PeDominios.SituacaoPasso.NaoSeAplica, (await PassoAsync(pdtic.Id, "preparacao.equipe")).Situacao);
+        Assert.Equal(Codigo(ErrorCode.PeNaoSeAplicaRecusado), await ErroAsync(async () =>
+            await Pdtics.MarcarNaoSeAplicaAsync(pdtic.Id, Passo("preparacao.equipe").Id, dto, await Orgao())));
     }
 
     [Fact]
     public async Task NaoSeAplica_SoComOPdticAberto()
     {
         var pdtic = await AbrirSesAsync();
-        await AjustarPassosAsync(OrgaoSes, ("preparacao.equipe", "opcional"));
+        await AjustarPassosAsync(OrgaoSes, ("preparacao.metodologia", "opcional"));
         var p = Context.PePdtics.Single(x => x.Id == pdtic.Id);
         p.Situacao = PeDominios.SituacaoPdtic.EmAprovacao;
         Context.SaveChanges();
         Context.ChangeTracker.Clear();
 
         Assert.Equal(Codigo(ErrorCode.PePdticFechado), await ErroAsync(async () => await Pdtics.MarcarNaoSeAplicaAsync(pdtic.Id,
-            Passo("preparacao.equipe").Id, new PeNaoSeAplicaDTO { Justificativa = "Não se aplica." }, await Orgao())));
+            Passo("preparacao.metodologia").Id, new PeNaoSeAplicaDTO { Justificativa = "Não se aplica." }, await Orgao())));
     }
 
     [Fact]
@@ -226,19 +240,22 @@ public class PePdticSituacaoTest : PePdticTestBase
         var d1 = await IncluirNoPdticAsync(pdtic.Id, "swot_fraquezas", new { descricao = "Rede antiga" });
         await IncluirNoPdticAsync(pdtic.Id, "swot_fraquezas", new { descricao = "Poucos servidores de TIC" });
         var am1 = await IncluirNoPdticAsync(pdtic.Id, "swot_ameacas", new { descricao = "Corte no orçamento" });
+        // Desde a versão 9, o SGTIC está no passo da equipe
+        await IncluirNoPdticAsync(pdtic.Id, "sgtic", new { forma = "subcomite", ato_tipo = "portaria", ato_numero = "12/2026", ato_data = "2026-01-10" });
+        await IncluirNoPdticAsync(pdtic.Id, "sgtic_membros", new { nome = "Maria da Silva", papel = "presidente", cargo = "Secretária-adjunta", unidade = "Gabinete" });
         await IncluirNoPdticAsync(pdtic.Id, "equipe_elaboracao", new { nome = "Ana", papel = "coordenacao", area = "Subsecretaria de TIC", tipo_area = "tic" });
         await IncluirNoPdticAsync(pdtic.Id, "equipe_elaboracao", new { nome = "Beto", papel = "membro", area = "Gerência de redes", tipo_area = "tic" });
 
         var swot = await PassoAsync(pdtic.Id, "diagnostico.swot");
         Assert.Equal(2, swot.Avisos.Count);
         Assert.Equal("As fraquezas D01 e D02 ainda não têm necessidade de TIC ligada. O guia recomenda que cada fraqueza vire pelo menos "
-                     + "uma necessidade: faça a ligação no passo 2.7.", swot.Avisos[0]);
-        Assert.Equal("A ameaça AM01 ainda não tem risco ligado. O guia recomenda tratar cada ameaça no plano de riscos: faça a ligação no passo 3.8.",
+                     + "uma necessidade: faça a ligação no passo 2.6.", swot.Avisos[0]);
+        Assert.Equal("A ameaça AM01 ainda não tem risco ligado. O guia recomenda tratar cada ameaça no plano de riscos: faça a ligação no passo 3.7.",
             swot.Avisos[1]);
         // O aviso não bloqueia: as seções da SWOT estão feitas, só faltam as forças e as oportunidades
         Assert.Equal(PeDominios.SituacaoPasso.Pendente, swot.Situacao);
         var equipe = await PassoAsync(pdtic.Id, "preparacao.equipe");
-        Assert.Equal("A equipe de elaboração tem só pessoas da área de TIC. O guia recomenda incluir também pessoas das áreas finalísticas do órgão.",
+        Assert.Equal("A equipe de elaboração só tem pessoas de TIC. O guia recomenda incluir pessoas das áreas finalísticas.",
             Assert.Single(equipe.Avisos));
         Assert.Equal(PeDominios.SituacaoPasso.Feito, equipe.Situacao);
 
@@ -256,7 +273,7 @@ public class PePdticSituacaoTest : PePdticTestBase
 
         swot = await PassoAsync(pdtic.Id, "diagnostico.swot");
         Assert.Equal("A fraqueza D02 ainda não tem necessidade de TIC ligada. O guia recomenda que cada fraqueza vire pelo menos uma necessidade: "
-                     + "faça a ligação no passo 2.7.", Assert.Single(swot.Avisos));
+                     + "faça a ligação no passo 2.6.", Assert.Single(swot.Avisos));
         Assert.Empty((await PassoAsync(pdtic.Id, "preparacao.equipe")).Avisos);
 
         // No Básico não há SWOT nem o tipo da área: sem avisos
@@ -273,7 +290,8 @@ public class PePdticSituacaoTest : PePdticTestBase
         {
             comite = "SGTIC", equipe_elaboracao = "Equipe do PDTIC", autoridade_cargo = "Secretário", autoridade_nome = "Fulano", unidade_tic = "SUTIC"
         });
-        Assert.Equal("1.3", (await SituacaoAsync(pdtic.Id)).ProximoPasso);
+        // Desde a versão 9, o 1.1 tem a abrangência e os nomes: o próximo é o 1.2
+        Assert.Equal("1.2", (await SituacaoAsync(pdtic.Id)).ProximoPasso);
 
         // Um comentário no passo 1.1 (feito) passa na frente
         await Comentarios.CriarAsync(pdtic.Id, new PeComentarioCriarDTO { PassoId = Passo("preparacao.abrangencia").Id, Texto = "Confira a vigência." },

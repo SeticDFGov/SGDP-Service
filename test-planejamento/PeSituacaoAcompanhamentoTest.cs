@@ -84,19 +84,22 @@ public class PeSituacaoAcompanhamentoTest : PeAcompanhamentoTestBase
     public async Task Avaliacao_AguardandoAteAbrirUma_DepoisPelaMaisRecente()
     {
         var id = await AcompanhadoAsync();
-        const string resultados = "avaliacao-intermediaria.resultados-intermediarios";
-        const string comite = "avaliacao-intermediaria.avaliacao-comite";
+        // Desde a versão 9, a avaliação intermediária é um passo só (os resultados, a análise e a avaliação do comitê)
+        const string avaliacaoIntermediaria = "avaliacao-intermediaria.avaliacao-comite";
 
-        var antes = await PassoDaSituacaoAsync(id, resultados);
+        var antes = await PassoDaSituacaoAsync(id, avaliacaoIntermediaria);
         Assert.Equal((PeDominios.SituacaoPasso.Aguardando, PePdticService.MotivoSemAvaliacao), (antes.Situacao, antes.Motivo));
-        Assert.Equal(PeDominios.SituacaoPasso.Aguardando, (await PassoDaSituacaoAsync(id, comite)).Situacao);
 
         var avaliacao = await AbrirAvaliacaoAsync(id);
-        Assert.Equal(PeDominios.SituacaoPasso.Pendente, (await PassoDaSituacaoAsync(id, resultados)).Situacao);
+        Assert.Equal(PeDominios.SituacaoPasso.Pendente, (await PassoDaSituacaoAsync(id, avaliacaoIntermediaria)).Situacao);
         await IncluirNoPdticAsync(id, "resultados_intermediarios",
             new { valor_alcancado = "40%", data = "2026-09-01", situacao = "em_andamento" }, new { meta = new[] { IdDe(id, "M01") } }, cicloId: avaliacao.Id);
-        Assert.Equal(PeDominios.SituacaoPasso.Feito, (await PassoDaSituacaoAsync(id, resultados)).Situacao);
-        Assert.Equal(PeDominios.SituacaoPasso.Pendente, (await PassoDaSituacaoAsync(id, comite)).Situacao);
+        await IncluirNoPdticAsync(id, "analise_intermediaria",
+            new { parecer_execucao = "A execução está no ritmo previsto.", ajustes_propostos = "Nenhum." }, cicloId: avaliacao.Id);
+        // Os dados completos: falta a decisão do comitê
+        Assert.Equal(PeDominios.SituacaoPasso.Pendente, (await PassoDaSituacaoAsync(id, avaliacaoIntermediaria)).Situacao);
+        await IncluirNoPdticAsync(id, "avaliacao_comite", new { decisao = "seguir", data = "2026-09-10" }, cicloId: avaliacao.Id);
+        Assert.Equal(PeDominios.SituacaoPasso.Feito, (await PassoDaSituacaoAsync(id, avaliacaoIntermediaria)).Situacao);
     }
 
     [Fact]

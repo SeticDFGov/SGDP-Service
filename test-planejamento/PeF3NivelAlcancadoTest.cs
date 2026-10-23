@@ -32,11 +32,12 @@ public class PeF3NivelAlcancadoTest : PePaineisTestBase
         Assert.Null(nivel.AlcancadoId);
         Assert.Null(nivel.Motivo);
         Assert.Equal((NivelId("basico"), "Básico"), (nivel.ProximoId, nivel.ProximoNome));
-        // Os princípios do art. 4º já vêm no PDTIC novo: o passo 1.8 não falta
+        // Os princípios do art. 4º já vêm no PDTIC novo: o passo 1.5 não falta
         Assert.DoesNotContain(nivel.Faltam, f => f.PassoId == Passo("preparacao.principios").Id);
         var abrangencia = Assert.Single(nivel.Faltam, f => f.PassoId == Passo("preparacao.abrangencia").Id);
         Assert.Equal(("1.1", Passo("preparacao.abrangencia").Titulo), (abrangencia.PassoNumero, abrangencia.PassoTitulo));
-        Assert.Equal("Preencha \"Abrangência e vigência\".", abrangencia.Motivo);
+        // Desde a versão 9, o passo 1.1 tem também o dicionário de nomes
+        Assert.Equal("Preencha \"Abrangência e vigência\". Preencha \"Nomes do órgão\".", abrangencia.Motivo);
         // Só contam os passos de dados, da conferência dos temas e de aprovação das etapas 1 a 3
         var contam = nivel.Faltam.Select(f => Context.PePassos.AsNoTracking().Single(p => p.Id == f.PassoId)).ToList();
         Assert.All(contam, p => Assert.Contains(p.Tipo, new[] { "dados", "conferencia_temas", "aprovacao" }));
@@ -86,6 +87,8 @@ public class PeF3NivelAlcancadoTest : PePaineisTestBase
             descricao = "Substituir o sistema de regulação.", tipo = "servico", origem = "swot", areas = "Regulação", priorizada = true,
             gravidade = 5, urgencia = 5, tendencia = 4
         }), await Orgao());
+        // Desde a versão 9, as necessidades de informação (obrigatórias no Intermediário) estão no mesmo passo
+        await IncluirNoPdticAsync(pdtic.Id, "necessidades_informacao", new { descricao = "Ocupação dos leitos", areas = "Regulação" });
         await Orgaos.DefinirDetalheAsync(OrgaoSes.Id, Passo("diagnostico.necessidades-tic").Id, new PePassoDetalheDTO(), EmailAdmin);
 
         nivel = await NivelAsync(pdtic.Id);

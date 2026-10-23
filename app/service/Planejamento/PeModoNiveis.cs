@@ -46,5 +46,5 @@ public sealed record PeModoNiveis(bool Ativo, string Modo)
     public PeModoNiveis Exigir() => Ativo
         ? this
         : throw new ApiException(ErrorCode.PeModeloIndisponivel,
-            "Esta parte da Governança Estratégica está sendo preparada nesta atualização. Tente de novo em alguns minutos.");
+            "Esta parte do módulo está sendo atualizada. Tente de novo em alguns minutos.");
 }

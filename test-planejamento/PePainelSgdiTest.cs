@@ -238,7 +238,7 @@ public class PePainelSgdiTest : PePaineisTestBase
         var seec = await AbrirSeecAsync();
         await IncluirNoPdticAsync(seec.Id, "abrangencia", new { tipo_abrangencia = "todo_com_vinculadas", vigencia_inicio = "2026-01-01", vigencia_fim = "2027-12-31", periodicidade_revisao = "anual" },
             user: UserOrgaoSeec);
-        await Comentarios.CriarAsync(seec.Id, new PeComentarioCriarDTO { PassoId = Passo("preparacao.nomes").Id, Texto = "Preencha o dicionário." }, await Sgdi());
+        await Comentarios.CriarAsync(seec.Id, new PeComentarioCriarDTO { PassoId = Passo("preparacao.equipe").Id, Texto = "Preencha o dicionário." }, await Sgdi());
         var extra = NovoOrgao("SEDES");
         await AbrirPdticAsync(extra);
 

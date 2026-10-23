@@ -145,10 +145,10 @@ public class PePlanilhaService : IPePlanilhaService
                 ? $"{passo.Ciclo.Rotulo} ({PeFormato.Data(passo.Ciclo.Inicio)} a {(passo.Ciclo.Fim is DateOnly fim ? PeFormato.Data(fim) : "-")})"
                 : passo.Ciclo.Rotulo));
         leiaMe.Add(("Extraído em", Agora()));
-        leiaMe.Add(("Como ler", "Cada aba é uma seção do passo, com as colunas que aparecem para o órgão. A coluna Código identifica cada registro "
-                                + "(por exemplo, N01), e as colunas de ligação mostram os códigos dos registros ligados, para cruzar as abas. "
+        leiaMe.Add(("Como ler", "Cada aba é uma seção do passo, com as colunas que o órgão vê. A coluna Código identifica o registro "
+                                + "(por exemplo, N01) e as colunas de ligação trazem os códigos dos registros ligados, para cruzar as abas. "
                                 + (passo.Ciclo == null ? string.Empty : "As seções registradas a cada ciclo trazem só o ciclo acima. ")
-                                + "Datas e valores estão como números."));
+                                + "Datas e valores são números."));
         return new PePlanilhaArquivo(PeXlsx.Gerar(passo.Secoes.Select(Aba).ToList(), leiaMe), MimeXlsx, $"{nome}.{Xlsx}");
     }
 
@@ -191,9 +191,9 @@ public class PePlanilhaService : IPePlanilhaService
                 ? $"{PeFormato.Data(pdtic.VigenciaInicio.Value)} a {PeFormato.Data(pdtic.VigenciaFim.Value)}"
                 : "-"),
             ("Extraído em", Agora()),
-            ("Como ler", "Cada aba é uma seção do PDTIC, com as colunas que aparecem para o órgão. A coluna Código identifica cada registro "
-                         + "(por exemplo, N01), e as colunas de ligação mostram os códigos dos registros ligados, para cruzar as abas. "
-                         + "Datas e valores estão como números.")
+            ("Como ler", "Cada aba é uma seção do PDTIC, com as colunas que o órgão vê. A coluna Código identifica o registro "
+                         + "(por exemplo, N01) e as colunas de ligação trazem os códigos dos registros ligados, para cruzar as abas. "
+                         + "Datas e valores são números.")
         };
         return itens;
     }
@@ -365,7 +365,7 @@ public class PePlanilhaService : IPePlanilhaService
     /// <summary>As colunas do órgão antes dos campos (nome, sigla, nível, versão e situação do PDTIC).</summary>
     private static readonly (string Titulo, double Largura, string Ajuda)[] ColunasDoOrgao =
     {
-        ("Órgão", 40, "Nome do órgão ou entidade."),
+        ("Órgão", 40, "Nome do órgão."),
         ("Sigla", 10, "Sigla do órgão."),
         ("Nível", 16, "Nível de maturidade do órgão hoje: diz que campos aparecem para ele."),
         ("Versão do PDTIC", 12, "Versão do PDTIC atual do órgão."),
@@ -379,7 +379,7 @@ public class PePlanilhaService : IPePlanilhaService
     private static readonly (string Titulo, double Largura, string Ajuda)[] ColunasDoOrgaoNoModoLivre = ColunasDoOrgao
         .Select((c, i) => i == 2
             ? ("Nível alcançado", 16d,
-                "O nível que o PDTIC da linha alcançou, pela régua dos níveis (a mesma da conformidade). Fica vazio quando o PDTIC "
+                "O nível que o PDTIC da linha alcançou, pela régua da conformidade. Vazio quando o PDTIC "
                 + "ainda não completa o primeiro nível ou foi aprovado fora do sistema.")
             : c)
         .ToArray();
@@ -455,7 +455,7 @@ public class PePlanilhaService : IPePlanilhaService
         // F3: no modo livre, a coluna do nível é a do nível que o PDTIC alcançou
         var nivel = baseConsolidada.NiveisAlcancados == null
             ? "o nível de maturidade dele"
-            : "o nível que o PDTIC alcançou (vazio quando ele ainda não completa o primeiro nível ou foi aprovado fora do sistema)";
+            : "o nível que o PDTIC alcançou (vazio quando ainda não completa o primeiro nível ou foi aprovado fora do sistema)";
         return new List<(string, string)>
         {
             ("Conteúdo", "Consolidado dos PDTICs atuais de todos os órgãos (em elaboração, em aprovação, devolvidos, aprovados, publicados ou em acompanhamento)"),
@@ -679,8 +679,8 @@ public class PePlanilhaService : IPePlanilhaService
 
     private static IEnumerable<(string, string)> ComoLer() => new[]
     {
-        ("Como ler", "Cada aba é uma seção. A coluna Código identifica cada registro (por exemplo, OE01), e as colunas de "
-                     + "ligação mostram os códigos dos registros ligados, para cruzar as abas. Datas e valores estão como números.")
+        ("Como ler", "Cada aba é uma seção. A coluna Código identifica o registro (por exemplo, OE01) e as colunas de "
+                     + "ligação trazem os códigos dos registros ligados, para cruzar as abas. Datas e valores são números.")
     };
 
     private static string Situacao(string situacao) => situacao switch

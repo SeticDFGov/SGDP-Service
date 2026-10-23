@@ -161,13 +161,13 @@ public class PeCiclosRegrasTest
         Assert.Equal(PeDominios.SituacaoCicloExibida.Aberto, PeCiclos.Exibida(ciclo, D(2026, 4, 1)));
         Assert.Equal(PeDominios.SituacaoCicloExibida.Aberto, PeCiclos.Exibida(ciclo, D(2026, 7, 15)));
         Assert.Equal(PeDominios.SituacaoCicloExibida.Atrasado, PeCiclos.Exibida(ciclo, D(2026, 7, 16)));
-        Assert.Equal("O ciclo 2026 · 2º trimestre começa em 01/04/2026. Os dados entram a partir do início do ciclo.",
+        Assert.Equal("O ciclo 2026 · 2º trimestre começa em 01/04/2026. Os dados entram a partir dessa data.",
             PeCiclos.RecusaDeDados(ciclo, D(2026, 3, 31)));
         Assert.Null(PeCiclos.RecusaDeDados(ciclo, D(2026, 8, 1)));
 
         ciclo.Situacao = PeDominios.SituacaoCiclo.Fechado;
         Assert.Equal(PeDominios.SituacaoCicloExibida.Fechado, PeCiclos.Exibida(ciclo, D(2026, 8, 1)));
-        Assert.Equal("O ciclo 2026 · 2º trimestre está fechado. Para mudar os dados dele, reabra o ciclo.", PeCiclos.RecusaDeDados(ciclo, D(2026, 8, 1)));
+        Assert.Equal("O ciclo 2026 · 2º trimestre está fechado. Reabra o ciclo para mudar os dados.", PeCiclos.RecusaDeDados(ciclo, D(2026, 8, 1)));
     }
 
     [Theory]

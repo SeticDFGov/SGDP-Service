@@ -115,7 +115,7 @@ public class PeAcompanhamentoService : IPeAcompanhamentoService
         var tipo = dto.Tipo?.Trim();
         if (tipo == PeDominios.TipoCiclo.Monitoramento)
             throw new ApiException(ErrorCode.PeCicloInvalido,
-                "Os ciclos de monitoramento são criados sozinhos pela periodicidade do monitoramento. Aqui se abre uma avaliação intermediária.");
+                "Os ciclos de monitoramento são criados pela periodicidade do plano. Aqui só se abre a avaliação intermediária.");
         if (tipo != PeDominios.TipoCiclo.Avaliacao)
             throw new ApiException(ErrorCode.PeDadosInvalidos, "Diga o tipo do ciclo: avaliacao.");
 
@@ -166,7 +166,7 @@ public class PeAcompanhamentoService : IPeAcompanhamentoService
             throw new ApiException(ErrorCode.PeCicloFechado,
                 $"O ciclo {ciclo.Rotulo} já foi fechado em {PePdticService.DataBrasilia(ciclo.FechadoEm)}.");
         if (ciclo.Inicio > hoje)
-            throw new ApiException(ErrorCode.PeCicloFechado, $"O ciclo {ciclo.Rotulo} começa em {PeCiclos.Data(ciclo.Inicio)}. Ele fecha depois de começar.");
+            throw new ApiException(ErrorCode.PeCicloFechado, $"O ciclo {ciclo.Rotulo} começa em {PeCiclos.Data(ciclo.Inicio)}. Só dá para fechá-lo depois do início.");
 
         var pendencias = await PendenciasDoFechamentoAsync(pdtic, trilha, ciclo);
         if (pendencias.Count > 0)
@@ -277,9 +277,8 @@ public class PeAcompanhamentoService : IPeAcompanhamentoService
             if (naoSeAplica.Contains(passo.Id)) continue;
             var secoes = passo.Secoes.Select(trilha.Montar).ToList();
             var porSecao = (await _registros.AnalisarAsync(dono, secoes, ciclo.Id)).Secoes.ToDictionary(s => s.Secao.Secao.Id);
-            var falta = passo.Tipo == PeDominios.TipoPasso.Aprovacao
-                ? PePdticService.FaltaNaAprovacao(passo, porSecao, new List<string>())
-                : PePdticService.FaltaNasSecoes(passo, porSecao);
+            // A avaliação do comitê é a última seção do passo da avaliação (versão 9): a regra da aprovação vale
+            var falta = PePdticService.FaltaNaAprovacao(passo, porSecao, new List<string>());
             if (falta != null) pendencias.Add(Pendencia(passo, falta));
         }
         return pendencias;
@@ -743,7 +742,7 @@ public class PeAcompanhamentoService : IPeAcompanhamentoService
         if (!PeDominios.SituacaoPdtic.Vigentes.Contains(pdtic.Situacao))
             throw new ApiException(ErrorCode.PePdticSituacaoInvalida, PeDominios.SituacaoPdtic.DaElaboracao.Contains(pdtic.Situacao)
                 ? "O acompanhamento começa depois da publicação do PDTIC."
-                : $"Este PDTIC está {PeDominios.SituacaoPdtic.RotuloMinusculo(pdtic.Situacao)} e o acompanhamento dele não muda mais.");
+                : $"Este PDTIC está {PeDominios.SituacaoPdtic.RotuloMinusculo(pdtic.Situacao)}: o acompanhamento não muda mais.");
     }
 
     private static bool TemSecoesDoTipo(PeTrilhaOrgao trilha, string tipo) =>

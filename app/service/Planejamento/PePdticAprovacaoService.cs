@@ -50,7 +50,7 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
     // O reenvio depois da devolução do CGTIC (decisão D3 da revisão final): a versão ajustada volta
     // ao comitê interno, então vale só a aprovação do SGTIC registrada no dia da devolução ou depois
     public const string PendenciaSgticDepoisDaDevolucao =
-        "Registre de novo a aprovação do SGTIC: a versão ajustada depois da devolução do CGTIC precisa passar pelo comitê interno.";
+        "Registre a aprovação do SGTIC de novo: o PDTIC ajustado depois da devolução do CGTIC volta ao SGTIC.";
 
     // A aprovação do SGTIC com a data no futuro (achado C05)
     public const string PendenciaSgticDataFutura = "Corrija a data da aprovação do SGTIC: ela não pode ser depois de hoje.";
@@ -306,8 +306,8 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
         var hoje = DateOnly.FromDateTime(DateTimeHelper.TodayBrasilia());
         if (pdtic.VigenciaFim is not DateOnly fim || fim >= hoje)
             throw new ApiException(ErrorCode.PeEncerramentoRecusado, pdtic.VigenciaFim is DateOnly ate
-                ? $"A vigência do PDTIC vai até {PeFormato.Data(ate)}. O administrador encerra o PDTIC só depois do fim da vigência."
-                : "O PDTIC não tem o fim da vigência (passo da abrangência). O administrador encerra o PDTIC só depois do fim da vigência.");
+                ? $"A vigência vai até {PeFormato.Data(ate)}. O administrador só encerra o PDTIC depois dessa data."
+                : "O PDTIC não tem o fim da vigência (passo da abrangência). O administrador só encerra o PDTIC depois dessa data.");
         return await EncerrarAsync(pdtic, motivo, ctx);
     }
 
@@ -369,8 +369,8 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
             var decisao = secaoDoComite == null ? null : await DecisaoDoComiteAsync(atual, trilha, secaoDoComite);
             if (decisao != PeDominios.Decisao.Revisar)
                 throw new ApiException(ErrorCode.PeRevisaoRecusada, secaoDoComite?.PorCiclo == PeDominios.TipoCiclo.Avaliacao
-                    ? $"Para abrir a revisão, registre na avaliação intermediária (passo {comite.Numero}) a avaliação do comitê com a decisão \"Revisar o PDTIC\"."
-                    : $"Para abrir a revisão, registre no passo {comite.Numero} a avaliação do comitê com a decisão \"Revisar o PDTIC\".");
+                    ? $"Para abrir a revisão, registre a decisão \"Revisar o PDTIC\" na avaliação intermediária (passo {comite.Numero})."
+                    : $"Para abrir a revisão, registre a decisão \"Revisar o PDTIC\" na avaliação do comitê (passo {comite.Numero}).");
         }
         else if (justificativa == null
                  && (secaoDoComite == null || await DecisaoDoComiteAsync(atual, trilha, secaoDoComite) != PeDominios.Decisao.Revisar))
@@ -447,8 +447,13 @@ public partial class PePdticAprovacaoService : IPePdticAprovacaoService
     {
         var tiposSemCopia = new[] { PeDominios.TipoPasso.Aprovacao, PeDominios.TipoPasso.Envio, PeDominios.TipoPasso.Publicacao };
         var passosSemCopia = modelo.Passos.Where(p => tiposSemCopia.Contains(p.Tipo)).Select(p => p.Id).ToHashSet();
+        // Versão 9: a aprovação pode ser a última seção de um passo de dados; ela não é copiada (as
+        // outras seções do passo, sim)
+        var secoesDeDecisao = modelo.Campos.Where(c => c.ExcluidoEm == null && c.Chave == PeDominios.ChavePdtic.CampoDecisao)
+            .Select(c => c.SecaoId).ToHashSet();
         var secoesSemCopia = modelo.Secoes
-            .Where(s => (s.PassoId != null && passosSemCopia.Contains(s.PassoId.Value)) || modelo.PorCicloDe(s.Id) != null)
+            .Where(s => (s.PassoId != null && passosSemCopia.Contains(s.PassoId.Value)) || modelo.PorCicloDe(s.Id) != null
+                        || (s.Escopo == PeDominios.Escopo.Pdtic && secoesDeDecisao.Contains(s.Id)))
             .Select(s => s.Id)
             .ToHashSet();
         var ativo = modelo.Acompanhamento.Ativo;

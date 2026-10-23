@@ -572,18 +572,18 @@ public class PePainelService : IPePainelService
 
         var colunas = new List<PeXlsxColuna>
         {
-            new() { Titulo = "Órgão", Largura = 40, Ajuda = "Nome do órgão ou entidade." },
+            new() { Titulo = "Órgão", Largura = 40, Ajuda = "Nome do órgão." },
             new() { Titulo = "Sigla", Largura = 10, Ajuda = "Sigla do órgão." },
             new()
             {
                 Titulo = tituloDoNivel,
                 Largura = 16,
                 Ajuda = livre
-                    ? "O nível que o PDTIC vigente (ou o da elaboração) alcançou, pelo que o PDTIC tem; \"Sem nível alcançado\" quando não completa o primeiro nível, não tem PDTIC ou foi aprovado fora do sistema."
+                    ? "O nível que o PDTIC vigente (ou o da elaboração) alcançou, pelo que já tem preenchido. \"Sem nível alcançado\": ainda não completa o primeiro nível, não há PDTIC ou foi aprovado fora do sistema."
                     : "Nível de maturidade do órgão hoje."
             },
-            new() { Titulo = "Versão do PDTIC", Largura = 12, Ajuda = "A versão de referência do órgão: a vigente; sem ela, a da elaboração; sem as duas, a mais recente (encerrada)." },
-            new() { Titulo = "Situação do PDTIC", Largura = 20, Ajuda = "Situação da versão de referência, a mesma do painel (a substituída conta como encerrada); \"Sem PDTIC\" quando o órgão nunca abriu um." }
+            new() { Titulo = "Versão do PDTIC", Largura = 12, Ajuda = "A versão de referência do órgão: a vigente, senão a da elaboração, senão a mais recente (encerrada)." },
+            new() { Titulo = "Situação do PDTIC", Largura = 20, Ajuda = "Situação da versão de referência, a do painel (a substituída conta como encerrada). \"Sem PDTIC\": o órgão nunca abriu um." }
         };
         colunas.AddRange(itens.Select(i => new PeXlsxColuna
         {
@@ -956,16 +956,18 @@ public class PePainelService : IPePainelService
     }
 
     /// <summary>
-    /// As decisões registradas nos passos de aprovação e na aprovação do SGTIC (no passo do envio),
-    /// na ordem da trilha; na seção por ciclo (a avaliação do comitê), uma por ciclo, com o rótulo dele.
+    /// As decisões registradas nas seções de aprovação (as que têm o campo decisao: as dos passos de
+    /// aprovação, as que fecham um passo de dados desde a versão 9 do modelo e a aprovação do SGTIC,
+    /// no passo do envio), na ordem da trilha; na seção por ciclo (a avaliação do comitê), uma por
+    /// ciclo, com o rótulo dele.
     /// </summary>
     private static List<PeOrgaoAprovacaoResponse> Aprovacoes(PeModeloDados dados, PePdtic pdtic, PeTrilhaOrgao trilha, PeLeituraDaSituacao leitura)
     {
         var registros = leitura.Registros(pdtic.Id).ToList();
         var ciclos = leitura.CiclosGravados(pdtic.Id).ToDictionary(c => c.Id);
         var saida = new List<PeOrgaoAprovacaoResponse>();
-        foreach (var passo in trilha.Passos.Where(p => p.Tipo is PeDominios.TipoPasso.Aprovacao or PeDominios.TipoPasso.Envio))
-            foreach (var secao in passo.Secoes.Where(s => s.Campos.Any(c => c.Chave == PeDominios.ChavePdtic.CampoDecisao)))
+        foreach (var passo in trilha.Passos)
+            foreach (var secao in passo.Secoes.Where(PePdticService.EhSecaoDeDecisao))
             {
                 var decisoes = Rotulos(dados, secao.Id, PeDominios.ChavePdtic.CampoDecisao);
                 var atos = Rotulos(dados, secao.Id, PeDominios.ChavePdtic.CampoAtoTipo);

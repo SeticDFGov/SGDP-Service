@@ -41,7 +41,7 @@ public class PeEdicaoPorSituacaoTest : PeAprovacaoTestBase
                 Assert.Equal(Codigo(ErrorCode.PePdticFechado), await ErroAsync(() => Registros.CriarAsync(dono, secao, Salvar(dados), orgao)));
         }
 
-        await Conferir("nomes", "preparacao.nomes", elaboracao, new
+        await Conferir("nomes", "preparacao.abrangencia", elaboracao, new
         {
             comite = "SGTIC", equipe_elaboracao = "Equipe", autoridade_cargo = "Secretária", autoridade_nome = "Maria", unidade_tic = "SUTIC"
         });

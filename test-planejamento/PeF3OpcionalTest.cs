@@ -85,8 +85,8 @@ public class PeF3OpcionalTest : PePaineisTestBase
         Assert.NotEmpty(opcionais);
         Assert.All(opcionais, p => Assert.Contains(p.Situacao, new[] { PeDominios.SituacaoPasso.Opcional, PeDominios.SituacaoPasso.Feito }));
         Assert.Equal(PeDominios.SituacaoPasso.Opcional, opcionais.Single(p => p.Chave == "diagnostico.swot").Situacao);
-        // O passo sem seção obrigatória (a consolidação do inventário) já ficava feito sem conteúdo: "feito" não muda
-        Assert.Equal(PeDominios.SituacaoPasso.Feito, opcionais.Single(p => p.Chave == "diagnostico.inventario").Situacao);
+        // Desde a versão 9, a consolidação do inventário (seção sem obrigatório) é seção do passo das necessidades,
+        // que é obrigatório: não há mais passo opcional "feito" sem conteúdo na etapa 2
     }
 
     [Fact]

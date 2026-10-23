@@ -71,7 +71,7 @@ public class PePdticService : IPePdticService
 
     /// <summary>O motivo do monitoramento sem ciclo porque a vigência terminou antes do começo do acompanhamento (C37).</summary>
     public static string MotivoVigenciaTerminada(DateOnly fim) =>
-        $"A vigência do PDTIC terminou em {PeCiclos.Data(fim)}, antes do começo do acompanhamento no sistema: não há ciclo de monitoramento a registrar";
+        $"A vigência terminou em {PeCiclos.Data(fim)}, antes do acompanhamento no sistema: não há ciclo de monitoramento a registrar";
 
     private readonly AppDbContext _context;
     private readonly IPeRegistroService _registros;
@@ -375,7 +375,8 @@ public class PePdticService : IPePdticService
             }
 
             // O aviso da decisão "devolvido" aparece também quando o passo está em atenção
-            if (situacao == PeDominios.SituacaoPasso.Atencao && passo.Tipo is PeDominios.TipoPasso.Aprovacao or PeDominios.TipoPasso.Envio
+            if (situacao == PeDominios.SituacaoPasso.Atencao
+                && passo.Tipo is PeDominios.TipoPasso.Aprovacao or PeDominios.TipoPasso.Envio or PeDominios.TipoPasso.Dados
                 && DecisaoDevolvida(passo, porSecao) && !doPasso.Contains(AvisoDevolvido))
                 doPasso.Add(AvisoDevolvido);
 
@@ -446,7 +447,8 @@ public class PePdticService : IPePdticService
         {
             case PeDominios.TipoPasso.Dados:
             {
-                var falta = FaltaNasSecoes(passo, porSecao);
+                // Versão 9: o passo de dados pode terminar com a aprovação dele (a regra da aprovação vale)
+                var falta = FaltaNaAprovacao(passo, porSecao, avisos);
                 return falta == null ? (feito, null, null) : (pendente, null, falta);
             }
             case PeDominios.TipoPasso.ConferenciaTemas:
@@ -588,10 +590,14 @@ public class PePdticService : IPePdticService
     /// com os mesmos campos vazios viram uma frase só, com quantas são ("Cronograma da elaboração:
     /// preencha "Início" e "Término" em 16 linhas."), na posição da primeira.
     /// </summary>
-    internal static string? FaltaNasSecoes(PeTrilhaPasso passo, IReadOnlyDictionary<long, PeSecaoAnalisada> porSecao)
+    internal static string? FaltaNasSecoes(PeTrilhaPasso passo, IReadOnlyDictionary<long, PeSecaoAnalisada> porSecao) =>
+        FaltaNasSecoes(passo.Secoes, porSecao);
+
+    /// <summary>O que falta numa lista de seções do passo (a regra do <see cref="FaltaNasSecoes(PeTrilhaPasso, IReadOnlyDictionary{long, PeSecaoAnalisada})"/>).</summary>
+    internal static string? FaltaNasSecoes(IEnumerable<PeTrilhaSecao> secoes, IReadOnlyDictionary<long, PeSecaoAnalisada> porSecao)
     {
         var faltas = new List<string>();
-        foreach (var secao in passo.Secoes)
+        foreach (var secao in secoes)
         {
             if (!porSecao.TryGetValue(secao.Id, out var analisada) || analisada.Completa) continue;
             if (analisada.FaltaRegistro)
@@ -621,21 +627,28 @@ public class PePdticService : IPePdticService
     }
 
     /// <summary>
-    /// O que falta num passo de aprovação: as seções completas e a decisão tomada (aprovado; na
-    /// avaliação do comitê, seguir ou revisar). A decisão "devolvido" pende, com o aviso.
+    /// O que falta num passo com aprovação: as seções completas e a decisão tomada (aprovado; na
+    /// avaliação do comitê, seguir ou revisar). A decisão "devolvido" pende, com o aviso. Desde a
+    /// versão 9 do modelo, a aprovação é uma seção (a que tem o campo decisao), que pode ser a última
+    /// de um passo de dados (o plano de trabalho, o inventário, o plano de acompanhamento e a
+    /// avaliação intermediária): primeiro vêm as seções de dados, depois a decisão. Num passo sem
+    /// seção de decisão, é o mesmo que <see cref="FaltaNasSecoes(PeTrilhaPasso, IReadOnlyDictionary{long, PeSecaoAnalisada})"/>.
     /// </summary>
     internal static string? FaltaNaAprovacao(PeTrilhaPasso passo, IReadOnlyDictionary<long, PeSecaoAnalisada> porSecao, List<string> avisos)
     {
         var devolvido = DecisaoDevolvida(passo, porSecao);
         if (devolvido) avisos.Add(AvisoDevolvido);
 
+        // As seções de dados do passo antes da decisão
+        if (FaltaNasSecoes(passo.Secoes.Where(s => !EhSecaoDeDecisao(s)), porSecao) is string faltaNosDados) return faltaNosDados;
+
         string? semDecisao = null;
-        foreach (var secao in passo.Secoes.Where(s => s.Campos.Any(c => c.Chave == PeDominios.ChavePdtic.CampoDecisao)))
+        foreach (var secao in passo.Secoes.Where(EhSecaoDeDecisao))
         {
             var decisao = Decisao(porSecao.GetValueOrDefault(secao.Id));
             if (decisao == null || !PeDominios.Decisao.Tomadas.Contains(decisao))
                 semDecisao = devolvido
-                    ? "A decisão registrada foi \"Devolvido\": ajuste o que foi pedido e registre a nova decisão."
+                    ? "Registre a nova decisão depois de ajustar o que foi pedido."
                     : "Registre a decisão e a data.";
         }
         return semDecisao ?? FaltaNasSecoes(passo, porSecao);
@@ -647,6 +660,9 @@ public class PePdticService : IPePdticService
             ? PeRegistroDados.Texto(PeRegistroDados.Ler(registro.Dados)[PeDominios.ChavePdtic.CampoDecisao])
             : null;
 
+    /// <summary>A seção é de uma aprovação (tem o campo decisao).</summary>
+    internal static bool EhSecaoDeDecisao(PeTrilhaSecao secao) => secao.Campos.Any(c => c.Chave == PeDominios.ChavePdtic.CampoDecisao);
+
     /// <summary>Alguma seção de decisão do passo está com "devolvido".</summary>
     private static bool DecisaoDevolvida(PeTrilhaPasso passo, IReadOnlyDictionary<long, PeSecaoAnalisada> porSecao) =>
         passo.Secoes.Any(s => s.Campos.Any(c => c.Chave == PeDominios.ChavePdtic.CampoDecisao)
@@ -654,7 +670,7 @@ public class PePdticService : IPePdticService
 
     /// <summary>O motivo do próximo passo na revisão recém-aberta (F1, achado B12).</summary>
     public const string MotivoInicioDaRevisao =
-        "Revise o PDTIC a partir do diagnóstico (etapa 2): os dados da versão anterior já estão nos passos. Confira cada um e ajuste o que mudou.";
+        "Comece pelo diagnóstico (etapa 2): os dados da versão anterior já estão nos passos. Confira e ajuste o que mudou.";
 
     private static PePdticSituacaoResponse ComProximoPasso(PePdticSituacaoResponse resposta, (string? Numero, string? Motivo) proximo)
     {
@@ -742,7 +758,7 @@ public class PePdticService : IPePdticService
                 .ToList();
             if (areas.Count > 0 && areas.All(a => a == PeDominios.ChavePdtic.AreaTic))
                 Avisar(equipe.Value.Passo.Id,
-                    "A equipe de elaboração tem só pessoas da área de TIC. O guia recomenda incluir também pessoas das áreas finalísticas do órgão.");
+                    "A equipe de elaboração só tem pessoas de TIC. O guia recomenda incluir pessoas das áreas finalísticas.");
         }
         return avisos;
     }

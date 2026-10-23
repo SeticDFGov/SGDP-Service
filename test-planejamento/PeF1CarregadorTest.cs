@@ -25,8 +25,8 @@ public class PeF1CarregadorTest
         var seed = PeCarregadorModelo.LerSeed();
         var campos = CamposDoSeed(seed).ToList();
 
-        // Desde a F3, o JSON está na versão 8 (o modo dos níveis); os "antes" e as regras novas são os da 7
-        Assert.Equal(PeCarregadorModelo.VersaoDoModoLivre, seed.Versao);
+        // Desde a revisão de 2026-10-20, o JSON está na versão 9 (os passos juntados); os "antes" e as regras novas são os da 7
+        Assert.Equal(PeCarregadorModelo.VersaoDaReestruturacao, seed.Versao);
         Assert.Single(seed.Etapas.SelectMany(e => e.Passos), p => p.Antes != null);
         // A sigla do órgão e a ajuda de "Quem decidiu" nas cinco aprovações
         Assert.Equal(6, campos.Count(c => c.Antes != null));
@@ -61,8 +61,8 @@ public class PeF1CarregadorTest
 
         var seed = PeCarregadorModelo.LerSeed();
         Assert.True(resultado.Executou);
-        // Desde a F3, a carga vai direto à versão 8 (com as correções da 7)
-        Assert.Equal((PeCarregadorModelo.VersaoDoAcompanhamento, PeCarregadorModelo.VersaoDoModoLivre),
+        // Desde a versão 9, a carga vai direto à 9 (com as correções da 7)
+        Assert.Equal((PeCarregadorModelo.VersaoDoAcompanhamento, PeCarregadorModelo.VersaoDaReestruturacao),
             (resultado.VersaoAnterior, resultado.Versao));
         Assert.Equal(0, resultado.Niveis + resultado.Etapas + resultado.Passos + resultado.Secoes + resultado.Campos + resultado.Opcoes
                         + resultado.Documentos + resultado.Capitulos + resultado.Blocos + resultado.Fluxos + resultado.Registros);
@@ -82,7 +82,7 @@ public class PeF1CarregadorTest
             Assert.Equal(sc.Largura, campo.Largura);
             Assert.Equal(PeCarregadorModelo.Autor, campo.AlteradoPor);
         }
-        Assert.Equal("Em geral, quem aprova o relatório de resultados final é a autoridade máxima do órgão. Mude quando outra instância decidiu.",
+        Assert.Equal("Em geral, a autoridade máxima do órgão. Mude se outra instância decidiu.",
             Campo(depois, "aprovacao_resultados_autoridade", "instancia").Ajuda);
         var sigla = Campo(depois, "nomes", "sigla_orgao");
         Assert.Equal(("estreita", "{\"max\":20}"), (sigla.Largura, Config(sigla).ToJsonString()));
@@ -135,18 +135,22 @@ public class PeF1CarregadorTest
         await using (var carga = new AppDbContext(banco.Opcoes))
             resultado = await new PeCarregadorModelo(carga).CarregarAsync();
 
-        // A ajuda de "Quem decidiu" do inventário e a capa do RA ficaram de fora
+        // A ajuda de "Quem decidiu" do inventário e a capa do RA ficaram de fora das correções da 7
         Assert.Equal(29, resultado.Correcoes);
+        // Desde a versão 9, os textos do sistema voltam aos do JSON (o título do passo e a ajuda que o
+        // administrador mudou); o config, a largura e a capa do RA (documento) não são texto do modelo
+        Assert.Equal(2, resultado.Textos);
 
         await using var depois = new AppDbContext(banco.Opcoes);
         var seed = PeCarregadorModelo.LerSeed();
         var doSeed = seed.Etapas.SelectMany(e => e.Passos).Single(p => p.Chave == PassoDoCiclo);
-        // Cada texto é conferido sozinho: o título mudado fica, o "o que fazer" que ninguém mudou passa ao de hoje
+        // Os textos são os do JSON (versão 9: o JSON é a fonte dos textos)
         var passo = Passo(depois, PassoDoCiclo);
-        Assert.Equal(("Atualize as ações do ciclo", doSeed.OQueFazer), (passo.Titulo, passo.OQueFazer));
+        Assert.Equal((doSeed.Titulo, doSeed.OQueFazer), (passo.Titulo, passo.OQueFazer));
 
-        Assert.Equal("Quem decide aqui é o comitê do órgão.", Campo(depois, "aprovacao_inventario", "instancia").Ajuda);
-        Assert.Equal("Em geral, quem aprova o plano de trabalho é o comitê interno de TIC (SGTIC). Mude quando outra instância decidiu.",
+        var inventario = CamposComSecao(seed).Single(x => x.Secao == "aprovacao_inventario" && x.Campo.Chave == "instancia").Campo;
+        Assert.Equal(inventario.Ajuda, Campo(depois, "aprovacao_inventario", "instancia").Ajuda);
+        Assert.Equal("Em geral, o SGTIC. Mude se outra instância decidiu.",
             Campo(depois, "aprovacao_plano_trabalho", "instancia").Ajuda);
 
         // O limite que o administrador escolheu fica; a largura, que ninguém mudou, passa à de hoje

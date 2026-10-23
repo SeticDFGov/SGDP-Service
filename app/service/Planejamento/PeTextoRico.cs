@@ -37,7 +37,7 @@ public static partial class PeTextoRico
     /// <summary>O documento limpo (nulo quando vazio), o erro (nulo quando válido) e as imagens usadas.</summary>
     public sealed record Resultado(JsonObject? Documento, string? Erro, IReadOnlyList<long> Imagens);
 
-    private const string FormatoRuim = "O texto formatado veio num formato que não serve. Atualize a tela e tente de novo.";
+    private const string FormatoRuim = "O texto formatado não foi aceito. Atualize a tela e tente de novo.";
     private const string ListaAceita = "Use parágrafos, títulos, listas, tabelas, imagens enviadas, negrito, itálico, sublinhado e links.";
 
     private static readonly string[] Blocos = { "paragraph", "heading", "bulletList", "orderedList", "table", "image" };
@@ -171,7 +171,7 @@ public static partial class PeTextoRico
     private static JsonObject No(JsonElement no, string tipo, int profundidade, Estado estado)
     {
         if (profundidade > ProfundidadeMaxima)
-            throw new Invalido("O texto formatado tem níveis demais (listas ou tabelas uma dentro da outra). Simplifique e tente de novo.");
+            throw new Invalido("O texto formatado tem listas ou tabelas aninhadas demais. Simplifique e tente de novo.");
         if (++estado.Nos > NosMaximos) throw new Invalido("O texto formatado passou do tamanho máximo.");
 
         var saida = new JsonObject { ["type"] = tipo };

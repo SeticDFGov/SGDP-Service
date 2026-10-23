@@ -47,10 +47,12 @@ public class PeF3ValidacaoTest : PePaineisTestBase
         Assert.False(Aceita("monitoramento.ciclo-monitoramento"));
         Assert.All(situacao.Passos, p => Assert.Null(p.Validacao));
 
-        // O passo de aprovação da elaboração também não (no modo livre, ele aparece)
+        // Desde a versão 9, a aprovação da elaboração é a última seção do passo de dados que ela aprova (o
+        // plano de trabalho, na metodologia; o inventário, nas necessidades): o passo de dados aceita
         DefinirModoNiveis(PeDominios.ModoNiveis.Livre);
         situacao = await SituacaoAsync(pdtic.Id);
-        Assert.False(Aceita("preparacao.aprovacao-plano-trabalho"));
+        Assert.True(Aceita("preparacao.metodologia"));
+        Assert.True(Aceita("diagnostico.necessidades-tic"));
         Assert.True(Aceita("diagnostico.swot"));
     }
 
@@ -92,7 +94,9 @@ public class PeF3ValidacaoTest : PePaineisTestBase
         var fora = await Assert.ThrowsAnyAsync<ApiException>(() => ValidarAsync(pdtic.Id, "diagnostico.swot"));
         Assert.Equal(((int)ErrorCode.PePassoIndisponivel, "Este passo não aparece para o órgão. Atualize a tela."), (fora.Error.Code, fora.Error.Message));
 
+        // Desde a versão 9, o passo 1.1 tem a abrangência e o dicionário de nomes
         await PreencherAbrangenciaAsync(pdtic.Id);
+        await PreencherNomesAsync(pdtic.Id);
         var antes = DateTime.UtcNow;
         var validado = await ValidarAsync(pdtic.Id, "preparacao.abrangencia");
         Assert.Equal(PeDominios.SituacaoPasso.Feito, validado.Situacao);
@@ -119,7 +123,9 @@ public class PeF3ValidacaoTest : PePaineisTestBase
     public async Task Validar_SoAEquipeDoPdticEOAdminGeral()
     {
         var pdtic = await AbrirSesAsync();
+        // Desde a versão 9, o passo 1.1 tem a abrangência e o dicionário de nomes
         await PreencherAbrangenciaAsync(pdtic.Id);
+        await PreencherNomesAsync(pdtic.Id);
         foreach (var user in new[] { UserConsultaSes, UserPeSgdi, UserPeCgtic, UserPeAdmin, UserOrgaoSeec })
         {
             Assert.Equal(Codigo(ErrorCode.PeSemPermissao), await ErroAsync(() => ValidarAsync(pdtic.Id, "preparacao.abrangencia", user)));
@@ -142,7 +148,7 @@ public class PeF3ValidacaoTest : PePaineisTestBase
         await ValidarAsync(pdtic.Id, "preparacao.abrangencia");
         await EnviarAsync(pdtic.Id);
 
-        var ex = await Assert.ThrowsAnyAsync<ApiException>(() => ValidarAsync(pdtic.Id, "preparacao.nomes"));
+        var ex = await Assert.ThrowsAnyAsync<ApiException>(() => ValidarAsync(pdtic.Id, "preparacao.equipe"));
         Assert.Equal(((int)ErrorCode.PePdticFechado, "Este PDTIC foi enviado ao CGTIC e não muda até a decisão."), (ex.Error.Code, ex.Error.Message));
         Assert.Equal(Codigo(ErrorCode.PePdticFechado), await ErroAsync(() => DesfazerAsync(pdtic.Id, "preparacao.abrangencia")));
         // A marca fica depois do envio
@@ -153,7 +159,9 @@ public class PeF3ValidacaoTest : PePaineisTestBase
     public async Task Desfazer_TiraAMarca_ESemMarcaNaoFazNada()
     {
         var pdtic = await AbrirSesAsync();
+        // Desde a versão 9, o passo 1.1 tem a abrangência e o dicionário de nomes
         await PreencherAbrangenciaAsync(pdtic.Id);
+        await PreencherNomesAsync(pdtic.Id);
         await ValidarAsync(pdtic.Id, "preparacao.abrangencia");
 
         var desfeito = await DesfazerAsync(pdtic.Id, "preparacao.abrangencia");
@@ -166,7 +174,7 @@ public class PeF3ValidacaoTest : PePaineisTestBase
         var deNovo = await DesfazerAsync(pdtic.Id, "preparacao.abrangencia");
         Assert.Null(deNovo.Validacao);
         // Sem marca, até num passo que não recebe a validação
-        Assert.Null((await DesfazerAsync(pdtic.Id, "preparacao.nomes")).Validacao);
+        Assert.Null((await DesfazerAsync(pdtic.Id, "preparacao.equipe")).Validacao);
     }
 
     [Fact]
@@ -174,6 +182,9 @@ public class PeF3ValidacaoTest : PePaineisTestBase
     {
         var pdtic = await AbrirSesAsync();
         var dono = PeDono.DoPdtic(pdtic.Id);
+        // Desde a versão 9, o SGTIC está no passo da equipe
+        await IncluirNoPdticAsync(pdtic.Id, "sgtic", new { forma = "subcomite", ato_tipo = "portaria", ato_numero = "12/2026", ato_data = "2026-01-10" });
+        await IncluirNoPdticAsync(pdtic.Id, "sgtic_membros", new { nome = "Maria da Silva", papel = "presidente" });
         await IncluirNoPdticAsync(pdtic.Id, "equipe_elaboracao", new { nome = "Ana Souza" });
         var bruno = await IncluirNoPdticAsync(pdtic.Id, "equipe_elaboracao", new { nome = "Bruno Lima" });
         await ValidarAsync(pdtic.Id, "preparacao.equipe");
@@ -212,7 +223,9 @@ public class PeF3ValidacaoTest : PePaineisTestBase
         Assert.NotNull((await ValidacaoAsync(pdtic.Id, "preparacao.equipe"))!.AlteradoDepoisEm);
 
         // A mudança num passo não mexe na marca de outro
+        // Desde a versão 9, o passo 1.1 tem a abrangência e o dicionário de nomes
         await PreencherAbrangenciaAsync(pdtic.Id);
+        await PreencherNomesAsync(pdtic.Id);
         await ValidarAsync(pdtic.Id, "preparacao.abrangencia");
         await IncluirNoPdticAsync(pdtic.Id, "equipe_elaboracao", new { nome = "Davi" });
         Assert.Null((await ValidacaoAsync(pdtic.Id, "preparacao.abrangencia"))!.AlteradoDepoisEm);
@@ -270,15 +283,15 @@ public class PeF3ValidacaoTest : PePaineisTestBase
     {
         DefinirModoNiveis(PeDominios.ModoNiveis.Livre);
         var pdtic = await AbrirSesAsync();
-        await IncluirNoPdticAsync(pdtic.Id, "documentos_referencia", new { identificacao = "Plano Plurianual", tipo = "ppa" });
-        await ValidarAsync(pdtic.Id, "preparacao.documentos-referencia");
+        await IncluirNoPdticAsync(pdtic.Id, "resultados_pdtic_anterior", new { resultados = "As metas de 2025 foram cumpridas.", teve_anterior = true });
+        await ValidarAsync(pdtic.Id, "diagnostico.pdtic-anterior");
 
-        var marcado = await Pdtics.MarcarNaoSeAplicaAsync(pdtic.Id, Passo("preparacao.documentos-referencia").Id,
-            new PeNaoSeAplicaDTO { Justificativa = "O órgão não usa documentos de referência." }, await Orgao());
+        var marcado = await Pdtics.MarcarNaoSeAplicaAsync(pdtic.Id, Passo("diagnostico.pdtic-anterior").Id,
+            new PeNaoSeAplicaDTO { Justificativa = "O órgão não teve PDTIC anterior." }, await Orgao());
         Assert.Equal(PeDominios.SituacaoPasso.NaoSeAplica, marcado.Situacao);
         Assert.Null(marcado.Validacao);
 
-        var desfeito = await Pdtics.DesmarcarNaoSeAplicaAsync(pdtic.Id, Passo("preparacao.documentos-referencia").Id, await Orgao());
+        var desfeito = await Pdtics.DesmarcarNaoSeAplicaAsync(pdtic.Id, Passo("diagnostico.pdtic-anterior").Id, await Orgao());
         Assert.Null(desfeito.Validacao);
     }
 
@@ -304,7 +317,7 @@ public class PeF3ValidacaoTest : PePaineisTestBase
     {
         var pdtic = await ProntoParaEnviarAsync();
         await ValidarAsync(pdtic.Id, "preparacao.abrangencia");
-        await ValidarAsync(pdtic.Id, "preparacao.nomes");
+        await ValidarAsync(pdtic.Id, "preparacao.equipe");
         await ValidarAsync(pdtic.Id, "diagnostico.ativos");
 
         var resumo = await Paineis.ResumoAsync(OrgaoSes.Id, await Sgdi());
@@ -315,7 +328,9 @@ public class PeF3ValidacaoTest : PePaineisTestBase
     public async Task AntesDaVersao8_SemValidacao_EAsRotasRespondem409()
     {
         var pdtic = await AbrirSesAsync();
+        // Desde a versão 9, o passo 1.1 tem a abrangência e o dicionário de nomes
         await PreencherAbrangenciaAsync(pdtic.Id);
+        await PreencherNomesAsync(pdtic.Id);
         await ValidarAsync(pdtic.Id, "preparacao.abrangencia");
         VersaoDoModelo(7);
 
@@ -343,7 +358,9 @@ public class PeF3ValidacaoTest : PePaineisTestBase
         var erro = JsonSerializer.SerializeToElement(corpo);
         Assert.Equal((1145, PeValidacaoDaEquipe.SoPassoFeito), (erro.GetProperty("Code").GetInt32(), erro.GetProperty("Message").GetString()));
 
+        // Desde a versão 9, o passo 1.1 tem a abrangência e o dicionário de nomes
         await PreencherAbrangenciaAsync(pdtic.Id);
+        await PreencherNomesAsync(pdtic.Id);
         var (ok, validado) = Resultado(await ControladorPdtic(UserOrgaoSes).Validar(pdtic.Id, passo));
         Assert.Equal(200, ok);
         Assert.NotNull(Assert.IsType<PePassoSituacaoResponse>(validado).Validacao);

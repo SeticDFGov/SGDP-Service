@@ -66,7 +66,7 @@ public class PeRevisaoTest : PeAprovacaoTestBase
     public async Task Revisao_CopiaOsDados_ComAsLigacoesRefeitas_SemOsDaAprovacao()
     {
         var (_, objetivo) = await VigenteAsync();
-        await AjustarPassosAsync(OrgaoSes, ("preparacao.documentos-referencia", "opcional"));
+        await AjustarPassosAsync(OrgaoSes, ("diagnostico.pdtic-anterior", "opcional"));
         var pdtic = await ProntoParaEnviarAsync();
         var dono = PeDono.DoPdtic(pdtic.Id);
         var orgao = await Orgao();
@@ -85,7 +85,7 @@ public class PeRevisaoTest : PeAprovacaoTestBase
         await Documentos.SalvarTextoAsync(pdtic.Id, introducao, Json(Rico("Introdução da Saúde.")), orgao);
         await Documentos.AtualizarCapituloAsync(pdtic.Id, CapituloDoModelo("termos").Id,
             new PeDocCapituloOrgaoDTO { Oculto = true, Informados = new HashSet<string> { "Oculto" } }, orgao);
-        await Pdtics.MarcarNaoSeAplicaAsync(pdtic.Id, Passo("preparacao.documentos-referencia").Id,
+        await Pdtics.MarcarNaoSeAplicaAsync(pdtic.Id, Passo("diagnostico.pdtic-anterior").Id,
             new PeNaoSeAplicaDTO { Justificativa = "Sem documentos além do PPA." }, orgao);
         var comentario = await Comentarios.CriarAsync(pdtic.Id, new PeComentarioCriarDTO { PassoId = Passo("diagnostico.ativos").Id, Texto = "Confira." },
             await ContextoDe(UserPeSgdi));
@@ -124,7 +124,7 @@ public class PeRevisaoTest : PeAprovacaoTestBase
         Assert.True(texto.EditadoPeloOrgao);
         Assert.Equal("Introdução da Saúde.", TextoDe(texto.TextoBruto));
         Assert.True(Cap(documento, "termos").Oculto);
-        Assert.Equal(PeDominios.SituacaoPasso.NaoSeAplica, (await PassoDaSituacaoAsync(nova.Id, "preparacao.documentos-referencia")).Situacao);
+        Assert.Equal(PeDominios.SituacaoPasso.NaoSeAplica, (await PassoDaSituacaoAsync(nova.Id, "diagnostico.pdtic-anterior")).Situacao);
 
         // Sem comentários, deliberações nem versões do documento
         Assert.Empty(Context.PeComentarios.Where(c => c.PdticId == nova.Id));
@@ -197,7 +197,7 @@ public class PeRevisaoTest : PeAprovacaoTestBase
 
         var ex = await Assert.ThrowsAsync<ApiException>(() => RevisarAsync(pdtic.Id));
         Assert.Equal((int)ErrorCode.PeRevisaoRecusada, ex.Error.Code);
-        Assert.Equal($"Para abrir a revisão, registre na avaliação intermediária (passo {numero}) a avaliação do comitê com a decisão \"Revisar o PDTIC\".",
+        Assert.Equal($"Para abrir a revisão, registre a decisão \"Revisar o PDTIC\" na avaliação intermediária (passo {numero}).",
             ex.Error.Message);
 
         // A decisão é a da avaliação intermediária (E7, rodada B: a seção é por ciclo de avaliação)

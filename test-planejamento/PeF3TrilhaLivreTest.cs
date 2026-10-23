@@ -35,7 +35,8 @@ public class PeF3TrilhaLivreTest : PeAprovacaoTestBase
 
         Assert.Equal(PeDominios.ModoNiveis.Livre, trilha.ModoNiveis);
         Assert.Equal((NivelId("basico"), "Básico", true, true), (trilha.NivelId, trilha.NivelNome, trilha.NivelPadrao, trilha.NivelAtivo));
-        Assert.Equal(50, passos.Count);
+        // Versão 9: os passos juntados (eram 50)
+        Assert.Equal(31, passos.Count);
         Assert.Equal(7, trilha.Etapas.Count);
 
         // A numeração é a do Avançado de hoje (todos os passos visíveis)
@@ -45,11 +46,11 @@ public class PeF3TrilhaLivreTest : PeAprovacaoTestBase
         Assert.Equal(avancado, passos.ToDictionary(p => p.Chave, p => p.Numero));
 
         // O que é do Básico segue a situação dele; o resto aparece opcional
-        Assert.Equal(23, passos.Count(p => p.Situacao == PeDominios.Situacao.Obrigatorio));
-        Assert.Equal(27, passos.Count(p => p.Situacao == PeDominios.Situacao.Opcional));
+        Assert.Equal(21, passos.Count(p => p.Situacao == PeDominios.Situacao.Obrigatorio));
+        Assert.Equal(10, passos.Count(p => p.Situacao == PeDominios.Situacao.Opcional));
         Assert.Equal(PeDominios.Situacao.Obrigatorio, NaTrilha(trilha, "diagnostico.ativos")!.Situacao);
         Assert.Equal(PeDominios.Situacao.Opcional, NaTrilha(trilha, "diagnostico.swot")!.Situacao);
-        Assert.Equal(PeDominios.Situacao.Opcional, NaTrilha(trilha, "preparacao.plano-trabalho")!.Situacao);
+        Assert.Equal(PeDominios.Situacao.Opcional, NaTrilha(trilha, "planejamento.fatores-criticos")!.Situacao);
     }
 
     [Fact]
@@ -57,7 +58,7 @@ public class PeF3TrilhaLivreTest : PeAprovacaoTestBase
     {
         await Modelo.DefinirModoNiveisAsync(new PeModoNiveisDTO { Modo = "definido" }, EmailAdmin);
         await DefinirNivelDoOrgaoAsync(OrgaoSes, "intermediario");
-        Assert.Equal(40, PassosDa(await TrilhaAsync(OrgaoSes)).Count);
+        Assert.Equal(30, PassosDa(await TrilhaAsync(OrgaoSes)).Count);
 
         await Modelo.DefinirModoNiveisAsync(new PeModoNiveisDTO { Modo = "livre" }, EmailAdmin);
         var livre = await TrilhaAsync(OrgaoSes);
@@ -71,7 +72,7 @@ public class PeF3TrilhaLivreTest : PeAprovacaoTestBase
         Assert.Equal(NivelId("intermediario"), Context.PeOrgaosConfig.AsNoTracking().Single(c => c.OrgaoId == OrgaoSes.Id).NivelId);
         await Modelo.DefinirModoNiveisAsync(new PeModoNiveisDTO { Modo = "definido" }, EmailAdmin);
         var definido = await TrilhaAsync(OrgaoSes);
-        Assert.Equal((NivelId("intermediario"), 40), (definido.NivelId, PassosDa(definido).Count));
+        Assert.Equal((NivelId("intermediario"), 30), (definido.NivelId, PassosDa(definido).Count));
         Assert.Equal(PeDominios.Situacao.Obrigatorio, NaTrilha(definido, "diagnostico.swot")!.Situacao);
         Assert.All(PassosDa(definido), p => Assert.Null(p.Detalhe));
         Assert.All(PassosDa(definido), p => Assert.Empty(p.OpcoesDetalhe));
@@ -80,7 +81,7 @@ public class PeF3TrilhaLivreTest : PeAprovacaoTestBase
     [Fact]
     public async Task Livre_OAjusteDoOrgaoVale_ETravadoNuncaDesliga()
     {
-        await AjustarPassosAsync(OrgaoSes, ("diagnostico.swot", "desligado"), ("preparacao.plano-trabalho", "obrigatorio"),
+        await AjustarPassosAsync(OrgaoSes, ("diagnostico.swot", "desligado"), ("planejamento.fatores-criticos", "obrigatorio"),
             ("preparacao.equipe", "opcional"));
         // O travado desligado por fora (a tela recusa): continua obrigatório
         Context.PeOrgaosAjuste.Add(new PeOrgaoAjuste
@@ -96,11 +97,11 @@ public class PeF3TrilhaLivreTest : PeAprovacaoTestBase
         var trilha = await TrilhaAsync(OrgaoSes);
 
         Assert.Null(NaTrilha(trilha, "diagnostico.swot"));
-        Assert.Equal(PeDominios.Situacao.Obrigatorio, NaTrilha(trilha, "preparacao.plano-trabalho")!.Situacao);
+        Assert.Equal(PeDominios.Situacao.Obrigatorio, NaTrilha(trilha, "planejamento.fatores-criticos")!.Situacao);
         Assert.Equal(PeDominios.Situacao.Obrigatorio, NaTrilha(trilha, "diagnostico.ativos")!.Situacao);
         Assert.Equal(PeDominios.Situacao.Opcional, NaTrilha(trilha, "preparacao.equipe")!.Situacao);
         Assert.True(NaTrilha(trilha, "preparacao.equipe")!.AjustadoParaOrgao);
-        Assert.Equal(49, PassosDa(trilha).Count);
+        Assert.Equal(30, PassosDa(trilha).Count);
     }
 
     [Fact]
@@ -112,7 +113,9 @@ public class PeF3TrilhaLivreTest : PeAprovacaoTestBase
         var necessidades = NaTrilha(trilha, "diagnostico.necessidades-tic")!;
         Assert.Equal((NivelId("basico"), "Básico"), (necessidades.Detalhe!.NivelId, necessidades.Detalhe.NivelNome));
         Assert.False(necessidades.DetalheEscolhido);
-        Assert.Equal(new[] { "Básico", "Intermediário" }, necessidades.OpcoesDetalhe.Select(o => o.NivelNome));
+        // Desde a versão 9, o passo tem também as necessidades de informação, o inventário e a aprovação dele:
+        // as três formas são distintas
+        Assert.Equal(new[] { "Básico", "Intermediário", "Avançado" }, necessidades.OpcoesDetalhe.Select(o => o.NivelNome));
         Assert.Equal(necessidades.Secoes.Count, necessidades.OpcoesDetalhe[0].Secoes);
         Assert.Equal(necessidades.Secoes.Sum(s => s.Campos.Count), necessidades.OpcoesDetalhe[0].Campos);
         Assert.True(necessidades.OpcoesDetalhe[1].Campos > necessidades.OpcoesDetalhe[0].Campos);
@@ -138,8 +141,12 @@ public class PeF3TrilhaLivreTest : PeAprovacaoTestBase
         var aprovacao = NaTrilha(trilha, "planejamento.aprovacao-sgtic")!;
         Assert.Empty(aprovacao.OpcoesDetalhe);
         Assert.Equal("Básico", aprovacao.Detalhe!.NivelNome);
-        var plano = NaTrilha(trilha, "preparacao.plano-trabalho")!;
+        var plano = NaTrilha(trilha, "planejamento.fatores-criticos")!;
         Assert.Empty(plano.OpcoesDetalhe);
+        // O passo juntado com seções de níveis diferentes: a forma de cada nível tem as seções dele
+        var metodologia = NaTrilha(trilha, "preparacao.metodologia")!;
+        Assert.Equal(new[] { "metodologia" }, metodologia.Secoes.Select(s => s.Chave));
+        Assert.Equal(5, metodologia.OpcoesDetalhe[2].Secoes);
         Assert.Equal("Avançado", plano.Detalhe!.NivelNome);
     }
 
@@ -149,8 +156,9 @@ public class PeF3TrilhaLivreTest : PeAprovacaoTestBase
         var resposta = await DefinirFormaAsync("diagnostico.necessidades-tic", "intermediario");
         var passo = NaTrilha(resposta, "diagnostico.necessidades-tic")!;
         Assert.Equal(("Intermediário", true), (passo.Detalhe!.NivelNome, passo.DetalheEscolhido));
-        var campos = passo.Secoes.Single().Campos.Select(c => c.Chave).ToList();
+        var campos = passo.Secoes.Single(s => s.Chave == "necessidades").Campos.Select(c => c.Chave).ToList();
         Assert.Contains("gravidade", campos);
+        Assert.Contains(passo.Secoes, s => s.Chave == "necessidades_informacao");
         Assert.Equal(passo.OpcoesDetalhe[1].Campos, passo.Secoes.Sum(s => s.Campos.Count));
         var linha = Context.PeOrgaosPassoDetalhe.AsNoTracking().Single(d => d.OrgaoId == OrgaoSes.Id && d.PassoId == passo.Id);
         Assert.Equal((NivelId("intermediario"), EmailAdmin), (linha.NivelId, linha.AlteradoPor));

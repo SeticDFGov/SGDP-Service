@@ -240,7 +240,7 @@ public partial class PeDocumentoService : IPeDocumentoService
             return $"O {PeDominios.TipoDocumento.NomeCurto(documento.Alvo.Tipo).ToLowerInvariant()} muda enquanto o PDTIC está vigente "
                    + "(publicado ou em acompanhamento).";
         if (documento.Ciclo is { } ciclo && ciclo.Inicio > PeCiclos.Hoje())
-            return $"O ciclo {ciclo.Rotulo} começa em {PeCiclos.Data(ciclo.Inicio)}. O relatório dele é editado a partir do início do ciclo.";
+            return $"O ciclo {ciclo.Rotulo} começa em {PeCiclos.Data(ciclo.Inicio)}. O relatório é editado a partir dessa data.";
         return null;
     }
 
@@ -313,10 +313,10 @@ public partial class PeDocumentoService : IPeDocumentoService
         var (pdtic, documento) = await PdticParaEditarAsync(alvo, ctx);
         var (bloco, base_) = await BlocoDoOrgaoAsync(pdtic, documento, blocoId);
         if (bloco.Tipo != PeDominios.TipoBloco.Texto)
-            throw new ApiException(ErrorCode.PeDocBlocoNaoEditavel, "Só o texto do documento é editado aqui. Os dados das tabelas são editados em cada passo.");
+            throw new ApiException(ErrorCode.PeDocBlocoNaoEditavel, "Aqui só se edita o texto. Os dados das tabelas ficam em cada passo.");
 
         if (texto.ValueKind != JsonValueKind.Object || texto.GetRawText().Length > PeDocConfig.MaximoTexto)
-            throw new ApiException(ErrorCode.PeDocTextoInvalido, "O texto passou do tamanho máximo ou veio num formato que não serve.");
+            throw new ApiException(ErrorCode.PeDocTextoInvalido, "O texto passou do tamanho máximo ou não está num formato aceito.");
         var rico = PeTextoRico.Validar(texto);
         if (rico.Erro != null) throw new ApiException(ErrorCode.PeDocTextoInvalido, rico.Erro);
         // Imagens já aceitas: do modelo, deste PDTIC ou (desde a E7) de outra versão do PDTIC do
@@ -556,8 +556,8 @@ public partial class PeDocumentoService : IPeDocumentoService
         catch (Exception ex) when (ex is not ApiException and not OperationCanceledException)
         {
             throw new ApiException(ErrorCode.PeDocGeracaoFalhou,
-                "O PDF não pôde ser montado: algum conteúdo não coube na página (uma imagem ou uma tabela muito grande, por exemplo). "
-                + "Confira os textos e as imagens e tente de novo.");
+                "O PDF não pôde ser montado: algum conteúdo não coube na página (uma imagem ou tabela muito grande, por exemplo). "
+                + "Confira e tente de novo.");
         }
 
         var hash = Convert.ToHexString(SHA256.HashData(pdf.Pdf)).ToLowerInvariant();
@@ -810,11 +810,32 @@ public partial class PeDocumentoService : IPeDocumentoService
         public bool Presente(PeDocCapitulo capitulo)
         {
             if (capitulo.PassoChave != null
-                && (Trilha.Passos.All(p => p.Chave != capitulo.PassoChave) || PassosOpcionaisVazios.Contains(capitulo.PassoChave)))
+                && (Trilha.Passos.All(p => p.Chave != capitulo.PassoChave) || PassosOpcionaisVazios.Contains(capitulo.PassoChave)
+                    || SemSecaoVisivel(capitulo)))
                 return false;
             if (capitulo.PaiId == null) return true;
             var pai = Capitulos.FirstOrDefault(c => c.Id == capitulo.PaiId);
             return pai != null && Presente(pai) && !Oculto(pai);
+        }
+
+        /// <summary>
+        /// Versão 9 do modelo (passos juntados): o capítulo de um passo cujos blocos de dados usam só
+        /// seções que o órgão não vê não aparece. Um passo pode ter seções de níveis diferentes (os
+        /// documentos de referência no passo das estratégias, por exemplo), e o capítulo delas segue
+        /// a seção, como seguia o passo antigo. Capítulo só de texto, ou com fluxo, ou com o inventário
+        /// do PGIA, segue só o passo.
+        /// </summary>
+        private bool SemSecaoVisivel(PeDocCapitulo capitulo)
+        {
+            var secoes = new List<string>();
+            foreach (var bloco in Blocos.Where(b => b.CapituloId == capitulo.Id))
+            {
+                if (bloco.Tipo is PeDominios.TipoBloco.Texto or PeDominios.TipoBloco.QuebraPagina) continue;
+                var doBloco = SecoesDoBloco(bloco.Tipo, PeDocConfig.Ler(bloco.Config)).ToList();
+                if (doBloco.Count == 0) return false;
+                secoes.AddRange(doBloco);
+            }
+            return secoes.Count > 0 && secoes.All(s => Trilha.Secao(s) == null);
         }
 
         /// <summary>Oculto pelo órgão (só vale no capítulo opcional; o obrigatório sempre aparece).</summary>

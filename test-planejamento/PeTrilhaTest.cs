@@ -26,7 +26,8 @@ public class PeTrilhaTest : PeModeloTestBase
         Assert.Equal("Básico", trilha.NivelNome);
         Assert.True(trilha.NivelPadrao);
         Assert.True(trilha.NivelAtivo);
-        Assert.Equal(23, PassosDa(trilha).Count);
+        // Versão 9: 21 passos no Básico (eram 23)
+        Assert.Equal(21, PassosDa(trilha).Count);
     }
 
     [Fact]
@@ -38,19 +39,20 @@ public class PeTrilhaTest : PeModeloTestBase
         Assert.Equal(new[] { "preparacao", "diagnostico", "planejamento", "plano-acompanhamento", "monitoramento", "fechamento" },
             trilha.Etapas.Select(e => e.Chave));
         Assert.Equal(new[] { 1, 2, 3, 4, 5, 6 }, trilha.Etapas.Select(e => e.Numero));
-        Assert.Equal(new[] { 7, 4, 8, 1, 1, 2 }, trilha.Etapas.Select(e => e.Passos.Count));
+        Assert.Equal(new[] { 5, 4, 8, 1, 1, 2 }, trilha.Etapas.Select(e => e.Passos.Count));
 
-        // Sem documentos de referência, as estratégias são o 1.6 (no Avançado, 1.7)
-        Assert.Equal("1.6", NaTrilha(trilha, "preparacao.estrategias")!.Numero);
+        // Desde a versão 9, os documentos de referência são uma seção das estratégias (o 1.4 em todos os níveis)
+        Assert.Equal("1.4", NaTrilha(trilha, "preparacao.estrategias")!.Numero);
         Assert.Equal("2.1", NaTrilha(trilha, "diagnostico.ambiente-tecnologico")!.Numero);
         Assert.Equal("2.3", NaTrilha(trilha, "diagnostico.necessidades-tic")!.Numero);
         Assert.Equal("3.1", NaTrilha(trilha, "planejamento.priorizacao")!.Numero);
         Assert.Equal("6.2", NaTrilha(trilha, "fechamento.aprovacao-autoridade")!.Numero);
-        Assert.Null(NaTrilha(trilha, "preparacao.documentos-referencia"));
+        Assert.Null(NaTrilha(trilha, "diagnostico.swot"));
+        Assert.DoesNotContain(NaTrilha(trilha, "preparacao.estrategias")!.Secoes, s => s.Chave == "documentos_referencia");
     }
 
     [Fact]
-    public async Task Intermediario_QuarentaPassos_SeteEtapas()
+    public async Task Intermediario_TrintaPassos_SeteEtapas()
     {
         await DefinirNivelDoOrgaoAsync(OrgaoSes, "intermediario");
 
@@ -58,12 +60,12 @@ public class PeTrilhaTest : PeModeloTestBase
 
         Assert.Equal("Intermediário", trilha.NivelNome);
         Assert.False(trilha.NivelPadrao);
-        Assert.Equal(new[] { 8, 9, 12, 2, 2, 3, 4 }, trilha.Etapas.Select(e => e.Passos.Count));
-        Assert.Equal(40, PassosDa(trilha).Count);
+        Assert.Equal(new[] { 5, 7, 11, 2, 2, 1, 2 }, trilha.Etapas.Select(e => e.Passos.Count));
+        Assert.Equal(30, PassosDa(trilha).Count);
     }
 
     [Fact]
-    public async Task Avancado_TodosOsCinquentaPassos_ComANumeracaoDoPlano()
+    public async Task Avancado_TodosOsTrintaEUmPassos_ComANumeracaoDoPlano()
     {
         await DefinirNivelDoOrgaoAsync(OrgaoSes, "avancado");
 
@@ -75,8 +77,8 @@ public class PeTrilhaTest : PeModeloTestBase
             .GroupBy(t => t.Chave.Split('.')[0])
             .SelectMany((g, e) => g.Select((t, p) => $"{e + 1}.{p + 1}"));
         Assert.Equal(esperada, passos.Select(p => p.Numero));
-        Assert.Equal("1.7", passos.Single(p => p.Chave == "preparacao.estrategias").Numero);
-        Assert.Equal("3.13", passos.Single(p => p.Chave == "planejamento.publicacao").Numero);
+        Assert.Equal("1.4", passos.Single(p => p.Chave == "preparacao.estrategias").Numero);
+        Assert.Equal("3.12", passos.Single(p => p.Chave == "planejamento.publicacao").Numero);
     }
 
     [Fact]
@@ -92,7 +94,8 @@ public class PeTrilhaTest : PeModeloTestBase
         Assert.True(passo.Travado);
         Assert.Equal("obrigatorio", passo.Situacao);
         Assert.False(passo.AjustadoParaOrgao);
-        Assert.False(string.IsNullOrWhiteSpace(passo.OQueFazer));
+        // Desde a versão 9, o "o que fazer" pode ficar vazio (texto vazio, nunca nulo)
+        Assert.NotNull(passo.OQueFazer);
     }
 
     [Fact]
@@ -107,7 +110,7 @@ public class PeTrilhaTest : PeModeloTestBase
         Assert.Equal("Intermediário", trilha.NivelNome);
         Assert.False(trilha.NivelAtivo);
         Assert.False(trilha.NivelPadrao);
-        Assert.Equal(40, PassosDa(trilha).Count);
+        Assert.Equal(30, PassosDa(trilha).Count);
 
         // Quem não tem nível escolhido segue no padrão (o primeiro ativo)
         Assert.Equal("Básico", (await TrilhaAsync(OrgaoSeec)).NivelNome);
@@ -118,20 +121,20 @@ public class PeTrilhaTest : PeModeloTestBase
     [Fact]
     public async Task Ajuste_LigaPassoDesligadoNoNivel_ERenumera()
     {
-        var plano = Passo("preparacao.plano-trabalho");
+        var fatores = Passo("planejamento.fatores-criticos");
         await Orgaos.DefinirAjustesAsync(OrgaoSes.Id, new List<PeOrgaoAjusteDTO>
         {
-            new() { AlvoTipo = "passo", AlvoId = plano.Id, Situacao = "opcional", Justificativa = "O órgão quer o plano de trabalho" }
+            new() { AlvoTipo = "passo", AlvoId = fatores.Id, Situacao = "opcional", Justificativa = "O órgão quer os fatores críticos" }
         }, EmailAdmin);
 
         var trilha = await TrilhaAsync(OrgaoSes);
-        var passo = NaTrilha(trilha, "preparacao.plano-trabalho")!;
+        var passo = NaTrilha(trilha, "planejamento.fatores-criticos")!;
 
-        Assert.Equal("1.8", passo.Numero);
+        Assert.Equal("3.5", passo.Numero);
         Assert.Equal("opcional", passo.Situacao);
         Assert.True(passo.AjustadoParaOrgao);
         // O ajuste é só deste órgão
-        Assert.Null(NaTrilha(await TrilhaAsync(OrgaoSeec), "preparacao.plano-trabalho"));
+        Assert.Null(NaTrilha(await TrilhaAsync(OrgaoSeec), "planejamento.fatores-criticos"));
     }
 
     [Fact]
@@ -139,13 +142,13 @@ public class PeTrilhaTest : PeModeloTestBase
     {
         await Orgaos.DefinirAjustesAsync(OrgaoSes.Id, new List<PeOrgaoAjusteDTO>
         {
-            new() { AlvoTipo = "passo", AlvoId = Passo("preparacao.nomes").Id, Situacao = "desligado" }
+            new() { AlvoTipo = "passo", AlvoId = Passo("preparacao.abrangencia").Id, Situacao = "desligado" }
         }, EmailAdmin);
 
         var trilha = await TrilhaAsync(OrgaoSes);
 
-        Assert.Null(NaTrilha(trilha, "preparacao.nomes"));
-        Assert.Equal("1.2", NaTrilha(trilha, "preparacao.sgtic")!.Numero);
+        Assert.Null(NaTrilha(trilha, "preparacao.abrangencia"));
+        Assert.Equal("1.1", NaTrilha(trilha, "preparacao.equipe")!.Numero);
     }
 
     [Fact]
@@ -182,14 +185,15 @@ public class PeTrilhaTest : PeModeloTestBase
     [Fact]
     public async Task SecaoDesligada_NaoAparece_NemOsCamposDela()
     {
+        // Desde a versão 9, o SGTIC e a equipe de elaboração estão no mesmo passo
         var basico = NaTrilha(await TrilhaAsync(OrgaoSes), "preparacao.equipe")!;
-        Assert.Equal(new[] { "equipe_elaboracao" }, basico.Secoes.Select(s => s.Chave));
-        Assert.Equal(new[] { "nome" }, basico.Secoes.Single().Campos.Select(c => c.Chave));
+        Assert.Equal(new[] { "sgtic", "sgtic_membros", "equipe_elaboracao" }, basico.Secoes.Select(s => s.Chave));
+        Assert.Equal(new[] { "nome" }, basico.Secoes.Single(s => s.Chave == "equipe_elaboracao").Campos.Select(c => c.Chave));
 
         await DefinirNivelDoOrgaoAsync(OrgaoSes, "avancado");
         var avancado = NaTrilha(await TrilhaAsync(OrgaoSes), "preparacao.equipe")!;
-        Assert.Equal(new[] { "equipe_elaboracao", "equipe_designacao" }, avancado.Secoes.Select(s => s.Chave));
-        Assert.Equal(5, avancado.Secoes[0].Campos.Count);
+        Assert.Equal(new[] { "sgtic", "sgtic_membros", "equipe_elaboracao", "equipe_designacao" }, avancado.Secoes.Select(s => s.Chave));
+        Assert.Equal(5, avancado.Secoes[2].Campos.Count);
     }
 
     [Fact]
@@ -209,7 +213,7 @@ public class PeTrilhaTest : PeModeloTestBase
     [Fact]
     public async Task CampoDoNivel_AparecePelaSituacao_ComObrigatorio()
     {
-        var basico = NaTrilha(await TrilhaAsync(OrgaoSes), "diagnostico.necessidades-tic")!.Secoes.Single();
+        var basico = NaTrilha(await TrilhaAsync(OrgaoSes), "diagnostico.necessidades-tic")!.Secoes.Single(s => s.Chave == "necessidades");
         Assert.DoesNotContain(basico.Campos, c => c.Chave == "gravidade");
         Assert.False(basico.Campos.Single(c => c.Chave == "objetivo_petic").Obrigatorio);
         Assert.True(basico.Campos.Single(c => c.Chave == "prioridade_simples").Obrigatorio);
@@ -217,7 +221,7 @@ public class PeTrilhaTest : PeModeloTestBase
         Assert.True(basico.Travada);
 
         await DefinirNivelDoOrgaoAsync(OrgaoSes, "intermediario");
-        var intermediario = NaTrilha(await TrilhaAsync(OrgaoSes), "diagnostico.necessidades-tic")!.Secoes.Single();
+        var intermediario = NaTrilha(await TrilhaAsync(OrgaoSes), "diagnostico.necessidades-tic")!.Secoes.Single(s => s.Chave == "necessidades");
         // Sem PETIC-DF vigente, a ligação com ele fica opcional também na trilha (E4); com a
         // vigente, volta a ser obrigatória (PeTrilhaPeticTest)
         Assert.False(intermediario.Campos.Single(c => c.Chave == "objetivo_petic").Obrigatorio);
@@ -229,7 +233,7 @@ public class PeTrilhaTest : PeModeloTestBase
     public async Task CampoDeLigacao_SomeQuandoASecaoLigadaNaoAparece()
     {
         await DefinirNivelDoOrgaoAsync(OrgaoSes, "intermediario");
-        var antes = NaTrilha(await TrilhaAsync(OrgaoSes), "diagnostico.necessidades-tic")!.Secoes.Single();
+        var antes = NaTrilha(await TrilhaAsync(OrgaoSes), "diagnostico.necessidades-tic")!.Secoes.Single(s => s.Chave == "necessidades");
         Assert.Contains(antes.Campos, c => c.Chave == "fraqueza");
 
         await Orgaos.DefinirAjustesAsync(OrgaoSes.Id, new List<PeOrgaoAjusteDTO>
@@ -237,7 +241,7 @@ public class PeTrilhaTest : PeModeloTestBase
             new() { AlvoTipo = "secao", AlvoId = Secao("swot_fraquezas").Id, Situacao = "desligado" }
         }, EmailAdmin);
 
-        var depois = NaTrilha(await TrilhaAsync(OrgaoSes), "diagnostico.necessidades-tic")!.Secoes.Single();
+        var depois = NaTrilha(await TrilhaAsync(OrgaoSes), "diagnostico.necessidades-tic")!.Secoes.Single(s => s.Chave == "necessidades");
         Assert.DoesNotContain(depois.Campos, c => c.Chave == "fraqueza");
         Assert.Contains(depois.Campos, c => c.Chave == "estrategia");
     }
@@ -249,7 +253,7 @@ public class PeTrilhaTest : PeModeloTestBase
         await Modelo.AtualizarOpcaoAsync(Opcao("necessidades", "tipo", "pessoal").Id,
             new PeOpcaoAtualizarDTO { Ativa = false, Informados = new HashSet<string> { "Ativa" } }, EmailAdmin);
 
-        var secao = NaTrilha(await TrilhaAsync(OrgaoSes), "diagnostico.necessidades-tic")!.Secoes.Single();
+        var secao = NaTrilha(await TrilhaAsync(OrgaoSes), "diagnostico.necessidades-tic")!.Secoes.Single(s => s.Chave == "necessidades");
 
         var prioridade = secao.Campos.Single(c => c.Chave == "prioridade");
         Assert.Equal(JsonValueKind.Object, prioridade.Config.ValueKind);
@@ -270,14 +274,14 @@ public class PeTrilhaTest : PeModeloTestBase
         await DefinirNivelDoOrgaoAsync(OrgaoSes, "avancado");
         var criado = await Modelo.CriarPassoAsync(new PePassoCriarDTO
         {
-            EtapaId = Passo("preparacao.nomes").EtapaId,
+            EtapaId = Passo("preparacao.abrangencia").EtapaId,
             Titulo = "Registre a carteira de projetos",
             OQueFazer = "Liste os projetos em andamento."
         }, EmailAdmin);
 
         var comNovo = await TrilhaAsync(OrgaoSes);
         var novo = NaTrilha(comNovo, criado.Chave)!;
-        Assert.Equal("1.11", novo.Numero);
+        Assert.Equal("1.6", novo.Numero);
         Assert.Equal("opcional", novo.Situacao);
 
         await Modelo.ExcluirPassoAsync(criado.Id, EmailAdmin);

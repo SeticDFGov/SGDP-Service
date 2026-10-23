@@ -39,7 +39,7 @@ public class PePlanilhaAcompanhamentoTest : PeAcompanhamentoTestBase
         var xlsx = await Planilhas.PdticSecaoAsync(id, "monitoramento_acoes", "xlsx", await Orgao());
         using var pacote = SpreadsheetDocument.Open(new MemoryStream(xlsx.Conteudo), false);
         var livro = pacote.WorkbookPart!;
-        var aba = livro.Workbook!.Sheets!.Elements<Sheet>().Single(s => s.Name == "Situação das ações no ciclo");
+        var aba = livro.Workbook!.Sheets!.Elements<Sheet>().Single(s => s.Name == "Situação das ações");
         var planilha = ((WorksheetPart)livro.GetPartById(aba.Id!)).Worksheet!;
         var cabecalho = planilha.Descendants<Row>().Single(r => r.RowIndex!.Value == 1).Elements<Cell>().Select(Texto).ToList();
         Assert.Equal("Ciclo", cabecalho[0]);

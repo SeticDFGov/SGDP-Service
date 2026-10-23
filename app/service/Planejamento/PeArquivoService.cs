@@ -80,7 +80,7 @@ public class PeArquivoService : IPeArquivoService
         if (conteudo.Length > TamanhoMaximoBytes) throw Invalido("O arquivo passa de 25 MB.");
         if (tipo.Tipo != "pdf" && conteudo.Length > TamanhoMaximoImagemBytes) throw Invalido("A imagem passa de 5 MB.");
         if (!ConteudoBate(tipo.Tipo, conteudo))
-            throw Invalido($"O conteúdo do arquivo não é {tipo.Tipo.ToUpperInvariant()}, apesar do nome. Confira o arquivo e envie de novo.");
+            throw Invalido($"O conteúdo não é {tipo.Tipo.ToUpperInvariant()}, apesar do nome. Confira o arquivo e envie de novo.");
 
         var arquivo = new PeArquivo
         {

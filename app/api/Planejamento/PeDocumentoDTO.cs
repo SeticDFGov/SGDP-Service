@@ -364,7 +364,7 @@ public class PeDocMarcadorResponse
     public string? SecaoChave { get; set; }
 
     // F2: a chave do passo no modelo ("planejamento.aprovacao-sgtic", "planejamento.deliberacao-cgtic",
-    // "planejamento.publicacao", "preparacao.nomes", "preparacao.abrangencia"), ou nulo
+    // "planejamento.publicacao", "preparacao.abrangencia", que desde a versão 9 tem também o dicionário de nomes), ou nulo
     public string? PassoChave { get; set; }
 
     // F2: o número do passo na trilha do órgão ("3.11"): só na resposta do documento de um PDTIC,

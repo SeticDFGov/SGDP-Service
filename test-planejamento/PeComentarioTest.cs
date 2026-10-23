@@ -100,7 +100,7 @@ public class PeComentarioTest : PePdticTestBase
         Assert.Equal(Codigo(ErrorCode.PeComentarioInvalido), await ErroAsync(() =>
             Comentarios.CriarAsync(pdtic.Id, new PeComentarioCriarDTO { PaiId = resposta.Id, Texto = "Tréplica" }, orgao)));
         Assert.Equal(Codigo(ErrorCode.PeComentarioInvalido), await ErroAsync(() => Comentarios.CriarAsync(pdtic.Id,
-            new PeComentarioCriarDTO { PaiId = conversa.Id, PassoId = Passo("preparacao.nomes").Id, Texto = "Outro passo" }, orgao)));
+            new PeComentarioCriarDTO { PaiId = conversa.Id, PassoId = Passo("preparacao.equipe").Id, Texto = "Outro passo" }, orgao)));
         Assert.Equal(Codigo(ErrorCode.PeComentarioInvalido), await ErroAsync(() => Comentarios.ResolverAsync(resposta.Id, orgao)));
         Assert.Equal(Codigo(ErrorCode.PeComentarioNaoEncontrado), await ErroAsync(() =>
             Comentarios.CriarAsync(pdtic.Id, new PeComentarioCriarDTO { PaiId = 999, Texto = "?" }, orgao)));
@@ -115,7 +115,7 @@ public class PeComentarioTest : PePdticTestBase
         var pdtic = await AbrirSesAsync();
         var sgdi = await ContextoDe(UserPeSgdi);
         var orgao = await Orgao();
-        var nomes = Passo("preparacao.nomes").Id;
+        var nomes = Passo("preparacao.equipe").Id;
         var primeiro = await Comentarios.CriarAsync(pdtic.Id, new PeComentarioCriarDTO { PassoId = PassoAbrangencia, Texto = "A" }, sgdi);
         await Comentarios.CriarAsync(pdtic.Id, new PeComentarioCriarDTO { PassoId = nomes, Texto = "B" }, sgdi);
         await Comentarios.CriarAsync(pdtic.Id, new PeComentarioCriarDTO { PassoId = PassoAbrangencia, Texto = "C" }, await ContextoDe(UserPeAdmin));

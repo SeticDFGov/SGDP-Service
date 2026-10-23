@@ -314,7 +314,7 @@ public class PeRegistroService : IPeRegistroService
         var secoes = passo.Secoes.Select(trilha.Montar).Where(s => s.Secao.NaPlanilha).ToList();
         if (secoes.Count == 0)
             throw new ApiException(ErrorCode.PePassoSemPlanilha,
-                $"O passo {passo.Numero} não tem dados para a planilha: ele não tem seção que o órgão preencha (ou o administrador deixou as seções dele fora da planilha).");
+                $"O passo {passo.Numero} não tem dados para a planilha: nenhuma seção dele é preenchida pelo órgão ou o administrador as deixou de fora.");
 
         // Seção por ciclo: o ciclo é obrigatório (400), do PDTIC (404) e do tipo de cada seção por ciclo (400)
         PeCiclo? ciclo = null;
@@ -681,7 +681,7 @@ public class PeRegistroService : IPeRegistroService
         var doDono = RegistrosDo(dono).Where(r => r.SecaoId == secao.Secao.Id);
         if (await doDono.AnyAsync())
             throw new ApiException(ErrorCode.PeCronogramaPreenchido,
-                "O cronograma já tem linhas. A sugestão só entra no cronograma vazio: apague as linhas para sugerir de novo.");
+                "O cronograma já tem linhas. Apague-as para receber a sugestão de novo.");
 
         var visiveis = secao.Visiveis.ToDictionary(v => v.Campo.Chave, v => v.Campo);
         var agora = DateTime.UtcNow;
