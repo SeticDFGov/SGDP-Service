@@ -174,6 +174,78 @@ public class PgiaOrgaoController : ControllerBase
     }
 
     /// <summary>
+    /// Completa (ato pendente da carga da planilha) ou corrige o ato de uma designação
+    /// de Responsável de IA. Exige todos os campos; salvo, o ato deixa de ser pendente.
+    /// O órgão (no próprio órgão), a SGDI e o admin.
+    /// </summary>
+    [HttpPut("{orgaoId:long}/responsavel-ia/{designacaoId:long}")]
+    public async Task<IActionResult> AtualizarResponsavelIa(long orgaoId, long designacaoId, [FromBody] PgiaResponsavelIaAtualizarDTO dto)
+    {
+        var ctx = await GetContextAsync();
+        if (ctx == null) return Unauthorized();
+        if (!_permissionService.CanEdit(ctx, PgiaResources.Designacao)) return Forbid();
+        if (!_permissionService.CanAccessOrgao(ctx, orgaoId)) return Forbid();
+
+        return Ok(await _service.AtualizarResponsavelIaAsync(orgaoId, designacaoId, dto, ctx.Email));
+    }
+
+    /// <summary>
+    /// Completa ou corrige o ato de uma designação de Encarregado de Dados
+    /// </summary>
+    [HttpPut("{orgaoId:long}/encarregado-dados/{designacaoId:long}")]
+    public async Task<IActionResult> AtualizarEncarregadoDados(long orgaoId, long designacaoId, [FromBody] PgiaDesignacaoAtualizarDTO dto)
+    {
+        var ctx = await GetContextAsync();
+        if (ctx == null) return Unauthorized();
+        if (!_permissionService.CanEdit(ctx, PgiaResources.Designacao)) return Forbid();
+        if (!_permissionService.CanAccessOrgao(ctx, orgaoId)) return Forbid();
+
+        return Ok(await _service.AtualizarEncarregadoDadosAsync(orgaoId, designacaoId, dto, ctx.Email));
+    }
+
+    /// <summary>
+    /// Histórico de designações de Curador de Dados de Negócio do órgão
+    /// </summary>
+    [HttpGet("{orgaoId:long}/curador-dados")]
+    public async Task<IActionResult> ListarCuradoresDados(long orgaoId)
+    {
+        var ctx = await GetContextAsync();
+        if (ctx == null) return Unauthorized();
+        if (!_permissionService.CanView(ctx, PgiaResources.CuradorDados)) return Forbid();
+        if (!_permissionService.CanAccessOrgao(ctx, orgaoId)) return Forbid();
+
+        return Ok(await _service.ListarCuradoresDadosAsync(orgaoId));
+    }
+
+    /// <summary>
+    /// Designa o Curador de Dados de Negócio do órgão (titular ou suplente)
+    /// </summary>
+    [HttpPost("{orgaoId:long}/curador-dados")]
+    public async Task<IActionResult> DesignarCuradorDados(long orgaoId, [FromBody] PgiaDesignacaoCreateDTO dto)
+    {
+        var ctx = await GetContextAsync();
+        if (ctx == null) return Unauthorized();
+        if (!_permissionService.CanCreate(ctx, PgiaResources.CuradorDados)) return Forbid();
+        if (!_permissionService.CanAccessOrgao(ctx, orgaoId)) return Forbid();
+
+        return Ok(await _service.DesignarCuradorDadosAsync(orgaoId, dto, ctx.Email));
+    }
+
+    /// <summary>
+    /// Completa ou corrige o ato de uma designação de Curador de Dados de Negócio
+    /// </summary>
+    [HttpPut("{orgaoId:long}/curador-dados/{designacaoId:long}")]
+    public async Task<IActionResult> AtualizarCuradorDados(long orgaoId, long designacaoId, [FromBody] PgiaDesignacaoAtualizarDTO dto)
+    {
+        var ctx = await GetContextAsync();
+        if (ctx == null) return Unauthorized();
+        if (!_permissionService.CanEdit(ctx, PgiaResources.CuradorDados)) return Forbid();
+        if (!_permissionService.CanAccessOrgao(ctx, orgaoId)) return Forbid();
+
+        return Ok(await _service.AtualizarCuradorDadosAsync(orgaoId, designacaoId, dto, ctx.Email));
+    }
+
+    /// <summary>
     /// Painel de prazos de conformidade do órgão (arts. 26, § 3º, 35 e 37)
     /// </summary>
     [HttpGet("{orgaoId:long}/prazos")]

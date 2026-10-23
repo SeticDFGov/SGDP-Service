@@ -15,8 +15,13 @@ public interface IPgiaOrgaoService
 
     Task<PgiaDesignacaoResponse> DesignarResponsavelIaAsync(long orgaoId, PgiaResponsavelIaCreateDTO dto, string userEmail);
     Task<List<PgiaDesignacaoResponse>> ListarResponsaveisIaAsync(long orgaoId);
+    Task<PgiaDesignacaoResponse> AtualizarResponsavelIaAsync(long orgaoId, long designacaoId, PgiaResponsavelIaAtualizarDTO dto, string userEmail);
     Task<PgiaDesignacaoResponse> DesignarEncarregadoDadosAsync(long orgaoId, PgiaDesignacaoCreateDTO dto, string userEmail);
     Task<List<PgiaDesignacaoResponse>> ListarEncarregadosDadosAsync(long orgaoId);
+    Task<PgiaDesignacaoResponse> AtualizarEncarregadoDadosAsync(long orgaoId, long designacaoId, PgiaDesignacaoAtualizarDTO dto, string userEmail);
+    Task<PgiaDesignacaoResponse> DesignarCuradorDadosAsync(long orgaoId, PgiaDesignacaoCreateDTO dto, string userEmail);
+    Task<List<PgiaDesignacaoResponse>> ListarCuradoresDadosAsync(long orgaoId);
+    Task<PgiaDesignacaoResponse> AtualizarCuradorDadosAsync(long orgaoId, long designacaoId, PgiaDesignacaoAtualizarDTO dto, string userEmail);
 
     Task<List<PgiaPrazoResponse>> ListarPrazosOrgaoAsync(long orgaoId);
     Task<List<PgiaPrazoResponse>> ListarPrazosCentraisAsync();

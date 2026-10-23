@@ -114,7 +114,7 @@ public class AuthRepositorio : IAuthRepositorio
         }
     }
 
-    // Responsável de IA e Encarregado de Dados vigentes têm a unidade travada à
+    // Responsável de IA, Encarregado de Dados e Curador de Dados vigentes têm a unidade travada à
     // designação (PgiaGovernancaService.GarantirQueNaoOrfanizaDesignacaoAsync); o
     // login não deve sobrescrever silenciosamente algo que a troca manual recusa.
     private async Task<bool> TemDesignacaoVigenteAsync(Guid userId)
@@ -123,8 +123,13 @@ public class AuthRepositorio : IAuthRepositorio
             .AnyAsync(r => r.AgenteId == userId && r.Ativo);
         if (ehResponsavel) return true;
 
-        return await _context.PgiaEncarregadosDados
+        var ehEncarregado = await _context.PgiaEncarregadosDados
             .AnyAsync(e => e.AgenteId == userId && e.Ativo);
+        if (ehEncarregado) return true;
+
+        // Curador de Dados de Negócio: a mesma trava (a C7 passou a considerá-lo)
+        return await _context.PgiaCuradoresDados
+            .AnyAsync(c => c.AgenteId == userId && c.Ativo);
     }
 
     public async Task CriarUnidade(UnidadeDTO unidade)

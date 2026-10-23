@@ -89,16 +89,23 @@ public static class PgiaModelConfiguration
 
         modelBuilder.Entity<PgiaResponsavelIa>(entity =>
         {
-            entity.ToTable("pgia_responsavel_ia");
+            entity.ToTable("pgia_responsavel_ia", t =>
+            {
+                t.HasCheckConstraint("ck_pgia_responsavel_ia_posicao", PgiaModelChecks.Posicao);
+                t.HasCheckConstraint("ck_pgia_responsavel_ia_ato_pendente", PgiaModelChecks.AtoPendente);
+            });
 
             entity.HasKey(r => r.Id).HasName("pk_pgia_responsavel_ia");
             entity.Property(r => r.Id).HasColumnName("id").UseIdentityByDefaultColumn();
             entity.Property(r => r.OrgaoId).HasColumnName("orgao_id");
             entity.Property(r => r.AgenteId).HasColumnName("agente_id");
-            entity.Property(r => r.AtoTipo).HasColumnName("ato_tipo").HasMaxLength(30).IsRequired();
-            entity.Property(r => r.AtoNumero).HasColumnName("ato_numero").HasMaxLength(30).IsRequired();
+            entity.Property(r => r.Posicao).HasColumnName("posicao").HasMaxLength(10).IsRequired()
+                .HasDefaultValue(PgiaDominios.PosicaoDesignacao.Titular);
+            entity.Property(r => r.AtoPendente).HasColumnName("ato_pendente").HasDefaultValue(false);
+            entity.Property(r => r.AtoTipo).HasColumnName("ato_tipo").HasMaxLength(30);
+            entity.Property(r => r.AtoNumero).HasColumnName("ato_numero").HasMaxLength(30);
             entity.Property(r => r.AtoData).HasColumnName("ato_data");
-            entity.Property(r => r.ProcessoSeiComunicacao).HasColumnName("processo_sei_comunicacao").HasMaxLength(25).IsRequired();
+            entity.Property(r => r.ProcessoSeiComunicacao).HasColumnName("processo_sei_comunicacao").HasMaxLength(25);
             entity.Property(r => r.DataComunicacaoSgdi).HasColumnName("data_comunicacao_sgdi");
             entity.Property(r => r.AcumulaFuncaoTic).HasColumnName("acumula_funcao_tic").HasDefaultValue(false);
             entity.Property(r => r.CapacitacaoAdequada).HasColumnName("capacitacao_adequada");
@@ -110,10 +117,11 @@ public static class PgiaModelConfiguration
             entity.Property(r => r.AlteradoEm).HasColumnName("alterado_em");
             entity.Property(r => r.AlteradoPor).HasColumnName("alterado_por").HasMaxLength(200);
 
-            // Índice único parcial: uma designação ativa por órgão (ux_responsavel_ia_vigente do schema)
+            // Índice único parcial: um titular e um suplente vigentes por órgão (era uma
+            // designação ativa por órgão, ux_responsavel_ia_vigente do schema)
             if (indicesRelacionais)
             {
-                entity.HasIndex(r => r.OrgaoId)
+                entity.HasIndex(r => new { r.OrgaoId, r.Posicao })
                     .IsUnique()
                     .HasFilter("ativo")
                     .HasDatabaseName("ux_pgia_responsavel_ia_vigente");
@@ -146,16 +154,23 @@ public static class PgiaModelConfiguration
 
         modelBuilder.Entity<PgiaEncarregadoDados>(entity =>
         {
-            entity.ToTable("pgia_encarregado_dados");
+            entity.ToTable("pgia_encarregado_dados", t =>
+            {
+                t.HasCheckConstraint("ck_pgia_encarregado_dados_posicao", PgiaModelChecks.Posicao);
+                t.HasCheckConstraint("ck_pgia_encarregado_dados_ato_pendente", PgiaModelChecks.AtoPendente);
+            });
 
             entity.HasKey(e => e.Id).HasName("pk_pgia_encarregado_dados");
             entity.Property(e => e.Id).HasColumnName("id").UseIdentityByDefaultColumn();
             entity.Property(e => e.OrgaoId).HasColumnName("orgao_id");
             entity.Property(e => e.AgenteId).HasColumnName("agente_id");
-            entity.Property(e => e.AtoTipo).HasColumnName("ato_tipo").HasMaxLength(30).IsRequired();
-            entity.Property(e => e.AtoNumero).HasColumnName("ato_numero").HasMaxLength(30).IsRequired();
+            entity.Property(e => e.Posicao).HasColumnName("posicao").HasMaxLength(10).IsRequired()
+                .HasDefaultValue(PgiaDominios.PosicaoDesignacao.Titular);
+            entity.Property(e => e.AtoPendente).HasColumnName("ato_pendente").HasDefaultValue(false);
+            entity.Property(e => e.AtoTipo).HasColumnName("ato_tipo").HasMaxLength(30);
+            entity.Property(e => e.AtoNumero).HasColumnName("ato_numero").HasMaxLength(30);
             entity.Property(e => e.AtoData).HasColumnName("ato_data");
-            entity.Property(e => e.ProcessoSeiComunicacao).HasColumnName("processo_sei_comunicacao").HasMaxLength(25).IsRequired();
+            entity.Property(e => e.ProcessoSeiComunicacao).HasColumnName("processo_sei_comunicacao").HasMaxLength(25);
             entity.Property(e => e.DataComunicacaoSgdi).HasColumnName("data_comunicacao_sgdi");
             entity.Property(e => e.InicioVigencia).HasColumnName("inicio_vigencia");
             entity.Property(e => e.FimVigencia).HasColumnName("fim_vigencia");
@@ -167,7 +182,7 @@ public static class PgiaModelConfiguration
 
             if (indicesRelacionais)
             {
-                entity.HasIndex(e => e.OrgaoId)
+                entity.HasIndex(e => new { e.OrgaoId, e.Posicao })
                     .IsUnique()
                     .HasFilter("ativo")
                     .HasDatabaseName("ux_pgia_encarregado_vigente");
@@ -195,6 +210,68 @@ public static class PgiaModelConfiguration
                 .HasForeignKey(e => e.DocumentoId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_pgia_encarregado_doc");
+        });
+
+        // Curador de Dados de Negócio: mesmo desenho do Encarregado de Dados, com a
+        // posição (titular ou suplente) e a marca do ato pendente da carga da planilha
+        modelBuilder.Entity<PgiaCuradorDados>(entity =>
+        {
+            entity.ToTable("pgia_curador_dados", t =>
+            {
+                t.HasCheckConstraint("ck_pgia_curador_dados_posicao", PgiaModelChecks.Posicao);
+                t.HasCheckConstraint("ck_pgia_curador_dados_ato_pendente", PgiaModelChecks.AtoPendente);
+            });
+
+            entity.HasKey(c => c.Id).HasName("pk_pgia_curador_dados");
+            entity.Property(c => c.Id).HasColumnName("id").UseIdentityByDefaultColumn();
+            entity.Property(c => c.OrgaoId).HasColumnName("orgao_id");
+            entity.Property(c => c.AgenteId).HasColumnName("agente_id");
+            entity.Property(c => c.Posicao).HasColumnName("posicao").HasMaxLength(10).IsRequired()
+                .HasDefaultValue(PgiaDominios.PosicaoDesignacao.Titular);
+            entity.Property(c => c.AtoPendente).HasColumnName("ato_pendente").HasDefaultValue(false);
+            entity.Property(c => c.AtoTipo).HasColumnName("ato_tipo").HasMaxLength(30);
+            entity.Property(c => c.AtoNumero).HasColumnName("ato_numero").HasMaxLength(30);
+            entity.Property(c => c.AtoData).HasColumnName("ato_data");
+            entity.Property(c => c.ProcessoSeiComunicacao).HasColumnName("processo_sei_comunicacao").HasMaxLength(25);
+            entity.Property(c => c.DataComunicacaoSgdi).HasColumnName("data_comunicacao_sgdi");
+            entity.Property(c => c.InicioVigencia).HasColumnName("inicio_vigencia");
+            entity.Property(c => c.FimVigencia).HasColumnName("fim_vigencia");
+            entity.Property(c => c.Ativo).HasColumnName("ativo").HasDefaultValue(true);
+            entity.Property(c => c.CriadoEm).HasColumnName("criado_em").HasDefaultValueSql("NOW()");
+            entity.Property(c => c.CriadoPor).HasColumnName("criado_por").HasMaxLength(200);
+            entity.Property(c => c.AlteradoEm).HasColumnName("alterado_em");
+            entity.Property(c => c.AlteradoPor).HasColumnName("alterado_por").HasMaxLength(200);
+
+            if (indicesRelacionais)
+            {
+                entity.HasIndex(c => new { c.OrgaoId, c.Posicao })
+                    .IsUnique()
+                    .HasFilter("ativo")
+                    .HasDatabaseName("ux_pgia_curador_dados_vigente");
+            }
+            entity.HasIndex(c => c.AgenteId).HasDatabaseName("ix_pgia_curador_dados_agente");
+
+            entity.HasOne(c => c.Orgao)
+                .WithMany()
+                .HasForeignKey(c => c.OrgaoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pgia_curador_dados_orgao");
+
+            entity.HasOne(c => c.Agente)
+                .WithMany()
+                .HasForeignKey(c => c.AgenteId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pgia_curador_dados_agente");
+
+            entity.Property(c => c.DocumentoId).HasColumnName("documento_id");
+            entity.HasIndex(c => c.DocumentoId).HasDatabaseName("ix_pgia_curador_dados_doc");
+
+            // Restrict, como nas demais FKs de documento do módulo: a cópia do ato é prova
+            entity.HasOne<PgiaDocumento>()
+                .WithMany()
+                .HasForeignKey(c => c.DocumentoId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_pgia_curador_dados_doc");
         });
 
         modelBuilder.Entity<PgiaPrazoConformidade>(entity =>
@@ -1287,4 +1364,23 @@ public static class PgiaModelConfiguration
                 .HasConstraintName("fk_pgia_solicitacao_agente");
         });
     }
+}
+
+/// <summary>
+/// CHECKs comuns às três designações do órgão (Responsável de IA, Encarregado de
+/// Dados e Curador de Dados de Negócio). O texto é o mesmo nas três tabelas.
+/// </summary>
+public static class PgiaModelChecks
+{
+    /// <summary>Posição da designação: titular ou suplente.</summary>
+    public const string Posicao = "posicao IN ('Titular','Suplente')";
+
+    /// <summary>
+    /// Os campos do ato, da comunicação à SGDI e do início da vigência só podem ficar
+    /// nulos com a marca de ato pendente ligada (linhas da carga da planilha da SGDI).
+    /// </summary>
+    public const string AtoPendente =
+        "ato_pendente OR (ato_tipo IS NOT NULL AND ato_numero IS NOT NULL AND ato_data IS NOT NULL " +
+        "AND processo_sei_comunicacao IS NOT NULL AND data_comunicacao_sgdi IS NOT NULL " +
+        "AND inicio_vigencia IS NOT NULL)";
 }

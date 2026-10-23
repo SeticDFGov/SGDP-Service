@@ -221,6 +221,37 @@ public class PgiaGovernancaRepositorio : IPgiaGovernancaRepositorio
             .FirstOrDefaultAsync(e => e.AgenteId == agenteId && e.Ativo);
     }
 
+    public async Task<List<PgiaFuncaoVigente>> ListarFuncoesVigentesAsync(IEnumerable<Guid> agenteIds)
+    {
+        var ids = agenteIds.Distinct().ToList();
+        if (ids.Count == 0) return new List<PgiaFuncaoVigente>();
+
+        var funcoes = new List<PgiaFuncaoVigente>();
+        funcoes.AddRange(await FuncoesAsync(_context.PgiaResponsaveisIa, ids, PgiaDominios.TipoDesignacao.ResponsavelIa));
+        funcoes.AddRange(await FuncoesAsync(_context.PgiaEncarregadosDados, ids, PgiaDominios.TipoDesignacao.EncarregadoDados));
+        funcoes.AddRange(await FuncoesAsync(_context.PgiaCuradoresDados, ids, PgiaDominios.TipoDesignacao.CuradorDados));
+        return funcoes;
+    }
+
+    private static async Task<List<PgiaFuncaoVigente>> FuncoesAsync<T>(IQueryable<T> tabela, List<Guid> ids, string tipo)
+        where T : class, IPgiaDesignacao
+    {
+        return await tabela
+            .Where(d => d.Ativo && ids.Contains(d.AgenteId))
+            .Select(d => new PgiaFuncaoVigente
+            {
+                AgenteId = d.AgenteId,
+                Tipo = tipo,
+                DesignacaoId = d.Id,
+                Posicao = d.Posicao,
+                AtoPendente = d.AtoPendente,
+                OrgaoId = d.OrgaoId,
+                OrgaoSigla = d.Orgao!.Sigla,
+                OrgaoUnidadeId = d.Orgao!.UnidadeId
+            })
+            .ToListAsync();
+    }
+
     // ── Apoio ─────────────────────────────────────────────────────────────────
 
     public async Task<List<PgiaSistemaIa>> ListarSistemasAsync()

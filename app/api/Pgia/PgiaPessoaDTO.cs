@@ -68,6 +68,32 @@ public class PgiaPessoaAcesso
     // A pessoa entra no PGIA pela role "pgia" do grupo no Keycloak (retrato do último
     // login) — gerido no Keycloak, só leitura aqui.
     public bool AcessoModuloKeycloak { get; set; }
+
+    // Funções vigentes da pessoa no PGIA: as designações dela (Responsável de IA,
+    // Encarregado de Dados, Curador de Dados de Negócio), com a posição e o órgão
+    public List<PgiaPessoaFuncao> Funcoes { get; set; } = new();
+}
+
+/// <summary>Uma designação vigente de uma pessoa, como a tela "Pessoas e acessos" mostra.</summary>
+public class PgiaPessoaFuncao
+{
+    // "responsavel_ia", "encarregado_dados" ou "curador_dados"
+    public string Designacao { get; set; } = string.Empty;
+
+    // "Responsável de IA", "Encarregado de Dados" ou "Curador de Dados de Negócio"
+    public string DesignacaoNome { get; set; } = string.Empty;
+
+    public long DesignacaoId { get; set; }
+
+    // "Titular" ou "Suplente"
+    public string Posicao { get; set; } = string.Empty;
+
+    // Importada da planilha da SGDI com o ato ainda a completar
+    public bool AtoPendente { get; set; }
+
+    public long OrgaoId { get; set; }
+
+    public string OrgaoSigla { get; set; } = string.Empty;
 }
 
 /// <summary>

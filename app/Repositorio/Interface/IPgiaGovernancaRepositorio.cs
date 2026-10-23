@@ -3,6 +3,27 @@ using Models.Pgia;
 
 namespace Repositorio.Interface;
 
+/// <summary>Uma designação vigente de uma pessoa (projeção das três tabelas de designação).</summary>
+public class PgiaFuncaoVigente
+{
+    public Guid AgenteId { get; set; }
+
+    // PgiaDominios.TipoDesignacao (responsavel_ia, encarregado_dados, curador_dados)
+    public string Tipo { get; set; } = string.Empty;
+
+    public long DesignacaoId { get; set; }
+
+    public string Posicao { get; set; } = string.Empty;
+
+    public bool AtoPendente { get; set; }
+
+    public long OrgaoId { get; set; }
+
+    public string OrgaoSigla { get; set; } = string.Empty;
+
+    public Guid? OrgaoUnidadeId { get; set; }
+}
+
 public interface IPgiaGovernancaRepositorio
 {
     // Deliberações do CGTIC (art. 7º)
@@ -82,6 +103,13 @@ public interface IPgiaGovernancaRepositorio
     Task<PgiaResponsavelIa?> GetResponsavelVigenteDoAgenteAsync(Guid agenteId);
 
     Task<PgiaEncarregadoDados?> GetEncarregadoVigenteDoAgenteAsync(Guid agenteId);
+
+    /// <summary>
+    /// Designações vigentes (Responsável de IA, Encarregado de Dados e Curador de Dados
+    /// de Negócio, titular ou suplente) das pessoas informadas, em três consultas fixas
+    /// (uma por tabela), sem uma ida ao banco por pessoa.
+    /// </summary>
+    Task<List<PgiaFuncaoVigente>> ListarFuncoesVigentesAsync(IEnumerable<Guid> agenteIds);
 
     // Apoio: existência das entidades referenciadas
     Task<PgiaSistemaIa?> GetSistemaByIdAsync(long id);

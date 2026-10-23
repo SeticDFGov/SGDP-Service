@@ -142,6 +142,55 @@ public static class PgiaDominios
         };
     }
 
+    /// <summary>
+    /// Posição da pessoa numa designação (Responsável de IA, Encarregado de Dados e
+    /// Curador de Dados de Negócio): cada órgão tem no máximo um titular e um suplente
+    /// vigentes de cada designação (índices únicos parciais por órgão e posição).
+    /// </summary>
+    public static class PosicaoDesignacao
+    {
+        public const string Titular = "Titular";
+        public const string Suplente = "Suplente";
+
+        public static readonly string[] Todos = { Titular, Suplente };
+
+        /// <summary>
+        /// Lê a posição enviada pela API: vazia vale titular (o front antigo não manda
+        /// o campo); caixa diferente é aceita; fora do domínio devolve null.
+        /// </summary>
+        public static string? Normalizar(string? posicao)
+        {
+            if (string.IsNullOrWhiteSpace(posicao)) return Titular;
+            var valor = posicao.Trim();
+            return Todos.FirstOrDefault(p => string.Equals(p, valor, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    /// <summary>Tipo de designação, como aparece nas funções de cada pessoa.</summary>
+    public static class TipoDesignacao
+    {
+        public const string ResponsavelIa = "responsavel_ia";
+        public const string EncarregadoDados = "encarregado_dados";
+        public const string CuradorDados = "curador_dados";
+
+        public static string Rotulo(string tipo) => tipo switch
+        {
+            ResponsavelIa => "Responsável de IA",
+            EncarregadoDados => "Encarregado de Dados",
+            CuradorDados => "Curador de Dados de Negócio",
+            _ => tipo
+        };
+
+        /// <summary>Ordem de exibição: Responsável, Encarregado, Curador.</summary>
+        public static int Ordem(string tipo) => tipo switch
+        {
+            ResponsavelIa => 0,
+            EncarregadoDados => 1,
+            CuradorDados => 2,
+            _ => 3
+        };
+    }
+
     // D28 — tipo de documento (apoio)
     public static class TipoDocumento
     {
