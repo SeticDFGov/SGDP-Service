@@ -6,11 +6,13 @@ on:
     workflows: ["Build and push image"]
     types: [completed]
     branches: [main]
+  # Execução manual (teste ou reenvio de métricas).
+  workflow_dispatch:
 
 jobs:
   msgram:
-    # Só builds de push na main; workflow_run de PR (inclusive de fork) não roda no self-hosted.
-    if: github.event.workflow_run.event == 'push'
+    # Só builds de push na main (ou execução manual); workflow_run de PR (inclusive de fork) não roda no self-hosted.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'push'
     # O MSG está em IP privado: só o runner da VM alcança.
     runs-on: self-hosted
     env:
@@ -34,7 +36,7 @@ jobs:
       with:
         githubToken: ${{ secrets.GITHUB_TOKEN }}
         msgramServiceToken: ${{ secrets.MSGRAM_SERVICE_TOKEN }}
-        productName: SGDP
+        productName: Produto de Governança - Gedê
         workflowName: Build and push image
         sonarProjectKey: SeticDFGov_SGDP-Service
         sonartoken: ${{ secrets.SONAR_TOKEN }}
