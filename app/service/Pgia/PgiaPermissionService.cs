@@ -8,7 +8,8 @@ namespace service.Pgia;
 
 /// <summary>
 /// Contexto do usuário no módulo PGIA. O papel efetivo considera o perfil admin
-/// do SGDP (acesso total) e, fora isso, apenas Users.PapelPgia.
+/// do SGDP (acesso total) e, fora isso, Users.PapelPgia ou, sem ele, o papel de
+/// órgão de quem tem designação vigente no próprio órgão (PapeisPgia.Efetivo).
 /// </summary>
 public class PgiaUserContext
 {
@@ -110,14 +111,37 @@ public class PgiaPermissionService : IPgiaPermissionService
         {
             // Só órgão ATIVO resolve o escopo: órgão desativado não pode continuar
             // dando acesso ao papel de órgão (falha fechada).
-            ctx.OrgaoId = await _context.PgiaOrgaos
-                .Where(o => o.UnidadeId == ctx.UnidadeId && o.Ativo)
-                .Select(o => (long?)o.Id)
-                .FirstOrDefaultAsync();
+            ctx.OrgaoId = await OrgaoAtivoDaUnidadeAsync(ctx.UnidadeId.Value);
         }
+
+        if (ctx.PapelPgia == null && ctx.OrgaoId != null)
+            ctx.PapelPgia = PapeisPgia.Efetivo(null, await TemDesignacaoVigenteAsync(user.Id, ctx.OrgaoId.Value));
 
         return ctx;
     }
+
+    public async Task<string?> PapelEfetivoAsync(Guid userId, string? papelGravado, Guid? unidadeId)
+    {
+        if (papelGravado != null || unidadeId == null) return papelGravado;
+
+        var orgaoId = await OrgaoAtivoDaUnidadeAsync(unidadeId.Value);
+        if (orgaoId == null) return null;
+
+        return PapeisPgia.Efetivo(null, await TemDesignacaoVigenteAsync(userId, orgaoId.Value));
+    }
+
+    private Task<long?> OrgaoAtivoDaUnidadeAsync(Guid unidadeId) =>
+        _context.PgiaOrgaos
+            .Where(o => o.UnidadeId == unidadeId && o.Ativo)
+            .Select(o => (long?)o.Id)
+            .FirstOrDefaultAsync();
+
+    // Titular ou suplente, com ou sem ato pendente: a designação da carga também vale.
+    // Só no órgão da própria unidade, para o papel nunca abrir o escopo de outro órgão.
+    private async Task<bool> TemDesignacaoVigenteAsync(Guid userId, long orgaoId) =>
+        await _context.PgiaResponsaveisIa.AnyAsync(r => r.AgenteId == userId && r.OrgaoId == orgaoId && r.Ativo)
+        || await _context.PgiaEncarregadosDados.AnyAsync(e => e.AgenteId == userId && e.OrgaoId == orgaoId && e.Ativo)
+        || await _context.PgiaCuradoresDados.AnyAsync(c => c.AgenteId == userId && c.OrgaoId == orgaoId && c.Ativo);
 
     public bool CanView(PgiaUserContext ctx, string resource)
     {

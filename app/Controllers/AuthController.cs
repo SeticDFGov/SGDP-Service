@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Text.Json;
 using api.Auth;
 using app.Auth;
@@ -19,14 +19,17 @@ public class AuthController : ControllerBase
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly AuthSettings _authSettings;
     private readonly IAcessoModuloService _acessoModuloService;
+    private readonly IPgiaPermissionService _pgiaPermissionService;
 
     public AuthController(IAuthRepositorio authRepositorio, IHttpClientFactory httpClientFactory,
-        IOptions<AuthSettings> authSettings, IAcessoModuloService acessoModuloService)
+        IOptions<AuthSettings> authSettings, IAcessoModuloService acessoModuloService,
+        IPgiaPermissionService pgiaPermissionService)
     {
         _authRepositorio = authRepositorio;
         _httpClientFactory = httpClientFactory;
         _authSettings = authSettings.Value;
         _acessoModuloService = acessoModuloService;
+        _pgiaPermissionService = pgiaPermissionService;
     }
 
     private string KeycloakTokenUrl => $"{_authSettings.Authority}/protocol/openid-connect/token";
@@ -111,6 +114,10 @@ public class AuthController : ControllerBase
         // Keycloak, por exemplo) sai da fila de quem decide
         await _acessoModuloService.EncerrarPedidosAtendidosAsync(user.Id, modulos, null, user.PapelPgia);
 
+        // PapelPgia é o papel que vale (o gravado ou, sem ele, o de órgão de quem tem
+        // designação vigente no próprio órgão): é por ele que o front monta o PGIA
+        var papelPgia = await _pgiaPermissionService.PapelEfetivoAsync(user.Id, user.PapelPgia, user.Unidade?.id);
+
         // PapelPgia, AcessoPgia, PapelContratacoes e Modulos são campos adicionais na
         // resposta; AcessoPgia passou a ser o acesso efetivo ao módulo PGIA
         return Ok(new
@@ -119,7 +126,7 @@ public class AuthController : ControllerBase
             user.Nome,
             user.Email,
             Perfil = perfil,
-            user.PapelPgia,
+            PapelPgia = papelPgia,
             AcessoPgia = modulos.Contains(ModulosSgdp.Pgia),
             user.PapelContratacoes,
             user.Unidade,
