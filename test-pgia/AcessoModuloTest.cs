@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using api.Acesso;
 using app.Auth;
 using app.Models;
@@ -513,7 +513,7 @@ public class AcessoModuloTest : PgiaTestBase
     private AuthController ComoMe(ClaimsPrincipal principal)
     {
         var controller = new AuthController(
-            new AuthRepositorio(Context), null!, Options.Create(new AuthSettings()), _service);
+            new AuthRepositorio(Context), null!, Options.Create(new AuthSettings()), _service, new PgiaPermissionService(Context));
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext { User = principal }
@@ -899,7 +899,7 @@ public class AcessoModuloTest : PgiaTestBase
         Assert.Equal(new[] { ModulosSgdp.Demandas }, transformado.FindAll(ModulosSgdp.ClaimModulo).Select(c => c.Value));
 
         // /me do admin: Modulos já traz o módulo novo, sem ler tabela nova
-        var me = new AuthController(new AuthRepositorio(contexto), null!, Options.Create(new AuthSettings()), acessos)
+        var me = new AuthController(new AuthRepositorio(contexto), null!, Options.Create(new AuthSettings()), acessos, new PgiaPermissionService(contexto))
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = principalAdmin } }
         };

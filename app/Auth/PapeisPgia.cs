@@ -1,8 +1,9 @@
-namespace app.Auth;
+﻿namespace app.Auth;
 
 /// <summary>
 /// Papéis do módulo PGIA (Decreto nº 48.901/2026), guardados em Users.PapelPgia.
-/// Não são perfis do SGDP nem roles do Keycloak.
+/// Não são perfis do SGDP nem roles do Keycloak. O papel de órgão também pode vir
+/// da designação vigente, sem nada gravado (ver <see cref="Efetivo"/>).
 /// </summary>
 public static class PapeisPgia
 {
@@ -15,4 +16,14 @@ public static class PapeisPgia
 
     public static bool EhValido(string? papel) =>
         papel == null || Todos.Contains(papel);
+
+    /// <summary>
+    /// Papel que vale no PGIA: o gravado em Users.PapelPgia; sem ele, quem é
+    /// Responsável de IA, Encarregado de Dados ou Curador de Dados de Negócio vigente
+    /// no órgão da própria unidade age como <see cref="Orgao"/>. Assim a carga das
+    /// designações não grava papel no banco: o acesso ao módulo continua vindo do
+    /// Keycloak (role pgia) e o papel acompanha a designação (encerrou, some).
+    /// </summary>
+    public static string? Efetivo(string? gravado, bool temDesignacaoVigenteNoOrgao) =>
+        gravado ?? (temDesignacaoVigenteNoOrgao ? Orgao : null);
 }

@@ -1,4 +1,4 @@
-using Models.Pgia;
+﻿using Models.Pgia;
 using service.Pgia;
 
 namespace service.Interface;
@@ -11,6 +11,13 @@ public interface IPgiaPermissionService
     /// usuário. Null se o usuário não existir.
     /// </summary>
     Task<PgiaUserContext?> GetContextAsync(string email, string perfil);
+
+    /// <summary>
+    /// Papel PGIA que vale para o usuário (<see cref="app.Auth.PapeisPgia.Efetivo"/>): o
+    /// gravado ou, sem ele, pgia_orgao para quem tem designação vigente no órgão ativo
+    /// da própria unidade. Usado pelo contexto do PGIA e pelo GET /api/Auth/me.
+    /// </summary>
+    Task<string?> PapelEfetivoAsync(Guid userId, string? papelGravado, Guid? unidadeId);
 
     bool CanView(PgiaUserContext ctx, string resource);
     bool CanCreate(PgiaUserContext ctx, string resource);

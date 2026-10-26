@@ -63,6 +63,8 @@ Pedido do usuário: o botão "Pedir acesso" do card registra um pedido (módulo 
 
 **Modelo de administração (decisão do dono do produto, a própria SGDI): a SGDI pré-cadastra tudo e entrega o órgão pronto; o papel de órgão só faz as designações.** Vale para os dados do órgão (`orgao_dados`), os dados de agente público (`agente_info`) e o vínculo de acesso das pessoas (`pessoa_vinculo`) — detalhe da matriz no fim deste arquivo.
 
+- **Papel de órgão pela designação (2026-10-25):** o acesso ao PGIA e a unidade ficam com o Keycloak (role `pgia` do client e grupo); a carga da planilha da SGDI deixou de gravar `PapelPgia`. `PapeisPgia.Efetivo(gravado, designado)`: vale o papel gravado; sem ele, quem é Responsável de IA, Encarregado de Dados ou Curador de Dados de Negócio **vigente** (titular ou suplente, com ou sem ato pendente) no **órgão ativo da própria unidade** age como `pgia_orgao`. Calculado em `PgiaPermissionService.GetContextAsync` e em `PapelEfetivoAsync`, que o `GET /api/Auth/me` usa no campo `PapelPgia` (o `AuthController` recebe o `IPgiaPermissionService`); **não abre o módulo** (`CalcularModulos` não mudou: sem a role, sem concessão e sem papel gravado, o PGIA não aparece) e nada é gravado. Designação em outro órgão, encerrada ou de órgão desativado não dá papel. Testes: `test-pgia/PgiaPapelPelaDesignacaoTest.cs`.
+
 ## Arquitetura e convenções
 
 - Camadas: **Controller fino → Service (interface em `service/Interface`) → Repositório (interface em `Repositorio/Interface`) → `AppDbContext`**. Registrar tudo no `Program.cs` junto dos existentes (`AddScoped`).

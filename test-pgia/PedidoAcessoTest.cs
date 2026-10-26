@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using api.Acesso;
 using api.Pgia;
 using app.Auth;
@@ -482,7 +482,7 @@ public class PedidoAcessoTest : PgiaTestBase
         var pedido = await Pedir(ModulosSgdp.Pgia);
 
         // A pessoa entrou no grupo do órgão no Keycloak e fez login de novo
-        var controller = new AuthController(new AuthRepositorio(Context), null!, Options.Create(new AuthSettings()), _acessos)
+        var controller = new AuthController(new AuthRepositorio(Context), null!, Options.Create(new AuthSettings()), _acessos, new PgiaPermissionService(Context))
         {
             ControllerContext = new ControllerContext
             {
