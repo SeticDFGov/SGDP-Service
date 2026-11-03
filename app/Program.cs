@@ -222,6 +222,7 @@ var authSettingsSection = builder.Configuration.GetSection(AuthSettings.SectionN
 builder.Services.Configure<AuthSettings>(authSettingsSection);
 var keycloakAuthority = authSettingsSection["Authority"]!;
 var keycloakClientId = authSettingsSection["ClientId"]!;
+var keycloakEmissores = AuthSettings.EmissoresValidos(keycloakAuthority, authSettingsSection["Issuer"]);
 
 // MODO LOCAL (execução independente para testes, sem Keycloak): opt-in explícito
 // via Auth:ModoLocal=true e proibido fora de Development — a aplicação nem sobe.
@@ -250,12 +251,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         }
         else
         {
+            // As chaves vêm do Authority (endereço interno, sem TLS dentro do cluster); o emissor
+            // aceito é o público (login OIDC no navegador) e, na transição, também o Authority
             options.Authority = keycloakAuthority;
             options.RequireHttpsMetadata = false;
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,
-                ValidIssuer = keycloakAuthority,
+                ValidIssuers = keycloakEmissores,
                 ValidateAudience = false,
                 ValidateLifetime = true,
             };
