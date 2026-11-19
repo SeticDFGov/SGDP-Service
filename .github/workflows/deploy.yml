@@ -14,7 +14,8 @@ concurrency:
 
 env:
   IMAGE_NAME: gede-api
-  # Imagens no GitHub Container Registry da organização (ghcr.io/seticdfgov/*), públicas.
+  # Imagens no GitHub Container Registry da organização (ghcr.io/seticdfgov/*), privadas:
+  # o cluster baixa com o Secret ghcr-seticdfgov (k8s-manifests, docs/ghcr.md).
   MANIFEST: backend/deployment.yaml
 
 jobs:
@@ -53,21 +54,6 @@ jobs:
     - name: Push da imagem
       if: github.event_name == 'push'
       run: docker push "$IMAGE"
-
-    # O cluster baixa sem credencial. Se o pacote não for público (todo pacote novo nasce
-    # privado), o deploy para aqui e o manifesto não muda: produção segue na imagem atual.
-    - name: Conferir que a imagem baixa sem login
-      if: github.event_name == 'push'
-      run: |
-        REPO="seticdfgov/${IMAGE_NAME}"
-        # Pacote privado já recusa o token anônimo; sem "|| true" o pipefail encerraria antes do aviso.
-        TOKEN=$(curl -fsS "https://ghcr.io/token?scope=repository:${REPO}:pull" | jq -r '.token // empty' || true)
-        if ! curl -fsS -o /dev/null -H "Authorization: Bearer ${TOKEN}" \
-             -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json" \
-             "https://ghcr.io/v2/${REPO}/manifests/${IMAGE_TAG}"; then
-          echo "::error::A imagem ${IMAGE} não baixa sem login. Torne o pacote público em ${{ github.server_url }}/orgs/SeticDFGov/packages/container/package/${IMAGE_NAME} (Package settings > Change visibility) e rode este workflow de novo."
-          exit 1
-        fi
 
     # O ArgoCD (auto-sync) aplica o que estiver no k8s-manifests; o push aqui é o deploy.
     - name: Update deployment manifest
